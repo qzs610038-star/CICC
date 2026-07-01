@@ -1,0 +1,26 @@
+* text=auto
+
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.S text eol=lf
+*.v text eol=lf
+*.sv text eol=lf
+*.vh text eol=lf
+*.svh text eol=lf
+*.sdc text eol=lf
+*.ld text eol=lf
+Makefile text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.docx binary
