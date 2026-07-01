@@ -1,0 +1,1 @@
+- [Repository CLAUDE guidance](CLAUDE.md) — FPGA competition bundle layout, Efinity project entry point, and simulation commands

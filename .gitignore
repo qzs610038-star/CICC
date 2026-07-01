@@ -1,0 +1,86 @@
+# OS / editor local files
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+.qoder/
+*.tmp
+*.bak
+*.swp
+
+# Efinity outputs and generated databases
+**/outflow/
+**/work_syn/
+**/work_pnr/
+**/work_pt/
+**/work_dbg/
+**/work_sim/
+*.vdb
+*.qdb
+*.db
+*.rs
+*.route.out
+*.place.out
+*.map.out
+*.tcl.out
+*.pgm.out
+*.pinout.csv
+*.interface.csv
+*.raminfo.pb
+*.troutingtraces
+
+# ModelSim / Questa
+**/work/
+**/modelsim/
+transcript
+vsim.wlf
+*.wlf
+*.vcd
+*.gtkw
+modelsim.ini_new
+vish_stacktrace.vstf
+tcl_stacktrace.txt
+
+# RISC-V / C build outputs
+*.o
+*.elf
+*.hex
+*.bin
+*.lst
+*.map
+*.asm
+*.d
+
+# Tool and IDE generated metadata
+.metadata/
+.settings/
+*.launch
+*.prefs
+*.qpg
+*.qtl
+*.pickle
+*.log
+*.rpt
+
+# Large raw archives, installers, and training videos
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.exe
+*.msi
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Local raw material libraries kept outside the collaboration repo by default
+初赛demo/
+赛方提供材料/
+
+# Local tool distributions supplied by the competition package
+赛方提供材料/EDA软件/
+赛方提供材料/EDA软件培训文档及视频/02 efinity培训视频/
+赛方提供材料/efinity-2025.2.288.4.15-windows-x64-patch/
