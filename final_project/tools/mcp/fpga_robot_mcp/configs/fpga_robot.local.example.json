@@ -1,0 +1,40 @@
+{
+  "project_root": "D:/第十届集创赛-雄芯院材料",
+  "efinity": {
+    "home": "D:/Efinity/2025.2",
+    "bin": "D:/Efinity/2025.2/bin",
+    "project_xml": "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml",
+    "constrain_sdc": "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc",
+    "device": "TJ375N529",
+    "timing_model": "I3",
+    "patch_dir": "赛方提供材料/efinity-2025.2.288.4.15-windows-x64-patch",
+    "pgm_fli": "D:/Efinity/2025.2/pgm/fli",
+    "toolchain_prefix": "riscv-none-embed-"
+  },
+  "riscv_ide": {
+    "home": "D:/Efinity/efinity-riscv-ide-2025.2",
+    "toolchain_bin": "D:/Efinity/efinity-riscv-ide-2025.2/toolchain/bin",
+    "openocd": "D:/Efinity/efinity-riscv-ide-2025.2/openocd/bin/openocd.exe",
+    "build_tools": "D:/Efinity/efinity-riscv-ide-2025.2/build_tools/bin"
+  },
+  "board": {
+    "name": "WZZY_FPGA / TJ375N529",
+    "cpu_route": "board_cpu_qcrv32",
+    "uart_candidates": ["JTAG-IF UART", "Type-C UART", "UART2 TO Peripherals"],
+    "gpio_notes": "J13/J15 are 3.3V GPIO candidates; do not connect to myCobot before voltage/protocol confirmation."
+  },
+  "mycobot280": {
+    "baudrate": 1000000,
+    "preferred_vid": "10C4",
+    "model": "MyCobot",
+    "allow_motion": false,
+    "max_speed": 30,
+    "default_port": null
+  },
+  "safety": {
+    "allow_hardware_actions": false,
+    "require_confirm_token": true,
+    "evidence_dir": "final_project/docs/evidence",
+    "formal_review_dir": "方案评审"
+  }
+}

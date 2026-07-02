@@ -1,0 +1,21 @@
+# fpga_robot_mcp — Python 缓存与日志
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# 本地配置（含本机路径，禁止提交）
+configs/fpga_robot.local.json
+
+# 日志
+logs/
+
+# 验证测试临时文件
+tests/verify_imports.py
+tests/verify_tools.py
+
+# IDE
+.idea/
+.vscode/

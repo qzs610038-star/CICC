@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fpga-robot-mcp"
+version = "0.2.0"
+description = "Efinity / 开发板 / myCobot 280 本地 MCP 工具"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "mcp>=1.28.0",
+    "pydantic>=2.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+mycobot = ["pymycobot>=4.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

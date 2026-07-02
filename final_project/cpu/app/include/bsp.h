@@ -1,8 +1,10 @@
 /*==========================================================================
- *  bsp.h  -  Board Support Package for SapphireSoC (QCRV32) on TJ375N529
+ *  bsp.h  -  Provisional Board Support Package for SapphireSoC on TJ375N529
  *
- *  Addresses derived from auto-generated soc.h in:
- *    embedded_sw/qcrv32_soc/bsp/efinix/EfxSapphireSoc/include/soc.h
+ *  These addresses are placeholders for the CPU skeleton. Replace them with
+ *  the final Efinity-generated soc.h values after the SoC configuration is
+ *  locked. The official RISC-V examples contain multiple incompatible maps,
+ *  so do not treat this file as the address source of truth.
  *
  *  UART register layout matches SapphireSoC UART IP:
  *    +0x00 DATA
@@ -30,7 +32,7 @@ static inline uint32_t read_u32(uint32_t addr)
 }
 
 /*--------------------------------------------------------------------------
- *  SoC memory map (from auto-generated soc.h)
+ *  Provisional SoC memory map. Final values must come from generated soc.h.
  *------------------------------------------------------------------------*/
 #define SYSTEM_UART_0_IO_CTRL   0xF8010000u
 #define SYSTEM_GPIO_0_IO_CTRL   0xF8015000u
@@ -40,7 +42,7 @@ static inline uint32_t read_u32(uint32_t addr)
 #define SYSTEM_PLIC_CTRL        0xF8C00000u
 #define IO_APB_SLAVE_0_INPUT    0xF8100000u
 
-/* CLINT clock frequency (from SoC configuration) */
+/* CLINT clock frequency. Final value must come from generated soc.h. */
 #define SYSTEM_CLINT_HZ         100000000u  /* 100 MHz */
 
 /* DDR memory base */

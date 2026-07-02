@@ -1,12 +1,13 @@
 /*==========================================================================
- *  linker.ld  -  Linker script for SapphireSoC (QCRV32) on TJ375N529
+ *  linker.ld  -  Provisional linker script for SapphireSoC on TJ375N529
  *
- *  Memory map:
+ *  Memory map assumption:
  *    - DDR: 0x00000000 - 0x1FFFFFFF (512MB LPDDR4x)
  *    - Peripherals: 0xF0000000 and above
  *
- *  The RISC-V code runs from DDR. Frame buffer is at 0x04000000 (64MB).
- *  Application code is placed at the beginning of DDR (0x00000000).
+ *  Official examples use different run origins depending on the SoC/loader
+ *  flow. Replace this file with the final Efinity-generated linker script
+ *  after CPU boot/download mode is confirmed.
  *==========================================================================*/
 
 OUTPUT_ARCH("riscv")
