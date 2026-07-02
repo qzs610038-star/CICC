@@ -1,0 +1,58 @@
+机械臂官网：https://www.elephantrobotics.com/mycobot-280-arduino-2023/
+夹抓官网：https://www.elephantrobotics.com/mycobot-accessories-grip-pawl-cn/
+
+机械臂技术参数：mycobot-280-arduino-2023
+自由度（DOF）	6
+最大工作半径（mm）	280
+最大负载（g）	250
+净重（g）	860
+重复定位精度（mm）	± 0.5
+寿命时长（h）	500
+电源接口INPUT	DC 12V5A
+主控型号	可扩展Arduino UNO/MEGA/MKR
+主控输入端口（INPUT）	面板IO均为转接功能，视扩展板决定。
+辅控型号	ESP32 *1
+辅控核心参数	240MHz dual core. 600 DMIPS, 520KB SRAM. Wi-Fi, dual mode Bluetooth
+辅控核心Flash	4MB
+辅控核心IO	G19,G21,G22,G23,G25,G33
+自由移动	支持
+关节运动	支持
+笛卡尔运动	支持
+Windows	支持
+Linux	支持
+MAC	支持
+ROS 1	支持
+ROS 2	支持
+Python	支持
+C++	支持
+C#	支持
+JS	支持
+myblockly	支持
+Arduino	支持
+mystudio	支持
+串口控制协议	支持
+关节活动范围	J1-165 ~ +165 
+J2-165 ~ +165
+J3-165 ~ +165 
+J4-165 ~ +165 
+J5-165 ~ +165
+J6-179 ~ +179
+电机编码器类型	12BIT磁编码器
+掉电位置保存	支持
+外壳材质	金属
+齿轮类型	钢
+
+
+夹抓技术参数：myCobot 自适应夹爪
+产品参数
+型号     	myCobot_自适应夹爪	尺寸               	112×94×50mm
+工艺          	ABS注塑	重量               	100g
+夹持范围         	20-45mm	固定方式               	乐高连接件
+最大夹持力       	150g	使用环境要求        	常温常压
+重复精度           	1mm	控制接口               	串口控制
+使用寿命         	一年	适用设备	ER myCobot 280 系列
+ER myPalletizer 260 系列
+ER mechArm 270 系列
+ER myBuddy 280 系列
+驱动方式           	电动 electric
+传动方式          	齿轮＋连杆
