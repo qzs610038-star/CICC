@@ -17,6 +17,10 @@ work_sim/
 *.raminfo.pb
 *.troutingtraces
 
+# Vendor IP generated products (ipm/), keep settings.json/define/tmpl in version control
+fpga/ip_vendor/*/ipm/
+fpga/ip_vendor/*/Testbench/modelsim/
+
 # ModelSim / Questa
 work/
 transcript

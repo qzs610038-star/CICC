@@ -1,0 +1,1086 @@
+{
+    "debug_cores": [
+        {
+            "name": "la0",
+            "type": "la",
+            "uuid": "26e39d2ff12946e7a7c20d8f84381b09",
+            "trigin_en": false,
+            "trigout_en": false,
+            "auto_inserted": true,
+            "capture_control": false,
+            "data_depth": 2048,
+            "input_pipeline": 1,
+            "probes": [
+                {
+                    "name": "ddr_cfg_ok",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ddr_inst_CFG_DONE",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ddr_inst_CFG_RST",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ddr_inst_CFG_START",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ddr_inst_CFG_SEL",
+                    "width": 1,
+                    "probe_type": 1
+                }
+            ]
+        },
+        {
+            "name": "la1",
+            "type": "la",
+            "uuid": "de5c69a17cd346c19b1a494dcbafec77",
+            "trigin_en": false,
+            "trigout_en": false,
+            "auto_inserted": true,
+            "capture_control": false,
+            "data_depth": 2048,
+            "input_pipeline": 1,
+            "probes": [
+                {
+                    "name": "ch0_hs",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ch0_de",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "ch0_vs",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "rx_out_vs",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "rx_out_hs",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "rx_out_data",
+                    "width": 40,
+                    "probe_type": 1
+                },
+                {
+                    "name": "rx_out_de",
+                    "width": 1,
+                    "probe_type": 1
+                }
+            ]
+        },
+        {
+            "name": "la2",
+            "type": "la",
+            "uuid": "573e0f2b3dd545b29ab84b542a1c5b30",
+            "trigin_en": false,
+            "trigout_en": false,
+            "auto_inserted": true,
+            "capture_control": false,
+            "data_depth": 2048,
+            "input_pipeline": 1,
+            "probes": [
+                {
+                    "name": "mipi_rx_ck0_HS_TERM",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_ck0_LP_N_IN",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_ck0_HS_ENA",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_ck0_LP_P_IN",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_FIFO_RD",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_TERM",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_LP_P_IN",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp01_FIFO_EMPTY",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_ENA",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_FIFO_EMPTY",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_LP_N_IN",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_IN",
+                    "width": 8,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_IN",
+                    "width": 8,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_TERM",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_ENA",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp01_FIFO_RD",
+                    "width": 1,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp02_HS_IN",
+                    "width": 8,
+                    "probe_type": 1
+                },
+                {
+                    "name": "mipi_rx_dp03_HS_IN",
+                    "width": 8,
+                    "probe_type": 1
+                }
+            ]
+        }
+    ],
+    "connections": [
+        {
+            "command": "add_ports",
+            "id": 1,
+            "args": {
+                "netlist": "top",
+                "ports": [
+                    {
+                        "name": "jtag_inst2_autodbg_CAPTURE__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_DRCK__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_RESET__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_RUNTEST__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_SEL__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_SHIFT__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_TCK__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_TDI__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_TMS__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_UPDATE__",
+                        "dir": "in",
+                        "width": 1
+                    },
+                    {
+                        "name": "jtag_inst2_autodbg_TDO__",
+                        "dir": "out",
+                        "width": 1
+                    }
+                ]
+            }
+        },
+        {
+            "command": "instantiate",
+            "netlist": "edb_top",
+            "id": 2,
+            "instance": "edb_top_autodbg_inst__"
+        },
+        {
+            "command": "connect",
+            "id": 3,
+            "args": {
+                "instance": "edb_top_autodbg_inst__",
+                "ports": [
+                    {
+                        "name": "bscan_CAPTURE",
+                        "net": "jtag_inst2_autodbg_CAPTURE__"
+                    },
+                    {
+                        "name": "bscan_DRCK",
+                        "net": "jtag_inst2_autodbg_DRCK__"
+                    },
+                    {
+                        "name": "bscan_RESET",
+                        "net": "jtag_inst2_autodbg_RESET__"
+                    },
+                    {
+                        "name": "bscan_RUNTEST",
+                        "net": "jtag_inst2_autodbg_RUNTEST__"
+                    },
+                    {
+                        "name": "bscan_SEL",
+                        "net": "jtag_inst2_autodbg_SEL__"
+                    },
+                    {
+                        "name": "bscan_SHIFT",
+                        "net": "jtag_inst2_autodbg_SHIFT__"
+                    },
+                    {
+                        "name": "bscan_TCK",
+                        "net": "jtag_inst2_autodbg_TCK__"
+                    },
+                    {
+                        "name": "bscan_TDI",
+                        "net": "jtag_inst2_autodbg_TDI__"
+                    },
+                    {
+                        "name": "bscan_TMS",
+                        "net": "jtag_inst2_autodbg_TMS__"
+                    },
+                    {
+                        "name": "bscan_UPDATE",
+                        "net": "jtag_inst2_autodbg_UPDATE__"
+                    },
+                    {
+                        "name": "bscan_TDO",
+                        "net": "jtag_inst2_autodbg_TDO__"
+                    },
+                    {
+                        "name": "la0_clk",
+                        "net": "i_fb_clk",
+                        "path": []
+                    },
+                    {
+                        "name": "la0_probe0",
+                        "net": "ddr_cfg_ok",
+                        "path": []
+                    },
+                    {
+                        "name": "la0_probe1",
+                        "net": "ddr_inst_CFG_DONE",
+                        "path": []
+                    },
+                    {
+                        "name": "la0_probe2",
+                        "net": "ddr_inst_CFG_RST",
+                        "path": []
+                    },
+                    {
+                        "name": "la0_probe3",
+                        "net": "ddr_inst_CFG_START",
+                        "path": []
+                    },
+                    {
+                        "name": "la0_probe4",
+                        "net": "ddr_inst_CFG_SEL",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_clk",
+                        "net": "i_sysclk_div2",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe0",
+                        "net": "ch0_hs",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe1",
+                        "net": "ch0_de",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe2",
+                        "net": "ch0_vs",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe3",
+                        "net": "rx_out_vs",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe4",
+                        "net": "rx_out_hs",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[0]",
+                        "net": "rx_out_data[0]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[1]",
+                        "net": "rx_out_data[1]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[2]",
+                        "net": "rx_out_data[2]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[3]",
+                        "net": "rx_out_data[3]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[4]",
+                        "net": "rx_out_data[4]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[5]",
+                        "net": "rx_out_data[5]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[6]",
+                        "net": "rx_out_data[6]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[7]",
+                        "net": "rx_out_data[7]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[8]",
+                        "net": "rx_out_data[8]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[9]",
+                        "net": "rx_out_data[9]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[10]",
+                        "net": "rx_out_data[10]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[11]",
+                        "net": "rx_out_data[11]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[12]",
+                        "net": "rx_out_data[12]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[13]",
+                        "net": "rx_out_data[13]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[14]",
+                        "net": "rx_out_data[14]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[15]",
+                        "net": "rx_out_data[15]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[16]",
+                        "net": "rx_out_data[16]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[17]",
+                        "net": "rx_out_data[17]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[18]",
+                        "net": "rx_out_data[18]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[19]",
+                        "net": "rx_out_data[19]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[20]",
+                        "net": "rx_out_data[20]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[21]",
+                        "net": "rx_out_data[21]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[22]",
+                        "net": "rx_out_data[22]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[23]",
+                        "net": "rx_out_data[23]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[24]",
+                        "net": "rx_out_data[24]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[25]",
+                        "net": "rx_out_data[25]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[26]",
+                        "net": "rx_out_data[26]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[27]",
+                        "net": "rx_out_data[27]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[28]",
+                        "net": "rx_out_data[28]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[29]",
+                        "net": "rx_out_data[29]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[30]",
+                        "net": "rx_out_data[30]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[31]",
+                        "net": "rx_out_data[31]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[32]",
+                        "net": "rx_out_data[32]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[33]",
+                        "net": "rx_out_data[33]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[34]",
+                        "net": "rx_out_data[34]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[35]",
+                        "net": "rx_out_data[35]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[36]",
+                        "net": "rx_out_data[36]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[37]",
+                        "net": "rx_out_data[37]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[38]",
+                        "net": "rx_out_data[38]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe5[39]",
+                        "net": "rx_out_data[39]",
+                        "path": []
+                    },
+                    {
+                        "name": "la1_probe6",
+                        "net": "rx_out_de",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_clk",
+                        "net": "mipi_rx_ck0_CLKOUT",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe0",
+                        "net": "mipi_rx_ck0_HS_TERM",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe1",
+                        "net": "mipi_rx_ck0_LP_N_IN",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe2",
+                        "net": "mipi_rx_ck0_HS_ENA",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe3",
+                        "net": "mipi_rx_ck0_LP_P_IN",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe4",
+                        "net": "mipi_rx_dp00_FIFO_RD",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe5",
+                        "net": "mipi_rx_dp00_HS_TERM",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe6",
+                        "net": "mipi_rx_dp00_LP_P_IN",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe7",
+                        "net": "mipi_rx_dp01_FIFO_EMPTY",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe8",
+                        "net": "mipi_rx_dp01_HS_ENA",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe9",
+                        "net": "mipi_rx_dp00_FIFO_EMPTY",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe10",
+                        "net": "mipi_rx_dp00_LP_N_IN",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[0]",
+                        "net": "mipi_rx_dp00_HS_IN[0]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[1]",
+                        "net": "mipi_rx_dp00_HS_IN[1]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[2]",
+                        "net": "mipi_rx_dp00_HS_IN[2]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[3]",
+                        "net": "mipi_rx_dp00_HS_IN[3]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[4]",
+                        "net": "mipi_rx_dp00_HS_IN[4]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[5]",
+                        "net": "mipi_rx_dp00_HS_IN[5]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[6]",
+                        "net": "mipi_rx_dp00_HS_IN[6]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe11[7]",
+                        "net": "mipi_rx_dp00_HS_IN[7]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[0]",
+                        "net": "mipi_rx_dp01_HS_IN[0]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[1]",
+                        "net": "mipi_rx_dp01_HS_IN[1]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[2]",
+                        "net": "mipi_rx_dp01_HS_IN[2]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[3]",
+                        "net": "mipi_rx_dp01_HS_IN[3]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[4]",
+                        "net": "mipi_rx_dp01_HS_IN[4]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[5]",
+                        "net": "mipi_rx_dp01_HS_IN[5]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[6]",
+                        "net": "mipi_rx_dp01_HS_IN[6]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe12[7]",
+                        "net": "mipi_rx_dp01_HS_IN[7]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe13",
+                        "net": "mipi_rx_dp01_HS_TERM",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe14",
+                        "net": "mipi_rx_dp00_HS_ENA",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe15",
+                        "net": "mipi_rx_dp01_FIFO_RD",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[0]",
+                        "net": "mipi_rx_dp02_HS_IN[0]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[1]",
+                        "net": "mipi_rx_dp02_HS_IN[1]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[2]",
+                        "net": "mipi_rx_dp02_HS_IN[2]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[3]",
+                        "net": "mipi_rx_dp02_HS_IN[3]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[4]",
+                        "net": "mipi_rx_dp02_HS_IN[4]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[5]",
+                        "net": "mipi_rx_dp02_HS_IN[5]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[6]",
+                        "net": "mipi_rx_dp02_HS_IN[6]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe16[7]",
+                        "net": "mipi_rx_dp02_HS_IN[7]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[0]",
+                        "net": "mipi_rx_dp03_HS_IN[0]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[1]",
+                        "net": "mipi_rx_dp03_HS_IN[1]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[2]",
+                        "net": "mipi_rx_dp03_HS_IN[2]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[3]",
+                        "net": "mipi_rx_dp03_HS_IN[3]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[4]",
+                        "net": "mipi_rx_dp03_HS_IN[4]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[5]",
+                        "net": "mipi_rx_dp03_HS_IN[5]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[6]",
+                        "net": "mipi_rx_dp03_HS_IN[6]",
+                        "path": []
+                    },
+                    {
+                        "name": "la2_probe17[7]",
+                        "net": "mipi_rx_dp03_HS_IN[7]",
+                        "path": []
+                    }
+                ]
+            }
+        }
+    ],
+    "vdbs": [
+        {
+            "file": "debug_top.post.vdb",
+            "instance": "edb_top_autodbg_inst__"
+        }
+    ],
+    "session": {
+        "wizard": {
+            "data_depth": 2048,
+            "capture_control": false,
+            "selected_nets": [
+                {
+                    "name": "ddr_cfg_ok",
+                    "width": 1,
+                    "clk_domain": "i_fb_clk",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ch0_hs",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ch0_de",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ch0_vs",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_ck0_HS_TERM",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_ck0_LP_N_IN",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_ck0_HS_ENA",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_ck0_LP_P_IN",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_FIFO_RD",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_TERM",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_LP_P_IN",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp01_FIFO_EMPTY",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_ENA",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_FIFO_EMPTY",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_LP_N_IN",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_IN",
+                    "width": 8,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": [],
+                    "net_idx_left": 7,
+                    "net_idx_right": 0
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_IN",
+                    "width": 8,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": [],
+                    "net_idx_left": 7,
+                    "net_idx_right": 0
+                },
+                {
+                    "name": "mipi_rx_dp01_HS_TERM",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp00_HS_ENA",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp01_FIFO_RD",
+                    "width": 1,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "mipi_rx_dp02_HS_IN",
+                    "width": 8,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": [],
+                    "net_idx_left": 7,
+                    "net_idx_right": 0
+                },
+                {
+                    "name": "mipi_rx_dp03_HS_IN",
+                    "width": 8,
+                    "clk_domain": "mipi_rx_ck0_CLKOUT",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": [],
+                    "net_idx_left": 7,
+                    "net_idx_right": 0
+                },
+                {
+                    "name": "rx_out_vs",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "rx_out_hs",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "rx_out_data",
+                    "width": 40,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": [],
+                    "net_idx_left": 39,
+                    "net_idx_right": 0
+                },
+                {
+                    "name": "rx_out_de",
+                    "width": 1,
+                    "clk_domain": "i_sysclk_div2",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ddr_inst_CFG_DONE",
+                    "width": 1,
+                    "clk_domain": "i_fb_clk",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ddr_inst_CFG_RST",
+                    "width": 1,
+                    "clk_domain": "i_fb_clk",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ddr_inst_CFG_START",
+                    "width": 1,
+                    "clk_domain": "i_fb_clk",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                },
+                {
+                    "name": "ddr_inst_CFG_SEL",
+                    "width": 1,
+                    "clk_domain": "i_fb_clk",
+                    "selected_probe_type": "DATA AND TRIGGER",
+                    "child": [],
+                    "path": []
+                }
+            ],
+            "top_module": "top",
+            "src": "elaborate",
+            "jtag_user": "USER2",
+            "input_pipeline": 1
+        }
+    }
+}

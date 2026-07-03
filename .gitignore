@@ -9,6 +9,11 @@ Desktop.ini
 *.bak
 *.swp
 
+# Local machine configuration
+final_project/tools/mcp/fpga_robot_mcp/configs/fpga_robot.local.json
+.venv/
+**/.venv/
+
 # Efinity outputs and generated databases
 **/outflow/
 **/work_syn/
