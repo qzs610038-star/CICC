@@ -347,3 +347,35 @@ CPU 第一版职责：
    - 形状分类阈值
 
 建议优先决策：第一版使用轮询寄存器，不做中断；FPGA 输出原始特征，CPU 做最终分类。
+
+---
+
+## 10. 视觉模块实施计划定稿记录（2026-07-03 追加）
+
+经 Gemini 起草 + Claude 四轮审核 + Codex 三轮复核，视觉模块实施计划定稿至 v4.3：
+
+- 计划文件：[`vision_module_implementation_plan.md`](vision_module_implementation_plan.md)（v4.3）
+- 审核记录：[`../review_packets/gemini_plan_review_2026-07-03.md`](../review_packets/gemini_plan_review_2026-07-03.md)
+- Codex 三次复核结果：[`../review_packets/codex_review_result_vision_module_round3_2026-07-03.md`](../review_packets/codex_review_result_vision_module_round3_2026-07-03.md)
+
+### 已确认方向（第 9 节待决问题的回答）
+
+1. 第一版只处理相机对应显示链路 `wb1_*`（已核实 `top.v` DSI/HDMI 均消费 wb1），`wb0_*` 旁路预留后续侧视；答第 1 项。
+2. CPU 读取采用 `valid`/`ack` + `frame_id` 匹配的轮询机制，首版不做中断；答第 2 项。
+3. 颜色阈值、尺寸/形状分类阈值可经 APB3 比赛当天动态下发；答第 3 项。
+4. FPGA 不直接输出 `dominant_color`，只输出各色 mask 面积，由 CPU 多帧滤波判断；答第 4 项。
+5. FPGA 输出 bbox/面积原始几何特征，不做 `shape_class`，由 CPU 算长宽比/占空比分类；答第 5 项。
+6. OSD 必须叠加：实时 bbox（绿，像素域无 CDC）+ CPU 回写稳态 bbox（红，VSYNC 影子寄存器）+ 中心十字；答第 6 项。
+7. CPU 动态写入：ROI、双边界颜色阈值、亮度门限、CPU OSD bbox，统一走 `CFG_COMMIT`/`CFG_STATUS` 原子提交；答第 7 项。
+
+### Gate 状态
+
+- ✅ **架构方向 Gate 已解除**（Codex 三次确认，2026-07-03）。
+- 🔶 **RTL/SoC 执行前 Gate 保留**：待补 B1 实物前置 `generated_soc_summary_YYYY-MM-DD.md`（UART/CLINT/PLIC/APB/AXI/DDR/时钟/空闲 `io_apbSlave_x`/PADDR/PSLVERROR，且 BSP 占位地址被 soc.h 真源替代）后最终解除。
+- ⚠ OSD 真插 `top.v` 前，**另交小包审查 fanout/timing**；"零改顶层"只对选 `wb1_*` 主通道成立。
+
+### 边界
+
+- 本计划不进首版 RTL：多物体分割、PLIC 中断、FPGA 尺寸分类。
+- `CPU_HEARTBEAT` 看门狗超时仅重置视觉状态机，**禁止触发 myCobot 急停/动作**。
+- 解除 RTL/SoC Gate 前，不进 SoC/IP 配置、不改 `top.v`、不改 CPU BSP 占位地址。
