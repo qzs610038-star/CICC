@@ -65,6 +65,7 @@ TOOL_ACTION_MAP: dict[str, str] = {
     "mycobot280_set_rgb": "MYCOBOT280_SAFE",
     "mycobot280_execute_motion": "MYCOBOT280_SAFE",
     "mycobot280_control_gripper": "MYCOBOT280_SAFE",
+    "mycobot280_stop": "MYCOBOT280_SAFE",
     "board_uart_loopback_test": "UART_LOOPBACK",
 }
 
@@ -190,7 +191,7 @@ class SafetyManager:
                             f"confirm_token '{confirm_token}' 格式不匹配。"
                             f"支持的 action_type: {', '.join(CONFIRM_PREFIXES.keys())}"
                         )
-            self._log_audit(tool_name, level, True, detail=f"confirm_token={confirm_token}")
+            self._log_audit(tool_name, level, True, detail="confirm_token=provided(redacted)")
             return True, "硬件副作用操作已确认，允许执行"
 
         self._log_audit(tool_name, level, False, detail="未知安全等级")

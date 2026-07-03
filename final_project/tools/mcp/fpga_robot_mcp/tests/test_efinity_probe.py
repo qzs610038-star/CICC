@@ -10,6 +10,7 @@ test_efinity_probe — efinity_tools 模块单元测试。
 
 import sys
 from pathlib import Path
+import tempfile
 
 _src = Path(__file__).resolve().parent.parent / "src"
 if str(_src) not in sys.path:
@@ -40,6 +41,24 @@ def test_locate_toolchain_has_found_tools():
     data = result.get("data", result)
     if "found_tools" in data:
         assert isinstance(data["found_tools"], list)
+
+
+def test_locate_toolchain_core_install_not_blocked_by_missing_simulator():
+    """efx_simulate.exe 缺失不应让核心 Efinity 安装被判为失败。"""
+    result = efinity_tools.locate_toolchain()
+    data = result.get("data", {})
+    checks = data.get("checks", {})
+    if (
+        checks.get("home_dir")
+        and checks.get("bin_dir")
+        and checks.get("efx_map.exe")
+        and checks.get("efx_pgm.exe")
+        and checks.get("efx_pnr.exe")
+        and checks.get("efx_run.bat")
+        and not checks.get("efx_simulate.exe")
+    ):
+        assert data.get("is_installed") is True
+        assert result.get("status") == "ok"
 
 
 def test_check_install_prereq_returns_dict():
@@ -111,6 +130,21 @@ def test_list_artifacts_returns_list():
     data = result.get("data", {})
     if "artifacts" in data:
         assert isinstance(data["artifacts"], list)
+
+
+def test_program_bitstream_rejects_unaligned_cli():
+    """自动烧录不能再调用旧的 efx_pgm.exe -m ram -p 1 -b 伪命令。"""
+    with tempfile.TemporaryDirectory() as td:
+        bitstream = Path(td) / "dummy.bit"
+        bitstream.write_text("00\n", encoding="ascii")
+        result = efinity_tools.program_bitstream(str(bitstream))
+
+    assert isinstance(result, dict)
+    assert result["status"] in {"programmer_cli_not_aligned", "error"}
+    data = result.get("data", {})
+    if result["status"] == "programmer_cli_not_aligned":
+        assert "ftdi_program.py" in data.get("ftdi_program_path", "")
+        assert "-m ram -p 1 -b" not in data.get("candidate_cli_after_usb_visible", "")
 
 
 if __name__ == "__main__":

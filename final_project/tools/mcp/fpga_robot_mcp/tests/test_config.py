@@ -126,6 +126,15 @@ def test_efinity_toolchain_prefix():
     assert cfg.efinity.toolchain_prefix == "riscv-none-embed-"
 
 
+def test_riscv_ide_defaults_point_to_installed_tool_paths():
+    """RISC-V IDE 默认配置应包含工具链、OpenOCD 和 build tools 路径。"""
+    cfg = get_default_config()
+    assert cfg.riscv_ide.home == "D:/Efinity/efinity-riscv-ide-2025.2"
+    assert cfg.riscv_ide.toolchain_bin.endswith("/toolchain/bin")
+    assert cfg.riscv_ide.openocd.endswith("/openocd/bin/openocd.exe")
+    assert cfg.riscv_ide.build_tools.endswith("/build_tools/bin")
+
+
 def test_safety_defaults():
     """安全配置默认值应禁止硬件操作。"""
     cfg = get_default_config()

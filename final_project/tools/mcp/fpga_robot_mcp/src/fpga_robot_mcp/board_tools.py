@@ -11,6 +11,7 @@ fpga_robot_mcp.board_tools — 开发板 UART/JTAG/接口契约工具。
 from __future__ import annotations
 
 import datetime
+import locale
 import os
 import subprocess
 import time
@@ -18,6 +19,11 @@ from typing import Any
 
 from fpga_robot_mcp import serial_probe
 from fpga_robot_mcp.config import load_config
+
+
+def _subprocess_text_encoding() -> str:
+    """Windows pnputil 输出使用本机代码页，不能固定按 UTF-8 解码。"""
+    return locale.getpreferredencoding(False) or "utf-8"
 
 
 def list_uart_candidates() -> dict:
@@ -32,7 +38,10 @@ def list_uart_candidates() -> dict:
         return {"status": "not_implemented", "message": "serial_probe 未实现，无法检测串口"}
 
     # 过滤蓝牙
-    board_ports = [p for p in ports if p.get("type") != "bluetooth" and p.get("type") != "error"]
+    board_ports = [
+        p for p in ports
+        if p.get("type") != "bluetooth" and p.get("type") != "error"
+    ]
     # 蓝牙端口（用于区分显示）
     bluetooth_ports = [p for p in ports if p.get("type") == "bluetooth"]
 
@@ -59,7 +68,9 @@ def check_jtag_chain() -> dict:
     """
     探测 JTAG 链上的设备。
 
-    通过 efx_pgm --scan 扫描 JTAG 链。
+    Efinity 2025.2 的 efx_pgm.exe 不支持 --scan。本函数只做只读硬件可见性检查：
+    1. 确认 efx_pgm.exe 存在
+    2. 通过串口枚举/PnP 识别 FTDI FT4232H 四通道接口
     本工具只读，不烧录。
     """
     cfg = load_config()
@@ -82,67 +93,60 @@ def check_jtag_chain() -> dict:
         "efx_pgm_size_kb": efx_pgm.stat().st_size // 1024,
     }
 
-    # 尝试扫描 JTAG 链
+    ports = serial_probe.list_ports()
+    ftdi_ports = [
+        p for p in ports
+        if p.get("type") == "fpga_ft4232"
+        or "0403:6011" in str(p.get("hwid", "")).upper()
+        or "VID_0403+PID_6011" in str(p.get("hwid", "")).upper()
+    ]
+
+    pnp_detected = False
+    pnp_excerpt = ""
     try:
         result = subprocess.run(
-            [str(efx_pgm), "--scan"],
+            ["pnputil", "/enum-devices", "/connected"],
             capture_output=True,
-            timeout=15,
-            encoding="utf-8",
+            timeout=10,
+            encoding=_subprocess_text_encoding(),
             errors="replace",
         )
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        raw_output = (stdout + "\n" + stderr).strip()
+        text = result.stdout or ""
+        pnp_detected = "VID_0403" in text and "PID_6011" in text
+        for line in text.splitlines():
+            if "VID_0403" in line or "PID_6011" in line or "USB Serial" in line:
+                pnp_excerpt += line.strip() + "\n"
+                if len(pnp_excerpt) > 800:
+                    break
+    except Exception:
+        pnp_detected = False
 
-        # 解析输出 - 查找 JTAG 设备信息
-        devices = []
-        for line in stdout.splitlines():
-            line_lower = line.lower()
-            if "idcode" in line_lower or "device" in line_lower or "jtag" in line_lower:
-                devices.append({"raw": line.strip()})
-            # 也尝试查找"Found"或"Detected"模式
-            if "found" in line_lower or "detected" in line_lower:
-                devices.append({"raw": line.strip()})
+    hardware_visible = bool(ftdi_ports) or pnp_detected
 
-        jtag_found = result.returncode == 0
-
-        return {
-            "status": "ok" if jtag_found else "scan_failed",
-            "data": {
-                **checks,
-                "scan_successful": jtag_found,
-                "return_code": result.returncode,
-                "jtag_devices": devices if devices else [],
-                "raw_output": raw_output[:500] if raw_output else "",
-                "message": f"JTAG 链扫描{'成功' if jtag_found else '失败'}"
-                           f"{'，发现 ' + str(len(devices)) + ' 个设备' if devices else ''}",
-            },
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "status": "timeout",
-            "data": {
-                **checks,
-                "message": "JTAG 扫描超时（15 秒），请检查 JTAG 下载线连接和 FT4232 驱动",
-            },
-        }
-    except FileNotFoundError:
-        return {
-            "status": "error",
-            "data": {
-                **checks,
-                "message": f"efx_pgm 路径不存在: {efx_pgm}",
-            },
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "data": {
-                **checks,
-                "message": f"JTAG 扫描异常: {e}",
-            },
-        }
+    return {
+        "status": "ok" if hardware_visible else "no_hardware",
+        "data": {
+            **checks,
+            "scan_supported": False,
+            "scan_successful": None,
+            "probe_method": "serial_probe_and_windows_pnp",
+            "jtag_devices": [],
+            "ftdi_ports": ftdi_ports,
+            "ftdi_port_count": len(ftdi_ports),
+            "pnp_detected": pnp_detected,
+            "pnp_excerpt": pnp_excerpt.strip(),
+            "raw_output": "",
+            "message": (
+                "已识别到 FTDI/FT4232H 多通道接口；JTAG 链 IDCODE 仍需用 Efinity Programmer/OpenOCD "
+                "等正确工具进一步确认。"
+                if hardware_visible else
+                "未识别到 FTDI/FT4232H 下载接口，请检查板卡 USB 连接和驱动。"
+            ),
+            "next_step": (
+                "不要使用 efx_pgm --scan；Efinity 2025.2 不支持该参数。"
+            ),
+        },
+    }
 
 
 def uart_loopback_test(port: str, baudrate: int = 115200) -> dict:

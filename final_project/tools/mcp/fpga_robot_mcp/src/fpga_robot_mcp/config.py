@@ -36,9 +36,9 @@ class EfinityConfig:
 @dataclass
 class RiscvIdeConfig:
     home: str = "D:/Efinity/efinity-riscv-ide-2025.2"
-    toolchain_bin: str = ""
-    openocd: str = ""
-    build_tools: str = ""
+    toolchain_bin: str = "D:/Efinity/efinity-riscv-ide-2025.2/toolchain/bin"
+    openocd: str = "D:/Efinity/efinity-riscv-ide-2025.2/openocd/bin/openocd.exe"
+    build_tools: str = "D:/Efinity/efinity-riscv-ide-2025.2/build_tools/bin"
 
 
 @dataclass

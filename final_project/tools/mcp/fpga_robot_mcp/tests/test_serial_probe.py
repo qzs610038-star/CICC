@@ -103,6 +103,18 @@ def test_classify_type_c_uart():
     assert result["type"] == "type_c_uart"
 
 
+def test_classify_ft4232_board_interface():
+    """FTDI 0403:6011 四通道接口应标注为 FPGA 板卡接口。"""
+    result = serial_probe.classify_port(
+        "COM3",
+        "USB Serial Port (COM3)",
+        "USB VID:PID=0403:6011 SER=FTBI7G42A",
+    )
+    assert result["type"] == "fpga_ft4232"
+    assert result["is_board_candidate"] is True
+    assert result["is_mycobot_candidate"] is False
+
+
 def test_classify_unknown():
     """无法识别的端口应分类为 unknown。"""
     result = serial_probe.classify_port(
@@ -135,6 +147,7 @@ def test_list_ports_return_format():
         assert "hwid" in entry
         assert "type" in entry
         assert "is_mycobot_candidate" in entry
+        assert "is_board_candidate" in entry
 
 
 def test_get_uart_summary():

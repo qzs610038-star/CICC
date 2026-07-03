@@ -13,6 +13,7 @@ fpga_robot_mcp.efinity_tools — Efinity 工具链校验工具。
 from __future__ import annotations
 
 import datetime
+import locale
 import os
 import shutil
 import subprocess
@@ -36,6 +37,11 @@ def _get_cfg() -> FpgaRobotConfig | None:
 def _exists(*parts: str) -> bool:
     """联合路径并检查存在性。"""
     return os.path.exists(os.path.join(*parts))
+
+
+def _subprocess_text_encoding() -> str:
+    """Windows 工具常按本机代码页输出，避免强制 UTF-8 造成中文乱码。"""
+    return locale.getpreferredencoding(False) or "utf-8"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -66,9 +72,12 @@ def locate_toolchain() -> dict:
     checks["home_dir"] = os.path.isdir(efinity_home)
     checks["bin_dir"] = os.path.isdir(efinity_bin)
 
-    # 2. 检查 CLI 可执行文件
+    # 2. 检查 CLI 可执行文件。efx_simulate.exe 在部分 Windows 安装中不存在，
+    #    不应影响核心综合/布局布线/烧录能力判断。
+    core_tools = ["efx_map.exe", "efx_pgm.exe", "efx_pnr.exe", "efx_run.bat"]
+    optional_tools = ["efx_simulate.exe"]
     if checks["bin_dir"]:
-        for tool in ["efx_map.exe", "efx_pgm.exe", "efx_pnr.exe", "efx_run.bat", "efx_simulate.exe"]:
+        for tool in core_tools + optional_tools:
             tool_path = os.path.join(efinity_bin, tool)
             exists = os.path.isfile(tool_path)
             checks[tool] = exists
@@ -89,7 +98,11 @@ def locate_toolchain() -> dict:
     pgm_fli = cfg.efinity.pgm_fli
     checks["jtag_bitstream_dir"] = os.path.isdir(pgm_fli)
 
-    all_found = all(v for k, v in checks.items() if k.startswith("efx_") or k in ("home_dir", "bin_dir"))
+    all_found = (
+        checks.get("home_dir", False)
+        and checks.get("bin_dir", False)
+        and all(checks.get(tool, False) for tool in core_tools)
+    )
 
     return {
         "status": "ok" if all_found else ("partial" if checks.get("home_dir") else "missing"),
@@ -98,6 +111,8 @@ def locate_toolchain() -> dict:
             "efinity_bin": efinity_bin,
             "checks": checks,
             "found_tools": found_tools,
+            "core_tools": core_tools,
+            "optional_tools": optional_tools,
             "is_installed": all_found,
         },
         "message": (
@@ -401,7 +416,8 @@ def check_programmer() -> dict:
     """
     检查下载线/烧录器。
 
-    定位 efx_pgm.exe，尝试 --scan，检查驱动状态。
+    定位 efx_pgm.exe，并通过 Windows PnP/串口枚举检查 FTDI FT4232H 四通道接口。
+    Efinity 2025.2 的 efx_pgm.exe 不支持 --scan，因此这里不调用该参数。
     本工具只读，不执行烧录。
     """
     cfg = _get_cfg()
@@ -422,45 +438,59 @@ def check_programmer() -> dict:
 
     # 检查 FTDI 驱动（Windows 下检查设备管理器信息）
     driver_status = "unknown"
+    ftdi_ports = []
+    try:
+        from fpga_robot_mcp import serial_probe
+
+        ports = serial_probe.list_ports()
+        ftdi_ports = [
+            p for p in ports
+            if p.get("type") == "fpga_ft4232"
+            or "0403:6011" in str(p.get("hwid", "")).upper()
+            or "VID_0403+PID_6011" in str(p.get("hwid", "")).upper()
+        ]
+    except Exception:
+        ports = []
+
     try:
         # 尝试通过 pnputil 检查
         driver_result = subprocess.run(
-            ["pnputil", "/enum-devices", "/deviceclass", "Ports"],
-            capture_output=True, timeout=10, encoding="utf-8", errors="replace",
+            ["pnputil", "/enum-devices", "/connected"],
+            capture_output=True, timeout=10, encoding=_subprocess_text_encoding(), errors="replace",
         )
-        if "FT4232" in driver_result.stdout or "4232" in driver_result.stdout:
+        driver_text = driver_result.stdout or ""
+        if ftdi_ports:
+            driver_status = "ft4232_ports_found"
+        elif "VID_0403" in driver_text and "PID_6011" in driver_text:
+            driver_status = "ft4232_usb_found"
+        elif "FT4232" in driver_text or "4232" in driver_text:
             driver_status = "ft4232_found"
-        elif "FT232" in driver_result.stdout:
+        elif "FT232" in driver_text:
             driver_status = "ft232_found"
-        elif "oem105" in driver_result.stdout.lower() or "libusb" in driver_result.stdout.lower():
+        elif "oem105" in driver_text.lower() or "libusb" in driver_text.lower():
             driver_status = "libusb_installed"
         else:
             driver_status = "no_ftdi_detected"
     except Exception:
-        driver_status = "check_failed"
+        driver_status = "ft4232_ports_found" if ftdi_ports else "check_failed"
 
-    # 尝试扫描 JTAG
-    jtag_result = None
-    try:
-        scan = subprocess.run(
-            [str(efx_pgm), "--scan"],
-            capture_output=True, timeout=10, encoding="utf-8", errors="replace",
-        )
-        jtag_result = {
-            "scan_successful": scan.returncode == 0,
-            "return_code": scan.returncode,
-            "stdout": (scan.stdout or "")[:500],
-        }
-    except subprocess.TimeoutExpired:
-        jtag_result = {"scan_successful": False, "message": "扫描超时"}
-    except Exception as e:
-        jtag_result = {"scan_successful": False, "message": str(e)}
+    jtag_result = {
+        "scan_supported": False,
+        "scan_successful": None,
+        "method": "windows_pnp_serial_probe",
+        "message": (
+            "Efinity 2025.2 efx_pgm.exe 不支持 --scan；"
+            "当前只确认 Windows 是否识别到 FTDI/FT4232 下载接口。"
+        ),
+    }
 
     return {
-        "status": "ok",
+        "status": "ok" if ftdi_ports else "no_hardware",
         "data": {
             **checks,
             "driver_status": driver_status,
+            "ftdi_ports": ftdi_ports,
+            "ftdi_port_count": len(ftdi_ports),
             "jtag_scan": jtag_result,
         },
     }
@@ -471,6 +501,13 @@ def program_bitstream(bitstream_path: str) -> dict:
     烧录 bitstream 到 FPGA。
 
     警告: 硬件副作用操作，需通过 safety 门控 + confirm_token。
+
+    当前 Efinity 2025.2 的实际下载 CLI 仍未完全对齐：
+    - efx_pgm.exe 是 bit/hex 生成器，不是直接上板下载器；
+    - Programmer GUI 使用 pgm/bin/efx_pgm/ftdi_program.py 作为 FTDI 下载后端；
+    - 本机目前 Windows VCP 能看到 FT4232 COM 口，但 ftdi_program.py --list_usb 尚未看到 USB target。
+
+    因此这里不再执行旧的 efx_pgm.exe -m ram -p 1 -b 命令，避免误报烧录能力。
     """
     cfg = _get_cfg()
     if cfg is None:
@@ -480,53 +517,41 @@ def program_bitstream(bitstream_path: str) -> dict:
     if not bs.is_file():
         return {"status": "error", "message": f"bitstream 文件不存在: {bitstream_path}"}
 
+    efinity_home = cfg.efinity_home_path()
     efx_pgm = cfg.efinity_bin_path() / "efx_pgm.exe"
+    setup_bat = cfg.efinity_bin_path() / "setup.bat"
+    ftdi_program = efinity_home / "pgm" / "bin" / "efx_pgm" / "ftdi_program.py"
+
     if not efx_pgm.is_file():
         return {"status": "error", "message": f"efx_pgm 不存在: {efx_pgm}"}
+    if not setup_bat.is_file():
+        return {"status": "error", "message": f"Efinity setup.bat 不存在: {setup_bat}"}
+    if not ftdi_program.is_file():
+        return {"status": "error", "message": f"ftdi_program.py 不存在: {ftdi_program}"}
 
-    # 构建烧录命令
-    cmd = [str(efx_pgm), "-m", "ram", "-p", "1", "-b", str(bs)]
-    start_time = time.time()
+    candidate_cmd = (
+        f'cmd /d /c "call {setup_bat} && python {ftdi_program} '
+        f'-m jtag -b "Generic Board Profile Using FT4232" {bs}"'
+    )
+    preflight_cmd = (
+        f'cmd /d /c "call {setup_bat} && python {ftdi_program} --list_usb"'
+    )
 
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            timeout=120,
-            encoding="utf-8",
-            errors="replace",
-        )
-        duration = round(time.time() - start_time, 1)
-
-        log_path = cfg.evidence_path() / f"program_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text(
-            f"=== Efinity Program Log ===\n"
-            f"Bitstream: {bs}\n"
-            f"Command: {' '.join(cmd)}\n"
-            f"Return code: {result.returncode}\n"
-            f"Duration: {duration}s\n\n"
-            f"--- STDOUT ---\n{result.stdout}\n\n"
-            f"--- STDERR ---\n{result.stderr}\n",
-            encoding="utf-8",
-        )
-
-        success = result.returncode == 0
-        return {
-            "status": "ok" if success else "program_failed",
-            "data": {
-                "bitstream": str(bs),
-                "command": " ".join(cmd),
-                "return_code": result.returncode,
-                "duration_seconds": duration,
-                "log_path": str(log_path),
-                "message": f"烧录{'成功' if success else '失败'} ({duration}s)",
-            },
-        }
-    except subprocess.TimeoutExpired:
-        return {"status": "error", "message": "烧录超时（120 秒）"}
-    except Exception as e:
-        return {"status": "error", "message": f"烧录异常: {e}"}
+    return {
+        "status": "programmer_cli_not_aligned",
+        "data": {
+            "bitstream": str(bs),
+            "efx_pgm_path": str(efx_pgm),
+            "efx_pgm_role": "bitstream/hex generator, not the direct board programmer CLI",
+            "ftdi_program_path": str(ftdi_program),
+            "candidate_cli_after_usb_visible": candidate_cmd,
+            "required_preflight": preflight_cmd,
+            "message": (
+                "已阻止旧烧录命令。请先让 ftdi_program.py --list_usb/--scan_usb 能识别 "
+                "FT4232 USB target，再启用 MCP 自动烧录。当前建议用 Efinity Programmer GUI 进行首次下载。"
+            ),
+        },
+    }
 
 
 def collect_logs(log_dir: str = "") -> dict:

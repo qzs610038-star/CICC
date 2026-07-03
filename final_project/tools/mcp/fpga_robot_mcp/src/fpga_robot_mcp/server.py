@@ -160,6 +160,21 @@ def fpga_robot_status() -> dict:
         efx_result = efinity_tools.locate_toolchain()
         efx_ok = efx_result.get("status") == "ok"
 
+        # RISC-V IDE / CPU toolchain
+        riscv_home = _config.riscv_ide.home
+        riscv_toolchain_bin = _config.riscv_ide.toolchain_bin
+        riscv_openocd = _config.riscv_ide.openocd
+        riscv_build_tools = _config.riscv_ide.build_tools
+        riscv_checks = {
+            "home_dir": os.path.isdir(riscv_home),
+            "toolchain_bin": os.path.isdir(riscv_toolchain_bin),
+            "gcc": os.path.isfile(os.path.join(riscv_toolchain_bin, "riscv-none-embed-gcc.exe")),
+            "gdb": os.path.isfile(os.path.join(riscv_toolchain_bin, "riscv-none-embed-gdb.exe")),
+            "openocd": os.path.isfile(riscv_openocd),
+            "make": os.path.isfile(os.path.join(riscv_build_tools, "make.exe")),
+        }
+        riscv_ok = all(riscv_checks.values())
+
         # 串口 — 调用 serial_probe（可能未实现）
         ports_result = _safe_call(serial_probe.list_ports)
 
@@ -174,6 +189,14 @@ def fpga_robot_status() -> dict:
                 "installed": efx_ok,
                 "home": _config.efinity.home if efx_ok else None,
                 "detail": efx_result.get("data", efx_result.get("message", "")),
+            },
+            "riscv_ide": {
+                "installed": riscv_ok,
+                "home": riscv_home if riscv_checks["home_dir"] else None,
+                "checks": riscv_checks,
+                "toolchain_bin": riscv_toolchain_bin,
+                "openocd": riscv_openocd,
+                "build_tools": riscv_build_tools,
             },
             "serial_ports": ports_result.get("data", ports_result),
             "mycobot": mycobot_result.get("data", mycobot_result),
@@ -290,7 +313,7 @@ def board_list_uart_candidates() -> dict:
     return _safe_call(board_tools.list_uart_candidates)
 
 
-@mcp.tool(description="通过 efx_pgm --scan 或等效命令探测 JTAG 链上的设备，不烧录。")
+@mcp.tool(description="通过 Windows PnP/串口枚举检查 FT4232/JTAG 下载接口可见性，不烧录。")
 def board_check_jtag_chain() -> dict:
     return _safe_call(board_tools.check_jtag_chain)
 
@@ -403,8 +426,13 @@ def mycobot280_control_gripper(
 def mycobot280_stop(
     port: str,
     baudrate: int = 1000000,
+    confirm_token: str = "",
 ) -> dict:
-    return _safe_call(mycobot_tools.stop_motion, port, baudrate)
+    return _safety_wrapper(
+        "mycobot280_stop", SafetyLevel.HARDWARE_SIDE_EFFECT,
+        mycobot_tools.stop_motion, port, baudrate,
+        confirm_token=confirm_token,
+    )
 
 
 @mcp.tool(description="导出本次连接、动作摘要、返回值和错误记录。")

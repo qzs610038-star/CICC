@@ -23,6 +23,7 @@ def classify_port(device: str, description: str, hwid: str) -> dict:
     - description 包含 "Silicon Labs" → cp210x
     - hwid 包含 "BTHENUM" 或 "蓝牙" 或 description 包含 "Bluetooth" → bluetooth
     - description 包含 "JTAG" → jtag_uart
+    - hwid 包含 "0403:6011" → fpga_ft4232 (Efinix/TJ375 板卡四通道接口候选)
     - description 包含 "USB Serial" → type_c_uart (开发板 Type-C UART)
     - 其他 → unknown
     """
@@ -30,15 +31,21 @@ def classify_port(device: str, description: str, hwid: str) -> dict:
     desc_lower = description.lower()
 
     port_type = "unknown"
-    is_candidate = False
+    is_mycobot_candidate = False
+    is_board_candidate = False
+
+    # FTDI FT4232H / 0403:6011，多数 Efinix/TJ375 板卡会枚举为四路 USB Serial。
+    if "0403:6011" in hwid_upper or "VID_0403+PID_6011" in hwid_upper:
+        port_type = "fpga_ft4232"
+        is_board_candidate = True
 
     # CP210x / myCobot 候选
-    if "10C4" in hwid_upper or "CP210X" in hwid_upper:
+    elif "10C4" in hwid_upper or "CP210X" in hwid_upper:
         port_type = "cp210x"
-        is_candidate = True
+        is_mycobot_candidate = True
     elif "silicon labs" in desc_lower:
         port_type = "cp210x"
-        is_candidate = True
+        is_mycobot_candidate = True
 
     # 蓝牙
     elif "BTHENUM" in hwid_upper or "蓝牙" in hwid_upper:
@@ -59,7 +66,8 @@ def classify_port(device: str, description: str, hwid: str) -> dict:
         "description": description,
         "hwid": hwid,
         "type": port_type,
-        "is_mycobot_candidate": is_candidate,
+        "is_mycobot_candidate": is_mycobot_candidate,
+        "is_board_candidate": is_board_candidate,
     }
 
 
@@ -89,6 +97,7 @@ def list_ports() -> list[dict]:
             "hwid": "",
             "type": "error",
             "is_mycobot_candidate": False,
+            "is_board_candidate": False,
         }]
 
     try:
@@ -100,6 +109,7 @@ def list_ports() -> list[dict]:
             "hwid": "",
             "type": "error",
             "is_mycobot_candidate": False,
+            "is_board_candidate": False,
         }]
 
     result = []
@@ -114,6 +124,7 @@ def list_ports() -> list[dict]:
                 "hwid": getattr(p, "hwid", "?"),
                 "type": "unknown",
                 "is_mycobot_candidate": False,
+                "is_board_candidate": False,
             })
     return result
 
@@ -134,17 +145,22 @@ def get_uart_summary() -> dict:
     ports = list_ports()
     by_type: dict[str, int] = {}
     candidates: list[str] = []
+    board_candidates: list[str] = []
 
     for p in ports:
         t = p.get("type", "unknown")
         by_type[t] = by_type.get(t, 0) + 1
         if p.get("is_mycobot_candidate"):
             candidates.append(p["device"])
+        if p.get("is_board_candidate"):
+            board_candidates.append(p["device"])
 
     return {
         "total_ports": len(ports),
         "by_type": by_type,
         "has_mycobot_candidate": len(candidates) > 0,
         "mycobot_candidates": candidates,
+        "has_board_candidate": len(board_candidates) > 0,
+        "board_candidates": board_candidates,
         "ports": ports,
     }

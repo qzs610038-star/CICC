@@ -71,6 +71,31 @@ def test_hardware_allowed_with_token():
     assert allowed is True
 
 
+def test_hardware_audit_redacts_confirm_token():
+    """硬件确认通过后，审计日志不能保留明文 confirm_token。"""
+    sm = _make_manager(allow_hardware=True)
+    token = sm.generate_confirm_token("MYCOBOT280_SAFE")
+    allowed, msg = sm.check_tool_allowed(
+        "mycobot280_execute_motion", SafetyLevel.HARDWARE_SIDE_EFFECT,
+        confirm_token=token,
+    )
+    assert allowed is True
+    detail = sm.get_recent_audit(1)[0]["detail"]
+    assert token not in detail
+    assert "redacted" in detail or "provided" in detail
+
+
+def test_mycobot_stop_uses_known_hardware_action():
+    """mycobot280_stop 应纳入硬件副作用 token 类型映射。"""
+    sm = _make_manager(allow_hardware=True)
+    token = sm.generate_confirm_token("MYCOBOT280_SAFE")
+    allowed, msg = sm.check_tool_allowed(
+        "mycobot280_stop", SafetyLevel.HARDWARE_SIDE_EFFECT,
+        confirm_token=token,
+    )
+    assert allowed is True
+
+
 def test_bad_token_rejected():
     """格式不匹配的 token 应被拒绝。"""
     sm = _make_manager(allow_hardware=True)

@@ -18,6 +18,7 @@ from fpga_robot_mcp import (
     review_packet,
     efinity_tools,
 )
+from fpga_robot_mcp import server
 
 
 def test_serial_probe_list_ports_callable():
@@ -32,6 +33,16 @@ def test_serial_probe_get_uart_summary_callable():
     assert isinstance(result, dict)
 
 
+def test_server_status_reports_riscv_ide():
+    """fpga_robot_status 应报告 CPU/RISC-V IDE 工具链状态。"""
+    server._init()
+    result = server.fpga_robot_status()
+    assert isinstance(result, dict)
+    data = result.get("data", {})
+    assert "riscv_ide" in data
+    assert "checks" in data["riscv_ide"]
+
+
 def test_board_tools_list_uart_candidates_callable():
     """board_tools.list_uart_candidates() 可调用。"""
     result = board_tools.list_uart_candidates()
@@ -42,6 +53,18 @@ def test_board_tools_check_jtag_chain_callable():
     """board_tools.check_jtag_chain() 可调用。"""
     result = board_tools.check_jtag_chain()
     assert isinstance(result, dict)
+
+
+def test_board_tools_check_jtag_chain_not_help_text_devices():
+    """JTAG 探测不能把 efx_pgm 帮助文本误解析为设备。"""
+    result = board_tools.check_jtag_chain()
+    assert isinstance(result, dict)
+    data = result.get("data", {})
+    raw_output = data.get("raw_output", "")
+    devices = data.get("jtag_devices", [])
+    if "unrecognised option '--scan'" in raw_output or "Usage: efx_pgm" in raw_output:
+        assert devices == []
+        assert result.get("status") != "scan_failed"
 
 
 def test_board_tools_generate_uart_test_plan_callable():
