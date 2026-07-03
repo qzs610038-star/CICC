@@ -14,6 +14,8 @@
 5. `04_mycobot280_notes.md`：本机机械臂调试主机使用，队友只需了解控制边界。
 6. `05_agent_quickstart.md`：给队友本地 agent 的最短任务入口。
 7. `06_open_questions_and_validation.md`：把未验证项转成后续上板、视觉和文档工作清单。
+8. `赛方提供材料_目录扫描_2026-07-03.md`：完整目录与文件级 TSV 清单，用于核对官方资料包是否齐全。
+9. `初赛demo_目录扫描_2026-07-03.md`：完整目录与文件级 TSV 清单，用于核对初赛 demo 资料是否齐全。
 
 RISC-V 官方例程的详细吸收结论已经存在于 `final_project/docs/architecture/riscv_official_examples_integration.md`。本同步包不重复新建 RISC-V 摘要，避免两份文档维护出分歧。
 

@@ -12,9 +12,11 @@ fpga_robot_mcp.efinity_tools — Efinity 工具链校验工具。
 
 from __future__ import annotations
 
+import datetime
 import os
 import shutil
-import subprocess  # noqa: F401 — 留待经济模型使用
+import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -235,127 +237,351 @@ def list_artifacts(limit: int = 30, offset: int = 0) -> dict:
     """
     列出 outflow 构建产物。
 
-    需要实现:
-    1. 定位 outflow 目录（cfg.resolve("赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/outflow")）
-    2. 递归遍历 *.bit、*.rpt、*.log、*.txt 等文件
-    3. 按修改时间倒序排列
-    4. 应用 limit/offset 分页
-    5. 返回每个文件的: path(相对), size_bytes, last_modified, type(bit/rpt/log)
+    遍历 outflow 目录中的 *.bit、*.rpt、*.log、*.txt 等文件，
+    按修改时间倒序排列，应用 limit/offset 分页。
+    """
+    cfg = _get_cfg()
+    if cfg is None:
+        return {"status": "error", "message": "无法加载配置"}
 
-    返回格式示例:
-    {
+    outflow = cfg.resolve("赛方提供材料", "TJ375N529_SC431HAI2LCD_Demo_V3", "outflow")
+    if not outflow.is_dir():
+        return {
+            "status": "ok",
+            "data": {
+                "total": 0,
+                "artifacts": [],
+                "outflow_path": str(outflow),
+                "message": "outflow 目录不存在",
+            },
+        }
+
+    # 收集产物文件
+    artifacts = []
+    try:
+        for f in outflow.rglob("*"):
+            if not f.is_file():
+                continue
+            ext = f.suffix.lower()
+            if ext not in (".bit", ".rpt", ".log", ".txt", ".bin", ".svf", ".csv", ".json", ".xml", ".htm", ".html"):
+                continue
+            # 分类
+            if ext == ".bit":
+                ftype = "bit"
+            elif ext == ".rpt":
+                ftype = "rpt"
+            elif ext in (".log", ".txt"):
+                ftype = "log"
+            else:
+                ftype = "other"
+
+            try:
+                mtime = datetime.datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                mtime = ""
+
+            rel_path = f.relative_to(outflow) if outflow in f.parents else f.name
+
+            artifacts.append({
+                "path": str(rel_path),
+                "size_bytes": f.stat().st_size,
+                "last_modified": mtime,
+                "type": ftype,
+            })
+    except Exception as e:
+        return {"status": "error", "message": f"遍历 outflow 目录失败: {e}"}
+
+    # 按修改时间倒序
+    artifacts.sort(key=lambda x: x.get("last_modified", ""), reverse=True)
+    total = len(artifacts)
+
+    # 分页
+    paged = artifacts[offset:offset + limit] if offset < total else []
+
+    return {
         "status": "ok",
         "data": {
-            "total": 42,
-            "artifacts": [
-                {
-                    "path": "top.bit",
-                    "size_bytes": 123456,
-                    "last_modified": "2026-07-01T10:30:00",
-                    "type": "bit"
-                },
-                ...
-            ]
-        }
+            "total": total,
+            "artifacts": paged,
+            "limit": limit,
+            "offset": offset,
+            "outflow_path": str(outflow),
+        },
     }
-    """
-    raise NotImplementedError("efinity_tools.list_artifacts() — 需遍历 outflow 目录并列出产物")
 
 
 def run_build(project_xml: str = "", dry_run: bool = True) -> dict:
     """
     运行 Efinity 综合/布局布线。
 
-    需要实现:
-    1. 解析 project_xml 路径（空则用 cfg.efinity_project_path()）
-    2. 定位 efx_run.bat (cfg.efinity_bin_path() / "efx_run.bat")
-    3. dry_run=True: 只检查文件存在性、工程可读性，不启动子进程
-    4. dry_run=False: 调用 subprocess.run([efx_run, "-f", project_xml], ...)
-       - 注意：首次运行前需要 Efinity license（如需要）
-       - 设置超时（默认 30 分钟）
-       - 捕获 stdout/stderr
-       - 返回构建日志路径
-
-    返回格式示例:
-    {
-        "status": "ok",
-        "data": {
-            "dry_run": true,
-            "project_xml": "...",
-            "efx_run": "...",
-            "checks": {...},  # dry_run 时返回预检查结果
-            "log_path": "...",  # dry_run=false 时返回
-            "return_code": 0,  # dry_run=false 时返回
-        }
-    }
+    dry_run=True: 只做预检查，不启动子进程。
+    dry_run=False: 调用 efx_run.bat 执行构建。
     """
-    raise NotImplementedError("efinity_tools.run_build() — 需调用 efx_run.bat 子进程；dry_run 做预检查")
+    cfg = _get_cfg()
+    if cfg is None:
+        return {"status": "error", "message": "无法加载配置"}
+
+    # 确定工程 XML 路径
+    if project_xml:
+        xml_path = Path(project_xml)
+        if not xml_path.is_absolute():
+            xml_path = cfg.resolve(project_xml)
+    else:
+        xml_path = cfg.efinity_project_path()
+
+    # 定位 efx_run
+    efx_run = cfg.efinity_bin_path() / "efx_run.bat"
+
+    checks = {
+        "project_xml": str(xml_path),
+        "project_xml_exists": xml_path.is_file(),
+        "efx_run": str(efx_run),
+        "efx_run_exists": efx_run.is_file(),
+    }
+
+    if not checks["project_xml_exists"]:
+        return {"status": "error", "message": f"工程 XML 不存在: {xml_path}", "data": checks}
+
+    if not checks["efx_run_exists"]:
+        return {"status": "error", "message": f"efx_run.bat 不存在: {efx_run}", "data": checks}
+
+    if dry_run:
+        return {
+            "status": "ok",
+            "data": {
+                "dry_run": True,
+                **checks,
+                "message": "dry-run 预检查通过，可执行构建",
+                "next_step": f"设置 dry_run=false 并确认后执行: {efx_run} -f {xml_path}",
+            },
+        }
+
+    # 实际执行构建
+    try:
+        result = subprocess.run(
+            [str(efx_run), "-f", str(xml_path)],
+            capture_output=True,
+            timeout=1800,  # 30 分钟超时
+            encoding="utf-8",
+            errors="replace",
+            shell=True,
+        )
+
+        log_path = cfg.evidence_path() / f"build_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_content = (
+            f"=== Efinity Build Log ===\n"
+            f"Command: {efx_run} -f {xml_path}\n"
+            f"Return code: {result.returncode}\n"
+            f"Time: {datetime.datetime.now().isoformat()}\n\n"
+            f"--- STDOUT ---\n{result.stdout}\n\n"
+            f"--- STDERR ---\n{result.stderr}\n"
+        )
+        log_path.write_text(log_content, encoding="utf-8")
+
+        return {
+            "status": "ok" if result.returncode == 0 else "build_failed",
+            "data": {
+                "dry_run": False,
+                **checks,
+                "return_code": result.returncode,
+                "log_path": str(log_path),
+                "stdout": result.stdout[:1000] if result.stdout else "",
+                "stderr": result.stderr[:500] if result.stderr else "",
+                "message": f"构建{'成功' if result.returncode == 0 else '失败 (返回码: ' + str(result.returncode) + ')'}",
+            },
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "message": "构建超时（30 分钟）", "data": checks}
+    except Exception as e:
+        return {"status": "error", "message": f"构建异常: {e}", "data": checks}
 
 
 def check_programmer() -> dict:
     """
     检查下载线/烧录器。
 
-    需要实现:
-    1. 定位 efx_pgm.exe (cfg.efinity_bin_path() / "efx_pgm.exe")
-    2. 尝试 subprocess.run([efx_pgm, "--scan"], capture_output=True, timeout=10)
-    3. 解析输出，查找连接的 JTAG 设备
-    4. 也检查 FTDI / FT4232 驱动状态
-
-    注意: 本工具只读，不执行烧录。
-
-    返回格式示例:
-    {
-        "status": "ok" | "no_hardware",
-        "data": {
-            "efx_pgm_path": "...",
-            "efx_pgm_exists": true,
-            "jtag_devices": [...],  # 扫描到的设备
-            "driver_status": "installed" | "missing",
-        }
-    }
+    定位 efx_pgm.exe，尝试 --scan，检查驱动状态。
+    本工具只读，不执行烧录。
     """
-    raise NotImplementedError("efinity_tools.check_programmer() — 需调用 efx_pgm --scan 并解析输出")
+    cfg = _get_cfg()
+    if cfg is None:
+        return {"status": "error", "message": "无法加载配置"}
+
+    efx_pgm = cfg.efinity_bin_path() / "efx_pgm.exe"
+    checks = {
+        "efx_pgm_path": str(efx_pgm),
+        "efx_pgm_exists": efx_pgm.is_file(),
+    }
+
+    if not checks["efx_pgm_exists"]:
+        return {
+            "status": "no_hardware",
+            "data": {**checks, "message": "efx_pgm 未安装或路径不正确"},
+        }
+
+    # 检查 FTDI 驱动（Windows 下检查设备管理器信息）
+    driver_status = "unknown"
+    try:
+        # 尝试通过 pnputil 检查
+        driver_result = subprocess.run(
+            ["pnputil", "/enum-devices", "/deviceclass", "Ports"],
+            capture_output=True, timeout=10, encoding="utf-8", errors="replace",
+        )
+        if "FT4232" in driver_result.stdout or "4232" in driver_result.stdout:
+            driver_status = "ft4232_found"
+        elif "FT232" in driver_result.stdout:
+            driver_status = "ft232_found"
+        elif "oem105" in driver_result.stdout.lower() or "libusb" in driver_result.stdout.lower():
+            driver_status = "libusb_installed"
+        else:
+            driver_status = "no_ftdi_detected"
+    except Exception:
+        driver_status = "check_failed"
+
+    # 尝试扫描 JTAG
+    jtag_result = None
+    try:
+        scan = subprocess.run(
+            [str(efx_pgm), "--scan"],
+            capture_output=True, timeout=10, encoding="utf-8", errors="replace",
+        )
+        jtag_result = {
+            "scan_successful": scan.returncode == 0,
+            "return_code": scan.returncode,
+            "stdout": (scan.stdout or "")[:500],
+        }
+    except subprocess.TimeoutExpired:
+        jtag_result = {"scan_successful": False, "message": "扫描超时"}
+    except Exception as e:
+        jtag_result = {"scan_successful": False, "message": str(e)}
+
+    return {
+        "status": "ok",
+        "data": {
+            **checks,
+            "driver_status": driver_status,
+            "jtag_scan": jtag_result,
+        },
+    }
 
 
 def program_bitstream(bitstream_path: str) -> dict:
     """
     烧录 bitstream 到 FPGA。
 
-    警告: 本工具是硬件副作用操作，需通过 safety 门控 + confirm_token。
-
-    需要实现:
-    1. 确认 bitstream_path 存在（.bit 或 .svf 文件）
-    2. 调用 efx_pgm [options] -m ram -p 1 -b <bitstream_path>
-    3. 捕获 stdout/stderr
-    4. 验证烧录结果（检查返回码和日志中的成功标志）
-
-    返回格式示例:
-    {
-        "status": "ok" | "error",
-        "data": {
-            "bitstream": "...",
-            "command": "...",
-            "return_code": 0,
-            "log": "...",
-            "duration_seconds": 12.3,
-        }
-    }
+    警告: 硬件副作用操作，需通过 safety 门控 + confirm_token。
     """
-    raise NotImplementedError("efinity_tools.program_bitstream() — 硬件副作用操作，需 safety 门控")
+    cfg = _get_cfg()
+    if cfg is None:
+        return {"status": "error", "message": "无法加载配置"}
+
+    bs = Path(bitstream_path)
+    if not bs.is_file():
+        return {"status": "error", "message": f"bitstream 文件不存在: {bitstream_path}"}
+
+    efx_pgm = cfg.efinity_bin_path() / "efx_pgm.exe"
+    if not efx_pgm.is_file():
+        return {"status": "error", "message": f"efx_pgm 不存在: {efx_pgm}"}
+
+    # 构建烧录命令
+    cmd = [str(efx_pgm), "-m", "ram", "-p", "1", "-b", str(bs)]
+    start_time = time.time()
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace",
+        )
+        duration = round(time.time() - start_time, 1)
+
+        log_path = cfg.evidence_path() / f"program_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(
+            f"=== Efinity Program Log ===\n"
+            f"Bitstream: {bs}\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Return code: {result.returncode}\n"
+            f"Duration: {duration}s\n\n"
+            f"--- STDOUT ---\n{result.stdout}\n\n"
+            f"--- STDERR ---\n{result.stderr}\n",
+            encoding="utf-8",
+        )
+
+        success = result.returncode == 0
+        return {
+            "status": "ok" if success else "program_failed",
+            "data": {
+                "bitstream": str(bs),
+                "command": " ".join(cmd),
+                "return_code": result.returncode,
+                "duration_seconds": duration,
+                "log_path": str(log_path),
+                "message": f"烧录{'成功' if success else '失败'} ({duration}s)",
+            },
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "message": "烧录超时（120 秒）"}
+    except Exception as e:
+        return {"status": "error", "message": f"烧录异常: {e}"}
 
 
 def collect_logs(log_dir: str = "") -> dict:
     """
     收集构建/烧录日志到证据目录。
-
-    需要实现:
-    1. 定位证据目录（cfg.evidence_path()，确保存在）
-    2. 如果 log_dir 为空，搜索常见日志位置:
-       - outflow/*.rpt
-       - outflow/*.log
-       - 工程目录下的 build_log/
-    3. 复制或汇总到证据目录
-    4. 返回复制的文件列表
     """
-    raise NotImplementedError("efinity_tools.collect_logs() — 需收集日志文件到证据目录")
+    cfg = _get_cfg()
+    if cfg is None:
+        return {"status": "error", "message": "无法加载配置"}
+
+    evidence = cfg.evidence_path()
+    evidence.mkdir(parents=True, exist_ok=True)
+
+    collected = []
+
+    # 如果指定了 log_dir，从该目录收集
+    if log_dir:
+        src = Path(log_dir)
+        if src.is_dir():
+            for f in src.glob("*"):
+                if f.is_file() and f.suffix.lower() in (".log", ".rpt", ".txt"):
+                    dst = evidence / f.name
+                    try:
+                        import shutil
+                        shutil.copy2(str(f), str(dst))
+                        collected.append({"src": str(f), "dst": str(dst), "size_kb": f.stat().st_size // 1024})
+                    except Exception as e:
+                        collected.append({"src": str(f), "error": str(e)})
+        else:
+            return {"status": "error", "message": f"日志目录不存在: {log_dir}"}
+
+    # 也自动尝试搜索 outflow 中的日志
+    outflow = cfg.resolve("赛方提供材料", "TJ375N529_SC431HAI2LCD_Demo_V3", "outflow")
+    if outflow.is_dir():
+        for f in sorted(outflow.rglob("*"), key=lambda p: p.stat().st_mtime if p.is_file() else 0, reverse=True):
+            if not f.is_file():
+                continue
+            if f.suffix.lower() not in (".rpt", ".log"):
+                continue
+            # 避免重复收集已复制的文件
+            dst = evidence / f.name
+            if dst.exists():
+                continue
+            try:
+                import shutil
+                shutil.copy2(str(f), str(dst))
+                collected.append({"src": str(f), "dst": str(dst), "size_kb": f.stat().st_size // 1024})
+            except Exception:
+                pass
+
+    return {
+        "status": "ok",
+        "data": {
+            "evidence_dir": str(evidence),
+            "collected_count": len(collected),
+            "collected": collected,
+        },
+    }

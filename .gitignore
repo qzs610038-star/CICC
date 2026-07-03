@@ -84,3 +84,6 @@ tcl_stacktrace.txt
 赛方提供材料/EDA软件/
 赛方提供材料/EDA软件培训文档及视频/02 efinity培训视频/
 赛方提供材料/efinity-2025.2.288.4.15-windows-x64-patch/
+
+# Claude Code project-level settings (contains machine-specific paths and permissions)
+.claude/settings.json
