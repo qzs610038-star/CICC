@@ -76,6 +76,9 @@ tcl_stacktrace.txt
 *.mov
 *.mkv
 
+# Local software packages and extracted vendor tools
+myblockly/
+
 # Local raw material libraries kept outside the collaboration repo by default
 初赛demo/
 赛方提供材料/
