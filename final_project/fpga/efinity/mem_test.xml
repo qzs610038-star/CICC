@@ -40,7 +40,6 @@
         <efx:design_file name="../rtl/debayer/raw_to_rgb.v" version="default" library="default"/>
         <efx:design_file name="../rtl/debayer/line_buffer.v" version="default" library="default"/>
         <efx:design_file name="../rtl/debayer/rgb_gain.v" version="default" library="default"/>
-        <efx:design_file name="../rtl/debayer/true_dual_port_ram.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/timescale.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/i2c_master_defines.v" version="default" library="default"/>
         <efx:design_file name="../rtl/framebuffer/elt_dcfifo_v10.v" version="default" library="default"/>
