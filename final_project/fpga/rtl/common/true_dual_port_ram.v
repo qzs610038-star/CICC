@@ -31,15 +31,15 @@ module true_dual_port_ram
 
 	localparam MEMORY_DEPTH = 2**ADDR_WIDTH;
 	localparam MAX_DATA = (1<<ADDR_WIDTH)-1;
-	
+
 	reg [DATA_WIDTH-1:0] ram [MEMORY_DEPTH-1:0];
-	
+
 	reg [DATA_WIDTH-1:0] r_dout1_1P;
 	reg [DATA_WIDTH-1:0] r_dout2_1P;
 
 	reg [DATA_WIDTH-1:0] r_dout1_2P;
 	reg [DATA_WIDTH-1:0] r_dout2_2P;
-	
+
 	integer i;
 	initial
 	begin
@@ -52,7 +52,7 @@ module true_dual_port_ram
 				$readmemh(RAM_INIT_FILE, ram);
 		end
 	end
-	
+
 	generate
 		if (WRITE_MODE_1 == "WRITE_FIRST")
 		begin
@@ -86,7 +86,7 @@ module true_dual_port_ram
 					r_dout1_1P	<= ram[addr1];
 			end
 		end
-		
+
 		if (WRITE_MODE_2 == "WRITE_FIRST")
 		begin
 			always@(posedge clkb)
@@ -124,12 +124,12 @@ module true_dual_port_ram
 		begin
 			always@(posedge clka)
 				r_dout1_2P	<= r_dout1_1P;
-			
+
 			assign dout1 = r_dout1_2P;
 		end
 		else
 			assign dout1 = r_dout1_1P;
-		
+
 		if (OUTPUT_REG_2 == "TRUE")
 		begin
 			always@(posedge clkb)
@@ -140,5 +140,5 @@ module true_dual_port_ram
 		else
 			assign dout2 = r_dout2_1P;
 	endgenerate
-	
+
 endmodule

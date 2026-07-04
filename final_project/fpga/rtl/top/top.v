@@ -1465,13 +1465,13 @@ end
 
 always @( posedge hdmi_tx_slow_clk )
 begin
-    rgb_vs_r <= wb1_vs_out     ;
-    rgb_hs_r <= wb1_hs_out     ;
-    rgb_de_r <= wb1_de_out     ;
-    if( sel ) begin 
-            rgb_datax1 <= wb1_data_out[47:24] ;
+    rgb_vs_r <= wb0_vs_out     ;
+    rgb_hs_r <= wb0_hs_out     ;
+    rgb_de_r <= wb0_de_out     ;
+    if( sel ) begin
+            rgb_datax1 <= wb0_data_out[47:24] ;
     end else begin
-        rgb_datax1 <= wb1_data_out[23:0] ;
+        rgb_datax1 <= wb0_data_out[23:0] ;
     end
 end
   hdmi_top  hdmi_top_inst (

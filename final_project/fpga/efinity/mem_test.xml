@@ -25,7 +25,7 @@
         <efx:design_file name="../rtl/framebuffer/rst_n_piple.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_dsi/panel_config.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_dsi/reset_ctrl.v" version="default" library="default"/>
-        <efx:design_file name="../rtl/mipi_dsi/true_dual_port_ram.v" version="default" library="default"/>
+        <efx:design_file name="../rtl/common/true_dual_port_ram.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/oc_i2c_master.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/i2c_master_bit_ctrl.v" version="default" library="default"/>
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/i2c_master_top.v" version="default" library="default"/>
