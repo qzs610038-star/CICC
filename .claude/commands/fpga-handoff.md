@@ -12,6 +12,11 @@
   "session_id": "session_xxx",
   "session_end": "ISO-8601 timestamp",
   "mode": "architecture-plan|execution|review-prep|debug",
+  "cbm_status": {
+    "project": "D-cicc_cbm_link",
+    "checked": false,
+    "queries": []
+  },
   "completed_tasks": [],
   "key_decisions": [],
   "architecture_boundary": "FPGA video front-end/ROI/statistics/OSD; board CPU vision decision/parameters/myCobot control; no pure-FPGA vision or pure-FPGA arm control as main route",

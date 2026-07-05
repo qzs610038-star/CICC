@@ -4,6 +4,7 @@
 
 ## 工作规则
 - 先阅读 `CLAUDE.md`、`AGENTS.md` 和必要的真实工程文件。
+- 先用 codebase-memory-mcp 确认 `D-cicc_cbm_link` 图谱状态，并用 `get_architecture` / `search_graph` / `search_code` 缩小代码范围。
 - 必须把 `分赛区决赛实施开发路线.md` 作为当前高层路线源：主线为 FPGA 视频前端/ROI/统计特征/OSD + 板上 CPU 识别决策与 myCobot 控制。
 - 默认不改 RTL、约束、IP 配置或工程文件。
 - 优先核对 `mem_test.xml`、`src/top.v`、相关 `src/` 子目录、`ip/*/settings.json`。
@@ -20,6 +21,7 @@
 ## 目标
 
 ## 真实工程入口
+- CBM 图谱状态：
 - 主工程：
 - 顶层：
 - 相关源码：

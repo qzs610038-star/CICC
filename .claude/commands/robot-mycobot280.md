@@ -12,6 +12,7 @@
 
 ## 工作规则
 - 先阅读 `CLAUDE.md`、`AGENTS.md` 和本命令文件。
+- 若需要查找项目内 CPU/FPGA/myCobot 相关源码，先用 codebase-memory-mcp 的 `D-cicc_cbm_link` 图谱定位，再回到真实文件核查。
 - 正式决赛路线是板上 CPU 控制 myCobot：协议封包、点位表、动作序列、互锁、超时和异常处理放到 CPU；FPGA RTL 只提供 UART/FIFO/寄存器等硬件通道。
 - PC + `pymycobot` 只用于开发期标定、验证机械臂安全范围和记录点位，不进入正式比赛闭环。
 - 不提出纯 FPGA RTL 直接承载 myCobot 动作状态机的主线方案。

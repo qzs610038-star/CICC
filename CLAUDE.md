@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
 ## 仓库性质
-本仓库是第十届集创赛雄芯院方向的 FPGA 资料包，不是单一的软件工程。实际开发主工程位于 `赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/`；`赛方提供材料/例程/2ChMIPICSI_2ChMIPIDSI_Demo_Test/` 是高度相关的参考工程，目录结构和部分 RTL 基本对应。
+本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
 
 当前分赛区决赛方案以 `分赛区决赛实施开发路线.md` 为最高层路线文件。已经重新解压并复扫的 `初赛demo/2ChMIPICSI_2ChMIPIDSI_Demo_Test/` 只作为经验库、风险清单和链路参考，不作为决赛代码基线。任何方案都必须保持“FPGA 视频前端 / ROI / 统计特征 / OSD + 板上 CPU 识别决策与机械臂控制”的主线，不再回到纯 FPGA 视觉识别或纯 FPGA 机械臂控制。
 
@@ -16,14 +16,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 - `outflow/` 等构建产物
 
 ## 主工程入口
+正式开发主工程：
+
+- FPGA 工程：`final_project/fpga/efinity/mem_test.xml`
+- FPGA 约束：`final_project/fpga/efinity/constrain.sdc`
+- FPGA 顶层：`final_project/fpga/rtl/top/top.v` 中的 `top`
+- 板上 CPU 程序：`final_project/cpu/app/src/*.c`
+- CPU BSP / MMIO 边界：`final_project/cpu/app/include/bsp.h`
+- 接口契约和文档：`final_project/integration/`、`final_project/docs/`
+
+赛方对照工程：
+
 - 工具链 / 器件：Efinity `2025.2.288.4.15`，Titanium `TJ375N529`，时序模型 `I3`
-- 主工程文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml`
-- 主约束文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc`
-- 顶层模块：`src/top.v` 中的 `top`
+- 原始主工程文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml`
+- 原始主约束文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc`
+- 原始顶层模块：`src/top.v` 中的 `top`
 - 主要生成 IP 配置入口：
   - `ip/csi_rx_controller/settings.json`
   - `ip/dsi_tx/settings.json`
   - `ip/ram/settings.json`
+
+## Codebase Memory 图谱
+本项目已启用 codebase-memory-mcp，用于让 Claude/Codex/队友 Agent 在阅读代码前快速定位真实入口。
+
+- 默认图谱项目：`D-cicc_cbm_link`
+- 默认索引入口：`D:\cicc_cbm_link`
+- 主 artifact：`.codebase-memory/graph.db.zst`
+- Phase 2 资料库 artifact：`.codebase-memory/phase2/official_demo/`、`.codebase-memory/phase2/prelim_src/`、`.codebase-memory/phase2/prelim_sw/`
+- 详细维护说明：`CBM_CONFIG_GUIDE.md`
+
+推荐使用顺序：
+
+```text
+list_projects / index_status
+-> get_architecture / search_graph / search_code
+-> 回到真实源码、Efinity XML、日志和上板现象核查
+```
+
+图谱只负责定位和上下文压缩。涉及 RTL 连线、时钟复位、AXI/framebuffer、QCRV32、myCobot 实机安全或 warning 取舍时，必须以真实文件和验证日志为准。
 
 ## 分赛区决赛主线
 本项目当前不是继续完善初赛纯 RTL 识别 demo，而是另起更稳的决赛闭环：
@@ -70,7 +100,12 @@ myCobot 280 文档指定 PC 端通过 USB 转 TTL 串口通信。接线记录为
 
 打开主 Efinity 工程：
 ```powershell
-Invoke-Item "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml"
+Invoke-Item "final_project\fpga\efinity\mem_test.xml"
+```
+
+确认 codebase-memory 主图谱：
+```powershell
+codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm_link`"}"
 ```
 
 运行 RAM IP 仿真：
@@ -103,7 +138,7 @@ Get-PnpDevice -Class Ports -ErrorAction SilentlyContinue | Select-Object Status,
 若仅看到蓝牙 COM 口，不能认为机械臂已连接；应优先检查 CP210x 驱动和 USB-TTL 线。资料包 CP210x 驱动说明建议优先安装高版本驱动，不行再尝试低版本。
 
 ## 整体架构
-主设计是一个围绕 `src/top.v` 搭建的双路视频处理链路。顶层把以下几类模块串接在一起：
+主设计是一个围绕 `final_project/fpga/rtl/top/top.v` 搭建的双路视频处理链路。顶层把以下几类模块串接在一起：
 
 - 双路 MIPI CSI-2 图像输入与摄像头控制
 - 基于 AXI 的帧缓存与外部存储访问
@@ -116,16 +151,16 @@ Get-PnpDevice -Class Ports -ErrorAction SilentlyContinue | Select-Object Status,
 
 理解代码时，以下结构关系最重要：
 
-- `src/top.v` 是系统集成中心。主要子模块都在这里例化，并通过宏控制功能开关，例如 `FRAME_BUFFER`、`HDMI_OUT_EN`。
+- `final_project/fpga/rtl/top/top.v` 是正式工程系统集成中心。主要子模块都在这里例化，并通过宏控制功能开关，例如 `FRAME_BUFFER`、`HDMI_OUT_EN`。
 - 设计明显按双通道组织，很多信号和模块都会成对出现，通常用 `0` / `1` 后缀区分两路。因此改一路逻辑时，要同步检查另一路是否也应保持一致。
-- `src/framebuffer/` 是整套设计的存储与时序核心，负责视频流写入/读出、AXI burst 访问、数据打包拆包、显示时序对齐等。
-- `src/axi_interconnect/rtl/` 是视频链路使用的 AXI 互连与仲裁逻辑。
-- `src/mipi_csi/` 是 CSI 接收相关逻辑；其中 `cam_i2c_ctrl/` 下面是摄像头 I2C 配置与寄存器初始化链路。
-- `src/mipi_dsi/` 是面板配置与 DSI 发射链路。
-- `src/dvi_tx/` 是 HDMI / TMDS 输出通路。
-- `src/debayer/` 负责 Bayer 原始图像到 RGB 的转换。
-- `src/contract_bright/` 负责亮度 / 对比度调整。
-- `src/uvc_src/` 是可选的 UVC / FX3 输出路径及其颜色格式处理辅助模块。
+- `final_project/fpga/rtl/framebuffer/` 是整套设计的存储与时序核心，负责视频流写入/读出、AXI burst 访问、数据打包拆包、显示时序对齐等。
+- `final_project/fpga/rtl/axi/` 是视频链路使用的 AXI 互连与仲裁逻辑。
+- `final_project/fpga/rtl/mipi_csi/` 是 CSI 接收相关逻辑；其中 `cam_i2c_ctrl/` 下面是摄像头 I2C 配置与寄存器初始化链路。
+- `final_project/fpga/rtl/mipi_dsi/` 是面板配置与 DSI 发射链路。
+- `final_project/fpga/rtl/dvi_tx/` 是 HDMI / TMDS 输出通路。
+- `final_project/fpga/rtl/debayer/` 负责 Bayer 原始图像到 RGB 的转换。
+- `final_project/fpga/rtl/contract_bright/` 负责亮度 / 对比度调整。
+- `final_project/fpga/rtl/uvc_src/` 是可选的 UVC / FX3 输出路径及其颜色格式处理辅助模块。
 
 ## FPGA 与机械臂联动边界
 TJ375N529 开发板提供 3 路 UART：JTAG-IF UART、Type-C 转 UART、UART2 TO Peripherals，并有 J13/J15 预留 3.3V GPIO。FPGA-to-myCobot 联动应按“PC 端先验证 myCobot 串口控制，再让板上 CPU 输出 myCobot 协议，FPGA RTL 只提供串口/FIFO/寄存器通道”的顺序推进。
@@ -136,13 +171,13 @@ TJ375N529 开发板提供 3 路 UART：JTAG-IF UART、Type-C 转 UART、UART2 TO
 - 默认波特率 `1000000` 仅用于 myCobot 串口控制；开发板 Type-C UART、JTAG-IF UART、UART2 的波特率必须根据对应固件或 RTL 另行确认。
 
 ## 关键文件的职责
-- `mem_test.xml` 是主工程的权威清单，定义了实际参与构建的源码列表、器件信息、综合 / 布局布线参数以及关联 IP。
+- `final_project/fpga/efinity/mem_test.xml` 是正式主工程的权威清单，定义了实际参与构建的源码列表、器件信息、综合 / 布局布线参数以及关联 IP。
 - `ip/*/settings.json` 是各生成 IP 的配置源；若只是改参数，优先改这里，不要直接手改 `ipm/` 下的生成产物。
 - `debug_profile.wizard.json` 记录了工程里的在线调试 / 逻辑分析探针配置。
-- `src/axi_interconnect/sim/`、`src/framebuffer/modelsim_tb/`、`src/uvc_src/color_bar_v3.0/` 这些目录保留了针对局部子系统的独立仿真资产，排查单块问题时很有用。
+- `final_project/fpga/rtl/axi/`、`final_project/fpga/rtl/framebuffer/`、`final_project/fpga/rtl/uvc_src/` 这些目录保留了针对局部子系统的独立仿真或参考资产，排查单块问题时很有用。
 
 ## 修改时的工作方式
-- 只有在系统连线关系变化时才优先改 `src/top.v`；如果问题属于某个子模块内部，应尽量把改动限制在该子系统目录内。
+- 只有在系统连线关系变化时才优先改 `final_project/fpga/rtl/top/top.v`；如果问题属于某个子模块内部，应尽量把改动限制在该子系统目录内。
 - 对生成文件和赛方原始文件保持克制，尽量不要直接重写 `ipm/`、补丁内容、波形文件、仿真 work 数据库和原始压缩包。
 - 凡是涉及视频时序、AXI 位宽、帧缓存地址、双通道对称结构的改动，都要联动检查参数定义、模块例化和另一路通道，而不是只改单点。
 

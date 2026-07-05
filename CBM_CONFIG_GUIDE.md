@@ -309,6 +309,7 @@ Agent 使用建议：
 
 - 真实中文路径 `D:/第十届集创赛-雄芯院材料` 直接索引会失败；当前使用 `D:/cicc_cbm_link` junction 作为稳定入口。
 - PowerShell CLI 的 `index_repository` 参数解析不可用；索引动作使用 MCP 工具调用。
+- 2026-07-05 入口文档维护后，MCP 运行态索引可更新到 `969 nodes / 1338 edges`，但本机未实际覆盖 `.codebase-memory/artifact.json` / `graph.db.zst`；共享 artifact 仍以已提交的 `967 nodes / 1356 edges` 为准。遇到这种情况不要声称 artifact 已刷新，应先核对 `artifact.json` 的 `indexed_at` 和节点数。
 - 图谱主要是文件/目录级，不保证 Verilog module 级语义。
 - `final_project/docs`、`final_project/integration`、`final_project/tools` 当前被 CBM 自动排除；文档审查仍要回到真实 Markdown 和源码。
 
