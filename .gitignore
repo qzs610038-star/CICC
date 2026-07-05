@@ -57,6 +57,10 @@ tcl_stacktrace.txt
 *.asm
 *.d
 
+# Python generated files
+__pycache__/
+*.pyc
+
 # Tool and IDE generated metadata
 .metadata/
 .settings/
