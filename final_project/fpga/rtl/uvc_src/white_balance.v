@@ -69,6 +69,7 @@ module white_balance #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             de_d      <= 1'b0;
+            vs_d      <= 1'b0;
             sum_r     <= {SUM_WIDTH{1'b0}};
             sum_g     <= {SUM_WIDTH{1'b0}};
             sum_b     <= {SUM_WIDTH{1'b0}};
@@ -76,6 +77,7 @@ module white_balance #(
 
         end else begin
             de_d <= de_in;
+            vs_d <= vs_in;
             if( vs_fall ) begin 
                 pixel_cnt <= 'd0;
                 sum_r <= 'd0;
@@ -89,9 +91,9 @@ module white_balance #(
             end
         end
     end
-    wire [DATA_WIDTH-1:0] avg_r_calc = sum_r / pixel_cnt;
-    wire [DATA_WIDTH-1:0] avg_g_calc = sum_g / pixel_cnt;
-    wire [DATA_WIDTH-1:0] avg_b_calc = sum_b / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_r_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_r / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_g_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_g / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_b_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_b / pixel_cnt;
 
      always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

@@ -16,6 +16,7 @@ module hdmi_top
     ////////////////////////    CLOCK & PLL     ////////////////////////
 	input hdmi_tx_locked,
     input hdmi_tx_slow_clk,
+  input         i_video_ready,
   input 		i_hs,
   input 		i_vs,
   input 		i_de,
@@ -35,16 +36,19 @@ module hdmi_top
 	output tmds_data0_TX_RST,
 	output tmds_data1_TX_RST,
 	output tmds_data2_TX_RST,
-	output tmds_clk_TX_RST
+	output tmds_clk_TX_RST,
+  output        o_input_stable
 
 );
 
 //=====================================================================================
 //localpram
 //=====================================================================================
+    // Keep fallback active until the selected camera path has stable timing.
+    parameter   USE_INPUT_STABLE_GATE = 1'b1;
 	parameter	MAX_HRES		= 12'd1920;
-	parameter	MAX_VRES		= 12'd1536;
-	parameter	HSP				= 8'd2;
+	parameter	MAX_VRES		= 12'd1080;
+	parameter	HSP				= 8'd4;
 	parameter	HBP				= 8'd88;
 	parameter	HFP				= 8'd120;
 	parameter	VSP				= 8'd2;
@@ -63,6 +67,10 @@ wire[7:0]                       video_r;
 wire[7:0]                       video_g;
 wire[7:0]                       video_b;
 wire   							sys_rst_n;
+wire [23:0]                      i_cfg_vid;
+wire [15:0]                      h_cnt;
+wire [15:0]                      v_cnt;
+assign i_cfg_vid = 24'd0;
 //=====================================================================================
 //rest-n
 //=====================================================================================
@@ -100,9 +108,13 @@ assign tmds_data2_TX_RST = 1'b0;
 assign tmds_clk_TX_RST   = 1'b0;
 
 wire i_stable;
+wire video_path_ready = sys_rst_n & i_video_ready;
+wire use_input_video = video_path_ready & (!USE_INPUT_STABLE_GATE || i_stable);
+assign o_input_stable = video_path_ready & i_stable;
+
 vid_info_det vid_info_det_inst (
     .clk(hdmi_tx_slow_clk),
-    .rst_n(1'b1),
+    .rst_n(video_path_ready),
     .i_vs(i_vs),
     .i_hs(i_hs),
     .i_de(i_de),
@@ -113,6 +125,7 @@ vid_info_det vid_info_det_inst (
     .o_h_act(),
     .h_active_error(),
     .o_v_act(),
+    .v_active_error(),
     .o_v_total(),
     .v_total_error(),
     .o_h_total(),
@@ -136,11 +149,11 @@ vid_info_det vid_info_det_inst (
     .VST(VSP),
     .VACT(MAX_VRES),
     .VBP(VBP),
-    .TEST_MODE(2'd1)
+    .TEST_MODE(2'd2)
   )
   color_bar_rgb_inst (
     .clk(hdmi_tx_slow_clk),
-    .rst_n(1'b1),
+    .rst_n(sys_rst_n),
     .i_cfg_vid(i_cfg_vid),
     .h_cnt(h_cnt),
     .v_cnt(v_cnt),
@@ -155,12 +168,12 @@ dvi_encoder dvi_encoder_m0
 	.pixelclk      (hdmi_tx_slow_clk        ),// system clock
 	.rstin         (~sys_rst_n         ),// reset
 	//hdmi tx
-	.blue_din      (i_stable ? i_bdata:video_b	 ),//(video_b	),    //  
-	.green_din     (i_stable ? i_gdata:video_g	 ),//(video_g	),    //  
-	.red_din       (i_stable ? i_rdata:video_r	 ),//(video_r	),    //  
-	.hsync         (i_stable ? i_hs   :video_hs  ),// (video_hs ),    //  
-	.vsync         (i_stable ? i_vs   :video_vs  ),// (video_vs ),    //  
-	.de            (i_stable ? i_de   :video_de  ),// (video_de ),    //
+	.blue_din      (use_input_video ? i_bdata : video_b	 ),//(video_b	),    //  
+	.green_din     (use_input_video ? i_gdata : video_g	 ),//(video_g	),    //  
+	.red_din       (use_input_video ? i_rdata : video_r	 ),//(video_r	),    //  
+	.hsync         (use_input_video ? i_hs    : video_hs  ),// (video_hs ),    //  
+	.vsync         (use_input_video ? i_vs    : video_vs  ),// (video_vs ),    //  
+	.de            (use_input_video ? i_de    : video_de  ),// (video_de ),    //
 	
     .tmds_data0    (tmds_data0),
     .tmds_data1    (tmds_data1),

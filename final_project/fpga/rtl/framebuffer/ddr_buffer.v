@@ -40,6 +40,7 @@ output [ WR_USEDW_WITH:0]						wr_fifo_wrusedw,
 
 output                                 ddr_rd_valid,
 output  [AXI_DATA_WIDTH-1:0] 					ddr_rd_data,
+output                                wr_frame_done,
 input 										            rd_fifo_wr_full,
 
 output 	[5:0] 									    awid,
@@ -103,6 +104,7 @@ wire		[AXI_ADDR_WIDTH-1:0]		wr_start_addr       ;
 wire		[AXI_ADDR_WIDTH-1:0]    rd_start_addr       ; 
 wire                            rd_end_flag         ;
 wire                            wr_end_flag         ;
+assign wr_frame_done = wr_end_flag;
 //=============================================================  
 //RTL                                                     
 //=============================================================  
