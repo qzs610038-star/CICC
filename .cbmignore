@@ -1,0 +1,105 @@
+# codebase-memory-mcp ignore rules for CICC
+
+# VCS / graph artifacts
+.git/
+.codebase-memory/
+
+# Local agent/runtime state
+.agents/
+.codex/
+.claude/settings.json
+.claude/scheduled_tasks.lock
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+.qoder/
+*.tmp
+*.bak
+*.swp
+
+# Python / local env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Efinity / simulation generated outputs
+outflow/
+work_syn/
+work_pnr/
+work_pt/
+work_dbg/
+work_sim/
+modelsim/
+*.vdb
+*.qdb
+*.db
+*.rs
+*.route.out
+*.place.out
+*.map.out
+*.tcl.out
+*.pgm.out
+*.pinout.csv
+*.interface.csv
+*.raminfo.pb
+*.troutingtraces
+
+# ModelSim / Questa
+transcript
+vsim.wlf
+*.wlf
+*.vcd
+*.gtkw
+modelsim.ini_new
+vish_stacktrace.vstf
+tcl_stacktrace.txt
+
+# RISC-V / C build outputs
+*.o
+*.elf
+*.hex
+*.bin
+*.lst
+*.map
+*.asm
+*.d
+
+# Tool and IDE generated metadata
+.metadata/
+.settings/
+*.launch
+*.prefs
+*.qpg
+*.qtl
+*.pickle
+*.log
+*.rpt
+
+# Large raw archives, installers, and media
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.exe
+*.msi
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.iso
+
+# Phase-1 shared graph: index the collaboration repo first.
+# Local source libraries can be indexed later as a separate extended graph.
+myblockly/
+初赛demo/
+赛方提供材料/
+
+# Local machine-specific config
+final_project/tools/mcp/fpga_robot_mcp/configs/fpga_robot.local.json
+final_project/tools/mcp/fpga_robot_mcp/logs/
