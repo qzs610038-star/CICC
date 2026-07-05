@@ -1,0 +1,11 @@
+{
+    "schema_version": 1,
+    "commit": "",
+    "indexed_at": "2026-07-05T14:41:17Z",
+    "project": "D-cbm_phase2_stage_20260705-prelim_src",
+    "nodes": 438,
+    "edges": 615,
+    "original_size": 1310720,
+    "compressed_size": 46245,
+    "compression_level": 9
+}

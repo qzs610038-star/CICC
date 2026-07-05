@@ -1,0 +1,11 @@
+{
+    "schema_version": 1,
+    "commit": "",
+    "indexed_at": "2026-07-05T14:41:13Z",
+    "project": "D-cbm_phase2_stage_20260705-official_demo",
+    "nodes": 628,
+    "edges": 962,
+    "original_size": 1835008,
+    "compressed_size": 67195,
+    "compression_level": 9
+}

@@ -87,7 +87,65 @@ Git 协作范围：
 
 ---
 
-## 4. 安装与注册
+## 4. Phase 2 资料库图谱审查
+
+结论：可以继续推进第二阶段，但不建议把全量资料库直接纳入默认共享 artifact。
+
+已建立的 Phase 2 本机 junction：
+
+```text
+D:\cicc_phase2_official_demo  -> 赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3
+D:\cicc_phase2_prelim_demo    -> 初赛demo\2ChMIPICSI_2ChMIPIDSI_Demo_Test
+D:\cicc_phase2_riscv_examples -> 赛方提供材料\例程\RISC-V例程
+D:\cicc_phase2_prelim_src     -> 初赛demo\2ChMIPICSI_2ChMIPIDSI_Demo_Test\src
+D:\cicc_phase2_prelim_sw      -> 初赛demo\2ChMIPICSI_2ChMIPIDSI_Demo_Test\sw
+D:\cicc_phase2_prelim_ip      -> 初赛demo\2ChMIPICSI_2ChMIPIDSI_Demo_Test\ip
+```
+
+非持久化索引烟测结果：
+
+| 项目 | 入口 | 节点/边 | 建议 |
+|---|---|---:|---|
+| `D-cicc_phase2_official_demo` | 官方主 demo | `638 / 982` | 推荐纳入 Phase 2 默认审查集 |
+| `D-cicc_phase2_prelim_src` | 初赛 demo `src/` | `438 / 615` | 推荐纳入 Phase 2 默认审查集 |
+| `D-cicc_phase2_prelim_sw` | 初赛 demo `sw/` | `83 / 120` | 推荐纳入 Phase 2 默认审查集 |
+| `D-cicc_phase2_prelim_ip` | 初赛 demo `ip/` | `12417 / 29124` | 按需索引，不默认持久化 |
+| `D-cicc_phase2_prelim_demo` | 初赛 demo 全量 | `85941 / 201806` | 过大，仅临时分析使用 |
+| `D-cicc_phase2_riscv_examples` | RISC-V 示例全量 | `48515 / 114677` | 过大，仅按需分析使用 |
+
+推荐推进路线：
+
+1. Phase 2A：持久化 `official_demo`、`prelim_src`、`prelim_sw` 三个精选图谱。
+2. Phase 2B：只在需要核对 QCRV32/IP/SoC 细节时临时索引 `prelim_ip` 或 RISC-V 示例。
+3. Phase 2C：若要共享资料库扩展 artifact，单独提交，不覆盖第一版 `.codebase-memory/graph.db.zst`。
+
+Phase 2A 已完成持久化，产物存放在：
+
+```text
+.codebase-memory/phase2/official_demo/
+.codebase-memory/phase2/prelim_src/
+.codebase-memory/phase2/prelim_sw/
+```
+
+本轮持久化采用临时 staging Git 仓库生成 artifact，再复制回主仓库。原因是 CBM 0.8.1 只会在被索引路径是 Git 仓库根目录时写出 `.codebase-memory/graph.db.zst`；直接对 Phase 2 junction 使用 `persistence=true` 可以完成索引，但不会生成 artifact。
+
+Phase 2A artifact：
+
+| 目录 | 项目名 | 节点/边 | `graph.db.zst` |
+|---|---|---:|---:|
+| `.codebase-memory/phase2/official_demo/` | `D-cbm_phase2_stage_20260705-official_demo` | `628 / 962` | `67,195 bytes` |
+| `.codebase-memory/phase2/prelim_src/` | `D-cbm_phase2_stage_20260705-prelim_src` | `438 / 615` | `46,245 bytes` |
+| `.codebase-memory/phase2/prelim_sw/` | `D-cbm_phase2_stage_20260705-prelim_sw` | `83 / 120` | `12,468 bytes` |
+
+注意：
+
+- Phase 2 图谱只能作为资料定位与经验对照，不改变“初赛 demo 不是决赛代码基线”的边界。
+- 全量初赛 demo 图谱很大，默认不建议持久化进 Git。
+- 若要提交 Phase 2 artifact，应采用单独目录或命名，避免和第一版协作工程图谱混淆。
+
+---
+
+## 5. 安装与注册
 
 Windows PowerShell：
 
@@ -105,7 +163,7 @@ codebase-memory-mcp install
 
 ---
 
-## 5. 首次拉取后的检查
+## 6. 首次拉取后的检查
 
 队友拉取后：
 
@@ -130,7 +188,7 @@ cmd /c mklink /J "D:\cicc_cbm_link" "E:\CICC"
 
 ---
 
-## 6. 初始化 / 刷新命令
+## 7. 初始化 / 刷新命令
 
 当前 PowerShell 下 `codebase-memory-mcp cli index_repository ...` 会误报 `repo_path is required`。刷新索引应通过 Codex / Claude 暴露的 MCP 工具执行：
 
@@ -163,7 +221,7 @@ graph.db.zst exists
 
 ---
 
-## 7. 提交范围
+## 8. 提交范围
 
 图谱初始化相关文件：
 
@@ -172,6 +230,7 @@ graph.db.zst exists
 .codebase-memory/.gitattributes
 .codebase-memory/artifact.json
 .codebase-memory/graph.db.zst
+.codebase-memory/phase2/
 CBM_CONFIG_GUIDE.md
 ```
 
@@ -197,7 +256,7 @@ codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm_link`"}"
 
 ---
 
-## 8. 使用方式
+## 9. 使用方式
 
 Agent 使用建议：
 
@@ -221,7 +280,7 @@ Agent 使用建议：
 
 ---
 
-## 9. 刷新策略
+## 10. 刷新策略
 
 不建议每次小改都更新图谱 artifact。推荐：
 
@@ -246,7 +305,7 @@ Agent 使用建议：
 
 ---
 
-## 10. 已知限制
+## 11. 已知限制
 
 - 真实中文路径 `D:/第十届集创赛-雄芯院材料` 直接索引会失败；当前使用 `D:/cicc_cbm_link` junction 作为稳定入口。
 - PowerShell CLI 的 `index_repository` 参数解析不可用；索引动作使用 MCP 工具调用。
@@ -255,7 +314,7 @@ Agent 使用建议：
 
 ---
 
-## 11. 初始化验收清单
+## 12. 初始化验收清单
 
 - [x] `codebase-memory-mcp --version` 输出 `0.8.1`。
 - [x] 仓库根目录已创建 `.cbmignore`。
@@ -264,11 +323,12 @@ Agent 使用建议：
 - [x] `index_status` 显示 `D-cicc_cbm_link` 为 `ready`。
 - [x] `.codebase-memory/graph.db.zst` 已生成且非 0 字节。
 - [x] `.codebase-memory/.gitattributes` 已生成，声明 `graph.db.zst merge=ours binary`。
+- [x] Phase 2A 精选资料库图谱已生成到 `.codebase-memory/phase2/`。
 - [ ] 图谱初始化文件已提交并推送。
 
 ---
 
-## 12. 一句话规则
+## 13. 一句话规则
 
 ```text
 第一版共享 codebase-memory 图谱通过 D:\cicc_cbm_link 生成，只覆盖 Git 协作工程和必要归档；它负责加速定位和管理上下文，不替代源码、Efinity 工程和审查证据。
