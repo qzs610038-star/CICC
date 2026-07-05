@@ -34,6 +34,8 @@ output	wire								o_hs , //active high
 output	wire								o_vs , //active hgih
 output	wire								o_de , //active high
 output	wire	[O_VID_WIDTH-1:0] 			vout ,
+output  wire                                frame_ready,
+output  wire                                fifo_rd_underflow,
 input  wire               out_sync,
 
 input	wire 	[12:0]						H_FRONT_PORCH 	,
@@ -109,6 +111,7 @@ wire                                                ddr_rd_valid;
 wire	[31:0]									    ddr_frame_len ;
 wire                                                frame_start;
 wire                                                frame_stable;
+wire                                                wr_frame_done;
 reg     [12:0]                                      h_front_porch  = 13'd100; 
 reg     [12:0]                                      h_sync 	 		= 13'd100; 
 reg     [12:0]                                      h_valid 	 	 	= 13'd100; 
@@ -122,6 +125,7 @@ wire                                                 rd_start ;
 wire                                                frame_en ;
 wire                                                axi_clk_rst_n;
 wire                                                o_clk_rst_n;
+wire                                                tx_fifo_rd_underflow;
 //=============================================================  
 //RTL                                                     
 //=============================================================  
@@ -191,6 +195,7 @@ ddr_buffer #(
     .rd_burst_len     (ddr_frame_len  ),
     .ddr_rd_valid     (ddr_rd_valid   ),
     .ddr_rd_data      (ddr_rd_data    ),
+    .wr_frame_done    (wr_frame_done  ),
     .rd_fifo_wr_full  (rd_fifo_wr_full),
 
     .awid			  ( awid			),
@@ -287,6 +292,52 @@ end
 
 reg [1:0] rd_frame_en_r = 'd0;
 reg [1:0] fifo_rd_period_r = 'd0;
+reg       rd_frame_available_axi = 1'b0;
+reg [1:0] rd_frame_available_o = 2'b00;
+wire      rd_frame_available;
+reg       fifo_rd_underflow_latched = 1'b0;
+reg       fifo_rd_period_d = 1'b0;
+wire      fifo_rd_frame_end;
+
+always @(posedge axi_clk or negedge axi_clk_rst_n)
+begin
+    if (!axi_clk_rst_n)
+        rd_frame_available_axi <= 1'b0;
+    else if (wr_frame_done)
+        rd_frame_available_axi <= 1'b1;
+end
+
+always @(posedge o_clk or negedge o_clk_rst_n)
+begin
+    if (!o_clk_rst_n)
+        rd_frame_available_o <= 2'b00;
+    else
+        rd_frame_available_o <= {rd_frame_available_o[0], rd_frame_available_axi};
+end
+
+assign rd_frame_available = rd_frame_available_o[1];
+assign frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched;
+assign fifo_rd_underflow = fifo_rd_underflow_latched;
+assign fifo_rd_frame_end = fifo_rd_period_d & ~fifo_rd_period;
+
+always @(posedge o_clk or negedge o_clk_rst_n)
+begin
+    if (!o_clk_rst_n)
+        fifo_rd_period_d <= 1'b0;
+    else
+        fifo_rd_period_d <= fifo_rd_period;
+end
+
+always @(posedge o_clk or negedge o_clk_rst_n)
+begin
+    if (!o_clk_rst_n)
+        fifo_rd_underflow_latched <= 1'b0;
+    else if (!frame_en || fifo_rd_frame_end)
+        fifo_rd_underflow_latched <= 1'b0;
+    else if (tx_fifo_rd_underflow)
+        fifo_rd_underflow_latched <= 1'b1;
+end
+
 always @( posedge o_clk or negedge o_clk_rst_n ) //two pipeline
 begin
     if( !o_clk_rst_n ) begin
@@ -303,8 +354,8 @@ begin
         fifo_rd_period_r <= {fifo_rd_period_r[0],fifo_rd_period};
     end 
 end
-assign rd_start = fifo_rd_period_r[1];
-assign frame_en = rd_frame_en_r[1];
+assign rd_start = fifo_rd_period_r[1] & rd_frame_available_axi;
+assign frame_en = rd_frame_en_r[1] & rd_frame_available;
 data_tx #(
 	.VID_WIDTH 				( O_VID_WIDTH  ),
 	.FIFO_DIPTH  			( 1024 				 ),
@@ -325,6 +376,7 @@ data_tx #(
 	/*i*/.fifo_wr_en	        (tx_valid		    ),
 	/*o*/.fifo_wr_almost_full	(tx_almost_full	),
 	/*o*/.fifo_rd_period      (fifo_rd_period ),
+	/*o*/.fifo_rd_underflow   (tx_fifo_rd_underflow),
 	/*o*/.vout		            (vout		        ),
 	/*o*/.o_hs		            (o_hs		        ),
 	/*o*/.o_vs		            (o_vs		        ),

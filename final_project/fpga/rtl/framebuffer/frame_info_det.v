@@ -120,7 +120,7 @@ reg frame_end_r1 = 'd0;
 			frame_len_d1 <= 'd0; 
 			frame_len_d2 <= 'd0; 
   		end else if( frame_end_r0 ) begin
-			frame_len_d0 <= frame_end_r0;//frame_pix_num;
+			frame_len_d0 <= frame_pix_num_o;
 			frame_len_d1 <= frame_len_d0;
 			frame_len_d2 <= frame_len_d1;
   		end
@@ -133,7 +133,7 @@ reg frame_end_r1 = 'd0;
   		if( !rst_n ) begin
 			frame_stable <= 1'b0;
 		end else if( frame_end_r1 ) begin
-			if( frame_len_d0 == frame_len_d1)// && frame_len_d0 == frame_len_d2 )
+			if( frame_len_d0 == frame_len_d1 && frame_len_d0 == frame_len_d2 && |frame_len_d0[23:12])
 					frame_stable <= 1'b1;
 			else
 					frame_stable <= 1'b0;
