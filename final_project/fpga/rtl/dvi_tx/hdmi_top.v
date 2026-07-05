@@ -168,11 +168,11 @@ dvi_encoder dvi_encoder_m0
 	.pixelclk      (hdmi_tx_slow_clk        ),// system clock
 	.rstin         (~sys_rst_n         ),// reset
 	//hdmi tx
-	.blue_din      (use_input_video ? i_bdata : video_b	 ),//(video_b	),    //  
-	.green_din     (use_input_video ? i_gdata : video_g	 ),//(video_g	),    //  
-	.red_din       (use_input_video ? i_rdata : video_r	 ),//(video_r	),    //  
-	.hsync         (use_input_video ? i_hs    : video_hs  ),// (video_hs ),    //  
-	.vsync         (use_input_video ? i_vs    : video_vs  ),// (video_vs ),    //  
+	.blue_din      (use_input_video ? i_bdata : video_b   ),//(video_b ),    //
+	.green_din     (use_input_video ? i_gdata : video_g   ),//(video_g ),    //
+	.red_din       (use_input_video ? i_rdata : video_r   ),//(video_r ),    //
+	.hsync         (use_input_video ? i_hs    : video_hs  ),// (video_hs ),    //
+	.vsync         (use_input_video ? i_vs    : video_vs  ),// (video_vs ),    //
 	.de            (use_input_video ? i_de    : video_de  ),// (video_de ),    //
 	
     .tmds_data0    (tmds_data0),
