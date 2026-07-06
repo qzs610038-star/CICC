@@ -23,7 +23,7 @@ output      wire                                         o_frame_end
 );
 localparam SHIFT_INT = O_VID_WIDTH/I_VID_WIDTH;
 localparam SHIFT_FLOAT = O_VID_WIDTH%I_VID_WIDTH;
-localparam I_VID_DIV = I_VID_WIDTH/SHIFT_FLOAT;
+localparam I_VID_DIV = (SHIFT_FLOAT == 0) ? 0 : I_VID_WIDTH/SHIFT_FLOAT;
 localparam MAXI_DATA_WIDTH = max_width(I_VID_WIDTH,O_VID_WIDTH);
 localparam IN_CNT = MAXI_DATA_WIDTH/I_VID_WIDTH;
 localparam OU_CNT = MAXI_DATA_WIDTH/O_VID_WIDTH;
@@ -202,23 +202,21 @@ end
 endgenerate
 //=======================================================================================
  function integer max_width;
- input [I_VID_WIDTH-1:0] indata;
- input [O_VID_WIDTH-1:0]	axi_data;
+ input integer indata;
+ input integer axi_data;
  integer i;
- reg [I_VID_WIDTH-1:0] sub_idata1,sub_idata2;
- reg [I_VID_WIDTH-1:0] max_sub_idata;
+ integer max_sub_idata;
  begin
 
- for(i = 0;i <= indata;i = i+1 ) begin 
-         sub_idata1 = indata%i;
-         sub_idata2 = axi_data%i;
-         if( sub_idata1 == 0 && sub_idata2 == 0 ) begin 
+ max_sub_idata = 1;
+ for(i = 1;i <= indata;i = i+1 ) begin 
+         if( (indata % i) == 0 && (axi_data % i) == 0 ) begin 
              max_sub_idata = i ;
          end 
          
  end 
 
- max_width=indata/max_sub_idata* axi_data;
+ max_width = (indata / max_sub_idata) * axi_data;
  end
 endfunction
 

@@ -30,6 +30,7 @@ module DC_FIFO
 
 assign RdDNum[AW_C] = 1'b0;
 assign WrDNum[AW_C] = 1'b0;
+assign DataVal = RdEn & ~RdEmpty;
 
 elt_dcfifo
 #(

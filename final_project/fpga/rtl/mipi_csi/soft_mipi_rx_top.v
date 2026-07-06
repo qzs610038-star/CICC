@@ -63,7 +63,9 @@ module soft_mipi_rx_top #(
    output      rx_out_de,
    output      rx_out_hs,
    output      rx_out_vs,
-   output      [PACK_BIT-1:0] rx_out_data
+   output      [PACK_BIT-1:0] rx_out_data,
+   output      [5:0] rx_out_datatype,
+   output      [3:0] rx_out_pixel_per_clk
 
 
 
@@ -77,6 +79,10 @@ module soft_mipi_rx_top #(
 //========================================================================== 
 wire mipi_dphy_rx_reset_byte_HS_n;
 wire reset_pixel_n;
+wire [63:0] csi_pixel_data;
+wire [15:0] word_count;
+wire [5:0]  datatype;
+wire [3:0]  pixel_per_clk;
     
 reset
 #(
@@ -107,12 +113,18 @@ inst_pixel_clk_rst
 
 
 
-reg		[5:0]	r_rx_axi_araddr_1P;
-reg				r_rx_axi_arvalid_1P;
+wire	[5:0]	r_rx_axi_araddr_1P;
+wire			r_rx_axi_arvalid_1P;
 wire			w_rx_axi_arready;
 wire	[31:0]	w_rx_axi_rdata;
 wire			w_rx_axi_rvalid;
 reg				r_rx_axi_rready_1P;
+
+assign r_rx_axi_araddr_1P  = 6'd0;
+assign r_rx_axi_arvalid_1P = 1'b0;
+assign rx_out_data = csi_pixel_data[PACK_BIT-1:0];
+assign rx_out_datatype = datatype;
+assign rx_out_pixel_per_clk = pixel_per_clk;
 
   assign mipi_rx_dp00_RST = 1'b0; 
   assign mipi_rx_dp01_RST = 1'b0; 
@@ -142,6 +154,10 @@ csi_rx_controller inst_efx_csi2_rx
 	.Rx_HS_D_1			    (mipi_rx_dp01_HS_IN),	
 	.Rx_HS_D_2			    (mipi_rx_dp02_HS_IN),
 	.Rx_HS_D_3			    (mipi_rx_dp03_HS_IN),
+	.Rx_HS_D_4			    (8'd0),
+	.Rx_HS_D_5			    (8'd0),
+	.Rx_HS_D_6			    (8'd0),
+	.Rx_HS_D_7			    (8'd0),
 	.Rx_HS_enable_D		  ({mipi_rx_dp03_HS_ENA    , mipi_rx_dp02_HS_ENA    , mipi_rx_dp01_HS_ENA    , mipi_rx_dp00_HS_ENA    }),
 	.LVDS_termen_D		  ({mipi_rx_dp03_HS_TERM   , mipi_rx_dp02_HS_TERM   , mipi_rx_dp01_HS_TERM   , mipi_rx_dp00_HS_TERM   }),
 	.fifo_rd_enable     ({mipi_rx_dp03_FIFO_RD   , mipi_rx_dp02_FIFO_RD   , mipi_rx_dp01_FIFO_RD   , mipi_rx_dp00_FIFO_RD   }),
@@ -182,9 +198,9 @@ csi_rx_controller inst_efx_csi2_rx
     .vc					(),
 	.word_count			(word_count),
 	.shortpkt_data_field(),
-	.datatype			(datatype),        //DATATYPE RAW8
-    .pixel_per_clk		(),
-	.pixel_data			(rx_out_data),
+	.datatype			(datatype),
+    .pixel_per_clk		(pixel_per_clk),
+	.pixel_data			(csi_pixel_data),
     .pixel_data_valid	(rx_out_de),
     .irq				(),
      .mipi_debug_in(),
@@ -228,7 +244,7 @@ vid_info_det # (
   )
   vid_info_det_inst (
     .clk(i_sysclk_div2),
-    .rst_n(pixel_data_en),
+    .rst_n(reset_pixel_n),
     .i_vs(rx_out_vs),
     .i_hs(rx_out_hs),
     .i_de(rx_out_de),

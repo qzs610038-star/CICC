@@ -27,6 +27,7 @@ input 												axi_clk,
 input 												rst_n,
 input	wire								i_clk	,
 input	wire								i_vs, //active hgih
+input	wire								i_hs,
 input	wire								i_de, //active high
 input	wire	[I_VID_WIDTH-1:0] 			vin ,
 input	wire								o_clk	,
@@ -97,11 +98,12 @@ output  									bready
 wire												wr_fifo_wren		;
 wire												wr_fifo_wrfull	;
 wire [AXI_DATA_WIDTH-1:0]		                    wr_fifo_wrdata	; 
+wire                                                wr_fifo_rst_p;
+wire [WR_USEDW_WITH:0]                              wr_fifo_wrusedw;
 
 
 wire [AXI_DATA_WIDTH-1:0] 	rd_fifo_rddata	;
 wire 												rd_fifo_rdempty	;
-reg												    rd_fifo_rdvalid ;
 wire                                                rd_fifo_wr_full;
 wire [AXI_DATA_WIDTH-1:0]                           ddr_rd_data;
 wire                                                ddr_rd_valid;
@@ -153,6 +155,7 @@ vid_rx_align_v1 #(
 /*i*/.clk			          (i_clk  		    ),  
 /*i*/.rst_n			        (rst_n	        ),
 /*i*/.i_vs			        (i_vs			      ), //active hgih
+/*i*/.i_hs			        (i_hs			      ),
 /*i*/.i_de			        (i_de			      ), //active high
 /*i*/.vin			          (vin			      ),
 /*o*/.fifo_wr_en	      (wr_fifo_wren	  ),
@@ -239,6 +242,7 @@ ddr_buffer #(
     wire                  rd_fifo_rden1;
     wire                 rd_fifo_rdempty1;
     wire [127:0]         rd_fifo_rddata1;
+    reg                  rd_fifo_rdvalid1;
 
     fifo_d512t128 # (
         .AXI_DATA_WIDTH(AXI_DATA_WIDTH),
@@ -257,6 +261,14 @@ ddr_buffer #(
         .rd_fifo_rddata1 (rd_fifo_rddata1)
       );
 
+always @(posedge o_clk or negedge o_clk_rst_n)
+begin
+    if (!o_clk_rst_n)
+        rd_fifo_rdvalid1 <= 1'b0;
+    else
+        rd_fifo_rdvalid1 <= rd_fifo_rden1;
+end
+
 wire tx_valid;
 wire [O_VID_WIDTH-1:0] tx_vin;
 wire   tx_almost_full;
@@ -268,7 +280,7 @@ wire   tx_almost_full;
     /*i*/.clk               (o_clk              ),
     /*i*/.rst_n             (o_clk_rst_n              ),
     /*i*/.frame_period      (fifo_rd_period     ),
-    /*i*/.rd_fifo_rdvalid   (rd_fifo_rdvalid    ),
+    /*i*/.rd_fifo_rdvalid   (rd_fifo_rdvalid1   ),
     /*i*/.rd_fifo_rddata    (rd_fifo_rddata1    ),
     /*i*/.rd_fifo_rdempty   (rd_fifo_rdempty1   ),
     /*o*/.rd_fifo_rden      (rd_fifo_rden1      ),
