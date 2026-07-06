@@ -1,0 +1,7 @@
+set pagination off
+set confirm off
+target remote localhost:12346
+load
+continue
+x/4xw &g_results
+quit

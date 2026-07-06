@@ -1,0 +1,8 @@
+#ifndef SHAPE_PARAMS_H
+#define SHAPE_PARAMS_H
+
+#define SHAPE_MIN_AREA_PIXELS      1u
+#define SHAPE_MAX_AREA_PIXELS      0xFFFFFFFFu
+#define SHAPE_ASPECT_RATIO_SCALE   1000u
+
+#endif
