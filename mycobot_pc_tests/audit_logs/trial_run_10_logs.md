@@ -12,14 +12,14 @@
 
 ```text
 PS D:\第十届集创赛-雄芯院材料> python mycobot_pc_tests/teach_replay_pick_return_ready.py
-PS D:\第十届集创赛-雄芯院材料> 
- *  还原的历史记录 
+PS D:\第十届集创赛-雄芯院材料>
+ *  还原的历史记录
 
 PS D:\第十届集创赛-雄芯院材料> python mycobot_pc_tests/teach_replay_pick_return_ready.py
 
 自动检测到以下可能的机械臂串口：
   [0] COM10 - USB-SERIAL CH340 (COM10)
-请输入对应的序号 (直接回车默认选[0]): 
+请输入对应的序号 (直接回车默认选[0]):
 尝试连接机械臂 (COM10 @ 1000000)...
 Note: This class is no longer maintained since v3.6.0, please refer to the project documentation: https://github.com/elephantrobotics/pymycobot/blob/main/README.md
 ====================================
@@ -166,7 +166,7 @@ arm_max_diff=43.1 <= 45.0，低速同步回直立零位...
 【警告】当前大臂 1-5 轴与零位偏差较大 (arm_max_diff=45.4度 > 45.0度)。
 -> 不自动执行笛卡尔保护拉升。进入人工扶正流程。
 当前大臂偏差较大。请先用手扶稳机械臂，按 Enter 后释放舵机...
-请手动扶到【夹爪尖端朝前】的预回零姿态；完成后按 Enter 上电读取，输入 q 放弃: 
+请手动扶到【夹爪尖端朝前】的预回零姿态；完成后按 Enter 上电读取，输入 q 放弃:
 扶正后稳定关节角: [7.99, -36.38, 3.51, 12.12, -4.48, 54.75]
 扶正后稳定空间坐标: [194.1, -40.3, 363.0, -122.12, 48.39, -111.94]
 扶正后大臂 1-5 轴偏差: [7.99, 36.38, 3.51, 12.12, 4.48], arm_max_diff=36.4

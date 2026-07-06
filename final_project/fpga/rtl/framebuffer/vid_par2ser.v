@@ -1,7 +1,7 @@
 module vid_par2ser#(
     parameter I_VID_WIDTH = 128,
     parameter O_VID_WIDTH = 48
-    
+
 
 )(
     input clk,
@@ -52,20 +52,20 @@ always @( posedge clk )
 begin
     rd_fifo_rdvalid_r <= rd_fifo_rdvalid;
 end
-generate 
+generate
 
-if( MAXI_DATA_WIDTH ==  I_VID_WIDTH) begin 
+if( MAXI_DATA_WIDTH ==  I_VID_WIDTH) begin
     always @( posedge clk )
     begin
         data_buffer <= rd_fifo_rdvalid_r ? rd_fifo_rddata : data_buffer;
     end
-end else begin 
+end else begin
     always @( posedge clk )
     begin
         data_buffer <= rd_fifo_rdvalid_r ? {data_buffer[MAXI_DATA_WIDTH-I_VID_WIDTH-1:0],rd_fifo_rddata} : data_buffer;
     end
-end 
-endgenerate 
+end
+endgenerate
 
 
 always @( posedge clk )
@@ -99,16 +99,16 @@ assign rd_fifo_rden =  ~pipe_en & rd_fifo_rden_r &(~rd_fifo_rdempty) ;
 
 always @( posedge clk )
 begin
-    if( pipe_en &&(dirty_data | rd_last)) begin 
+    if( pipe_en &&(dirty_data | rd_last)) begin
         data_buffer1 <= data_buffer;
     end else if( ~wr_fifo_full & tx_valid_en ) begin //
         data_buffer1 <= data_buffer1 << O_VID_WIDTH;
-    end 
+    end
 end
 
 always @( posedge clk )
 begin
-    if( pipe_en &&(dirty_data | rd_last)) begin 
+    if( pipe_en &&(dirty_data | rd_last)) begin
         tx_fifo_valid <= 1'b1;
     end else if( ~wr_fifo_full & tx_valid_en & ~rd_last ) begin //
         tx_fifo_valid <= 1'b1;
@@ -131,7 +131,7 @@ begin
     else if(tx_valid_en ) begin //~dirty_data &&
         if( ~wr_fifo_full )
             shift_out <= shift_out == OU_CNT-1 ? 'd0 : shift_out + 1'b1;
-    end else 
+    end else
         shift_out <= 'd0;
 end
 
@@ -139,7 +139,7 @@ always @( posedge clk or negedge rst_n )
 begin
     if( !rst_n )
         dirty_data <= 1'b1;
-    else if( pipe_en )//第一个数据控制 dirty_data && 
+    else if( pipe_en )//第一个数据控制 dirty_data &&
         dirty_data <= 1'b0;
     else if( rd_last & ~pipe_en)
         dirty_data <= 1'b1;
@@ -158,12 +158,12 @@ integer max_sub_idata;
 begin
 
 max_sub_idata = 1;
-for(i = 1;i <= indata;i = i+1 ) begin 
-        if( (indata % i) == 0 && (axi_data % i) == 0 ) begin 
+for(i = 1;i <= indata;i = i+1 ) begin
+        if( (indata % i) == 0 && (axi_data % i) == 0 ) begin
             max_sub_idata = i ;
-        end 
-        
-end 
+        end
+
+end
 
 max_width = (indata / max_sub_idata) * axi_data;
 end

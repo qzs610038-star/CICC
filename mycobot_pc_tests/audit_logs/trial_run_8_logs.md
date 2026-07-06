@@ -11,7 +11,7 @@ PS D:\第十届集创赛-雄芯院材料> python mycobot_pc_tests/teach_replay_p
 
 自动检测到以下可能的机械臂串口：
   [0] COM10 - USB-SERIAL CH340 (COM10)
-请输入对应的序号 (直接回车默认选[0]): 
+请输入对应的序号 (直接回车默认选[0]):
 尝试连接机械臂 (COM10 @ 1000000)...
 Note: This class is no longer maintained since v3.6.0, please refer to the project documentation: https://github.com/elephantrobotics/pymycobot/blob/main/README.md
 ====================================

@@ -10,13 +10,13 @@ _startup:
 	la gp, __global_pointer$
 .option pop
 	la sp, _sp
-	
+
 	/* Load data section */
 	la a0, _data_lma
 	la a1, _data
 	la a2, _edata
 	bgeu a1, a2, 2f
-	
+
 1:
 	lw t0, (a0)
 	sw t0, (a1)
@@ -50,7 +50,7 @@ _startup:
 	fssr x0
 1:
 #endif*/
-	
+
 	auipc ra, 0
 	addi sp, sp, -16
 /*#if __riscv_xlen == 32*/
@@ -58,7 +58,7 @@ _startup:
 /*#else
 	sd ra, 8(sp)
 #endif*/
-	
+
 	/* argc = argv = 0 */
 	li a0, 0
 	li a1, 0

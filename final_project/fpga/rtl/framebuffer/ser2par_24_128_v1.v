@@ -3,9 +3,9 @@
 module ser2par_24_128_v1 #(
 	parameter I_VID_WIDTH = 16,
 	parameter O_VID_WIDTH = 64
-	 
+
 )(
-input		wire										clk		,    
+input		wire										clk		,
 input		wire										rst_n	,
 input       wire                                        i_valid,
 input		wire										i_frame_start	, //active hgih
@@ -43,20 +43,20 @@ reg start_cycle = 'd0;
 reg i_valid_r = 'd0;
 reg par_valid = 1'b1;
 always @( posedge clk or negedge rst_n )
-begin 
+begin
     if( !rst_n ) begin
         par_pix_data <= 'd0;
     end else if( i_valid |last_shift)
         par_pix_data <= {par_pix_data[MAXI_DATA_WIDTH-I_VID_WIDTH-1:0],i_data};
-end 
+end
 
 always @( posedge clk or negedge rst_n )
 begin
-    if( !rst_n ) begin 
+    if( !rst_n ) begin
         r_in_cnt <= 'd0;
-    end else begin 
+    end else begin
         r_in_cnt <= w_in_cnt ;
-    end 
+    end
 end
 
 always @(*)
@@ -67,7 +67,7 @@ begin
         w_in_cnt = 'd0;
     else if( i_valid | last_shift)
         w_in_cnt = r_in_cnt + 1'b1;
-    else 
+    else
         w_in_cnt = r_in_cnt;
 end
 
@@ -85,7 +85,7 @@ begin
         par_valid <= 1'b0;
     else if( r_in_cnt == IN_CNT -1 && (i_valid | last_shift))//last_shift_r[0]))
         par_valid <= 1'b1;
-    else 
+    else
         par_valid <= 1'b0;
 end
 
@@ -93,7 +93,7 @@ always @( posedge clk or negedge rst_n )
 begin
       if( ~rst_n )
             start_cycle <= 1'b0;
-      else if( i_frame_start ) 
+      else if( i_frame_start )
             start_cycle <= 1'b1;
       else if( o_valid )
             start_cycle <= 1'b0;
@@ -102,15 +102,15 @@ end
 
 always @( posedge clk or negedge rst_n )
 begin
-    if( !rst_n ) begin 
+    if( !rst_n ) begin
         par_pix_valid <= 1'b0;
-    end else begin 
+    end else begin
         par_pix_valid <= par_valid;
-    end 
+    end
 end
 
-generate 
-    
+generate
+
 if( SHIFT_FLOAT != 0 ) begin : SHIFT_FLOAT_NONE_ZERO
 always @( posedge clk or negedge rst_n )
 begin
@@ -118,7 +118,7 @@ begin
         par_pix_data_r0 <= 'd0;
     else if( par_valid )
         par_pix_data_r0 <= par_pix_data;
-    else 
+    else
         par_pix_data_r0 <= par_pix_data_r0 << O_VID_WIDTH;
 end
 
@@ -130,16 +130,16 @@ begin
         r_out_cnt <= 1;
     else if( |r_out_cnt == 1'b0)
         r_out_cnt <= 0;
-    else 
+    else
         r_out_cnt <= r_out_cnt == OU_CNT-1 ? 0 :r_out_cnt + 1'b1;
 end
 
 reg [1:0] state = 'd0;
 always @( posedge clk )
 begin
-    if( i_frame_start ) begin 
+    if( i_frame_start ) begin
         state <= 2'd0;
-    end else begin 
+    end else begin
         case( state )
         2'd0 : begin
             state <= i_frame_end ? 2'd1 : 2'd0;
@@ -151,7 +151,7 @@ begin
         end
         default:;
         endcase
-    end 
+    end
 end
 
  assign    o_data = par_pix_data_r0[MAXI_DATA_WIDTH-1:MAXI_DATA_WIDTH-O_VID_WIDTH];
@@ -178,9 +178,9 @@ end else begin
     reg [1:0] state = 'd0;
     always @( posedge clk )
     begin
-        if( i_frame_start ) begin 
+        if( i_frame_start ) begin
             state <= 2'd0;
-        end else begin 
+        end else begin
             case( state )
             2'd0 : begin
                 state <= i_frame_end ? 2'd1 : 2'd0;
@@ -192,7 +192,7 @@ end else begin
             end
             default:;
             endcase
-        end 
+        end
     end
     assign    o_data = par_pix_data_r0;
     assign    o_valid = par_pix_valid;
@@ -209,16 +209,15 @@ endgenerate
  begin
 
  max_sub_idata = 1;
- for(i = 1;i <= indata;i = i+1 ) begin 
-         if( (indata % i) == 0 && (axi_data % i) == 0 ) begin 
+ for(i = 1;i <= indata;i = i+1 ) begin
+         if( (indata % i) == 0 && (axi_data % i) == 0 ) begin
              max_sub_idata = i ;
-         end 
-         
- end 
+         end
+
+ end
 
  max_width = (indata / max_sub_idata) * axi_data;
  end
 endfunction
 
 endmodule
-

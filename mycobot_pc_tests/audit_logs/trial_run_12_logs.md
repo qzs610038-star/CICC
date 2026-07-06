@@ -28,7 +28,7 @@ PS D:\第十届集创赛-雄芯院材料> python mycobot_pc_tests/teach_replay_p
 
 自动检测到以下可能的机械臂串口：
   [0] COM10 - USB-SERIAL CH340 (COM10)
-请输入对应的序号 (直接回车默认选[0]): 
+请输入对应的序号 (直接回车默认选[0]):
 尝试连接机械臂 (COM10 @ 1000000)...
 Note: This class is no longer maintained since v3.6.0, please refer to the project documentation: https://github.com/elephantrobotics/pymycobot/blob/main/README.md
 ====================================
@@ -38,7 +38,7 @@ Note: This class is no longer maintained since v3.6.0, please refer to the proje
 -> 准备好后，按 Enter 键释放舵机...
 
 ✅ 机械臂已变软。
--> 请手动拖动到【抓取悬停点 pick_hover】，保持稳定后按 Enter 读取...    
+-> 请手动拖动到【抓取悬停点 pick_hover】，保持稳定后按 Enter 读取...
   -> 抓取悬停点 pick_hover R=268.8mm  【边缘风险区 R>260.0】强烈建议重新摆放物块到 R<=250.0mm，带载远端力矩大。
   -> 抓取悬停点 pick_hover 处于边缘风险区，仍要保存该示教点吗？(y/n): y
 抓取悬停点 pick_hover angles = [39.9, -53.43, -47.19, 15.29, 1.49, 84.99]
@@ -48,7 +48,7 @@ Note: This class is no longer maintained since v3.6.0, please refer to the proje
   -> 抓取下探点 pick R=272.7mm  【边缘风险区 R>260.0】强烈建议重新摆放物块到 R<=250.0mm，带载远端力矩大。
   -> 抓取下探点 pick 处于边缘风险区，仍要保存该示教点吗？(y/n): y
 抓取下探点 pick angles = [40.16, -71.01, -47.1, 30.05, 1.58, 84.99]
-抓取下探点 pick coords  = [243.0, 123.7, 87.0, 178.68, 2.05, -134.82]   
+抓取下探点 pick coords  = [243.0, 123.7, 87.0, 178.68, 2.05, -134.82]
 确认保存该示教点吗？(y/n): y
 -> 请手动拖动到【放置悬停点 drop_hover】，保持稳定后按 Enter 读取...
   -> 放置悬停点 drop_hover R=240.5mm  [推荐带载区 R<=250.0]
@@ -58,7 +58,7 @@ Note: This class is no longer maintained since v3.6.0, please refer to the proje
 -> 请手动拖动到【放置下探点 drop】，保持稳定后按 Enter 读取...
   -> 放置下探点 drop R=245.3mm  [推荐带载区 R<=250.0]
 放置下探点 drop angles = [9.22, -57.56, -74.44, 38.4, -1.23, 55.81]
-放置下探点 drop coords  = [244.0, -25.5, 84.5, 179.13, -3.45, -136.52]  
+放置下探点 drop coords  = [244.0, -25.5, 84.5, 179.13, -3.45, -136.52]
 确认保存该示教点吗？(y/n): y
 
 -> 接下来示教 home_ready：drop_hover 与直立零位之间的空中安全中间姿态。
@@ -66,9 +66,9 @@ Note: This class is no longer maintained since v3.6.0, please refer to the proje
 home_ready angles = [9.22, -43.06, -4.39, -1.4, -10.1, 46.93]
 home_ready coords  = [240.6, -33.1, 300.5, -143.54, 22.76, -123.44]  (R=242.9mm, Z=300.5mm)
 home_ready 相对 HOME: arm_diffs=[9.22, 43.06, 4.39, 1.4, 10.1], arm_max_diff=43.1, wrist6_diff=46.9
-【警告】home_ready arm_max_diff=43.1 在 40.0~45.0 余量不足区间。        
+【警告】home_ready arm_max_diff=43.1 在 40.0~45.0 余量不足区间。
 -> 软到位容差 3.0° 可能像 run-10 一样把实际 arm_max_diff 推过 45.0，导致仍需人工扶正。
--> 强烈建议重新示教更直立的姿态（J2 绝对值压到 35~38°、J3 接近 0~5°）。 
+-> 强烈建议重新示教更直立的姿态（J2 绝对值压到 35~38°、J3 接近 0~5°）。
 重新示教 home_ready？(y=重新示教 / n=仍然保存此贴边点): y
 -> 请手动拖动到【home_ready 回零中间姿态】（夹爪朝前/略向下，尽量接近直 立，不要扫到桌面/物块/线缆），稳定后按 Enter 读取...
 home_ready angles = [9.22, -31.02, -0.17, -7.29, -8.52, 39.9]
@@ -90,7 +90,7 @@ home_ready 相对 HOME: arm_diffs=[9.22, 31.02, 0.17, 7.29, 8.52], arm_max_diff=
 -> 请将手轻轻拿开，按 Enter 键通电并执行安全回零...
 当前稳定关节角: [9.22, -31.55, -0.52, -11.33, -10.81, 39.9]
 相对 HOME_ANGLES 全轴偏差: [9.22, 31.55, 0.52, 11.33, 10.81, 39.9]
-大臂 1-5 轴偏差: [9.22, 31.55, 0.52, 11.33, 10.81], arm_max_diff=31.6   
+大臂 1-5 轴偏差: [9.22, 31.55, 0.52, 11.33, 10.81], arm_max_diff=31.6
 第 6 轴末端旋转偏差: 39.9
 当前稳定空间坐标: [202.1, -37.9, 338.4, -137.02, 22.17, -115.67]
 arm_max_diff=31.6 <= 45.0，低速同步回直立零位...
@@ -114,11 +114,11 @@ arm_max_diff=31.6 <= 45.0，低速同步回直立零位...
 
 ⚠️ 请确认轨迹范围内无障碍物，特别是 drop_hover -> home_ready 的空中过渡路径。
 ⚠️ 如遇危险，请随时按 Ctrl+C 触发急停！
--> 请将正方体放回【抓取点】，按 Enter 键开始（空载首测可不放物块）...   
+-> 请将正方体放回【抓取点】，按 Enter 键开始（空载首测可不放物块）...
 
 1. 张开夹爪准备...
   -> 下发夹爪动作: 张开...
-  -> 【信息】当前库无 get_gripper_value 反馈接口，使用开环定时等待。    
+  -> 【信息】当前库无 get_gripper_value 反馈接口，使用开环定时等待。
 
 2. 关节角回放到 pick_hover...
   -> 关节回放到 pick_hover: [45.43, -36.38, -74.17, 28.12, -2.19, 92.37]

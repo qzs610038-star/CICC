@@ -561,4 +561,3 @@ Do not change RAW packing to byte-aligned RAW8 unless CSI status proves the came
 2. If yes, is HDMI fallback static bars?
 3. If static bars, which readiness signal blocks `hdmi_input_stable`?
 4. If live input is accepted but bad-looking, debug Bayer/pixel order rather than HDMI fallback.
-

@@ -43,9 +43,9 @@ input [1:0] 									rresp
 );
 localparam ADDR_SHIFT_BITS = $clog2(AXI_STRB_WIDTH);
 localparam [AXI_BURST_WIDTH-1:0] BURST_LEN_W = BURST_LEN;
-// reg 										ddr_rd_valid;                      
-// reg [AXI_DATA_WIDTH-1:0] 					ddr_rd_data;     
-reg	[AXI_BURST_WIDTH-1:0]					ddr_arlen = 'd0; 
+// reg 										ddr_rd_valid;
+// reg [AXI_DATA_WIDTH-1:0] 					ddr_rd_data;
+reg	[AXI_BURST_WIDTH-1:0]					ddr_arlen = 'd0;
 reg			[2:0]							start_sync = 'd0;
 wire [AXI_ADDR_WIDTH-1:0] 					nx_ddr_addr;
 wire										rd_addr_en	;
@@ -74,11 +74,11 @@ begin
 		sync_r0 <= 1'b0;
 		sync_r1 <= 1'b0;
 		sync_r2 <= 1'b0;
-	end else begin 
+	end else begin
 		sync_r0 <= pos_start;
 		sync_r1 <= sync_r0;
 		sync_r2 <= sync_r1;
-	end 
+	end
 end
 
 always @( posedge axi_clk or negedge rst_n )
@@ -101,7 +101,7 @@ always @( posedge axi_clk or negedge rst_n )
 begin
         if( !rst_n ) begin
             first_burst_cnt <= 'd0;
-        end else begin 
+        end else begin
             if(sync_r0) begin
             case( BURST_LEN)
                 8'd1 : first_burst_cnt <= |first_4k_burst_len[0]  ? first_4k_burst_len_w-'d1 : BURST_LEN_W;
@@ -114,14 +114,14 @@ begin
                 // 8'd255:first_burst_cnt <= |first_4k_burst_len[7:0]?{first_4k_burst_len[7:0]}-1:cfg_awlen_r;;
                 default:;
             endcase
-            end 
-        end 
-end 
+            end
+        end
+end
 always @( posedge axi_clk or negedge rst_n  )
 begin
     if( !rst_n ) begin
         last_burst_cnt <= 'd0;
-    end else begin 
+    end else begin
 		if(sync_r0) begin
 		case( BURST_LEN)
 			8'd1 : last_burst_cnt <= |last_4k_burst_len[0]  ? last_4k_burst_len_w-'d1 : BURST_LEN_W;
@@ -132,24 +132,24 @@ begin
 			8'd63: last_burst_cnt <= |last_4k_burst_len[5:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
 			default:;
 		endcase
-		end 
-    end 
-end 
+		end
+    end
+end
 
 always @( posedge axi_clk or negedge rst_n   )
-begin 
+begin
     if( !rst_n ) begin
         align_burst_num <= 'd0;
     end else begin //w_wr_sync_r1;
 	    align_burst_num <= burst_len_r - first_burst_cnt - last_burst_cnt -'d2 ;
-    end 
+    end
 end
 
 always @( posedge axi_clk or negedge rst_n   )
 begin
     if( !rst_n ) begin
         total_burst_num <= 'd0;
-    end else begin 
+    end else begin
 		if(sync_r2) begin
 		case( BURST_LEN)
 			8'd1 : total_burst_num <= align_burst_num[31:1] + 'd2 ;
@@ -160,20 +160,20 @@ begin
 			8'd63: total_burst_num <= align_burst_num[31:6] + 'd2 ;
 			default:;
 		endcase
-		end 
-    end 
-end 	
+		end
+    end
+end
 //====================================================================================
 //address process
-always @(posedge axi_clk or negedge rst_n) 
+always @(posedge axi_clk or negedge rst_n)
 begin
 	if (!rst_n) 									        araddr <= start_addr_r;
 	else if( sync_r2 )						                araddr <= start_addr_r;
 	else if (rd_addr_en) 						            araddr <= nx_ddr_addr;
-    
-end 
+
+end
 wire [AXI_ADDR_WIDTH-1:0] rd_addr_incr = {{(AXI_ADDR_WIDTH-AXI_BURST_WIDTH-ADDR_SHIFT_BITS){1'b0}}, (ddr_arlen + {{(AXI_BURST_WIDTH-1){1'b0}}, 1'b1}), {ADDR_SHIFT_BITS{1'b0}}};
-assign nx_ddr_addr = araddr + rd_addr_incr;  
+assign nx_ddr_addr = araddr + rd_addr_incr;
 
 assign rd_addr_en = rvalid & rready & rlast;
 //=====================================================================================
@@ -184,20 +184,20 @@ begin
  	if( !rst_n )  							                burst_cnt <= 0;
  	else if(sync_r2)					                    burst_cnt <= 0;//( w_wr_sync0 )
  	else if( rd_addr_en )					                burst_cnt <= burst_cnt + 1'b1;
-end 
+end
 
 always @( posedge axi_clk or negedge rst_n )
 begin
     if( !rst_n )								            burst_last <= 1'b0;
-    else if( sync_r2 )					                    burst_last <= 1'b0;	
+    else if( sync_r2 )					                    burst_last <= 1'b0;
     else if(rd_addr_en && total_burst_num == burst_cnt+2 )  burst_last <= 1'b1;
-end 
+end
 
 always @( posedge axi_clk or negedge rst_n  )
 begin
     if( !rst_n ) 							                    ddr_arlen 	<= BURST_LEN_W;
-    else if( sync_r2 )						                    ddr_arlen 	<= first_burst_cnt;	 
-    else if(rd_addr_en && total_burst_num == burst_cnt+2)		ddr_arlen	<= last_burst_cnt;//(rd_addr_en && burst_last) 
+    else if( sync_r2 )						                    ddr_arlen 	<= first_burst_cnt;
+    else if(rd_addr_en && total_burst_num == burst_cnt+2)		ddr_arlen	<= last_burst_cnt;//(rd_addr_en && burst_last)
     else if( rd_addr_en )					                    ddr_arlen 	<= BURST_LEN_W;
 end
 
@@ -238,20 +238,20 @@ end
 
 
 
-always @(posedge axi_clk or negedge rst_n )											
+always @(posedge axi_clk or negedge rst_n )
 begin
 	if( !rst_n )									ddr_rd_valid <= 1'b0;
-	else											ddr_rd_valid <= rvalid & rready;				
-end 			
+	else											ddr_rd_valid <= rvalid & rready;
+end
 
 always @( posedge axi_clk )
 begin
     ddr_rd_data <= rdata;
 end
 
-assign arapcmd  = 1'b0;  
-assign arlock   = 1'b0;  
-assign arqos    = 1'b0; 
+assign arapcmd  = 1'b0;
+assign arlock   = 1'b0;
+assign arqos    = 1'b0;
 assign arid     = 6'h00;
 assign arsize   = AXSIZE_WTH;
 assign arlen	= ddr_arlen;

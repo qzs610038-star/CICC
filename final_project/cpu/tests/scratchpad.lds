@@ -14,7 +14,7 @@ SECTIONS
   .init           :
   {
     KEEP (*(SORT_NONE(.init)))
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .text           :
   {
@@ -22,12 +22,12 @@ SECTIONS
     *(.text.startup .text.startup.*)
     *(.text .text.*)
     *(.gnu.linkonce.t.*)
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .fini           :
   {
     KEEP (*(SORT_NONE(.fini)))
-  } >ram AT>ram 
+  } >ram AT>ram
 
   PROVIDE (__etext = .);
   PROVIDE (_etext = .);
@@ -38,7 +38,7 @@ SECTIONS
     *(.rdata)
     *(.rodata .rodata.*)
     *(.gnu.linkonce.r.*)
-  } >ram AT>ram 
+  } >ram AT>ram
 
   . = ALIGN(4);
 
@@ -47,7 +47,7 @@ SECTIONS
     PROVIDE_HIDDEN (__preinit_array_start = .);
     KEEP (*(.preinit_array))
     PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .init_array     :
   {
@@ -55,7 +55,7 @@ SECTIONS
     KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
     KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
     PROVIDE_HIDDEN (__init_array_end = .);
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .fini_array     :
   {
@@ -63,7 +63,7 @@ SECTIONS
     KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
     KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
     PROVIDE_HIDDEN (__fini_array_end = .);
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .ctors          :
   {
@@ -85,7 +85,7 @@ SECTIONS
     KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
     KEEP (*(SORT(.ctors.*)))
     KEEP (*(.ctors))
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .dtors          :
   {
@@ -94,13 +94,13 @@ SECTIONS
     KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
     KEEP (*(SORT(.dtors.*)))
     KEEP (*(.dtors))
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .lalign         :
   {
     . = ALIGN(4);
     PROVIDE( _data_lma = . );
-  } >ram AT>ram 
+  } >ram AT>ram
 
   .dalign         :
   {
@@ -122,7 +122,7 @@ SECTIONS
     *(.srodata.cst4)
     *(.srodata.cst2)
     *(.srodata .srodata.*)
-  } >ram AT>ram 
+  } >ram AT>ram
 
   . = ALIGN(4);
   PROVIDE( _edata = . );
@@ -138,7 +138,7 @@ SECTIONS
     *(.gnu.linkonce.b.*)
     *(COMMON)
     . = ALIGN(4);
-  } >ram AT>ram 
+  } >ram AT>ram
 
   . = ALIGN(8);
   PROVIDE( _end = . );
@@ -150,5 +150,5 @@ SECTIONS
     . += __stack_size;
     PROVIDE( _sp = . );
     PROVIDE( _heap_end = . );
-  } >ram AT>ram 
+  } >ram AT>ram
 }

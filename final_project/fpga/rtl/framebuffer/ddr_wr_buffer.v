@@ -2,19 +2,19 @@
 module ddr_wr_buffer#(
     parameter AXI_DATA_WIDTH = 512, //!AXI接口位宽
     parameter AXI_ADDR_WIDTH = 32,  //!AXI地址位宽
-    parameter WR_FIFO_DEPTH	= 1024, //!Write fifo depth   
+    parameter WR_FIFO_DEPTH	= 1024, //!Write fifo depth
     parameter BURST_LEN = 'd7,
     parameter AXI_STRB_WIDTH = AXI_DATA_WIDTH/8,//!总共的字节数量，= AXI_DATA_WIDTH/8
     parameter AXSIZE_WTH = $clog2(AXI_DATA_WIDTH/8),//!内部数据
     parameter AXI_BURST_WIDTH = $clog2(AXI_DATA_WIDTH/8),
     parameter WR_USEDW_WITH = $clog2(WR_FIFO_DEPTH) //!内部数据
-    
-    
+
+
     )(
-        
+
 input 								        axi_clk,
 input 								        rst_n,
-input								        wr_start, // pulse signal 
+input								        wr_start, // pulse signal
 
 input		[AXI_ADDR_WIDTH-1:0]	        start_addr,
 input		[31:0]							burst_len,
@@ -24,8 +24,8 @@ input                                       wr_fifo_rst_p,
 input										wr_fifo_wrclk,
 input										wr_fifo_wren,
 output										wr_fifo_wrfull,
-input	 [AXI_DATA_WIDTH-1:0]		        wr_fifo_wrdata, 
-output [ WR_USEDW_WITH:0]			        wr_fifo_wrusedw, 
+input	 [AXI_DATA_WIDTH-1:0]		        wr_fifo_wrdata,
+output [ WR_USEDW_WITH:0]			        wr_fifo_wrusedw,
 
 output 	[5:0] 								awid,
 output  reg [AXI_ADDR_WIDTH-1:0] 	        awaddr = 'd0,
@@ -42,7 +42,7 @@ output reg 									awqos = 'd0,
 input 										awready,
 
 output [31:0]                               wr_fifo_rd_data_test,
-output  [AXI_DATA_WIDTH-1:0] 	            wdata,  
+output  [AXI_DATA_WIDTH-1:0] 	            wdata,
 output  [AXI_STRB_WIDTH-1:0] 	            wstrb,
 output  reg									wlast,
 output  									wvalid,
@@ -58,12 +58,12 @@ output reg [15:0] test_cnt
     localparam MAX_BURST_LEN = 4096/(AXI_DATA_WIDTH/8);
     localparam [AXI_BURST_WIDTH-1:0] BURST_LEN_W = BURST_LEN;
     //=============================================================
-    //reg define 
-    //=============================================================   
-        
+    //reg define
+    //=============================================================
+
     reg	    	[1:0]							                start_sync = 'd0;
     reg [31:0]	burst_len_r   = 'd0;
-   
+
     reg	[AXI_BURST_WIDTH-1:0] 						        last_burst_cnt = 'd0;
     reg [AXI_BURST_WIDTH-1:0]                               first_burst_cnt = 'd0;
     reg                                                     sync_r1 = 1'b0;
@@ -74,37 +74,37 @@ output reg [15:0] test_cnt
     reg [31:0]                                              total_burst_num = 'd0;
     reg [AXI_ADDR_WIDTH-1:0]                                start_addr_r = 'd0;
     //=============================================================
-    //wire define 
-    //============================================================= 
+    //wire define
+    //=============================================================
     wire   [ WR_USEDW_WITH:0] 		wr_fifo_rdusedw;
 wire [AXI_DATA_WIDTH-1:0]		wr_fifo_rddata;
-wire							wr_fifo_rdempty;  
+wire							wr_fifo_rdempty;
 wire							wr_fifo_rden;
 wire 							pos_sync;
 wire [AXI_ADDR_WIDTH-1:0]  		nx_ddr_wr_addr;
 wire axi_wr_clk = axi_clk;
-//=============================================================  
-//RTL                                                     
-//=============================================================  
+//=============================================================
+//RTL
+//=============================================================
 
 	DC_FIFO
 # (
   	.FIFO_MODE  ( "Normal"    ), //"Normal"; //"ShowAhead"
     .DATA_WIDTH ( AXI_DATA_WIDTH ),
     .FIFO_DEPTH ( WR_FIFO_DEPTH   )
-  ) u_wr_fifo(   
+  ) u_wr_fifo(
   //System Signal
-  /*i*/.Reset   (wr_fifo_rst_p	|| (~rst_n) ), 
-  /*i*/.WrClk   (wr_fifo_wrclk		), 
-  /*i*/.WrEn    (wr_fifo_wren		), 
-  /*o*/.WrDNum  (wr_fifo_wrusedw	), 
-  /*o*/.WrFull  (wr_fifo_wrfull 	), 
-  /*i*/.WrData  (wr_fifo_wrdata 	), 
-  /*i*/.RdClk   (axi_clk			), 
-  /*i*/.RdEn    (wr_fifo_rden		), 
-  /*o*/.RdDNum  (wr_fifo_rdusedw	), 
-  /*o*/.RdEmpty (wr_fifo_rdempty	), 
-  /*o*/.RdData  (wr_fifo_rddata		)  
+  /*i*/.Reset   (wr_fifo_rst_p	|| (~rst_n) ),
+  /*i*/.WrClk   (wr_fifo_wrclk		),
+  /*i*/.WrEn    (wr_fifo_wren		),
+  /*o*/.WrDNum  (wr_fifo_wrusedw	),
+  /*o*/.WrFull  (wr_fifo_wrfull 	),
+  /*i*/.WrData  (wr_fifo_wrdata 	),
+  /*i*/.RdClk   (axi_clk			),
+  /*i*/.RdEn    (wr_fifo_rden		),
+  /*o*/.RdDNum  (wr_fifo_rdusedw	),
+  /*o*/.RdEmpty (wr_fifo_rdempty	),
+  /*o*/.RdData  (wr_fifo_rddata		)
 );
 
 assign wr_fifo_rd_data_test =  wr_fifo_rddata[511:478];
@@ -124,12 +124,12 @@ begin
 		sync_r1 <= 1'b0;
 		sync_r2 <= 1'b0;
         sync_r3 <= 1'b0;
-	end else begin 
+	end else begin
 		sync_r0 <= pos_sync;
 		sync_r1 <= sync_r0;
 		sync_r2 <= sync_r1;
         sync_r3 <= sync_r2;
-	end 
+	end
 end
 
 always @( posedge axi_clk or negedge rst_n )
@@ -144,7 +144,7 @@ begin
 end
 
 
-  
+
 wire [12-WR_ADDR_SHIFT_BITS:0]     first_4k_burst_len = {1'b0,~start_addr_r[11:WR_ADDR_SHIFT_BITS]} + 1'b1;
 wire [AXI_BURST_WIDTH-1:0]         first_4k_burst_len_w = first_4k_burst_len[AXI_BURST_WIDTH-1:0];
 wire [31:0]     last_4k_burst_len  = burst_len_r - first_4k_burst_len;
@@ -154,7 +154,7 @@ always @( posedge axi_clk or negedge rst_n )
 begin
         if( !rst_n ) begin
             first_burst_cnt <= 'd0;
-        end else begin 
+        end else begin
             if(sync_r0) begin
             case( BURST_LEN)
                 8'd1 : first_burst_cnt <= |first_4k_burst_len[0]  ? first_4k_burst_len_w-'d1 : BURST_LEN_W;
@@ -167,14 +167,14 @@ begin
                 // 8'd255:first_burst_cnt <= |first_4k_burst_len[7:0]?{first_4k_burst_len[7:0]}-1:BURST_LEN;;
                 default:;
             endcase
-            end 
-        end 
-end 
+            end
+        end
+end
 always @( posedge axi_clk or negedge rst_n  )
 begin
     if( !rst_n ) begin
         last_burst_cnt <= 'd0;
-    end else begin 
+    end else begin
 		if(sync_r0) begin
 		case( BURST_LEN)
 			8'd1 : last_burst_cnt <= |last_4k_burst_len[0]  ? last_4k_burst_len_w-'d1 : BURST_LEN_W;
@@ -185,24 +185,24 @@ begin
 			8'd63: last_burst_cnt <= |last_4k_burst_len[5:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
 			default:;
 		endcase
-		end 
-    end 
-end 
+		end
+    end
+end
 
 always @( posedge axi_clk or negedge rst_n   )
-begin 
+begin
     if( !rst_n ) begin
         align_burst_num <= 'd0;
     end else begin //sync_r1;
 	    align_burst_num <= burst_len_r - first_burst_cnt - last_burst_cnt -2 ;
-    end 
+    end
 end
 
 always @( posedge axi_clk or negedge rst_n   )
 begin
     if( !rst_n ) begin
         total_burst_num <= 'd0;
-    end else begin 
+    end else begin
 		if(sync_r2) begin
 		case( BURST_LEN)
 			8'd1 : total_burst_num <= align_burst_num[31:1] + 2 ;
@@ -213,9 +213,9 @@ begin
 			8'd63: total_burst_num <= align_burst_num[31:6] + 2 ;
 			default:;
 		endcase
-		end 
-    end 
-end 		
+		end
+    end
+end
 //=======================================================================================
 //address process
 //=======================================================================================
@@ -224,26 +224,26 @@ reg addr_add_last = 'd0;
 reg [31:0] burst_cnt = 'd0;
 reg [1:0] state = 'd0;
 assign wr_end_flag = addr_add_last;
-always @(posedge axi_clk or negedge rst_n) 
+always @(posedge axi_clk or negedge rst_n)
 begin
 	if (!rst_n) 							                    awaddr      <= start_addr_r;//start_addr;
 	else if(sync_r2)				                            awaddr      <= start_addr_r;//start_addr;//( pos_sync )
 	else if( addr_add_en ) 				                        awaddr      <= nx_ddr_wr_addr;
-end      
+end
 wire [AXI_ADDR_WIDTH-1:0] wr_addr_incr = {{(AXI_ADDR_WIDTH-AXI_BURST_WIDTH-WR_ADDR_SHIFT_BITS){1'b0}}, (awlen + {{(AXI_BURST_WIDTH-1){1'b0}}, 1'b1}), {WR_ADDR_SHIFT_BITS{1'b0}}};
-assign nx_ddr_wr_addr = awaddr + wr_addr_incr;  
+assign nx_ddr_wr_addr = awaddr + wr_addr_incr;
 always @( posedge axi_clk or negedge rst_n )
 begin
  	if( !rst_n )  							                    burst_cnt <= 'd0;
  	else if(sync_r2)					                        burst_cnt <= 'd0;//( pos_sync )
  	else if( addr_add_en )					                    burst_cnt <= burst_cnt + 1'b1;
-end 
+end
 always @( posedge axi_clk or negedge rst_n )
 begin
 	if( !rst_n )										        addr_add_last <= 1'b0;
-	else if(sync_r2)						                    addr_add_last <= 1'b0;	//( pos_sync )	
+	else if(sync_r2)						                    addr_add_last <= 1'b0;	//( pos_sync )
     else if( addr_add_en && total_burst_num == burst_cnt+'d1  ) addr_add_last <= 1'b1;
-end 
+end
 
 
 
@@ -251,19 +251,19 @@ assign addr_add_en = wvalid & wready & wlast;//
 always @( posedge axi_clk or negedge rst_n  )
 begin
     if( !rst_n ) 								                awlen 	    <= first_burst_cnt;
-    else if( sync_r2 )						                    awlen 	    <= first_burst_cnt;	 
+    else if( sync_r2 )						                    awlen 	    <= first_burst_cnt;
     else if(addr_add_en && total_burst_num == burst_cnt+'d2 )	awlen	    <= last_burst_cnt;
-    else if( addr_add_en )						                awlen 	    <= BURST_LEN_W;	
+    else if( addr_add_en )						                awlen 	    <= BURST_LEN_W;
 end
 reg wdata_en = 1'b0;
 reg [8:0] write_cnt = 'd0;
 // always@( posedge axi_clk or negedge rst_n )
 // begin
-//     if( !rst_n ) begin 
+//     if( !rst_n ) begin
 //         state <= 'd0;
 //         wdata_en <= 1'b0;
 //         awvalid <= 1'b0;
-//     end else if( sync_r2 ) begin 
+//     end else if( sync_r2 ) begin
 //         state <= 'd0;
 //         wdata_en <= 1'b0;
 //         awvalid <= 1'b0;
@@ -272,40 +272,40 @@ reg [8:0] write_cnt = 'd0;
 //         2'd0 : begin
 //             if( sync_r3)
 //                 state <= 2'd1;
-//         end 
+//         end
 //         2'd1 : begin
 //             if( wr_fifo_rdusedw >= awlen+1 ) begin
 //                 state <= 2'd2;
 //                 awvalid <= 1'b1;
-//             end 
+//             end
 //             wdata_en <= 1'b0;
-//         end 
+//         end
 //         2'd2 : begin
 //             if( awready )
 //                 awvalid <= 1'b0;
 
-//             if( write_cnt == awlen && wr_fifo_rden ) begin 
+//             if( write_cnt == awlen && wr_fifo_rden ) begin
 //                 wdata_en <= 1'b0;
 //                 state <= 2'd3;
-//             end else begin 
+//             end else begin
 //                 wdata_en <= 1'b1;
-//             end 
+//             end
 
-//         end 
+//         end
 //         2'd3 : begin
 //             state <= awvalid ? 2'd3 : 2'd1;
-//         end 
+//         end
 //         default:;
 //         endcase
-//     end 
-// end 
+//     end
+// end
 reg first_rd = 1'b0;
 always@( posedge axi_clk or negedge rst_n )
 begin
-    if( !rst_n ) begin 
+    if( !rst_n ) begin
         state <= 'd0;
         awvalid <= 1'b0;
-    end else if( sync_r2 ) begin 
+    end else if( sync_r2 ) begin
         state <= 'd0;
         awvalid <= 1'b0;
     end else begin
@@ -313,32 +313,32 @@ begin
         case( state )
         2'd0 : begin
             // if( sync_r3)
-                
+
             if( ~wr_fifo_rdempty) begin
                 state <= 2'd1;
                 first_rd <= 1'b1;
             end
-        end 
+        end
         2'd1 : begin
             if( wr_fifo_rdusedw >= awlen ) begin
                 state <= 2'd2;
                 awvalid <= 1'b1;
-            end 
-        end 
+            end
+        end
         2'd2 : begin
             if( awready )
                 awvalid <= 1'b0;
-            if( wlast & wready ) begin 
+            if( wlast & wready ) begin
                 state <= wr_fifo_rden ? 2'd1 : 2'd0;
             end
-        end 
+        end
         2'd3 : begin
             state <= awvalid ? 2'd3 : 2'd1;
-        end 
+        end
         default:;
         endcase
-    end 
-end 
+    end
+end
 
 always @( posedge axi_clk or negedge rst_n )
 begin
@@ -346,8 +346,8 @@ begin
         test_cnt <= 'd0;
     else if( state == 2 )
         test_cnt <= test_cnt + 1'b1;
-    else 
-        test_cnt <= 'd0; 
+    else
+        test_cnt <= 'd0;
 end
 
 always @( posedge axi_clk or negedge rst_n )
@@ -359,8 +359,8 @@ begin
             write_cnt <= write_cnt + 1'b1;
     end else begin
             write_cnt <= 'd0;
-    end 
-end 
+    end
+end
 
 
 
@@ -375,8 +375,8 @@ begin
             wlast <= 1'b1;
         else if( write_cnt  == awlen-1 && wready && wvalid)
             wlast <= 1'b1;
-    end 
-end 
+    end
+end
 
 always @( posedge axi_clk or negedge rst_n )
 begin
@@ -395,15 +395,15 @@ assign wvalid = wdata_en;
 //=============================================================================================
 
 assign wdata		= wr_fifo_rddata;
-assign awlock 		= 2'b00;  
-assign awapcmd 		= 1'b0;  
-assign awcobuf 		= 1'b0;  
-assign awcache 		= 4'd0;  
+assign awlock 		= 2'b00;
+assign awapcmd 		= 1'b0;
+assign awcobuf 		= 1'b0;
+assign awcache 		= 4'd0;
 assign awallstrb 	= 1'b0;
 assign awburst 		= 2'b01;
 assign awsize  		= AXSIZE_WTH;
 assign awid 		= 6'd0;
-assign wstrb 		= {AXI_STRB_WIDTH{1'b1}};  
+assign wstrb 		= {AXI_STRB_WIDTH{1'b1}};
 always @( posedge axi_clk or negedge rst_n )
 begin
 		if( !rst_n )							bready	<= 1'b0;
@@ -413,8 +413,8 @@ always @( posedge axi_clk or negedge rst_n )
 begin
 		if( !rst_n )							awqos <= 1'b0;
 		else                					awqos <= 1'b1;
-end 
-   
+end
 
 
-endmodule 
+
+endmodule

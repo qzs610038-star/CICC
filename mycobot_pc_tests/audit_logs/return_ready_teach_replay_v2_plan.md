@@ -1,8 +1,8 @@
 # myCobot 带载抓取回零自动化 V2 方案
 
-> 日期: 2026-07-06  
-> 目标读者: Claude 执行 / Codex 复核  
-> 适用范围: `mycobot_pc_tests/` PC 端机械臂安全联调  
+> 日期: 2026-07-06
+> 目标读者: Claude 执行 / Codex 复核
+> 适用范围: `mycobot_pc_tests/` PC 端机械臂安全联调
 > 核心要求: 新写脚本，不直接修改已经跑通的 `teach_replay_pick.py`
 
 ## 0. 执行边界
@@ -283,8 +283,8 @@ Codex 审查重点:
 
 ## 12. run-10 实跑复核与 V2.1 修改建议
 
-> 依据: `mycobot_pc_tests/audit_logs/trial_run_10_logs.md`  
-> 状态: V2 五点示教方向有效，但尚未达到“0 轮人工扶正”目标。  
+> 依据: `mycobot_pc_tests/audit_logs/trial_run_10_logs.md`
+> 状态: V2 五点示教方向有效，但尚未达到“0 轮人工扶正”目标。
 > 重要修正: Claude 实现期已将本方案 §6 中 `RETURN_ARM_JOINT_MAX_DELTA=55.0` 修正为 `90.0`，理由成立。`drop_hover -> home_ready` 本质是大幅拉直，小臂 J3 单轴变化可达 60~80 度；55 度会误拒更接近 HOME 的优秀 home_ready。
 
 ### 12.1 run-10 关键证据
@@ -376,8 +376,8 @@ run-11 仍建议空载先测。通过条件:
 
 ## 13. run-11 两轮带载复核与 V2.2 修改建议
 
-> 依据: `mycobot_pc_tests/audit_logs/trial_run_11_logs.md`  
-> 状态: V2.1 的 `home_ready` 余量门已经通过两轮带载验证。下一阶段焦点从“回零自动化”转为“上行到位精度、等待时间、点位复用”。  
+> 依据: `mycobot_pc_tests/audit_logs/trial_run_11_logs.md`
+> 状态: V2.1 的 `home_ready` 余量门已经通过两轮带载验证。下一阶段焦点从“回零自动化”转为“上行到位精度、等待时间、点位复用”。
 > 重要结论: 不要再优先改 `home_ready` 安全门。`HOME_READY_TARGET_ARM_MAX=40.0` 成立，应保留。
 
 ### 13.1 run-11 关键证据
