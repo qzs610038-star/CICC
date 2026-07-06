@@ -42,6 +42,7 @@ input [1:0] 									rresp
 
 );
 localparam ADDR_SHIFT_BITS = $clog2(AXI_STRB_WIDTH);
+localparam [AXI_BURST_WIDTH-1:0] BURST_LEN_W = BURST_LEN;
 // reg 										ddr_rd_valid;                      
 // reg [AXI_DATA_WIDTH-1:0] 					ddr_rd_data;     
 reg	[AXI_BURST_WIDTH-1:0]					ddr_arlen = 'd0; 
@@ -59,7 +60,7 @@ reg	[AXI_BURST_WIDTH-1:0] 			        last_burst_cnt = 'd0;
 reg [31:0]                                  align_burst_num = 'd0;
 reg [31:0]                                  total_burst_num = 'd0;
 reg [31:0]                                  burst_cnt = 'd0;
-//wire pos_start;
+wire                                        pos_start;
 always @( posedge axi_clk or negedge rst_n )
 begin
 	if( !rst_n )			start_sync <= 'd0;
@@ -92,7 +93,9 @@ begin
 end
 
 wire [12-ADDR_SHIFT_BITS:0]     first_4k_burst_len = {1'b0,~start_addr_r[11:ADDR_SHIFT_BITS]} + 1'b1;
+wire [AXI_BURST_WIDTH-1:0]      first_4k_burst_len_w = first_4k_burst_len[AXI_BURST_WIDTH-1:0];
 wire [31:0]     last_4k_burst_len  = burst_len_r - first_4k_burst_len;
+wire [AXI_BURST_WIDTH-1:0]      last_4k_burst_len_w = last_4k_burst_len[AXI_BURST_WIDTH-1:0];
 
 always @( posedge axi_clk or negedge rst_n )
 begin
@@ -101,12 +104,12 @@ begin
         end else begin 
             if(sync_r0) begin
             case( BURST_LEN)
-                8'd1 : first_burst_cnt <= |first_4k_burst_len[0]  ? {7'd0,first_4k_burst_len[0]}-'d1  :BURST_LEN;
-                8'd3 : first_burst_cnt <= |first_4k_burst_len[1:0]? {6'd0,first_4k_burst_len[1:0]}-'d1:BURST_LEN;
-                8'd7 : first_burst_cnt <= |first_4k_burst_len[2:0]? {5'd0,first_4k_burst_len[2:0]}-'d1:BURST_LEN;
-                8'd15: first_burst_cnt <= |first_4k_burst_len[3:0]? {4'd0,first_4k_burst_len[3:0]}-'d1:BURST_LEN;
-                8'd31: first_burst_cnt <= |first_4k_burst_len[4:0]? {3'd0,first_4k_burst_len[4:0]}-'d1:BURST_LEN;
-                8'd63: first_burst_cnt <= |first_4k_burst_len[5:0]? {2'd0,first_4k_burst_len[5:0]}-'d1:BURST_LEN;
+                8'd1 : first_burst_cnt <= |first_4k_burst_len[0]  ? first_4k_burst_len_w-'d1 : BURST_LEN_W;
+                8'd3 : first_burst_cnt <= |first_4k_burst_len[1:0]? first_4k_burst_len_w-'d1 : BURST_LEN_W;
+                8'd7 : first_burst_cnt <= |first_4k_burst_len[2:0]? first_4k_burst_len_w-'d1 : BURST_LEN_W;
+                8'd15: first_burst_cnt <= |first_4k_burst_len[3:0]? first_4k_burst_len_w-'d1 : BURST_LEN_W;
+                8'd31: first_burst_cnt <= |first_4k_burst_len[4:0]? first_4k_burst_len_w-'d1 : BURST_LEN_W;
+                8'd63: first_burst_cnt <= |first_4k_burst_len[5:0]? first_4k_burst_len_w-'d1 : BURST_LEN_W;
                 // 8'd127:first_burst_cnt <= |first_4k_burst_len[6:0]?{1'd0,first_4k_burst_len[6:0]}-1:cfg_awlen_r;;
                 // 8'd255:first_burst_cnt <= |first_4k_burst_len[7:0]?{first_4k_burst_len[7:0]}-1:cfg_awlen_r;;
                 default:;
@@ -121,12 +124,12 @@ begin
     end else begin 
 		if(sync_r0) begin
 		case( BURST_LEN)
-			8'd1 : last_burst_cnt <= |last_4k_burst_len[0]  ? {7'd0,last_4k_burst_len[0]}-'d1  :BURST_LEN;
-			8'd3 : last_burst_cnt <= |last_4k_burst_len[1:0]? {6'd0,last_4k_burst_len[1:0]}-'d1:BURST_LEN;
-			8'd7 : last_burst_cnt <= |last_4k_burst_len[2:0]? {5'd0,last_4k_burst_len[2:0]}-'d1:BURST_LEN;
-			8'd15: last_burst_cnt <= |last_4k_burst_len[3:0]? {4'd0,last_4k_burst_len[3:0]}-'d1:BURST_LEN;
-			8'd31: last_burst_cnt <= |last_4k_burst_len[4:0]? {3'd0,last_4k_burst_len[4:0]}-'d1:BURST_LEN;
-			8'd63: last_burst_cnt <= |last_4k_burst_len[5:0]? {2'd0,last_4k_burst_len[5:0]}-'d1:BURST_LEN;
+			8'd1 : last_burst_cnt <= |last_4k_burst_len[0]  ? last_4k_burst_len_w-'d1 : BURST_LEN_W;
+			8'd3 : last_burst_cnt <= |last_4k_burst_len[1:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
+			8'd7 : last_burst_cnt <= |last_4k_burst_len[2:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
+			8'd15: last_burst_cnt <= |last_4k_burst_len[3:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
+			8'd31: last_burst_cnt <= |last_4k_burst_len[4:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
+			8'd63: last_burst_cnt <= |last_4k_burst_len[5:0]? last_4k_burst_len_w-'d1 : BURST_LEN_W;
 			default:;
 		endcase
 		end 
@@ -169,7 +172,8 @@ begin
 	else if (rd_addr_en) 						            araddr <= nx_ddr_addr;
     
 end 
-assign nx_ddr_addr =  araddr + {(ddr_arlen+1),{ADDR_SHIFT_BITS{1'b0}} };  
+wire [AXI_ADDR_WIDTH-1:0] rd_addr_incr = {{(AXI_ADDR_WIDTH-AXI_BURST_WIDTH-ADDR_SHIFT_BITS){1'b0}}, (ddr_arlen + {{(AXI_BURST_WIDTH-1){1'b0}}, 1'b1}), {ADDR_SHIFT_BITS{1'b0}}};
+assign nx_ddr_addr = araddr + rd_addr_incr;  
 
 assign rd_addr_en = rvalid & rready & rlast;
 //=====================================================================================
@@ -191,10 +195,10 @@ end
 
 always @( posedge axi_clk or negedge rst_n  )
 begin
-    if( !rst_n ) 							                    ddr_arlen 	<= BURST_LEN;
+    if( !rst_n ) 							                    ddr_arlen 	<= BURST_LEN_W;
     else if( sync_r2 )						                    ddr_arlen 	<= first_burst_cnt;	 
     else if(rd_addr_en && total_burst_num == burst_cnt+2)		ddr_arlen	<= last_burst_cnt;//(rd_addr_en && burst_last) 
-    else if( rd_addr_en )					                    ddr_arlen 	<= BURST_LEN;
+    else if( rd_addr_en )					                    ddr_arlen 	<= BURST_LEN_W;
 end
 
 

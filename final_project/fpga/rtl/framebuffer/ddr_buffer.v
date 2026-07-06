@@ -104,6 +104,8 @@ wire		[AXI_ADDR_WIDTH-1:0]		wr_start_addr       ;
 wire		[AXI_ADDR_WIDTH-1:0]    rd_start_addr       ; 
 wire                            rd_end_flag         ;
 wire                            wr_end_flag         ;
+wire        [1:0]               wr_bank             ;
+wire        [1:0]               rd_bank             ;
 assign wr_frame_done = wr_end_flag;
 //=============================================================  
 //RTL                                                     
@@ -156,8 +158,8 @@ ddr_wr_buffer # (
   );
 
 
-assign test_wdata = wdata[32:0];
-assign test_rdata = rdata[32:0];
+assign test_wdata = wdata[31:0];
+assign test_rdata = rdata[31:0];
 //=============================================================================================
 // FIFO RD_PROCESSING
 //=============================================================================================

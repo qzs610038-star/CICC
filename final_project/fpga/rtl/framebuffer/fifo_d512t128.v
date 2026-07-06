@@ -20,8 +20,8 @@ module fifo_d512t128 #(
  
 localparam FIFO_CNT_WIDTH = $clog2(RD_FIFO_DEPTH);
 
-wire [FIFO_CNT_WIDTH-1:0] ddr_wrdnum;
-wire [FIFO_CNT_WIDTH-1:0] wrfifo_wrdnum;
+wire [FIFO_CNT_WIDTH:0] ddr_wrdnum;
+wire [FIFO_CNT_WIDTH:0] wrfifo_wrdnum;
 wire [512-1:0] 	                                    rd_fifo_rddata	;
 wire 												rd_fifo_rdempty	;
 wire 												rd_fifo_rden    ; 

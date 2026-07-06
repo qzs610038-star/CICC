@@ -34,6 +34,10 @@ output  reg  										h_sync_error
   reg  											hs_r0 = 1'b0;
   wire 											neg_vs;
   wire											pos_vs;
+  wire                                          pos_hs;
+  wire                                          neg_hs;
+  wire                                          pos_de;
+  wire                                          neg_de;
   reg						[1:0]				frame_num = 'd0;  
   reg						[23:0]				frame_cnt = 'd0; 
   reg						[23:0] 				frame_len_d0 = 'd0;

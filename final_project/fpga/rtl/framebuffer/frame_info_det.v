@@ -119,8 +119,8 @@ reg frame_end_r1 = 'd0;
 			frame_len_d0 <= 'd0; 
 			frame_len_d1 <= 'd0; 
 			frame_len_d2 <= 'd0; 
-  		end else if( frame_end_r0 ) begin
-			frame_len_d0 <= frame_pix_num_o;
+  		end else if( w_frame_end ) begin
+			frame_len_d0 <= frame_pix_num;
 			frame_len_d1 <= frame_len_d0;
 			frame_len_d2 <= frame_len_d1;
   		end

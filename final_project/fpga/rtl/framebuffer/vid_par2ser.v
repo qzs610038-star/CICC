@@ -50,7 +50,7 @@ wire frame_start = {frame_period_r1,frame_period_r0} == 2'b01;
 reg rd_fifo_rdvalid_r = 1'b0;
 always @( posedge clk )
 begin
-    rd_fifo_rdvalid_r <= rd_fifo_rden;
+    rd_fifo_rdvalid_r <= rd_fifo_rdvalid;
 end
 generate 
 
@@ -151,23 +151,21 @@ assign tx_fifo_wrdata = data_buffer1[MAXI_DATA_WIDTH-1:MAXI_DATA_WIDTH-O_VID_WID
 
 //=======================================================================================
 function integer max_width;
-input [I_VID_WIDTH-1:0] indata;
-input [O_VID_WIDTH-1:0]	axi_data;
+input integer indata;
+input integer axi_data;
 integer i;
-reg [I_VID_WIDTH-1:0] sub_idata1,sub_idata2;
-reg [I_VID_WIDTH-1:0] max_sub_idata;
+integer max_sub_idata;
 begin
 
-for(i = 0;i <= indata;i = i+1 ) begin 
-        sub_idata1 = indata%i;
-        sub_idata2 = axi_data%i;
-        if( sub_idata1 == 0 && sub_idata2 == 0 ) begin 
+max_sub_idata = 1;
+for(i = 1;i <= indata;i = i+1 ) begin 
+        if( (indata % i) == 0 && (axi_data % i) == 0 ) begin 
             max_sub_idata = i ;
         end 
         
 end 
 
-max_width=indata/max_sub_idata* axi_data;
+max_width = (indata / max_sub_idata) * axi_data;
 end
 endfunction
 

@@ -5,6 +5,7 @@ Desktop.ini
 .vscode/
 .idea/
 .qoder/
+.vs/
 *.tmp
 *.bak
 *.swp
