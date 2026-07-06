@@ -1,0 +1,311 @@
+================================================================================
+  CPU 端 6 大模块开发计划
+  项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
+  平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
+  更新: 2026-07-05
+================================================================================
+
+模块一览
+--------
+  [1] board_io          ✅ 已完成     FPGA↔CPU APB3 寄存器读写
+  [2] vision_classifier 🔄 重构中     颜色/形状/尺寸分类
+  [3] param_table       ⬜ 待开发     阈值/标定参数管理
+  [4] task_matcher      ⬜ 待开发     目标匹配与动作决策
+  [5] arm_controller    ⬜ 待开发     机械臂控制 + mycobot 协议
+  [6] main              ⬜ 待开发     主循环集成
+
+================================================================================
+  [1] board_io  —  FPGA↔CPU 寄存器读写层
+================================================================================
+  状态: ✅ 已完成 (V2 双路版, 2026-07-05)
+  文件: app/include/board_io.h, app/src/board_io.c
+  依赖: Efinity 生成 soc.h (提供 APB_VISION_BASE)
+
+  功能:
+    - MMIO 原子读写 (mmio_read32 / mmio_write32)
+    - 上电握手验证 (board_io_validate → 读 REG_MAGIC 高 16-bit)
+    - CamN 配置写入 (write_config → staging, commit_config → active)
+    - 特征快照读取 (read_features → 等 valid, 读全部 LIVE_*)
+    - 结果回写 (write_results → staging, commit_results → active)
+    - 全局状态写入 (write_global_state → staging, commit_global → active)
+    - 心跳维护 (board_io_heartbeat)
+    - SYS_CTRL 读取 (HDMI 选择位/通道使能/OSD 状态)
+
+  协议要点:
+    - Staging → Commit → Active 影子寄存器协议
+    - CFG_COMMIT 16-bit 全值比较, VSYNC 边界生效
+    - valid/ack + frame_id 握手, 独立 per camera
+    - 编译期适配开关: HANDSHAKE_MODE, CAM_ENABLED(n), CAM_COMMIT_GLOBAL
+
+  待定:
+    - LIVE_FG_AREA 寄存器 (bbox 内前景像素数) 待加到手冊 v2.1
+      → Cam0: offset 0x0B0, Cam1: offset 0x1B0
+      → 用于填充率精确计算 (区分方/圆/三角的关键信号)
+
+================================================================================
+  [2] vision_classifier  —  颜色/形状/尺寸分类
+================================================================================
+  状态: 🔄 重构中 (轮廓优先方案讨论阶段)
+  文件: app/include/vision_classifier.h, app/src/vision_classifier.c
+  依赖: board_io (feature_snapshot_t 输入)
+
+  重构方向 (用户确定):
+    第1步: 找到物块轮廓/bbox
+    第2步: 形状判别 (基于填充率, 分摄像头角色)
+            - Cam0 俯视: 区分 圆 vs 方 (填充率 78% vs ~100%)
+            - Cam1 侧面: 区分 方 vs 三角 (填充率 ~100% vs <60%)
+    第3步: 融合决策
+            - 俯视=方 + 侧面=方 → CUBE
+            - 俯视=圆 + 侧面=方 → CYLINDER
+            - 俯视=圆 + 侧面=三 → CONE
+    第4步: 颜色提取 (在轮廓/bbox 范围内取色, 而非全局 argmax)
+
+  数据流:
+    FPGA LIVE_* 寄存器 ──→ feature_snapshot_t ──→ classify_frame()
+    ├─ Cam0 俯视: 颜色 + 形状(圆/方)
+    └─ Cam1 侧面: 颜色 + 形状(方/三角) + 尺寸(height_px)
+
+    classify_frame() × 2 ──→ mf_filter_update() × 2 ──→ fuse_results()
+    ├─ 多帧投票滤波 (5帧窗口, 3票确认)
+    └─ 两路融合 → 最终 vision_result_t
+
+  待讨论/确认:
+    - 颜色提取: 方案A(不改FPGA, bbox内颜色面积近似) vs 方案B/C(FPGA改动)
+      建议首版选方案A, 手冊预留 scope-to-bbox 注释
+    - 是否需要 LIVE_FG_AREA 寄存器? (建议加, 对填充率计算至关重要)
+    - 形状判别的填充率阈值具体数值 (需现场标定)
+
+================================================================================
+  [3] param_table  —  参数表管理
+================================================================================
+  状态: ⬜ 待开发
+  计划文件: app/include/param_table.h, app/src/param_table.c
+  依赖: vision_classifier (classifier_cfg_t)
+
+  功能:
+    - 存储/加载 classifier_cfg_t (颜色阈值、形状比例、尺寸表)
+    - 双配置槽: 默认值 + 标定值, 运行时切换
+    - 参数合法性校验 (ratio 范围、area 阈值不越界等)
+    - 标定模式入口 (通过 SYS_CTRL 或按键触发标定流程)
+    - 非易失存储? (若有 SPI Flash / EEPROM 可用, 否则每次上电加载默认值)
+
+  配置项清单:
+    颜色:
+      min_red_area, min_blue_area, min_yel_area    (uint32_t × 3)
+      white_luma_ratio, black_luma_ratio            (float × 2)
+    形状:
+      cube_ratio_lo, cube_ratio_hi                  (uint16_t × 2)
+      cyl_ratio_lo, cyl_ratio_hi                    (uint16_t × 2)
+      cube_fill_lo, cyl_fill_lo                     (float × 2)
+      circle_fill_lo, circle_fill_hi                (float × 2, 圆填充率区间)
+      triangle_fill_hi                              (float, 三角填充率上限)
+    尺寸:
+      height_px_20mm, height_px_25mm, height_px_30mm (uint16_t × 3)
+    滤波:
+      filter_window, filter_confirm                 (uint8_t × 2)
+
+  接口草案:
+    void param_table_init(void);                          // 加载默认值
+    int  param_table_load_calibrated(void);               // 从 Flash 加载标定值
+    int  param_table_save_calibrated(const classifier_cfg_t *cfg);
+    const classifier_cfg_t* param_table_get(void);        // 获取当前配置
+    int  param_table_set(const classifier_cfg_t *cfg);    // 运行时更新
+    void param_table_enter_calibration(void);             // 进入标定模式
+
+================================================================================
+  [4] task_matcher  —  目标匹配与动作决策
+================================================================================
+  状态: ⬜ 待开发
+  计划文件: app/include/task_matcher.h, app/src/task_matcher.c
+  依赖: vision_classifier (vision_result_t 输入)
+
+  功能:
+    - 接收稳定后的 vision_result_t (颜色+形状+尺寸)
+    - 与任务目标比对 (目标物块属性)
+    - 决策动作: 抓取 / 跳过 / 报错
+    - 输出 match_action (回写到 FPGA OSD 显示)
+
+  任务输入 (从哪个接口获取待定):
+    方案A: 编译期硬编码任务序列 (比赛任务固定)
+    方案B: 通过 UART/按键 动态设置目标
+
+  决策逻辑:
+    if (observed.color != target.color) → SKIP (颜色不对)
+    if (observed.shape != target.shape) → SKIP (形状不对)
+    if (observed.size   != target.size)   → SKIP (尺寸不对)
+    if (all match)                       → GRAB + 输出抓取坐标
+
+  接口草案:
+    typedef struct {
+      uint8_t target_color;
+      uint8_t target_shape;
+      uint8_t target_size_cm_x10;
+    } task_target_t;
+
+    void     task_matcher_set_target(const task_target_t *t);
+    uint8_t  task_matcher_evaluate(const vision_result_t *obs);  // 返回 match_action
+    int      task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy); // 抓取点坐标
+
+================================================================================
+  [5] arm_controller  —  机械臂控制
+================================================================================
+  状态: ⬜ 待开发
+  计划文件: app/include/arm_controller.h,   app/src/arm_controller.c
+            app/include/mycobot_protocol.h, app/src/mycobot_protocol.c
+  依赖: board_io (CPU_ARM_STATE 状态回写)
+
+  硬件接口:
+    myCobot 280 机械臂, 通信接口待确认 (UART? I2C? SPI?)
+
+  mycobot_protocol 层:
+    - 串口初始化 (波特率/数据位/停止位, 查 myCobot 280 手册)
+    - 指令打包: 关节角度 / 末端坐标 / 夹爪控制
+    - 应答解析: 状态反馈 / 错误码
+    - 超时重传机制
+
+  arm_controller 层:
+    - 状态机: IDLE → MOVING → GRASPING → LIFTING → PLACING → RETURNING → IDLE
+    - 坐标变换: 像素坐标 → 机械臂坐标系 (需标定)
+        Cam0 俯视 (x, y) → 物块在桌面的平面位置
+        Cam1 侧面 height_px → 物块高度 (决定夹爪下探深度)
+    - 预设位置: 拍照位、预抓位、放置位、安全位
+    - 错误处理: 堵转/超限/通信超时 → 回写 CPU_ERROR_CODE
+    - 状态回写: board_io_write_global_state(arm_state, error_code)
+
+  状态机阶段:
+    ARM_IDLE        (0)  等待指令
+    ARM_MOVE_TO_PRE (1)  移动到预抓位置
+    ARM_APPROACH    (2)  接近物块
+    ARM_GRASP       (3)  闭合夹爪
+    ARM_LIFT        (4)  抬起物块
+    ARM_MOVE_TO_DST (5)  移动到放置位置
+    ARM_RELEASE     (6)  释放夹爪
+    ARM_RETRACT     (7)  退回安全位
+    ARM_ERROR       (255) 错误状态
+
+  接口草案:
+    int  arm_init(void);                                  // 初始化串口 + 归零
+    int  arm_move_to_preset(int preset_id);               // 移动到预设位置
+    int  arm_grasp_at(uint16_t cx, uint16_t cy, uint8_t size_cm);  // 在指定坐标抓取
+    int  arm_place_at(int preset_id);                     // 在指定位置放置
+    int  arm_emergency_stop(void);                        // 急停
+    int  arm_get_state(uint8_t *state, uint16_t *error);  // 查询状态
+
+================================================================================
+  [6] main  —  主循环集成
+================================================================================
+  状态: ⬜ 待开发
+  计划文件: app/src/main.c
+  依赖: 以上全部 5 个模块
+
+  主循环伪代码:
+
+    void main(void) {
+        // 1. 上电握手
+        if (board_io_validate() != 0) { halt_with_error(ERR_NO_FPGA); }
+
+        // 2. 初始化
+        param_table_init();              // 加载分类器配置
+        arm_init();                      // 机械臂归零
+        mf_filter_t filt_cam0, filt_cam1;
+        mf_filter_reset(&filt_cam0);
+        mf_filter_reset(&filt_cam1);
+        uint16_t seq_cam0 = 0, seq_cam1 = 0, seq_global = 0;
+        const classifier_cfg_t *cfg = param_table_get();
+
+        // 3. 写入初始配置到两路 staging + commit
+        board_io_write_config(0, ...);
+        board_io_write_config(1, ...);
+        board_io_commit_config(0, &seq_cam0);
+        board_io_commit_config(1, &seq_cam1);
+
+        // 4. 主循环
+        while (1) {
+            board_io_heartbeat();
+
+            // ---- 处理 Cam0 ----
+            feature_snapshot_t snap0;
+            if (board_io_read_features(0, &snap0) == 0) {
+                vision_result_t r0 = classify_frame(&snap0, 0, cfg);
+                vision_result_t s0 = mf_filter_update(&filt_cam0, &r0, cfg);
+                board_io_ack_frame(0, snap0.frame_id);
+                // 回写结果
+                result_writeback_t wb0 = build_writeback(&s0);
+                board_io_write_results(0, &wb0);
+                board_io_commit_results(0, &seq_cam0);
+            }
+
+            // ---- 处理 Cam1 ----
+            feature_snapshot_t snap1;
+            if (board_io_read_features(1, &snap1) == 0) {
+                vision_result_t r1 = classify_frame(&snap1, 1, cfg);
+                vision_result_t s1 = mf_filter_update(&filt_cam1, &r1, cfg);
+                board_io_ack_frame(1, snap1.frame_id);
+                // 回写结果
+                result_writeback_t wb1 = build_writeback(&s1);
+                board_io_write_results(1, &wb1);
+                board_io_commit_results(1, &seq_cam1);
+            }
+
+            // ---- 融合决策 ----
+            vision_result_t fused = fuse_results(
+                &filt_cam0.stable, &filt_cam1.stable, cfg);
+
+            // ---- 任务匹配 ----
+            uint8_t action = task_matcher_evaluate(&fused);
+            if (action == MATCH_ACTION_GRAB) {
+                uint16_t cx, cy;
+                task_matcher_get_grab_coord(&cx, &cy);
+                arm_grasp_at(cx, cy, fused.size_cm_x10);
+                arm_place_at(PLACE_DEST);
+            }
+
+            // ---- 全局状态回写 ----
+            uint8_t arm_st; uint16_t arm_err;
+            arm_get_state(&arm_st, &arm_err);
+            board_io_write_global_state(arm_st, arm_err);
+            board_io_commit_global(&seq_global);
+        }
+    }
+
+  待定:
+    - 两路相机是轮询还是等 VSYNC 中断? (当前方案: 独立轮询)
+    - 机械臂动作是否阻塞主循环? (当前假设: 阻塞, 抓完再看下一帧)
+    - 任务序列如何输入? (编译期硬编码 vs UART 动态设定)
+
+================================================================================
+  模块依赖关系
+================================================================================
+
+    board_io  ←── 底板, 无依赖 (只依赖 soc.h)
+       ↑
+    vision_classifier  ←── 依赖 board_io (feature_snapshot_t)
+       ↑
+    param_table  ←── 依赖 vision_classifier (classifier_cfg_t)
+       ↑
+    task_matcher  ←── 依赖 vision_classifier (vision_result_t)
+       ↑
+    arm_controller  ←── 依赖 board_io (CPU_ARM_STATE 回写)
+       ↑
+    main  ←── 依赖以上全部
+
+  开发顺序: [1] → [2] → [3] → [4] + [5] → [6]
+  (param_table 可在 vision_classifier 完成后并行开发)
+
+================================================================================
+  与 FPGA 的接口依赖 (需 FPGA 队友配合)
+================================================================================
+
+  ■ 已确认:
+    - APB3 基地址 (soc.h)
+    - 双路寄存器映射 (Handbook v2)
+    - Staging/Commit 协议
+    - valid/ack + frame_id 握手
+
+  ■ 待确认/待新增:
+    - LIVE_FG_AREA @ Cam0 0x0B0, Cam1 0x1B0 (bbox 内前景像素总数)
+    - 颜色面积是否限定 bbox 内部 (当前为全帧)
+    - 机械臂通信接口 (UART? 波特率?)
+    - 是否有 VSYNC 中断可用 (优化轮询)
+
+================================================================================
