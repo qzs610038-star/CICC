@@ -67,4 +67,3 @@ _startup:
 	j 1b
 
 	.cfi_endproc
-	
