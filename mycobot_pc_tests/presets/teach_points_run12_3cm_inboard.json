@@ -1,0 +1,41 @@
+{
+  "name": "run12_3cm_inboard",
+  "created_from_log": "trial_run_12_logs.md",
+  "object_size_cm": "3",
+  "points": {
+    "pick_hover": {
+      "angles": [45.43, -36.38, -74.17, 28.12, -2.19, 92.37],
+      "coords": [211.7, 122.1, 159.0, -178.11, 7.46, -136.95]
+    },
+    "pick": {
+      "angles": [45.35, -58.27, -74.09, 46.75, -3.6, 94.92],
+      "coords": [218.1, 126.3, 93.1, -176.61, 4.7, -139.57]
+    },
+    "drop_hover": {
+      "angles": [9.31, -42.27, -74.44, 22.93, 0.43, 56.6],
+      "coords": [239.2, -24.6, 127.8, 177.69, -2.69, -137.24]
+    },
+    "drop": {
+      "angles": [9.22, -57.56, -74.44, 38.4, -1.23, 55.81],
+      "coords": [244.0, -25.5, 84.5, 179.13, -3.45, -136.52]
+    },
+    "home_ready": {
+      "angles": [9.22, -31.02, -0.17, -7.29, -8.52, 39.9],
+      "coords": [197.4, -39.6, 347.0, -132.64, 25.18, -113.99]
+    }
+  },
+  "safety": {
+    "radii": {
+      "pick_hover": 244.4,
+      "pick": 252.0,
+      "drop_hover": 240.5,
+      "drop": 245.3,
+      "home_ready": 201.3
+    },
+    "home_ready_arm_max_diff": 31.0,
+    "R_MAX": 280.0,
+    "HOME_READY_TARGET_ARM_MAX": 40.0,
+    "ARM_MAX_DIFF_SAFE": 45.0
+  },
+  "notes": "run-12 带载 3cm 正方体实测跑通。业务点全部 R<=252mm（pick_hover/pick/drop_hover/drop 在推荐/可接受区），home_ready arm_max_diff=31.0 留 14° 余量。V2.2 参数：SHORT_UP_SPEED=16/SHORT_UP_TIMEOUT=15/HOME_RETURN_SPEED=20。step5/9 正常返回1未触发软通过/微调；step11 'auto' 0轮扶正。注意：改善来自短超时+内收工作半径共同作用，不是单独归因 SHORT_UP_TIMEOUT。预设加载后仍会跑全部安全门。"
+}

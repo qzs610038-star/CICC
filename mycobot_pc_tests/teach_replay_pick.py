@@ -11,16 +11,30 @@
      `angles` 和 `coords`，悬停点由用户手工示教，不再自动 Z+60 推导。
   2. 长距离过渡（零位 <-> 悬停点、悬停点 <-> 悬停点、回零保护）
      统一使用 `sync_send_angles` 关节空间回放，绕开 IK 奇异。
-  3. 仅短距离 hover <-> pick/drop 谨慎保留 mode=1 直线运动；失败即熔断，
-     不自动 fallback 到 mode=0，避免不可预测轨迹。
-  4. `get_filtered_coords()` 多次读取异常时返回 None，上层拒绝继续，
+  3. §14.3：短距离 hover <-> pick/drop 也改为纯关节角回放
+     (`checked_short_angles`)，不再调用 `sync_send_coords()`。原因：
+     `mode=0` 只表示关节空间插值，不表示绕过 IK——只要调用
+     `sync_send_coords()`，固件端仍必须把笛卡尔目标解算为关节角，
+     远端低位/腕部多解/边界点仍可能快速返回 0。
+  4. §14.4：短距离 hover/down 点对先做关节连续性校验
+     (`validate_short_angle_pair`)，防止示教落在不同 IK 分支导致大幅摆动。
+  5. `get_filtered_coords()` 多次读取异常时返回 None，上层拒绝继续，
      绝不返回最后一次异常读数兜底。
-  5. 关节角回放到位后用空间坐标做一致性校验，校验只用于确认到位，
-     不再驱动后续规划。
-  6. `checked_gripper_action()` 返回值在主流程中必须被处理。
+  6. `coords` 只用于 `verify_coords_near()` 等只读到位校验，
+     不参与任何运动规划（§14.3 验收硬性项）。
+  7. §16.3/§16.4 方向分离速度/超时 + 软到位判定：下行（重力辅助）用
+     SHORT_DOWN_SPEED=12 / SHORT_DOWN_TIMEOUT=10；上行（抗重力）用
+     SHORT_UP_SPEED=16 / SHORT_UP_TIMEOUT=25。run-7 确诊上行失败时
+     max_angle_delta 仅 2.2°（固件到位判定未收敛），因此新增软到位：
+     sync_send_angles 返回 0 后读实际角度/坐标，若 max_angle_delta ≤ 3.0°
+     且 delta_xyz ≤ 25mm 则软通过。上行动作允许软通过，下行保持严格。
+  8. §16.5 异常退出策略：普通 RuntimeError 先提示用户扶稳再释放舵机，
+     避免臂已抬起时直接掉电下沉。KeyboardInterrupt 急停仍保持立即释放。
+  9. `checked_gripper_action()` 返回值在主流程中必须被处理。
 
-实机测试前请阅读 trial_run_logs.md 中两次失败记录，理解 IK 奇异与
-Z=425.4 异常读数的成因。空载分段验证步骤见 plan 第 8 节。
+实机测试前请阅读 trial_run_logs.md 中失败记录，
+以及 joint_space_teach_replay_plan.md §15 的验证分析。
+空载分段验证步骤见 plan 第 8 节与 §14.6。
 """
 
 import time
@@ -34,8 +48,22 @@ from pymycobot.mycobot import MyCobot
 # ============================================================
 ANG_REPLAY_SPEED = 20          # 关节角回放速度 (%)
 ANG_REPLAY_TIMEOUT = 20        # 关节角回放超时 (s)
-SHORT_LINEAR_SPEED = 15        # 短距离直线速度 (%)
-SHORT_LINEAR_TIMEOUT = 10     # 短距离直线超时 (s)
+# §16.3 / §16.8：方向分离速度/超时参数——下行（重力辅助）保持低速短超时，
+# 上行（抗重力）适当提速并放宽超时窗口。run-7 确证根因为固件到位判定
+# 未收敛（max_angle_delta=2.2° 仍返回 0），因此上行超时从 15s 增至 25s。
+SHORT_DOWN_SPEED = 12          # 下行关节速度（重力辅助）(%)
+SHORT_DOWN_TIMEOUT = 10        # 下行关节超时 (s)
+SHORT_UP_SPEED = 16            # 上行动作适当提速，克服逆重力阻力 (%)
+SHORT_UP_TIMEOUT = 25          # 上行动作放宽超时窗口 (s)，§16.3 从 15 增至 25
+# §16.4 软到位成功判定——sync_send_angles 返回 0 后先读数再决断，
+# 物理已接近目标（max_angle_delta <= 3° 且 delta_xyz <= 25mm）时软通过。
+SOFT_ANGLE_SUCCESS_TOL = 3.0   # 软到位关节角度容差 (deg)
+SOFT_COORD_SUCCESS_TOL = 25.0  # 软到位坐标容差 (mm)，复用 COORD_VERIFY_TOL
+SOFT_SETTLE_SECONDS = 0.5      # 软到位前等待舵机稳定 (s)
+# §14.4：短距离 hover/down 点对关节连续性安全门，防止示教落在不同 IK 分支。
+# 1-5 轴短距离单轴变化过大说明 hover/down 可能不在同一解分支，回放会大幅摆动。
+SHORT_ARM_JOINT_MAX_DELTA = 30.0   # 短距离 1-5 轴单轴最大变化（度）
+SHORT_WRIST6_MAX_DELTA = 45.0      # 短距离第 6 轴末端旋转最大变化（度）
 GRIPPER_SPEED = 50             # 夹爪速度 (%)
 GRIPPER_TIMEOUT = 2.5          # 夹爪开环等待 (s)
 
@@ -295,20 +323,123 @@ def checked_sync_angles(mc, angles, speed, timeout, label):
     return True
 
 
+def checked_short_angles(
+    mc,
+    target_angles,
+    speed,
+    timeout,
+    label,
+    expected_coords=None,
+    allow_soft_success=False,
+):
+    """
+    §16.4：短距离关节角回放，用于 hover <-> pick/drop。
+    彻底绕开 sync_send_coords() 的笛卡尔目标 IK 解算——固件端只做
+    关节空间插值，不再把坐标目标解算为关节角，规避远端低位/腕部
+    多解/边界点快速返回 0 的熔断。
+    注意：末端不保证严格垂直直线运动，物块位置必须与示教时一致，
+    且示教的 hover/down 点必须保证中间关节路径不会扫到物块/桌面/夹具。
+
+    §16.4 新增软到位成功判定：sync_send_angles 返回 != 1 后读取
+    实际角度/坐标，若 max_angle_delta <= SOFT_ANGLE_SUCCESS_TOL 且
+    delta_xyz <= SOFT_COORD_SUCCESS_TOL，允许软通过（不抛异常）。
+    软通过后续仍必须执行 verify_coords_near()。
+    """
+    if not isinstance(target_angles, list) or len(target_angles) < 6:
+        raise RuntimeError(f"{label}: 目标关节角非法: {target_angles}")
+    if not all(isinstance(v, (int, float)) and math.isfinite(v)
+               and -180.0 <= v <= 180.0 for v in target_angles[:6]):
+        raise RuntimeError(f"{label}: 目标关节角含非数值或越界: {target_angles}")
+    print(f"  -> 短距离关节回放到 {label}: {target_angles} "
+          f"(speed={speed}, timeout={timeout}s)")
+    res = mc.sync_send_angles(target_angles, speed, timeout=timeout)
+    if res == 1:
+        return True
+
+    # §16.4：失败后诊断读取 + 软到位判定
+    print(f"  -> [诊断] {label}: sync_send_angles 返回 {res}")
+    time.sleep(SOFT_SETTLE_SECONDS)
+    actual_angles = get_filtered_angles(mc)
+    actual_coords = get_filtered_coords(mc)
+
+    if actual_angles:
+        angle_deltas = [abs(actual_angles[i] - target_angles[i]) for i in range(6)]
+        max_angle_delta = max(angle_deltas)
+        print(f"  -> [诊断] {label}: 实际关节角={actual_angles}")
+        print(f"  -> [诊断] {label}: 与目标关节角差值={angle_deltas}, "
+              f"max={max_angle_delta:.1f}°")
+    else:
+        max_angle_delta = None
+        print(f"  -> [诊断] {label}: 无法读取稳定实际关节角")
+
+    if actual_coords:
+        print(f"  -> [诊断] {label}: 实际坐标={actual_coords}")
+    else:
+        print(f"  -> [诊断] {label}: 无法读取稳定实际坐标")
+
+    if allow_soft_success and max_angle_delta is not None:
+        angle_ok = max_angle_delta <= SOFT_ANGLE_SUCCESS_TOL
+        coord_ok = True
+        if expected_coords is not None and actual_coords is not None:
+            coord_delta = max(abs(actual_coords[i] - expected_coords[i])
+                              for i in range(3))
+            coord_ok = coord_delta <= SOFT_COORD_SUCCESS_TOL
+            print(f"  -> [诊断] {label}: 软到位坐标 delta_xyz="
+                  f"{coord_delta:.1f} mm")
+        elif expected_coords is not None and actual_coords is None:
+            # §16.4 执行要求：expected_coords 已提供但 actual_coords 读不到，
+            # 建议不通过以策安全。
+            print(f"  -> [诊断] {label}: 无法读取坐标，不允许软通过")
+            coord_ok = False
+
+        if angle_ok and coord_ok:
+            print(f"  -> [软通过] {label}: 固件返回 {res}，但实际姿态已在容差内，"
+                  f"继续执行后续坐标校验。")
+            return True
+
+    raise RuntimeError(f"{label}: 短距离角度动作超时或失败 (返回 {res})")
+
+
+def validate_short_angle_pair(src_point, dst_point, label):
+    """
+    §14.4：短距离 hover <-> down 点对的关节连续性校验。
+    全角度回放可以绕开固件 IK，但不能无条件信任所有示教角度——
+    若 hover/down 落在不同 IK 分支（如 run-5 的 drop_hover -> drop
+    关节 3/4/6 差异巨大），直接按角度短距离回放会产生大幅摆动或
+    腕部翻转。校验失败抛异常，要求用户重新示教对应点位。
+    """
+    src = src_point["angles"]
+    dst = dst_point["angles"]
+    deltas = [abs(dst[i] - src[i]) for i in range(6)]
+    arm_max_delta = max(deltas[:5]) if len(deltas) >= 5 else 0.0
+    wrist6_delta = deltas[5] if len(deltas) >= 6 else 0.0
+    print(f"  -> {label} 短距离关节差: {deltas}, "
+          f"arm_max_delta={arm_max_delta:.1f}, wrist6_delta={wrist6_delta:.1f}")
+    if arm_max_delta > SHORT_ARM_JOINT_MAX_DELTA:
+        raise RuntimeError(
+            f"{label}: 1-5轴短距离关节变化过大 "
+            f"(arm_max_delta={arm_max_delta:.1f} > {SHORT_ARM_JOINT_MAX_DELTA})，"
+            f"疑似示教到不同IK分支，请重新示教")
+    if wrist6_delta > SHORT_WRIST6_MAX_DELTA:
+        raise RuntimeError(
+            f"{label}: 第6轴短距离旋转过大 "
+            f"(wrist6_delta={wrist6_delta:.1f} > {SHORT_WRIST6_MAX_DELTA})，"
+            f"疑似腕部翻转，请重新示教")
+    return True
+
+
 def checked_short_linear(mc, target_coords, speed, timeout, label):
     """
-    短距离直线动作（mode=1），仅用于 hover <-> pick/drop。
-    目标坐标必须通过 is_safe_coord；失败抛异常，不自动 fallback。
+    [已禁用 / 仅供历史对照] 短距离直线动作，调用 sync_send_coords()。
+    §14.2/§14.3 已确认：短距离继续使用坐标驱动是 run-5 熔断的根因——
+    mode=0 只表示关节空间插值，不表示绕过 IK，固件端仍必须把笛卡尔
+    目标解算为关节角，远端低位/腕部多解/边界点仍可能快速返回 0。
+    自动阶段不得调用本函数；短距离请改用 checked_short_angles()。
+    本函数保留仅供历史对照与回归验证，禁止进入 auto_phase 调用链。
     """
-    if not is_safe_coord(target_coords):
-        raise RuntimeError(f"{label}: 目标坐标不安全: {target_coords}")
-    print(f"  -> 短距离过渡到 {label}: {target_coords}")
-    # 将 mode 从 1 (空间直线插补) 改为 0 (关节空间插值)，以彻底规避远端工作区奇异点熔断问题。
-    # 在 40mm 的极短位移中，关节插值引起的末端摆动偏移极微（通常小于 2mm），不影响精准对齐。
-    res = mc.sync_send_coords(target_coords, speed, 0, timeout=timeout)
-    if res != 1:
-        raise RuntimeError(f"{label}: 短距离直线动作超时或失败 (返回 {res})")
-    return True
+    raise RuntimeError(
+        f"{label}: checked_short_linear 已禁用（§14.3），自动阶段不得使用坐标驱动，"
+        f"请改用 checked_short_angles()。")
 
 
 def verify_coords_near(mc, expected, label, xyz_tol=COORD_VERIFY_TOL):
@@ -574,14 +705,29 @@ def prepare_phase(mc):
 
 def auto_phase(mc, pick_hover, pick, drop_hover, drop):
     """
-    第三阶段：关节角回放 + 短距离直线 + 坐标校验。
-    长距离用 checked_sync_angles；短距离 hover<->pick/drop 用 checked_short_linear。
+    第三阶段：纯关节角回放 + 空间坐标只读校验（§14.3/§14.4）。
+    长距离用 checked_sync_angles；短距离 hover<->pick/drop 用
+    checked_short_angles（关节角驱动，不再调用 sync_send_coords）。
+    coords 只保留给 verify_coords_near 做到位一致性校验，不参与运动规划。
     任一动作失败即抛异常熔断，不自动 fallback。
+
+    §14.4：实机动作前先校验四对短距离点对的关节连续性，任一校验
+    失败则禁止进入实机自动动作，要求用户重新示教对应点位。
     """
     print("\n====================================")
     print("【第三阶段：关节角示教回放 + 空间一致性校验】")
     print("====================================")
-    print("⚠️ 请确认轨迹范围内无障碍物。如遇危险，请随时按 Ctrl+C 触发急停！")
+
+    # §14.4：短距离点对关节连续性预校验（只读，不发任何运动指令）。
+    # 任一对落在不同 IK 分支即在此拦截，避免实机大幅摆动/腕部翻转。
+    print("\n0. 短距离点对关节连续性预校验...")
+    validate_short_angle_pair(pick_hover, pick, "pick_hover->pick")
+    validate_short_angle_pair(pick, pick_hover, "pick->pick_hover")
+    validate_short_angle_pair(drop_hover, drop, "drop_hover->drop")
+    validate_short_angle_pair(drop, drop_hover, "drop->drop_hover")
+    print("  -> 四对短距离点对关节连续性校验通过。")
+
+    print("\n⚠️ 请确认轨迹范围内无障碍物。如遇危险，请随时按 Ctrl+C 触发急停！")
     input("-> 请将正方体放回【抓取点】，按 Enter 键开始（空载首测可不放物块）...")
 
     print("\n1. 张开夹爪准备...")
@@ -591,27 +737,39 @@ def auto_phase(mc, pick_hover, pick, drop_hover, drop):
     checked_sync_angles(mc, pick_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "pick_hover")
     verify_coords_near(mc, pick_hover["coords"], "pick_hover")
 
-    print("\n3. 短距离直线下探到 pick...")
-    checked_short_linear(mc, pick["coords"], SHORT_LINEAR_SPEED, SHORT_LINEAR_TIMEOUT, "pick")
+    print("\n3. 短距离关节下探到 pick...")
+    checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick")
+    verify_coords_near(mc, pick["coords"], "pick")
 
     print("\n4. 闭合夹爪抓取目标...")
     gripper_action_with_retry(mc, 1, "step4 闭合")
 
-    print("\n5. 短距离直线抬起回 pick_hover...")
-    checked_short_linear(mc, pick_hover["coords"], SHORT_LINEAR_SPEED, SHORT_LINEAR_TIMEOUT, "pick_hover")
+    print("\n5. 短距离关节抬起回 pick_hover...")
+    checked_short_angles(
+        mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover",
+        expected_coords=pick_hover["coords"],
+        allow_soft_success=True,
+    )
+    verify_coords_near(mc, pick_hover["coords"], "pick_hover")
 
     print("\n6. 关节角回放到 drop_hover（空中长距离过渡）...")
     checked_sync_angles(mc, drop_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "drop_hover")
     verify_coords_near(mc, drop_hover["coords"], "drop_hover")
 
-    print("\n7. 短距离直线下降至 drop...")
-    checked_short_linear(mc, drop["coords"], SHORT_LINEAR_SPEED, SHORT_LINEAR_TIMEOUT, "drop")
+    print("\n7. 短距离关节下降至 drop...")
+    checked_short_angles(mc, drop["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "drop")
+    verify_coords_near(mc, drop["coords"], "drop")
 
     print("\n8. 张开夹爪放置正方体...")
     gripper_action_with_retry(mc, 0, "step8 张开")
 
-    print("\n9. 短距离直线抬起回 drop_hover...")
-    checked_short_linear(mc, drop_hover["coords"], SHORT_LINEAR_SPEED, SHORT_LINEAR_TIMEOUT, "drop_hover")
+    print("\n9. 短距离关节抬起回 drop_hover...")
+    checked_short_angles(
+        mc, drop_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "drop_hover",
+        expected_coords=drop_hover["coords"],
+        allow_soft_success=True,
+    )
+    verify_coords_near(mc, drop_hover["coords"], "drop_hover")
 
     print("\n10. 任务完成，准备返回直立安全零位...")
     if not safe_return_home(mc):
@@ -654,11 +812,18 @@ def main():
             print("已切断所有舵机动力，机械臂完全变软。")
     except Exception as e:
         print(f"\n🚨 [异常] 运行中发生错误或运动超时: {e}")
+        # §16.5：普通动作异常不应立即 release_all_servos()——
+        # run-7 失败时臂已抬到接近 pick_hover（Z=92mm），直接掉电会下沉，
+        # 必须提示用户扶稳后再释放。KeyboardInterrupt 仍保持急停释放。
+        print("-> 请用手扶稳机械臂/物块防止下沉/掉落，扶稳后按 Enter 释放舵机...")
         if mc:
-            mc.stop()
-            time.sleep(0.1)
+            try:
+                mc.stop()
+            except Exception:
+                pass
+            input()
             mc.release_all_servos()
-            print("安全起见，已紧急释放所有舵机。")
+            print("已在人工扶稳后释放所有舵机。")
 
 
 if __name__ == "__main__":
