@@ -80,6 +80,44 @@ Verilog/SystemVerilog 代码应沿用现有风格：文件名使用 snake_case�
 - 调试动作：先做只读状态读取、RGB 灯板或极小幅安全演示，再考虑关节、夹爪或快速移动。任何会导致机械臂运动的命令都必须显式确认目标、速度、角度范围和急停/断电方式。
 - FPGA 联动：TJ375N529 侧可通过 Type-C UART、JTAG-IF UART、UART2 TO Peripherals 或预留 3.3V GPIO/J13/J15 做链路探索；正式方案应由板上 CPU 通过 UART 协议控制 myCobot，FPGA RTL 只提供硬件通道。在未确认电平、接线和协议前，不要把 FPGA 输出直接接入机械臂控制线。
 
+## 文档优先级与交接规则
+
+### 优先级阶梯（高 → 低）
+1. 用户当前对话中的明确指令。
+2. 本文件中的安全红线：机械臂动作限制、Codex 审查门、决赛主线边界、Git 提交规范。任何其他文件不可覆盖。其中“决赛主线边界”具体指本文件「分赛区决赛主线」章节与 `分赛区决赛实施开发路线.md` 中未被 `CURRENT_STATE.md` 明确降级或覆盖的路线定义。
+3. `CURRENT_STATE.md`：最新路线增量与当前状态索引，可覆盖旧规划中的路线选择、任务优先级和已废弃方案。
+4. `SESSION_HANDOFF.md` 或 `debug_records/*handoff*.md`：高置信接力事实，需先跑 `tools/agent_handoff_health_check.ps1`。
+5. `分赛区决赛实施开发路线.md` 等历史规划文件。
+6. 初赛 demo 文档与旧日志：仅作经验库，不作事实来源。
+
+真实源码、工程 XML、构建日志和上板现象始终是最终事实来源；上述文件只记录对它们的最新结论和证据位置。
+
+### 决赛主线边界引用规则
+- 引用“决赛主线边界”时必须写明具体来源文件和章节，优先写作：`AGENTS.md`「分赛区决赛主线」+ `分赛区决赛实施开发路线.md`。
+- `AGENTS.md`「分赛区决赛主线」是硬边界：FPGA 负责视频前端/ROI/统计特征/OSD/必要硬件加速；板上 CPU 负责识别决策、参数管理和 myCobot 控制；不得恢复纯 FPGA 视觉识别或纯 FPGA 机械臂控制。
+- `分赛区决赛实施开发路线.md` 是路线图和经验库；若其中某个阶段性“保底方案”已被 `CURRENT_STATE.md` 标为历史参考或旧结论，则不得再把它当作当前核心目标。
+
+### 高置信交接规则（非绝对信任）
+- 新会话发现交接文件时，必须先运行 `tools/agent_handoff_health_check.ps1`，再做任何修改。
+- 默认接受 `[Verified Facts]`，禁止重型重复验证：不跑完整 Efinity 综合、不跑完整仿真、不做全仓库 `rg`、不做机械臂动作测试。
+- 允许且要求只读、低成本、无副作用的健康检查（git 状态、关键文件存在性、串口枚举）。
+- 出现以下任一跳出条件时，进入 `[Contradiction Report]` 流程，仅针对冲突事实做最小范围核查与纠偏，不得借机推翻整个交接包：
+  1. 当前 `HEAD`、分支或 dirty 状态与 handoff 声明不一致。
+  2. `Verified Facts` 缺少证据路径、命令记录、日志位置、时间戳或 commit 信息。
+  3. handoff 声明的关键文件、日志或产物不存在。
+  4. 健康检查脚本失败。
+  5. 用户当前明确指令与 handoff 事实冲突。
+  6. 涉及机械臂运动、FPGA-to-机械臂接线/电平、bitstream、`constrain.sdc`、`mem_test.xml`、时钟复位、AXI/CDC、CPU→OSD 回写等安全关键边界。
+
+### 归档时机
+完成 `[Next Immediate Action]` 的首个可验证 checkpoint，且新事实/风险/下一步已写入 `CURRENT_STATE.md` 或任务日志，确认无仍依赖 handoff 原文的未完成动作后，将交接文件移入 `debug_records/handoffs/` 并按 `SESSION_HANDOFF_YYYYMMDD_HHMMSS.md` 重命名。
+
+### Skill 索引
+- `.agents/skills/fpga_vision/SKILL.md`：FPGA 顶层、RTL、视频链路（CSI/DSI/OSD/ROI）、SDC 约束、ModelSim 仿真。
+- `.agents/skills/cpu_mycobot/SKILL.md`：板上 CPU 固件、UART 寄存器、myCobot 280 串口通信、姿态插值、参数管理。
+- 若当前 Agent 支持 `.agents/skills/` 自动加载，按任务触发对应 Skill；若不支持，按任务手动读取对应 `SKILL.md`。
+- Skill 承载模块细则，不取代本文件的全局红线。安全红线、Codex 审查门、决赛主线边界仍以 `AGENTS.md`「分赛区决赛主线」和 `分赛区决赛实施开发路线.md`（未被 `CURRENT_STATE.md` 降级/覆盖的部分）为准。
+
 ## Claude/Codex 协同分工
 本项目采用 Claude 执行、Codex 复核的双工具协作方式。Claude 侧详细工程上下文以 `CLAUDE.md` 为准；Codex 侧在本文件基础上承担独立审查、纠偏和困难救场职责。
 
