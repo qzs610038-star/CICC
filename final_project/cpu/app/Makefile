@@ -20,8 +20,22 @@ SRCS_S := $(STARTUP_DIR)/startup_qcrv32.S
 OBJS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS_C)) \
         $(BUILD_DIR)/startup_qcrv32.o
 
+# APB base address: real build MUST set SOC_H_PATH to the Efinity-generated
+# soc.h directory, which provides the true IO_APB_SLAVE_0_BASE.
+# Placeholder builds (unit tests, standalone) are gated behind STANDALONE_TEST=1
+# to prevent accidental use of dummy base addresses in production firmware.
+# See CPU_MODULE_PLAN §1.
+SOC_H_PATH ?=
+ifneq ($(SOC_H_PATH),)
+  CFLAGS_SOC := -I$(SOC_H_PATH) -include soc.h
+else ifeq ($(STANDALONE_TEST),1)
+  CFLAGS_SOC := -DAPB_VISION_BASE_PLACEHOLDER=0xF0000000u
+else
+  $(error SOC_H_PATH not set. Set SOC_H_PATH=<dir> to the Efinity soc.h directory, or STANDALONE_TEST=1 for unit test builds)
+endif
+
 CPU_FLAGS := -march=rv32imac -mabi=ilp32 -mcmodel=medlow
-CFLAGS := $(CPU_FLAGS) -I$(INC_DIR) -O2 -ffunction-sections -fdata-sections -Wall -Wextra -g
+CFLAGS := $(CPU_FLAGS) $(CFLAGS_SOC) -I$(INC_DIR) -O2 -ffunction-sections -fdata-sections -Wall -Wextra -g
 LDFLAGS := $(CPU_FLAGS) -nostartfiles -Wl,--gc-sections -Wl,-Map=$(BUILD_DIR)/$(TARGET).elf.map -T $(LINKER)
 
 .PHONY: all clean info
