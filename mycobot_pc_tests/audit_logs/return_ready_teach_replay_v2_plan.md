@@ -780,3 +780,108 @@ run-13 不建议继续调高速度，先验证“预设复用 + 当前 V2.2 参�
 5. 另做一次示教回归：故意拖出 `R>280`，确认 `record_teach_point()` 能提示重试并允许重新保存安全点。
 
 只有 run-13 预设复用稳定后，才考虑把边缘半径 `R=260~274mm` 作为压力测试单独验证；不要把边缘点位作为默认使用方案。
+
+### 14.6 串口可选参数识别 Bug 与修复建议
+
+在第十四次试运行（2026-07-07）时，发现若在使用 `--save-preset` 或 `--preset` 等可选参数时未显式指定 `--port`，会触发串口开启失败报错：`could not open port '--save-preset'`。
+
+**1. 故障根因**：
+脚本中的 `get_port()` 采用了 `if len(sys.argv) > 1: return sys.argv[1]` 的老旧位置参数提取逻辑。当命令行使用其他可选参数但未指定 `--port` 时，自动识别到的 `sys.argv[1]`（即 `"--save-preset"` 等）被误判为串口名称传入 `MyCobot` 造成报错。
+
+**2. 修复方案建议**：
+在未来的维护或优化中，应彻底移除这种非 argparse 风格的盲目提取。只留下基于 `serial` 库自动识别与交互选择串口的逻辑，由 `argparse` 接管参数解析：
+```python
+def get_port():
+    # 彻底废除位置参数盲读：
+    # if len(sys.argv) > 1:
+    #     # return sys.argv[1]
+
+    ports = serial.tools.list_ports.comports()
+    ...
+```
+该漏洞与修复建议同样适用于以下脚本：
+*   `mycobot_pc_tests/teach_replay_pick_return_ready.py` (V2.3)
+*   `mycobot_pc_tests/teach_replay_pick.py`
+*   `mycobot_pc_tests/teach_and_pick.py`
+
+### 14.7 run-14 复核与 V2.4 修改建议（串口 Bug 修复 + 末段回零提速）
+
+> 依据: `mycobot_pc_tests/audit_logs/trial_run_14_logs.md`
+> 状态: V2.3 预设复用稳定（前后两次 0 轮人工扶正、动作重合度高）。本轮焦点转为
+>   ① 串口参数 Bug 根治；② 用户附加要求——加快最终回零响应速度。
+> 边界: 本节改动属 myCobot 动作链路（L2/L3/L4 触及 safe_return_home 签名与动作参数），
+>   依 AGENTS.md Codex Gate，须 Codex 复核后再实机验证 run-15。
+
+#### 14.7.1 串口 Bug 修复范围修正（对 §14.6 / Gemini 建议的收敛）
+
+§14.6 称"修复同样适用于 teach_replay_pick.py 和 teach_and_pick.py"——**此范围需收敛**：
+
+| 脚本 | 有 argparse/可选参数? | Bug 实际触发? | 是否改? |
+| --- | --- | --- | --- |
+| `teach_replay_pick_return_ready.py` (V2.3) | 有 | **会**（--save-preset 被误读） | **改** |
+| `teach_replay_pick.py` | 无 | 不会（无可选参数可被误判） | **不改**（方案 §0 硬规则：不直接修改此基线） |
+| `teach_and_pick.py` | 无 | 不会（同上） | **不改**（无实际 bug + 归档脚本） |
+
+两个无 argparse 的脚本只是"代码风格老旧"，但没有任何可选参数会被 `sys.argv[1]` 误判为串口，**不存在实际 bug**；且 `teach_replay_pick.py` 受方案 §0 明确保护。故 V2.4 只修 V2.3 脚本一个文件——删 `get_port()` 里 `if len(sys.argv) > 1: return sys.argv[1]` 两行。`main()` 已用 argparse 接管 `--port`，`get_port()` 只在 `--port` 未给时被调用，删盲读后纯做 `comports()` 自动枚举 + 交互选择，与 argparse 完全兼容。
+
+#### 14.7.2 末段回零提速——真实耗时归因
+
+trial_run_14 关键 step 耗时：
+
+| Step | 含义 | Run1 | Run2 | 说明 |
+| --- | --- | --- | --- | --- |
+| 5 | pick → pick_hover（带载上行） | 3.4s | 1.4s | 正常 |
+| **9** | **drop → drop_hover（带载上行）** | **23.0s** | **23.0s** | ⚠️ 瓶颈：触发软通过+微调且微调不收敛 |
+| 10 | drop_hover → home_ready | 2.6s | 2.6s | 正常 |
+| 11 | home_ready → HOME（回零） | 2.4s | 2.0s | 正常 |
+
+严格意义的"回零"（step 10+11）≈5s，已经不慢。真正大头是 step 9 的 23s（放物块后抬起，属回零前序）。所以提速分两档：窄义回零(step10+11) 与 广义末段(step9+10+11)。
+
+step 11 真正"动"之前有冗余读数开销：`_verify_actual_pose_for_auto_return` 读一次角度、`verify_coords_near` 读一次坐标（两者必要），但 `safe_return_home` 又重读一次角度（与第1步冗余、臂静止）+ 读一次 `diag_coords` 纯诊断坐标（只打印不决策、完全冗余）。每次 `get_filtered_*` 静态臂约 0.25-1s。这是"响应速度"的可压缩空间。
+
+#### 14.7.3 四个提速杠杆（用户已批 L1+L2+L3+L4 全套）
+
+*   **L1（去冗余诊断读）**：`safe_return_home` auto 分支去掉纯诊断的 `diag_coords` 读数（只打印不决策）；manual 分支保留（扶正诊断有价值）。省 ~0.4-0.8s，风险零。
+*   **L2（缓存角度）**：`_verify_actual_pose_for_auto_return` 返回校验通过时的实际角度（越界/走人工扶正返回 None）；`checked_return_transition` 透传；`safe_return_home` 新增 `cached_angles=None` 参数，传入则跳过自身 `get_filtered_angles` 重读。省 ~0.25-0.4s。`cached_angles` 默认 None → `prepare_phase` 路径与旧调用方行为不变；安全门（calc_home_diffs + 有限值校验 + arm_max_diff 门）不跳过，只省读数。
+*   **L3（回零速度 20→25）**：`HOME_RETURN_SPEED` 20→25。该段是全程最安全的移动——近直立位、无负载（夹爪已张开放下物块）、距离短、单轴 delta≤45。提速 25 风险低于 step5/9 带载远端上行。提速后固件不收敛返回 0 → `safe_return_home` 返回 `"failed"` → 提示扶稳+release（**安全失败，不撞机**）。需单独验证 run。
+*   **L4（收紧 step9 微调超时 6→3s）**：`SOFT_REFINE_TIMEOUT` 6→3s。run-14 step9 实测微调不收敛（固件 plateau 在 ~2.1°），6s 纯等待；微调 best-effort，失败仍走旧软通过门(3°/25mm) 兜底，逻辑不变。省 step9 ~3s（针对广义末段瓶颈）。
+
+预期：窄义回零 step10+11 ~5s→~3s；广义末段 step9+10+11 ~28s→~23s。
+
+#### 14.7.4 Claude 修改清单（已落地）
+
+1. `get_port()` 删位置参数盲读两行（§14.6 根治，只改 V2.3 脚本）。
+2. `SOFT_REFINE_TIMEOUT` 6→3s（L4）。
+3. `HOME_RETURN_SPEED` 20→25（L3）。
+4. `_verify_actual_pose_for_auto_return` 返回实际角度；`checked_return_transition` 透传；`safe_return_home(cached_angles=...)` 复用（L1+L2）。`auto_phase_v2` step11 传入缓存角度。
+5. 文件头 docstring 追加 V2.4 W/X/Y 条目。
+6. 运行 `python -m py_compile mycobot_pc_tests/teach_replay_pick_return_ready.py` → 通过。
+7. mock-serial 验证 `get_port()` 在 `['--save-preset','my_new_test']`（无 --port）下不再返回 `"--save-preset"`，正确进入 comports 枚举/退出。
+
+#### 14.7.5 未动项
+
+`SHORT_UP_SPEED` 保持 16；`ARM_MAX_DIFF_SAFE`=45 / `HOME_READY_TARGET_ARM_MAX`=40 不变；`SHORT_UP_TIMEOUT`=15 不变；`teach_replay_pick.py` 与 `teach_and_pick.py` 不改（§0 保护 + 无实际 bug）。
+
+#### 14.7.6 run-15 验收建议
+
+1. 先验证串口 Bug：`python mycobot_pc_tests/teach_replay_pick_return_ready.py --save-preset <name>`（不传 --port）应正常进入 comports 自动枚举，不再报 `could not open port '--save-preset'`。
+2. 带 3cm 物块，工作半径 `R<=252mm`，用 run-14 的 `my_new_test` 预设或重新示教。
+3. 记录 step 5/9/10/11 耗时、`delta_xyz`、`safe_return_home` 返回值、是否触发微调及微调是否收敛。
+4. 验收门：
+   *   全流程跑通，0 轮人工扶正。
+   *   step 11 回零 `safe_return_home="auto"`，且 `res==1`（L3 提速到 25 后固件仍收敛）。若 `res!=1` 返回 `"failed"`，回退 `HOME_RETURN_SPEED` 25→20 再测（不要回到 15）。
+   *   窄义回零(step10+11) 耗时应明显低于 run-14 的 ~5s（目标 ~3s）。
+   *   step 9 若触发微调，记录微调耗时（L4 后应 ≤3s）与微调前后 `max_err`/`delta_xyz`。
+   *   `delta_xyz` 不应回升到 run-11 Run B 的 16.2mm。
+5. 只有 run-15 稳定后，才考虑把边缘半径 `R>260mm` 作为压力测试单独验证。
+
+#### 14.7.7 Codex 复核门
+
+Codex 复核重点：
+*   `get_port()` 盲读是否彻底删除、是否未误伤 `--port` 既有路径。
+*   `safe_return_home(cached_angles=...)` 是否仅在 auto 分支省读数、是否仍走 calc_home_diffs + 有限值校验 + arm_max_diff 安全门（不能跳过安全判定）。
+*   `cached_angles=None` 默认是否保证 `prepare_phase` 的 `safe_return_home(mc)` 旧调用行为不变。
+*   `HOME_RETURN_SPEED=25` 是否仅在 arm_max_diff≤45 的 auto/manual 末段生效，是否保留了 `res!=1 → "failed" → 扶稳+release` 的安全失败路径。
+*   `SOFT_REFINE_TIMEOUT=3` 是否保留了"微调失败走旧软通过门(3°/25mm)兜底"的逻辑。
+*   是否未恢复 `sync_send_coords()`、未放宽 `ARM_MAX_DIFF_SAFE`/`HOME_READY_TARGET_ARM_MAX`/`R_MAX`。
+*   `teach_replay_pick.py` 与 `teach_and_pick.py` 是否确实未被修改。

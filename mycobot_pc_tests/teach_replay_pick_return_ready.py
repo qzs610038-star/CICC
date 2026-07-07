@@ -83,7 +83,34 @@ V2.3 相对 V2.2 的迭代（plan §14 / run-12 复核，焦点转为预设复�
      TeachAbort 异常，main 走安全退出（teach 阶段舵机已掉电，无需再 release）。
   V. 不继续提速（SHORT_UP_SPEED 保持 16）；home_ready 安全门保持 40/45。
 
-运动/安全参数沿用 V2.2 已验证值，V2.3 只加预设复用 + 日志兜底 + q 退出，不动运动参数。
+V2.4 相对 V2.3 的迭代（plan §14.6/§14.7 / run-14 复核，焦点转为串口参数 Bug 修复 +
+  末段回零响应提速；属 myCobot 动作链路改动，须 Codex 复核后实机验证）:
+  W. 串口参数 Bug 修复（plan §14.6 / trial_run_14 §1）：get_port() 移除位置参数盲读
+     `if len(sys.argv) > 1: return sys.argv[1]`。main() 已用 argparse 接管 --port，
+     get_port() 只在 --port 未给时被调用，删盲读后纯做 comports() 自动枚举 + 交互选择，
+     与 argparse 完全兼容。trial_run_14 不传 --port 传 --save-preset 时把 "--save-preset"
+     误判为串口名导致 could not open port '--save-preset'，本项根治。
+     不改 teach_replay_pick.py（plan §0 禁止改基线）与 teach_and_pick.py（无 argparse
+     可选参数、无实际 bug、归档脚本）。
+  X. 末段回零提速 L1+L2+L3+L4（plan §14.7）：
+     L1：safe_return_home auto 分支去掉纯诊断的 diag_coords 读数（只打印不决策，manual
+         分支保留）。省 ~0.4-0.8s。
+     L2：_verify_actual_pose_for_auto_return 返回校验通过时的实际角度，checked_return_transition
+         透传，safe_return_home 新增 cached_angles 参数复用它，跳过 auto 分支冗余的
+         get_filtered_angles 重读（臂在 home_ready 静止，两读相隔~0.1s）。省 ~0.25-0.4s。
+         cached_angles 默认 None，prepare_phase 路径与旧调用方行为不变；安全门判定
+         （calc_home_diffs + 有限值校验 + arm_max_diff 门）不跳过，只省读数。
+     L3：HOME_RETURN_SPEED 20->25。该段是全程最安全的移动（近直立位、无负载、距离短、
+         单轴 delta<=45），提速 25 风险低于 step5/9 带载远端上行。提速后固件不收敛返回
+         0 -> "failed" 安全失败（提示扶稳+release，非撞机）。需单独验证 run。
+     L4：SOFT_REFINE_TIMEOUT 6->3s。run-14 step 9 实测微调不收敛（固件 plateau 在 ~2.1°），
+         6s 纯等待；微调是 best-effort，失败仍走旧软通过门(3°/25mm) 兜底，逻辑不变。
+         省 step 9 ~3s（针对广义末段瓶颈，非回零本身）。
+  Y. 不动 SHORT_UP_SPEED（保持 16）、不动 ARM_MAX_DIFF_SAFE（45）/HOME_READY_TARGET_ARM_MAX（40）。
+     窄义回零(step10+11) 预期 ~5s->~3s；广义末段(step9+10+11) 预期 ~28s->~23s。
+
+运动/安全参数沿用 V2.3 已验证值，V2.4 只动 HOME_RETURN_SPEED/SOFT_REFINE_TIMEOUT +
+串口 Bug 修复 + 末段冗余读数压缩；安全门（45/40/R_MAX）与软通过兜底逻辑不变。
 """
 
 import time
@@ -128,13 +155,17 @@ SOFT_REFINE_ANGLE_OK = 1.2         # 微调达标角差 (deg)
 SOFT_REFINE_COORD_OK = 10.0        # 微调达标坐标 (mm)
 SOFT_REFINE_WARN_COORD = 15.0      # 残差强警告阈值 (mm)；Run B 16.2mm 即此级别
 SOFT_REFINE_SPEED = 8              # 微调速度 (%)，低速避免带载晃动
-SOFT_REFINE_TIMEOUT = 6            # 微调超时 (s)，短时避免长等待
+SOFT_REFINE_TIMEOUT = 3            # V2.4 §14.7 L4：微调超时 6->3s（run-14 step 9 实测微调不收敛，6s 纯等待）
 SOFT_REFINE_MAX_ROUNDS = 1         # 最多微调轮数
 
 # V2.2 §13.3 优先级 4：回零速度独立参数（home_ready -> HOME 路径短且安全）。
 # run-11 step 11 从 arm_max_diff≈34° 回直立，物理 6~8s，原硬编码 speed=15/timeout=20
 # 偏保守。提至 20/12s 缩短等待，不改变 ARM_MAX_DIFF_SAFE 安全门（仍 <=45 才走此路径）。
-HOME_RETURN_SPEED = 20
+# V2.4 §14.7 L3：HOME_RETURN_SPEED 20->25。该段是全程最安全的移动——近直立位、
+# 无负载（夹爪已张开放下物块）、单轴 delta<=45。提速 25 仍远低于 SHORT_UP_SPEED
+# 边界风险。提速后固件 is_in_position 若不收敛返回 0 -> safe_return_home 返回
+# "failed" -> 提示扶稳+release（安全失败，不撞机）。需单独验证 run + Codex 复核。
+HOME_RETURN_SPEED = 25
 HOME_RETURN_TIMEOUT = 12
 # §14.4：短距离 hover/down 点对关节连续性安全门，防止示教落在不同 IK 分支。
 # 1-5 轴短距离单轴变化过大说明 hover/down 可能不在同一解分支，回放会大幅摆动。
@@ -231,9 +262,10 @@ def fmt_mm(value):
 # 串口选择（沿用 teach_and_pick.py 风格）
 # ============================================================
 def get_port():
-    if len(sys.argv) > 1:
-        return sys.argv[1]
-
+    # V2.4 §14.6/§14.7：移除位置参数盲读。main() 已用 argparse 接管 --port，
+    # get_port() 只在 --port 未给时被调用，应纯粹做 comports() 自动枚举 + 交互选择。
+    # 旧逻辑 `if len(sys.argv) > 1: return sys.argv[1]` 会把 --save-preset 等可选
+    # 参数误判为串口名（trial_run_14：could not open port '--save-preset'）。
     ports = serial.tools.list_ports.comports()
     if not ports:
         print("【错误】未检测到任何串口设备，请检查连接！")
@@ -759,6 +791,11 @@ def checked_return_transition(mc, target_point, label):
           人工扶正，不比不重试差。
         - 重试后仍 >45：不抛异常（抛了会触发 main 的异常掉电，臂在半空危险），
           而是返回让 auto_phase_v2 落到 safe_return_home 人工扶正状态机。
+
+    V2.4 §14.7 L2：返回校验完成时的实际角度（或重试后的角度），供调用链透传
+    给 safe_return_home(cached_angles=...)，避免 auto 末段 safe_return_home
+    在同一静止姿态上再读一次 get_filtered_angles（~0.25-0.4s 冗余读数）。
+    越界走人工扶正时返回 None（不缓存，safe_return_home 会自行重读）。
     """
     checked_short_angles(
         mc, target_point["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, label,
@@ -767,7 +804,7 @@ def checked_return_transition(mc, target_point, label):
     )
     # V2.1：软通过后做实际姿态安全门校验（sync_send_angles 返回 1 的严格通过
     # 也走这一层，因固件返回 1 不保证 arm_max_diff<=45，只是"固件判到位"）。
-    _verify_actual_pose_for_auto_return(mc, target_point, label)
+    return _verify_actual_pose_for_auto_return(mc, target_point, label)
 
 
 def _verify_actual_pose_for_auto_return(mc, target_point, label):
@@ -776,19 +813,24 @@ def _verify_actual_pose_for_auto_return(mc, target_point, label):
     越界则低速重试一次 home_ready，仍越界则打印诊断交还上层走人工扶正。
     不抛异常——臂在半空过渡姿态时抛异常会触发 main 的异常掉电路径，
     不如让 safe_return_home 的人工扶正状态机接管（它会先扶稳再 release）。
+
+    V2.4 §14.7 L2：返回校验通过时的实际角度，供上层透传给
+    safe_return_home(cached_angles=...) 跳过 auto 分支的冗余重读。
+    越界/读不到角度/走人工扶正时返回 None（上层不缓存，safe_return_home
+    会自行重读，保证安全门判定始终基于新鲜读数）。
     """
     actual = get_filtered_angles(mc)
     if actual is None:
         print(f"  -> [V2.1] {label}: 软通过后无法读取实际角度，"
               f"交 safe_return_home 自行判断。")
-        return
+        return None
     _, _, arm_max_diff, _ = calc_home_diffs(actual)
     print(f"  -> [V2.1] {label}: 实际姿态 arm_max_diff={arm_max_diff:.1f} "
           f"(门 {ARM_MAX_DIFF_SAFE})")
     if arm_max_diff <= ARM_MAX_DIFF_SAFE:
         print(f"  -> [V2.1] {label}: 实际姿态在自动回零安全门内，"
               f"safe_return_home 将走自动回零。")
-        return
+        return actual  # V2.4 L2：缓存供 safe_return_home 跳过冗余重读
 
     # 越界：低速重试一次（命令朝 HOME 方向挪，单向安全）
     print(f"  -> [V2.1] {label}: 实际 arm_max_diff={arm_max_diff:.1f} > "
@@ -804,16 +846,17 @@ def _verify_actual_pose_for_auto_return(mc, target_point, label):
     if actual is None:
         print(f"  -> [V2.1] {label}: 重试后无法读取实际角度，"
               f"交 safe_return_home 人工扶正。")
-        return
+        return None
     _, _, arm_max_diff, _ = calc_home_diffs(actual)
     print(f"  -> [V2.1] {label}: 重试后实际 arm_max_diff={arm_max_diff:.1f}")
     if arm_max_diff <= ARM_MAX_DIFF_SAFE:
         print(f"  -> [V2.1] {label}: 重试后进入自动回零安全门，"
               f"safe_return_home 将走自动回零。")
-        return
+        return actual  # V2.4 L2：缓存重试后角度
     print(f"  -> [V2.1] {label}: 重试后仍 arm_max_diff={arm_max_diff:.1f} > "
           f"{ARM_MAX_DIFF_SAFE}，交 safe_return_home 人工扶正状态机接管。"
           f"（建议下一轮示教更直立的 home_ready，J2 绝对值压到 35~38°。）")
+    return None
 
 
 def validate_short_angle_pair(src_point, dst_point, label):
@@ -1073,7 +1116,7 @@ def prompt_manual_prehome(mc, max_rounds=2):
 # ============================================================
 # 安全回零（§13.2/§13.3/§13.4：大臂安全门 + 人工扶正状态机）
 # ============================================================
-def safe_return_home(mc):
+def safe_return_home(mc, cached_angles=None):
     """
     安全回零策略（§13 覆盖 §12.4 的大偏差交互）：
       1. 读取稳定 angles（连续两次稳定，§12.3）。
@@ -1098,8 +1141,22 @@ def safe_return_home(mc):
       - "failed" : 无法读角度 / 含非有限值 / 回零动作超时 / 扶正未通过。
     仍为 truthy("auto"/"manual") / falsy("failed")，旧式 `if not safe_return_home`
     调用兼容。
+
+    V2.4 §14.7 L1+L2：cached_angles 可选参数。auto_phase_v2 末段调用时可传入
+    _verify_actual_pose_for_auto_return 刚读完的实际角度（臂在 home_ready 静止），
+    跳过本函数的 get_filtered_angles 重读，并跳过 auto 分支纯诊断的
+    diag_coords 读取（diag_coords 只打印不决策，auto 分支去掉它对安全门判定
+    零影响）。manual 分支仍保留 diag_coords 诊断（扶正场景诊断有价值）。
+    cached_angles 默认 None：prepare_phase 路径与旧调用方行为完全不变。
+    安全约束：cached_angles 仍走 calc_home_diffs + 有限值校验 + arm_max_diff
+    安全门判定，不跳过任何安全逻辑，只省冗余读数。
     """
-    angles = get_filtered_angles(mc)
+    if cached_angles is not None:
+        angles = cached_angles
+        print(f"  -> [V2.4 L2] 复用上游已读角度（臂在 home_ready 静止），"
+              f"跳过 safe_return_home 重读。angles={angles}")
+    else:
+        angles = get_filtered_angles(mc)
     if angles is None:
         print("【错误】无法读取稳定关节角，拒绝回零！")
         print("-> 请人工扶正到接近直立姿态后重试，或重新示教。")
@@ -1116,18 +1173,16 @@ def safe_return_home(mc):
     print(f"大臂 1-5 轴偏差: {arm_diffs}, arm_max_diff={arm_max_diff:.1f}")
     print(f"第 6 轴末端旋转偏差: {wrist6_diff:.1f}")
 
-    # 诊断坐标（只用于诊断，不构造回零目标）
-    diag_coords = get_filtered_coords(mc)
-    print(f"当前稳定空间坐标: {diag_coords}")
-
     if arm_max_diff <= ARM_MAX_DIFF_SAFE:
+        # V2.4 §14.7 L1：auto 分支跳过纯诊断的 diag_coords 读取（只打印不决策，
+        # 省 ~0.4-0.8s 读数开销）。manual 分支保留 diag_coords（扶正诊断有价值）。
         # §13.4：第 6 轴较大时提示末端旋转风险，但不阻断回零
         if wrist6_diff > WRIST6_WARN_DIFF:
             print(f"【提示】第6轴末端旋转偏差较大 ({wrist6_diff:.1f}度)，"
                   f"回零时夹爪会自转，请确认末端线缆/夹爪周边无干涉。")
         print(f"arm_max_diff={arm_max_diff:.1f} <= {ARM_MAX_DIFF_SAFE}，低速同步回直立零位...")
-        # V2.2 §13.3 优先级 4：home_ready->HOME 路径短且安全，speed 15->20、
-        # timeout ANG_REPLAY_TIMEOUT(20)->HOME_RETURN_TIMEOUT(12) 缩短等待。
+        # V2.4 §14.7 L3：HOME_RETURN_SPEED 20->25（近直立位、无负载、距离短，
+        # 全程最安全的一段移动）。提速后固件不收敛会返回 0 -> "failed" 安全失败。
         # 不改变 ARM_MAX_DIFF_SAFE 安全门（仍 <=45 才走此分支）。
         res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
                                   timeout=HOME_RETURN_TIMEOUT)
@@ -1139,6 +1194,9 @@ def safe_return_home(mc):
     # 大偏差分支：人工扶正状态机（§13.3）
     print(f"\n【警告】当前大臂 1-5 轴与零位偏差较大 (arm_max_diff={arm_max_diff:.1f}度 > {ARM_MAX_DIFF_SAFE}度)。")
     print("-> 不自动执行笛卡尔保护拉升。进入人工扶正流程。")
+    # V2.4 L1：manual 分支保留 diag_coords 诊断读数（扶正场景诊断有价值）。
+    diag_coords = get_filtered_coords(mc)
+    print(f"当前稳定空间坐标: {diag_coords}")
     angles = prompt_manual_prehome(mc)
     if angles is None:
         print("【错误】人工扶正未通过大臂安全门，拒绝自动回零。请人工扶正到直立姿态后重跑。")
@@ -1149,8 +1207,8 @@ def safe_return_home(mc):
         print(f"【提示】第6轴末端旋转偏差较大 ({wrist6_diff:.1f}度)，"
               f"回零时夹爪会自转，请确认末端线缆/夹爪周边无干涉。")
     print(f"扶正通过，arm_max_diff={arm_max_diff:.1f}，低速同步回直立零位...")
-    # V2.2：人工扶正分支也用 HOME_RETURN_SPEED/HOME_RETURN_TIMEOUT（扶正后 arm_max_diff
-    # 已 <=45，路径同样短且安全）。
+    # V2.4 L3：人工扶正分支也用提速后的 HOME_RETURN_SPEED/HOME_RETURN_TIMEOUT
+    # （扶正后 arm_max_diff 已 <=45，路径同样短且安全）。
     res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
                               timeout=HOME_RETURN_TIMEOUT)
     if res != 1:
@@ -1298,7 +1356,10 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
     print("\n10. 回零过渡：drop_hover -> home_ready（空中长距离拉直）...")
     print("  -> 即将把臂从 drop_hover 拉向接近直立的 home_ready，请确认空中路径无障碍。")
     _t = time.time()
-    checked_return_transition(mc, home_ready, "home_ready")
+    # V2.4 §14.7 L2：checked_return_transition 返回 _verify_actual_pose_for_auto_return
+    # 刚读完的 home_ready 实际角度（越界/走人工扶正时返回 None），透传给 step11 的
+    # safe_return_home(cached_angles=...)，跳过 auto 分支的冗余 get_filtered_angles 重读。
+    home_ready_actual_angles = checked_return_transition(mc, home_ready, "home_ready")
     verify_coords_near(mc, home_ready["coords"], "home_ready")
     print(f"  -> [V2.2 耗时] step 10: {time.time() - _t:.1f}s")
 
@@ -1306,7 +1367,7 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
     # V2.1 §12.4-5：safe_return_home 返回三态，最终消息如实区分
     # "0 轮自动回零" / "触发人工扶正后完成" / "回零失败"，避免把人工扶正写成自动回零。
     _t = time.time()
-    result = safe_return_home(mc)
+    result = safe_return_home(mc, cached_angles=home_ready_actual_angles)
     print(f"  -> [V2.2 耗时] step 11: {time.time() - _t:.1f}s")
     if result == "failed":
         # 回零失败时臂可能偏高/带载，直接 release 会让臂下沉。提示扶稳再释放。
