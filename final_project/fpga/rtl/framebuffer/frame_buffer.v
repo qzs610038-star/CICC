@@ -37,6 +37,19 @@ output	wire								o_de , //active high
 output	wire	[O_VID_WIDTH-1:0] 			vout ,
 output  wire                                frame_ready,
 output  wire                                fifo_rd_underflow,
+output  wire                                dbg_fifo_rd_period,
+output  wire                                dbg_ddr_rd_seen,
+output  wire                                dbg_ddr_read_gap,
+output  wire                                dbg_frame_stable,
+output  wire                                dbg_wr_frame_done,
+output  wire                                dbg_rd_frame_available,
+output  wire                                dbg_frame_start_seen,
+output  wire                                dbg_wr_fifo_wren_seen,
+output  wire                                dbg_wr_start_seen,
+output  wire                                dbg_awvalid_seen,
+output  wire                                dbg_wr_frame_done_seen,
+output  wire                                dbg_rd_start_seen,
+output  wire                                dbg_arvalid_seen,
 input  wire               out_sync,
 
 input	wire 	[12:0]						H_FRONT_PORCH 	,
@@ -114,6 +127,7 @@ wire	[31:0]									    ddr_frame_len ;
 wire                                                frame_start;
 wire                                                frame_stable;
 wire                                                wr_frame_done;
+wire                                                wr_start;
 reg     [12:0]                                      h_front_porch  = 13'd100; 
 reg     [12:0]                                      h_sync 	 		= 13'd100; 
 reg     [12:0]                                      h_valid 	 	 	= 13'd100; 
@@ -185,7 +199,7 @@ ddr_buffer #(
     .axi_rst_n				(axi_clk_rst_n 	    ),
     
 //write interface 
-/*i*/.wr_start	      (frame_start & frame_stable ),
+/*i*/.wr_start	      (wr_start ),
      .wr_busrt_len    (ddr_frame_len  ),
 /*i*/.wr_fifo_wrclk	  (i_clk			    ),
 /*i*/.wr_fifo_rst_p   (wr_fifo_rst_p  ),
@@ -310,6 +324,16 @@ wire      rd_frame_available;
 reg       fifo_rd_underflow_latched = 1'b0;
 reg       fifo_rd_period_d = 1'b0;
 wire      fifo_rd_frame_end;
+reg       dbg_ddr_rd_seen_r = 1'b0;
+reg       dbg_ddr_read_gap_r = 1'b0;
+reg [9:0] dbg_ddr_no_valid_cnt = 10'd0;
+reg       dbg_frame_start_seen_r = 1'b0;
+reg       dbg_wr_fifo_wren_seen_r = 1'b0;
+reg       dbg_wr_start_seen_r = 1'b0;
+reg       dbg_awvalid_seen_r = 1'b0;
+reg       dbg_wr_frame_done_seen_r = 1'b0;
+reg       dbg_rd_start_seen_r = 1'b0;
+reg       dbg_arvalid_seen_r = 1'b0;
 
 always @(posedge axi_clk or negedge axi_clk_rst_n)
 begin
@@ -328,9 +352,76 @@ begin
 end
 
 assign rd_frame_available = rd_frame_available_o[1];
+assign wr_start = frame_start & frame_stable;
 assign frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched;
 assign fifo_rd_underflow = fifo_rd_underflow_latched;
 assign fifo_rd_frame_end = fifo_rd_period_d & ~fifo_rd_period;
+assign dbg_fifo_rd_period = fifo_rd_period;
+assign dbg_ddr_rd_seen = dbg_ddr_rd_seen_r;
+assign dbg_ddr_read_gap = dbg_ddr_read_gap_r;
+assign dbg_frame_stable = frame_stable;
+assign dbg_wr_frame_done = wr_frame_done;
+assign dbg_rd_frame_available = rd_frame_available;
+assign dbg_frame_start_seen = dbg_frame_start_seen_r;
+assign dbg_wr_fifo_wren_seen = dbg_wr_fifo_wren_seen_r;
+assign dbg_wr_start_seen = dbg_wr_start_seen_r;
+assign dbg_awvalid_seen = dbg_awvalid_seen_r;
+assign dbg_wr_frame_done_seen = dbg_wr_frame_done_seen_r;
+assign dbg_rd_start_seen = dbg_rd_start_seen_r;
+assign dbg_arvalid_seen = dbg_arvalid_seen_r;
+
+always @(posedge i_clk or negedge rst_n)
+begin
+    if (!rst_n) begin
+        dbg_frame_start_seen_r <= 1'b0;
+        dbg_wr_fifo_wren_seen_r <= 1'b0;
+        dbg_wr_start_seen_r <= 1'b0;
+    end else begin
+        if (frame_start)
+            dbg_frame_start_seen_r <= 1'b1;
+        if (wr_fifo_wren)
+            dbg_wr_fifo_wren_seen_r <= 1'b1;
+        if (wr_start)
+            dbg_wr_start_seen_r <= 1'b1;
+    end
+end
+
+always @(posedge axi_clk or negedge axi_clk_rst_n)
+begin
+    if (!axi_clk_rst_n) begin
+        dbg_awvalid_seen_r <= 1'b0;
+        dbg_wr_frame_done_seen_r <= 1'b0;
+        dbg_rd_start_seen_r <= 1'b0;
+        dbg_arvalid_seen_r <= 1'b0;
+    end else begin
+        if (awvalid)
+            dbg_awvalid_seen_r <= 1'b1;
+        if (wr_frame_done)
+            dbg_wr_frame_done_seen_r <= 1'b1;
+        if (rd_start)
+            dbg_rd_start_seen_r <= 1'b1;
+        if (arvalid)
+            dbg_arvalid_seen_r <= 1'b1;
+    end
+end
+
+always @(posedge axi_clk or negedge axi_clk_rst_n)
+begin
+    if (!axi_clk_rst_n) begin
+        dbg_ddr_rd_seen_r <= 1'b0;
+        dbg_ddr_read_gap_r <= 1'b0;
+        dbg_ddr_no_valid_cnt <= 10'd0;
+    end else if (!rd_start) begin
+        dbg_ddr_no_valid_cnt <= 10'd0;
+    end else if (ddr_rd_valid) begin
+        dbg_ddr_rd_seen_r <= 1'b1;
+        dbg_ddr_no_valid_cnt <= 10'd0;
+    end else if (dbg_ddr_no_valid_cnt == 10'h3ff) begin
+        dbg_ddr_read_gap_r <= 1'b1;
+    end else begin
+        dbg_ddr_no_valid_cnt <= dbg_ddr_no_valid_cnt + 1'b1;
+    end
+end
 
 always @(posedge o_clk or negedge o_clk_rst_n)
 begin

@@ -39,6 +39,15 @@ set_clock_groups -asynchronous -group {mipi_dphy_rx_inst1_byte_clk} -group {CLK_
 set_clock_groups -asynchronous -group {mipi_dphy_rx_inst1_byte_clk} -group {mipi_clk} 
 #set_clock_groups -asynchronous -group {mipi_dphy_rx_inst1_byte_clk} -group {i_sysclk_div2}   
 
+# HDMI stripe debug timing cleanup, 2026-07-07:
+# i_fb_clk generates DDR configuration/reset state; hdmi_tx_slow_clk logic
+# only consumes the resulting reset/control state asynchronously.
+set_clock_groups -asynchronous -group {i_fb_clk} -group {hdmi_tx_slow_clk}
+
+# MIPI RX reset/config logic crosses between the 70 MHz pixel/control clock
+# and the 100 MHz MIPI management clock through reset/control paths.
+set_clock_groups -asynchronous -group {i_sysclk_div2} -group {mipi_clk}
+
 # GPIO Constraints
 ####################
 # set_output_delay -clock <CLOCK> [-reference_pin <clkout_pad>] -max <MAX CALCULATION> [get_ports {lcd_power_en}]
@@ -63,6 +72,7 @@ set_clock_groups -asynchronous -group {mipi_dphy_rx_inst1_byte_clk} -group {mipi
 ############################
  create_clock -period 10.000 -name mipi_rx_ck0_CLKOUT [get_ports {mipi_rx_ck0_CLKOUT}]
  create_clock -period 10.000 -name mipi_rx_ck1_CLKOUT [get_ports {mipi_rx_ck1_CLKOUT}]
+set_clock_groups -asynchronous -group {i_sysclk_div2} -group {mipi_rx_ck0_CLKOUT} -group {mipi_rx_ck1_CLKOUT}
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -max 1.414 [get_ports {mipi_rx_dp00_FIFO_RD}]
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -min -0.006 [get_ports {mipi_rx_dp00_FIFO_RD}]
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -max 1.172 [get_ports {mipi_rx_dp00_RST}]
