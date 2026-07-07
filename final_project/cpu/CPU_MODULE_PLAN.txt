@@ -1,4 +1,4 @@
-================================================================================
+﻿================================================================================
   CPU 端 6 大模块开发计划
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
@@ -8,8 +8,8 @@
 模块一览
 --------
   [1] board_io          ✅ 已完成     FPGA↔CPU APB3 寄存器读写
-  [2] vision_classifier 🔄 重构中     颜色/形状/尺寸分类
-  [3] param_table       ⬜ 待开发     阈值/标定参数管理
+  [2] vision_classifier ✅ 已完成 (29/29 单测通过, 2026-07-07)  颜色/形状/尺寸分类
+  [3] param_table       ✅ 已完成 (68/68 单测通过, 2026-07-07)  阈值/标定参数管理
   [4] task_matcher      ⬜ 待开发     目标匹配与动作决策
   [5] arm_controller    ⬜ 待开发     机械臂控制 + mycobot 协议
   [6] main              ⬜ 待开发     主循环集成
@@ -21,7 +21,7 @@
   文件: app/include/board_io.h, app/src/board_io.c
   依赖: Efinity 生成 soc.h (提供 APB_VISION_BASE)
 
-  功能:
+  实现:
     - MMIO 原子读写 (mmio_read32 / mmio_write32)
     - 上电握手验证 (board_io_validate → 读 REG_MAGIC 高 16-bit)
     - CamN 配置写入 (write_config → staging, commit_config → active)
@@ -45,9 +45,38 @@
 ================================================================================
   [2] vision_classifier  —  颜色/形状/尺寸分类
 ================================================================================
-  状态: 🔄 重构中 (轮廓优先方案讨论阶段)
+  状态: ✅ 已完成 (2026-07-07, 29/29 单测通过, Codex R1→R2→R3 全部合入)
   文件: app/include/vision_classifier.h, app/src/vision_classifier.c
+测试: tests/test_classifier.c (29 条, gcc 14.2.0 x86-64 全通过)
   依赖: board_io (feature_snapshot_t 输入)
+
+  Codex R1 审查修复 (已合入):
+    ✅ [1] Makefile 构建阻塞 → board_io.h APB_VISION_BASE_PLACEHOLDER + Makefile SOC_H_PATH
+    ✅ [2] fuse_results() 空指针 → cam0/cam1 NULL 退化三路
+    ✅ [3] 白/黑排除法局限 → FG_AREA_AVAILABLE=1 时改用 fg_area；注释保留
+
+  Codex R2 审查修复 (本轮):
+    ✅ [1] Makefile SOC_H_PATH 缺 -include soc.h → 已补
+    ✅ [2] 白/黑排除法未用 fg_area → FG_AREA_AVAILABLE=1 路径切到 fg_area/bbox_area
+    ✅ [3] 测试 test_filter_noise_causes_unknown 逻辑错误
+           → 两色 5 窗 confirm=3 永远有赢家；改为三色打破平局
+    ✅ [4] mf_filter_update 投票忽略 size → key 从 (color,shape) 扩展为 (color,shape,size)
+    ✅ [5] FG_AREA_AVAILABLE=1 路径 _fill_rate 无 clamp → 已加 fg_area>area 截顶
+    ✅ [+] 新增 test_filter_size_jitter 验证尺寸参与投票
+
+  Codex R3 审查修复 (本轮 2026-07-07):
+    ✅ [1] Makefile 默认静默用 placeholder → 加 STANDALONE_TEST=1 门控
+           SOC_H_PATH 为空且未设 STANDALONE_TEST=1 → $(error ...)
+    ✅ [2] mf_filter_update confirm==0 顺序 bug
+           → 先设默认值 confirm=3，再 clamp 到 w，防止 confirm>w 永不收敛
+    ✅ [3] _classify_color 白/黑路径未 clamp → 改用 _fill_rate() 复用，含 clamp
+    ✅ [4] test_filter_size_jitter 注释/名字误导
+           → 修正：实际验证尺寸参与投票键且多数胜出，不是"无多数"
+
+  未验证项:
+    - PC 单测: ✅ 本机 gcc 14.2.0 (d:\CICC w\tools\mingw64\) 全部通过
+    - RISC-V 交叉编译: riscv-none-embed-gcc 8.3.0 编译通过 (0 error, 仅预期 warning), 上板待验证
+    - 所有阈值仍需现场标定
 
   重构方向 (用户确定):
     第1步: 找到物块轮廓/bbox
@@ -78,39 +107,23 @@
 ================================================================================
   [3] param_table  —  参数表管理
 ================================================================================
-  状态: ⬜ 待开发
+  状态: ✅ 已完成 (2026-07-07, 68/68 单测通过)
   计划文件: app/include/param_table.h, app/src/param_table.c
+  测试: tests/test_param_table.c (68 条, gcc 14.2.0 x86-64 全通过)
   依赖: vision_classifier (classifier_cfg_t)
 
-  功能:
-    - 存储/加载 classifier_cfg_t (颜色阈值、形状比例、尺寸表)
-    - 双配置槽: 默认值 + 标定值, 运行时切换
-    - 参数合法性校验 (ratio 范围、area 阈值不越界等)
-    - 标定模式入口 (通过 SYS_CTRL 或按键触发标定流程)
-    - 非易失存储? (若有 SPI Flash / EEPROM 可用, 否则每次上电加载默认值)
+  实现:
+    - 双槽 RAM 存储: slot 0 默认值, slot 1 标定值
+    - param_table_get() 优先返回标定值（若有），否则默认值
+    - param_table_set(slot, cfg): 先校验再写入，自动切换活跃槽
+    - param_table_validate(cfg): 6 类校验规则 (阈值/亮度比/宽高比/填充率/尺寸/滤波)
+    - 标定模式: enter_calibration() → set(1, ...) 逐步微调
 
-  配置项清单:
-    颜色:
-      min_red_area, min_blue_area, min_yel_area    (uint32_t × 3)
-      white_luma_ratio, black_luma_ratio            (float × 2)
-    形状:
-      cube_ratio_lo, cube_ratio_hi                  (uint16_t × 2)
-      cyl_ratio_lo, cyl_ratio_hi                    (uint16_t × 2)
-      cube_fill_lo, cyl_fill_lo                     (float × 2)
-      circle_fill_lo, circle_fill_hi                (float × 2, 圆填充率区间)
-      triangle_fill_hi                              (float, 三角填充率上限)
-    尺寸:
-      height_px_20mm, height_px_25mm, height_px_30mm (uint16_t × 3)
-    滤波:
-      filter_window, filter_confirm                 (uint8_t × 2)
+    - NVM 持久化: PARAM_TABLE_NVM_AVAILABLE=1 时启用 CRC32 + magic 校验
+      默认 0（掉电丢失标定值），需用户提供 nvm_read/write 函数
 
-  接口草案:
-    void param_table_init(void);                          // 加载默认值
-    int  param_table_load_calibrated(void);               // 从 Flash 加载标定值
-    int  param_table_save_calibrated(const classifier_cfg_t *cfg);
-    const classifier_cfg_t* param_table_get(void);        // 获取当前配置
-    int  param_table_set(const classifier_cfg_t *cfg);    // 运行时更新
-    void param_table_enter_calibration(void);             // 进入标定模式
+  待定:
+    - NVM 读写函数具体实现（依赖硬件 SPI Flash / EEPROM 驱动）
 
 ================================================================================
   [4] task_matcher  —  目标匹配与动作决策
@@ -194,7 +207,7 @@
 ================================================================================
   [6] main  —  主循环集成
 ================================================================================
-  状态: ⬜ 待开发
+  状态: ✅ 已完成 (2026-07-07, 68/68 单测通过)
   计划文件: app/src/main.c
   依赖: 以上全部 5 个模块
 

@@ -15,10 +15,15 @@ extern "C" {
 #endif
 
 /*--------------------------------------------------------------------------
- *  编译期强制校验：必须由 soc.h 提供基地址
+ *  编译期校验：正式构建必须由 soc.h 提供基地址；测试/独立编译可用占位值
  *--------------------------------------------------------------------------*/
 #if !defined(IO_APB_SLAVE_0_BASE) && !defined(IO_APB_SLAVE_x_BASE)
-#  error "APB3 base address not defined. Include the Efinity-generated soc.h."
+#  ifdef APB_VISION_BASE_PLACEHOLDER
+#    define IO_APB_SLAVE_0_BASE  APB_VISION_BASE_PLACEHOLDER
+#    warning "APB3 base address not provided by soc.h — using placeholder. Real build MUST include soc.h."
+#  else
+#    error "APB3 base address not defined. Include the Efinity-generated soc.h, or define APB_VISION_BASE_PLACEHOLDER for test builds."
+#  endif
 #endif
 
 /* 如果 soc.h 定义的宏名不同，在此统一映射 */
