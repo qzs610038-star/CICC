@@ -1244,3 +1244,94 @@ run-18 三轮实测耗时：
 4. 点 3 的 Tee 双写 stdout 方案是否会干扰现有 `input()`/Ctrl+C/异常捕获路径。
 5. 三点合并落地时，是否存在跨点相互作用风险（如点 1 异步化后点 2 的轮间状态机是否仍成立）。
 6. 是否同意第一批复用点 2+3、第二批复用点 1 走 Codex 门的分批策略。
+
+#### 14.10.8 V2.8 落地记录（2026-07-07，三点全部应用）
+
+> 状态: 代码已落地 + `py_compile` 通过 + 9 项 mock 控制流测试全 PASS。
+> 用户确认赛场流程（CPU 信号→单轮抓放→人补块到 pick 点）+ 机械臂始终有人保护后，
+> 三点一并落地（不分批），在分支 `work/mycobot-v2.8-fluency` 上演进。
+> Codex 自动审核子代理在审核中途被用户终止（用户决定基于现有分析直接落地），
+> 故未采纳 Codex 审核结论；本节为 Claude 自审 + mock 验证结果，实机验证前建议补 Codex 复核。
+
+##### 落地改动清单
+
+**点 2（去 Enter 全自动，LL）**：
+- `auto_phase_v2` 内 `input("-> 请将正方体放回【抓取点】...")` 移除，N 轮全自动。
+- 一次性轨迹/物块确认移到 `main` 循环开始前（`确认无误后按 Enter 开始连续抓取`），只问一次。
+- 保留回零失败扶稳 `input()`（安全路径，不去除）；保留急停提示 print（不阻塞）。
+
+**点 3（日志导出，MM）**：
+- 新增 `Tee` 类（双写 stdout：终端 + UTF-8 文件），`__getattr__`/`isatty` 透传原 stdout 保兼容。
+- 新增 `AUTO_LOGS_DIR` 常量 + `--no-log` CLI 开关（默认启用日志）。
+- `main` 开头装 `sys.stdout = Tee(auto_run_<时间戳>.log)`，`try/finally` 确保异常/Ctrl+C/正常退出时恢复 stdout + 关闭文件落盘。
+- 不动任何 `print`；`input()` 提示文本走 stdout 也被记录（日志可复盘交互）。
+
+**点 1（step 9 异步化，NN + B 类 OO）**：
+- 新增 `checked_short_angles_async()` 函数：非阻塞 `send_angles` + Python 软到位循环（`get_angles_once` 单次读数，复用 V2.5 关键设计点），残差≤`ASYNC_SHORT_SOFT_TOL`(3°) 即软通过退出；软超时走阻塞 `sync_send_angles` 收尾兜底，`res!=1` 抛异常熔断（保留 V2.4 安全失败语义）。
+- 新增参数：`ASYNC_SHORT_ENABLE`(总开关)/`ASYNC_SHORT_SOFT_TOL=3.0`/`ASYNC_SHORT_TIMEOUT=4.0`/`ASYNC_SHORT_POLL=0.05`。
+- `auto_phase_v2` step 9 改调 `checked_short_angles_async`（`ASYNC_SHORT_ENABLE=False` 回退原 `checked_short_angles`）。
+- B 类：`GRIPPER_TIMEOUT 2.5→1.2s`；新增 `SKIP_COORD_VERIFY_ON_STRICT_PASS=True`，step 2/3/6/7（长距离+短下探）严格通过时跳过 `verify_coords_near`，step 5/9（带载上行软通过）保留无条件复核。
+- 不动：软通过容差 3°/25mm、所有安全门（`validate_return_ready`/`validate_short_angle_pair`/`validate_return_angle_pair`/`is_safe_coord`/R_MAX/`arm_max_diff≤45`）、step 10+11 回零路径（V2.6 已 3.4s）、step 3/5/7 仍用阻塞 `checked_short_angles`、`teach_replay_pick.py`/`teach_and_pick.py`。
+
+##### 预期收益
+
+| 项 | V2.7 (run-18) | V2.8 预期 | 说明 |
+| --- | --- | --- | --- |
+| step 9 耗时 | 20.0s | ~2s | 去除 15s sync timeout + 3s 微调 timeout 死区等待 |
+| 夹爪等待/轮 | 7.5s (3×2.5s) | 3.6s (3×1.2s) | GRIPPER_TIMEOUT 2.5→1.2 |
+| verify_coords_near/轮 | ~7次×0.6s≈4.2s | ~2次×0.6s≈1.2s | B类跳过长距离+短下探 |
+| 单轮总耗时 | ~33s | ~13-15s | 三项合计省 ~18-20s |
+| N 轮交互 | 每轮 Enter | 一次性 Enter | 点2 |
+
+##### 已运行验证
+
+- **静态**：`python -m py_compile mycobot_pc_tests\teach_replay_pick_return_ready.py` → 通过（点 2+3 后、点 1 后、全部完成后三阶段均通过）。
+- **mock 控制流**（9 项全 PASS）：
+  - T1: Tee 双写终端+文件内容一致，文件 UTF-8 落盘。
+  - T2: `auto_phase_v2` 去除每轮换块 Enter，保留回零失败扶稳 input。
+  - T3: main 循环前一次性确认在 for 循环之前。
+  - T4: 异步软通过分支（残差 5°→2°）正确退出，不触发 sync 兜底。
+  - T5: 软超时（残差恒 5°）正确走 sync 收尾兜底。
+  - T6: sync 收尾 `res!=1` 抛 RuntimeError 熔断。
+  - T7: V2.8 参数默认值正确（ENABLE=True/SKIP=True/GRIPPER=1.2/TOL=3.0）。
+  - T8: 目标角度合法性校验（<6 元素）保留。
+  - T9: B 类跳过保护 4 处（step2/3/6/7），step5/9 保留无条件复核。
+
+##### 安全守住
+
+- **不抛异常防掉电**：异步软超时不抛异常（防臂在运动路径掉电），走 sync 收尾；只有 sync `res!=1` 才抛异常熔断（V2.4 语义）。
+- **安全门全保留**：C 类（`validate_return_ready`/IK 分支校验/R_MAX/`arm_max_diff≤45`）一律不动。
+- **软通过容差不放宽**：3°/25mm 是物理可达判定，非安全门，但不放宽以保持与 V2.7 一致的可重复性基准。
+- **回零失败扶稳 input 保留**：回零失败时 `release_all_servos` 前仍提示扶稳，不因"全自动"去除。
+- **Tee 不干扰控制流**：`isatty`/`__getattr__` 透传原 stdout，`input()`/Ctrl+C/异常捕获路径不变（mock T1 + 编译验证）。
+
+##### 未验证项与风险
+
+- **实机未验证**：所有预期耗时（step 9 20s→2s 等）为基于 run-18 数据的推算，需 run-19 实机确认。
+- **异步软到位循环的固件响应**：非阻塞 `send_angles` 在 drop→drop_hover 带载上行路径的固件行为未实测（V2.5 只在 HOME 回零路径验证过）。run-19 须人眼盯防，异常即 Ctrl+C + 设 `ASYNC_SHORT_ENABLE=False` 回退。
+- **SKIP_COORD_VERIFY_ON_STRICT_PASS**：跳过长距离/短下探的坐标校验，依赖"res==1 严格通过时坐标必然准"的假设。run-19 须对比 V2.7 的 delta_xyz 数据确认无回归。
+- **Codex 复核未完成**：用户终止了 Codex 审核子代理，本节为 Claude 自审。按 AGENTS.md Codex Gate，点 1 属动作链路改动，**实机验证前建议补一次 Codex Review Packet 复核**。
+
+##### run-19 验收建议
+
+1. `python mycobot_pc_tests/teach_replay_pick_return_ready.py --port COM10 --preset my_new_test`
+2. 输入 N=2（先验证 2 轮全自动），确认一次性 Enter 后不再有换块 Enter 提示。
+3. 验收门：
+   - step 9 耗时从 20s 降至 ~2-4s（异步软通过）；若软超时走 sync 兜底，记录 sync res 与 final max_err。
+   - 单轮总耗时从 ~33s 降至 ~13-15s。
+   - delta_xyz 不回升（pick_hover 仍 ~6.6mm，drop_hover 软通过后 ~10.9mm）。
+   - 2 轮均 0 轮人工扶正，轮间臂停在 HOME。
+   - 日志自动写入 `audit_logs/auto_run_<时间戳>.log`，内容与终端一致（UTF-8 无乱码）。
+4. 回退验证：若 step 9 异步路径异常，设 `ASYNC_SHORT_ENABLE=False` 重跑确认回退 V2.7 行为。
+5. run-19 日志写入 `trial_run_19_logs.md`，至少含：各 step 耗时、step 9 异步 mode（软通过/软超时+sync）、delta_xyz、`safe_return_home` 返回值、自动日志路径。
+
+##### Codex 复核门（实机前建议补）
+
+复核重点：
+- `checked_short_angles_async` 软超时 sync 收尾 + res 检查是否保留 V2.4 安全失败语义。
+- `get_angles_once` 用于异步轮询是否合理（V2.5 已验证同款设计点）。
+- `SKIP_COORD_VERIFY_ON_STRICT_PASS` 跳过长距离/短下探坐标校验是否安全（res==1 严格通过时坐标必然准的假设是否成立）。
+- `Tee` 的 `isatty`/`__getattr__` 透传是否干扰 `input()`/Ctrl+C/异常捕获。
+- 点 1 异步化后点 2 轮间状态机是否仍成立（每轮末态臂在 HOME/夹爪开不变量）。
+- `ASYNC_SHORT_TIMEOUT=4.0s` 是否合理（物理 ~1.5s + 余量）。
+- 是否未恢复 `sync_send_coords()`、未放宽安全门、未改基线脚本。
