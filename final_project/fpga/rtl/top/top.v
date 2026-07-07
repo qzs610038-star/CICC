@@ -203,6 +203,17 @@ parameter	VFP				= 13'd20
   (* syn_peri_port = 0 *) output S1_io_cam_sda_OE,
   (* syn_peri_port = 0 *) output S1_o_cam_rst_p,
   (* syn_peri_port = 0 *) output [3:0] led,
+  //=== DEBUG LED bank (assign to LED22–LED29 via Efinity Interface Designer) ===
+  // LED22–LED29 are Bank 4C, 1.8V LVCMOS. Signal names below match user-board silk.
+  (* syn_peri_port = 0 *) output dbg_ddr_ok,          // LED22 (G2): 1=DDR configured
+  (* syn_peri_port = 0 *) output dbg_fb0_ready,       // LED23 (K6): 1=ch0 framebuffer has stable frame
+  (* syn_peri_port = 0 *) output dbg_fb0_underflow,   // LED24 (J3): 1=ch0 read FIFO underflow (BAD, latched until channel toggle)
+  (* syn_peri_port = 0 *) output dbg_csi_fmt_ok,      // LED25 (L6): 1=selected CSI RAW10/4ppc confirmed
+  (* syn_peri_port = 0 *) output dbg_bridge_active,   // LED26 (K4): 1=CDC 2pix->1pix bridge running
+  (* syn_peri_port = 0 *) output dbg_bridge_under,    // LED27 (K3): 1=CDC bridge FIFO underflow (BAD, latched until channel toggle)
+  (* syn_peri_port = 0 *) output dbg_video_ready,     // LED28 (M5): 1=i_video_ready to hdmi_top
+  (* syn_peri_port = 0 *) output dbg_input_stable,    // LED29 (M6): 1=hdmi_top accepted input timing (1920x1080)
+  //=== end debug LED bank ===
   //mipi rx
   (* syn_peri_port = 0 *) output mipi_rx_ck0_HS_ENA,
   (* syn_peri_port = 0 *) output mipi_rx_dp00_HS_ENA,
@@ -615,7 +626,7 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
   reg  out_sync;
   localparam [12:0] HDMI_H_FRONT_PORCH = HFP >> 1;
   localparam [12:0] HDMI_H_SYNC        = HSP >> 1;
-  localparam [12:0] HDMI_H_VALID       = HACT >> 1;
+  localparam [12:0] HDMI_H_VALID       = 13'd480;  // was HACT>>1 (960); halved to reduce DDR read bandwidth
   localparam [12:0] HDMI_H_BACK_PORCH  = HBP >> 1;
   localparam [12:0] HDMI_V_FRONT_PORCH = VFP;
   localparam [12:0] HDMI_V_SYNC        = VSP;
@@ -1176,8 +1187,8 @@ frame_buffer #(
 /*i*/.i_clk			(i_sysclk_div2      ),
 /*i*/.i_vs			(rx_out_vs1	),
 /*i*/.i_hs			(rx_out_hs1	),
-/*i*/.i_de			(rx_out_de1 	),
-/*i*/.vin 			(ch1_raw8_4pix	),
+/*i*/.i_de			(1'b0               ),
+/*i*/.vin 			(32'd0              ),
 
 /*i*/.o_clk       (i_sysclk_div2  ) ,
 /*i*/.o_hs    		(ch1_hs	    ),			
@@ -1786,6 +1797,76 @@ assign selected_fifo_underflow = channel_sel ? ch1_fifo_underflow : ch0_fifo_und
 assign selected_csi_format_ok = channel_sel ? ch1_csi_format_ok_cdc[1] : ch0_csi_format_ok_cdc[1];
 assign selected_frame_ok_hdmi = selected_frame_ready_cdc[2] & ~selected_fifo_underflow_cdc[1];
 assign led[3] = hdmi_input_stable & selected_csi_format_ok;  // selected CSI is RAW10/4ppc and HDMI timing is accepted
+
+  //===================================================================
+  // Debug LED bank: drive 8 signals onto LED22–LED29 (Bank 4C, 1.8V).
+  // All signals are already in hdmi_tx_slow_clk domain except where
+  // a CDC synchronizer is explicitly added.  Read 1=OK, 0=BAD for
+  // status signals; underflow signals are 1=BAD (latched high).
+  //
+  // Signal-to-LED mapping (assign via Efinity Interface Designer):
+  //   LED22 (G2) = dbg_ddr_ok         LED26 (K4) = dbg_bridge_active
+  //   LED23 (K6) = dbg_fb0_ready      LED27 (K3) = dbg_bridge_under
+  //   LED24 (J3) = dbg_fb0_underflow  LED28 (M5) = dbg_video_ready
+  //   LED25 (L6) = dbg_csi_fmt_ok     LED29 (M6) = dbg_input_stable
+  //===================================================================
+
+  // Bring ch0 signals into hdmi_tx_slow_clk domain with 2-stage sync.
+  // ch0_frame_ready / ch0_fifo_underflow are in i_sysclk_div2 (typ 70 MHz);
+  // hdmi_tx_slow_clk is ~140 MHz — over-sampled, safe for 2-FF sync.
+  reg [1:0] ch0_frame_ready_sync;
+  reg [1:0] ch0_fifo_underflow_sync;
+  always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
+      if (!sys_rst_n) begin
+          ch0_frame_ready_sync     <= 2'b00;
+          ch0_fifo_underflow_sync  <= 2'b00;
+      end else begin
+          ch0_frame_ready_sync    <= {ch0_frame_ready_sync[0],    ch0_frame_ready};
+          ch0_fifo_underflow_sync <= {ch0_fifo_underflow_sync[0], ch0_fifo_underflow};
+      end
+  end
+
+  // ddr_cfg_ok toggles only once per boot (0->1 in i_fb_clk). A simple
+  // 2-FF sync on hdmi_tx_slow_clk is sufficient since it's quasi-static.
+  reg [1:0] ddr_cfg_ok_sync;
+  always @(posedge hdmi_tx_slow_clk or negedge arst_n) begin
+      if (!arst_n)                         ddr_cfg_ok_sync <= 2'b00;
+      else                                 ddr_cfg_ok_sync <= {ddr_cfg_ok_sync[0], ddr_cfg_ok};
+  end
+
+  // Underflow latches: once a bridge/read FIFO underflow occurs,
+  // keep the debug LED on until the user switches camera channel
+  // (channel_sel_toggle pulse). This makes intermittent underflows
+  // visible without needing a scope.
+  reg dbg_fb0_uf_latch;
+  reg dbg_bridge_uf_latch;
+  always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
+      if (!sys_rst_n) begin
+          dbg_fb0_uf_latch    <= 1'b0;
+          dbg_bridge_uf_latch <= 1'b0;
+      end else begin
+          if (channel_sel_toggle) begin
+              dbg_fb0_uf_latch    <= 1'b0;
+              dbg_bridge_uf_latch <= 1'b0;
+          end else begin
+              if (ch0_fifo_underflow_sync[1])
+                  dbg_fb0_uf_latch    <= 1'b1;
+              if (selected_bridge_underflow)
+                  dbg_bridge_uf_latch <= 1'b1;
+          end
+      end
+  end
+
+  assign dbg_ddr_ok         = ddr_cfg_ok_sync[1];                     // 1=DDR configured & ready
+  assign dbg_fb0_ready      = ch0_frame_ready_sync[1];                // 1=ch0 framebuffer locked on camera frame
+  assign dbg_fb0_underflow  = dbg_fb0_uf_latch;                       // 1=ch0 read FIFO underflowed (latched)
+  assign dbg_csi_fmt_ok     = selected_csi_format_ok;                 // 1=selected CSI is RAW10/4ppc
+  assign dbg_bridge_active  = selected_bridge_active;                 // 1=CDC 2pix->1pix bridge output running
+  assign dbg_bridge_under   = dbg_bridge_uf_latch;                    // 1=CDC bridge underflowed (latched)
+  assign dbg_video_ready    = hdmi_video_ready;                       // 1=i_video_ready -> hdmi_top
+  assign dbg_input_stable   = hdmi_input_stable & selected_csi_format_ok; // 1=hdmi_top accepted 1920x1080 input
+  //=== end debug LED bank drive ===
+
   hdmi_top #(
     .USE_INPUT_STABLE_GATE(1'b1)
   ) hdmi_top_inst (

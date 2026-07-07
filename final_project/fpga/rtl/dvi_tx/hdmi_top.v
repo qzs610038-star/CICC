@@ -47,7 +47,7 @@ module hdmi_top
     // Keep fallback active until the selected camera path has stable timing.
     parameter   USE_INPUT_STABLE_GATE = 1'b1;
     parameter   INPUT_STABLE_FRAME_COUNT = 4'd4;
-	parameter	MAX_HRES		= 12'd1920;
+	parameter	MAX_HRES		= 12'd960;   // was 1920; halved to match reduced framebuffer H_VALID
 	parameter	MAX_VRES		= 12'd1080;
 	parameter	HSP				= 8'd4;
 	parameter	HBP				= 8'd88;
