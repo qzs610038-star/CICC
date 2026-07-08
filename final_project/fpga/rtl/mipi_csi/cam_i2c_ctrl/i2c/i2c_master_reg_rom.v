@@ -241,6 +241,7 @@ ROM[8'h9d] = {16'h3210,8'h01,1'b0};
 ROM[8'h9e] = {16'h3211,8'h44,1'b0};
 ROM[8'h9f] = {16'h3212,8'h00,1'b0};
 ROM[8'ha0] = {16'h3213,8'h05,1'b0};
+ROM[8'ha1] = {16'h0100,8'h01,1'b0}; // repeat stream-on after final window registers
 
 end 
 // write is unused
@@ -263,4 +264,4 @@ end
 
 assign rdata_out = RDATA;
    
-endmodule			      
+endmodule

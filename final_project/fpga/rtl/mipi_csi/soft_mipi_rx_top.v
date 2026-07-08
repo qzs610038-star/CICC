@@ -1,6 +1,8 @@
 
 module soft_mipi_rx_top #(
-  parameter PACK_BIT          = 40
+  parameter PACK_BIT          = 40,
+  parameter I2C_DEVICE_ADDR   = 8'h60,
+  parameter I2C_RST_DELAY_BIT = 22
 ) (
    input mipi_clk,
    input i_sysclk_div2,
@@ -67,7 +69,25 @@ module soft_mipi_rx_top #(
    output      [5:0] rx_out_datatype,
    output      [3:0] rx_out_pixel_per_clk,
    output      dbg_reset_pixel_n,
-   output      dbg_i2c_rst_n
+   output      dbg_i2c_rst_n,
+   output      dbg_i2c_init_done,
+   output      dbg_i2c_wr_en,
+   output      dbg_i2c_wr_done,
+   output      dbg_i2c_cfg_done,
+   output      dbg_i2c_last_index_seen,
+   output      dbg_i2c_stream_on_index_reached,
+   output      dbg_i2c_stream_on_seen,
+   output      dbg_i2c_status_sample_seen,
+   output      dbg_i2c_status_rxack_seen,
+   output      dbg_i2c_status_busy_seen,
+   output      dbg_i2c_status_al_seen,
+   output      dbg_i2c_status_tip_seen,
+   output      dbg_i2c_status_rxack_prebyte_seen,
+   output      dbg_i2c_status_rxack_devaddr_seen,
+   output      dbg_i2c_status_rxack_reg_high_seen,
+   output      dbg_i2c_status_rxack_reg_low_seen,
+   output      dbg_i2c_status_rxack_data_seen,
+   output      [7:0] dbg_i2c_last_status
 
 
 
@@ -214,20 +234,58 @@ wire scl_padoen_o;
 wire sda_padoen_o;
 
 
-reg [12:0] i2c_rst_cnt = 'd0;
+reg [I2C_RST_DELAY_BIT:0] i2c_rst_cnt = 'd0;
 
 always @( posedge mipi_clk or negedge reset_pixel_n )
 begin
     if( !reset_pixel_n )
        i2c_rst_cnt <= 'd0;
     else 
-       i2c_rst_cnt <= i2c_rst_cnt[12] ? i2c_rst_cnt : i2c_rst_cnt + 1'b1;
+       i2c_rst_cnt <= i2c_rst_cnt[I2C_RST_DELAY_BIT] ? i2c_rst_cnt : i2c_rst_cnt + 1'b1;
 end
-wire i2c_rst_n = i2c_rst_cnt[12];
+wire i2c_rst_n = i2c_rst_cnt[I2C_RST_DELAY_BIT];
 assign dbg_reset_pixel_n = reset_pixel_n;
 assign dbg_i2c_rst_n = i2c_rst_n;
+wire dbg_i2c_init_done_w;
+wire dbg_i2c_wr_en_w;
+wire dbg_i2c_wr_done_w;
+wire dbg_i2c_cfg_done_w;
+wire dbg_i2c_last_index_seen_w;
+wire dbg_i2c_stream_on_index_reached_w;
+wire dbg_i2c_stream_on_seen_w;
+wire dbg_i2c_status_sample_seen_w;
+wire dbg_i2c_status_rxack_seen_w;
+wire dbg_i2c_status_busy_seen_w;
+wire dbg_i2c_status_al_seen_w;
+wire dbg_i2c_status_tip_seen_w;
+wire dbg_i2c_status_rxack_prebyte_seen_w;
+wire dbg_i2c_status_rxack_devaddr_seen_w;
+wire dbg_i2c_status_rxack_reg_high_seen_w;
+wire dbg_i2c_status_rxack_reg_low_seen_w;
+wire dbg_i2c_status_rxack_data_seen_w;
+wire [7:0] dbg_i2c_last_status_w;
+assign dbg_i2c_init_done = dbg_i2c_init_done_w;
+assign dbg_i2c_wr_en = dbg_i2c_wr_en_w;
+assign dbg_i2c_wr_done = dbg_i2c_wr_done_w;
+assign dbg_i2c_cfg_done = dbg_i2c_cfg_done_w;
+assign dbg_i2c_last_index_seen = dbg_i2c_last_index_seen_w;
+assign dbg_i2c_stream_on_index_reached = dbg_i2c_stream_on_index_reached_w;
+assign dbg_i2c_stream_on_seen = dbg_i2c_stream_on_seen_w;
+assign dbg_i2c_status_sample_seen = dbg_i2c_status_sample_seen_w;
+assign dbg_i2c_status_rxack_seen = dbg_i2c_status_rxack_seen_w;
+assign dbg_i2c_status_busy_seen = dbg_i2c_status_busy_seen_w;
+assign dbg_i2c_status_al_seen = dbg_i2c_status_al_seen_w;
+assign dbg_i2c_status_tip_seen = dbg_i2c_status_tip_seen_w;
+assign dbg_i2c_status_rxack_prebyte_seen = dbg_i2c_status_rxack_prebyte_seen_w;
+assign dbg_i2c_status_rxack_devaddr_seen = dbg_i2c_status_rxack_devaddr_seen_w;
+assign dbg_i2c_status_rxack_reg_high_seen = dbg_i2c_status_rxack_reg_high_seen_w;
+assign dbg_i2c_status_rxack_reg_low_seen = dbg_i2c_status_rxack_reg_low_seen_w;
+assign dbg_i2c_status_rxack_data_seen = dbg_i2c_status_rxack_data_seen_w;
+assign dbg_i2c_last_status = dbg_i2c_last_status_w;
 
-i2c_master_ctrl_top u2_i2c_master_ctrl_top(
+i2c_master_ctrl_top #(
+  .I2C_DEVICE_ADDR(I2C_DEVICE_ADDR)
+) u2_i2c_master_ctrl_top(
   /*i*/.clk			(mipi_clk),
   /*i*/.rst_n			(i2c_rst_n		),
   /*i*/.scl_pad_i     (io_cam_scl_IN),//(1'b1),
@@ -235,9 +293,28 @@ i2c_master_ctrl_top u2_i2c_master_ctrl_top(
   /*o*/.scl_padoen_o  (scl_padoen_o),
   /*i*/.sda_pad_i     (io_cam_sda_IN),
   /*o*/.sda_pad_o     (io_cam_sda_OUT),
-  /*o*/.sda_padoen_o  (sda_padoen_o)
+  /*o*/.sda_padoen_o  (sda_padoen_o),
+  /*o*/.dbg_init_done (dbg_i2c_init_done_w),
+  /*o*/.dbg_wr_en     (dbg_i2c_wr_en_w),
+  /*o*/.dbg_wr_done   (dbg_i2c_wr_done_w),
+  /*o*/.dbg_cfg_done  (dbg_i2c_cfg_done_w),
+  /*o*/.dbg_last_index_seen(dbg_i2c_last_index_seen_w),
+  /*o*/.dbg_stream_on_index_reached(dbg_i2c_stream_on_index_reached_w),
+  /*o*/.dbg_stream_on_seen(dbg_i2c_stream_on_seen_w),
+  /*o*/.dbg_i2c_status_sample_seen(dbg_i2c_status_sample_seen_w),
+  /*o*/.dbg_i2c_status_rxack_seen(dbg_i2c_status_rxack_seen_w),
+  /*o*/.dbg_i2c_status_busy_seen(dbg_i2c_status_busy_seen_w),
+  /*o*/.dbg_i2c_status_al_seen(dbg_i2c_status_al_seen_w),
+  /*o*/.dbg_i2c_status_tip_seen(dbg_i2c_status_tip_seen_w),
+  /*o*/.dbg_i2c_status_rxack_prebyte_seen(dbg_i2c_status_rxack_prebyte_seen_w),
+  /*o*/.dbg_i2c_status_rxack_devaddr_seen(dbg_i2c_status_rxack_devaddr_seen_w),
+  /*o*/.dbg_i2c_status_rxack_reg_high_seen(dbg_i2c_status_rxack_reg_high_seen_w),
+  /*o*/.dbg_i2c_status_rxack_reg_low_seen(dbg_i2c_status_rxack_reg_low_seen_w),
+  /*o*/.dbg_i2c_status_rxack_data_seen(dbg_i2c_status_rxack_data_seen_w),
+  /*o*/.dbg_i2c_last_status(dbg_i2c_last_status_w)
   
   );
+// Match the vendor demo reset polarity for this controlled I2C ACK test.
 assign o_cam_rst_p = ~arst_n;
 assign io_cam_scl_OE = ~scl_padoen_o;
 assign io_cam_sda_OE = ~sda_padoen_o;

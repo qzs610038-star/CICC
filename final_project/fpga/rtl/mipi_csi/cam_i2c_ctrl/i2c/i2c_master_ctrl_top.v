@@ -1,5 +1,5 @@
 module i2c_master_ctrl_top #(
-	parameter DATA_LENGTH = 161,
+	parameter DATA_LENGTH = 162,
 	parameter I2C_REG_ADDR_WIDTH = 16,
 	parameter I2C_DATA_WIDTH = 8,
 	parameter I2C_DEVICE_ADDR = 8'h60,
@@ -15,7 +15,25 @@ output scl_padoen_o,    // SCL-line output enable (active low)
 
 input  sda_pad_i,       // SDA-line input
 output sda_pad_o,       // SDA-line output (always 1'b0)
-output sda_padoen_o    // SDA-line output enable (active low)
+output sda_padoen_o,    // SDA-line output enable (active low)
+output dbg_init_done,
+output dbg_wr_en,
+output dbg_wr_done,
+output dbg_cfg_done,
+output dbg_last_index_seen,
+output dbg_stream_on_index_reached,
+output dbg_stream_on_seen,
+output dbg_i2c_status_sample_seen,
+output dbg_i2c_status_rxack_seen,
+output dbg_i2c_status_busy_seen,
+output dbg_i2c_status_al_seen,
+output dbg_i2c_status_tip_seen,
+output dbg_i2c_status_rxack_prebyte_seen,
+output dbg_i2c_status_rxack_devaddr_seen,
+output dbg_i2c_status_rxack_reg_high_seen,
+output dbg_i2c_status_rxack_reg_low_seen,
+output dbg_i2c_status_rxack_data_seen,
+output [7:0] dbg_i2c_last_status
     
 );
 
@@ -37,6 +55,21 @@ wire	 [7:0]	i2c_writedata;
 wire			 i2c_read;
 wire			 i2c_write;
 wire			 i2c_chipselect;
+wire			 dbg_cfg_done_w;
+wire			 dbg_last_index_seen_w;
+wire			 dbg_stream_on_index_reached_w;
+wire			 dbg_stream_on_seen_w;
+wire			 dbg_i2c_status_sample_seen_w;
+wire			 dbg_i2c_status_rxack_seen_w;
+wire			 dbg_i2c_status_busy_seen_w;
+wire			 dbg_i2c_status_al_seen_w;
+wire			 dbg_i2c_status_tip_seen_w;
+wire			 dbg_i2c_status_rxack_prebyte_seen_w;
+wire			 dbg_i2c_status_rxack_devaddr_seen_w;
+wire			 dbg_i2c_status_rxack_reg_high_seen_w;
+wire			 dbg_i2c_status_rxack_reg_low_seen_w;
+wire			 dbg_i2c_status_rxack_data_seen_w;
+wire	[7:0]	 dbg_i2c_last_status_w;
 //==================================================
 i2c_master_reg_set #(
 	.DATA_LENGTH (DATA_LENGTH),
@@ -53,7 +86,11 @@ i2c_master_reg_set #(
 	/*o*/ .rd_en(rd_en),
 	/*o*/ .addr(addr),
 	/*o*/ .dout(set_data),
-	/*o*/.dev_addr(dev_addr)
+	/*o*/.dev_addr(dev_addr),
+	/*o*/.dbg_cfg_done(dbg_cfg_done_w),
+	/*o*/.dbg_last_index_seen(dbg_last_index_seen_w),
+	/*o*/.dbg_stream_on_index_reached(dbg_stream_on_index_reached_w),
+	/*o*/.dbg_stream_on_seen(dbg_stream_on_seen_w)
 	
 );
 
@@ -77,6 +114,17 @@ i2c_16addr_8data #(
 	.din(set_data),
 	.dout(get_data),
 	.dout_valid(get_valid),
+	.dbg_status_sample_seen(dbg_i2c_status_sample_seen_w),
+	.dbg_status_rxack_seen (dbg_i2c_status_rxack_seen_w),
+	.dbg_status_busy_seen  (dbg_i2c_status_busy_seen_w),
+	.dbg_status_al_seen    (dbg_i2c_status_al_seen_w),
+	.dbg_status_tip_seen   (dbg_i2c_status_tip_seen_w),
+	.dbg_status_rxack_prebyte_seen(dbg_i2c_status_rxack_prebyte_seen_w),
+	.dbg_status_rxack_devaddr_seen(dbg_i2c_status_rxack_devaddr_seen_w),
+	.dbg_status_rxack_reg_high_seen(dbg_i2c_status_rxack_reg_high_seen_w),
+	.dbg_status_rxack_reg_low_seen(dbg_i2c_status_rxack_reg_low_seen_w),
+	.dbg_status_rxack_data_seen(dbg_i2c_status_rxack_data_seen_w),
+	.dbg_last_status       (dbg_i2c_last_status_w),
 	.i2c_address       (i2c_addr),       // i2c.address
   .i2c_write         (i2c_write),         //          .write
   .i2c_readdata      (i2c_readdata),      //          .readdata
@@ -103,5 +151,24 @@ i2c_16addr_8data #(
     /* I */ .wb_we_i 		(i2c_write ),
     /* O */ .wb_inta_o 		(tx_i2c_irq )
   );
+
+assign dbg_init_done = init_done;
+assign dbg_wr_en = wr_en;
+assign dbg_wr_done = wr_done;
+assign dbg_cfg_done = dbg_cfg_done_w;
+assign dbg_last_index_seen = dbg_last_index_seen_w;
+assign dbg_stream_on_index_reached = dbg_stream_on_index_reached_w;
+assign dbg_stream_on_seen = dbg_stream_on_seen_w;
+assign dbg_i2c_status_sample_seen = dbg_i2c_status_sample_seen_w;
+assign dbg_i2c_status_rxack_seen = dbg_i2c_status_rxack_seen_w;
+assign dbg_i2c_status_busy_seen = dbg_i2c_status_busy_seen_w;
+assign dbg_i2c_status_al_seen = dbg_i2c_status_al_seen_w;
+assign dbg_i2c_status_tip_seen = dbg_i2c_status_tip_seen_w;
+assign dbg_i2c_status_rxack_prebyte_seen = dbg_i2c_status_rxack_prebyte_seen_w;
+assign dbg_i2c_status_rxack_devaddr_seen = dbg_i2c_status_rxack_devaddr_seen_w;
+assign dbg_i2c_status_rxack_reg_high_seen = dbg_i2c_status_rxack_reg_high_seen_w;
+assign dbg_i2c_status_rxack_reg_low_seen = dbg_i2c_status_rxack_reg_low_seen_w;
+assign dbg_i2c_status_rxack_data_seen = dbg_i2c_status_rxack_data_seen_w;
+assign dbg_i2c_last_status = dbg_i2c_last_status_w;
   
 endmodule

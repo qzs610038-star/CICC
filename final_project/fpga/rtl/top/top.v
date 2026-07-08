@@ -201,7 +201,7 @@ parameter	VFP				= 13'd20
   (* syn_peri_port = 0 *) output S1_io_cam_sda_OE,
   (* syn_peri_port = 0 *) output S1_o_cam_rst_p,
   (* syn_peri_port = 0 *) output [3:0] led,
-  //=== DEBUG LED bank: LED18-29 are used for HDMI stripe bring-up probes. ===
+  //=== DEBUG LED bank: LED18-33 are used for HDMI stripe bring-up probes. ===
   (* syn_peri_port = 0 *) output dbg_ddr_ok,          // LED22 (G2)
   (* syn_peri_port = 0 *) output dbg_fb0_ready,       // LED23 (K6)
   (* syn_peri_port = 0 *) output dbg_fb0_underflow,   // LED24 (J3)
@@ -627,7 +627,7 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
   reg  out_sync;
   localparam [12:0] HDMI_H_FRONT_PORCH = HFP >> 1;
   localparam [12:0] HDMI_H_SYNC        = HSP >> 1;
-  localparam [12:0] HDMI_H_VALID       = 13'd480;  // was HACT>>1 (960); halved to reduce DDR read bandwidth
+  localparam [12:0] HDMI_H_VALID       = HACT >> 1;  // 960 pixels in the 2-pixel framebuffer domain
   localparam [12:0] HDMI_H_BACK_PORCH  = HBP >> 1;
   localparam [12:0] HDMI_V_FRONT_PORCH = VFP;
   localparam [12:0] HDMI_V_SYNC        = VSP;
@@ -636,6 +636,9 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
   localparam        CH0_BAYER_SWAP_PIXELS = 1'b1;
   localparam        CH1_BAYER_SWAP_PIXELS = 1'b1;
   localparam [5:0]  CSI_RAW10_DATATYPE    = 6'h2B;
+  localparam [7:0]  CH0_I2C_DEVICE_ADDR   = 8'h60;
+  localparam [7:0]  CH1_I2C_DEVICE_ADDR   = 8'h60;
+  localparam        CAM_I2C_RST_DELAY_BIT = 22;
 
   function [31:0] raw10_4pix_to_raw8_4pix;
     input [39:0] raw10_4pix;
@@ -855,8 +858,44 @@ wire [5:0] rx_out_datatype1;
 wire [3:0] rx_out_pixel_per_clk1;
 wire ch0_dbg_reset_pixel_n;
 wire ch0_dbg_i2c_rst_n;
+wire ch0_dbg_i2c_init_done;
+wire ch0_dbg_i2c_wr_en;
+wire ch0_dbg_i2c_wr_done;
+wire ch0_dbg_i2c_cfg_done;
+wire ch0_dbg_i2c_last_index_seen;
+wire ch0_dbg_i2c_stream_on_index_reached;
+wire ch0_dbg_i2c_stream_on_seen;
+wire ch0_dbg_i2c_status_sample_seen;
+wire ch0_dbg_i2c_status_rxack_seen;
+wire ch0_dbg_i2c_status_busy_seen;
+wire ch0_dbg_i2c_status_al_seen;
+wire ch0_dbg_i2c_status_tip_seen;
+wire ch0_dbg_i2c_status_rxack_prebyte_seen;
+wire ch0_dbg_i2c_status_rxack_devaddr_seen;
+wire ch0_dbg_i2c_status_rxack_reg_high_seen;
+wire ch0_dbg_i2c_status_rxack_reg_low_seen;
+wire ch0_dbg_i2c_status_rxack_data_seen;
+wire [7:0] ch0_dbg_i2c_last_status;
 wire ch1_dbg_reset_pixel_n;
 wire ch1_dbg_i2c_rst_n;
+wire ch1_dbg_i2c_init_done;
+wire ch1_dbg_i2c_wr_en;
+wire ch1_dbg_i2c_wr_done;
+wire ch1_dbg_i2c_cfg_done;
+wire ch1_dbg_i2c_last_index_seen;
+wire ch1_dbg_i2c_stream_on_index_reached;
+wire ch1_dbg_i2c_stream_on_seen;
+wire ch1_dbg_i2c_status_sample_seen;
+wire ch1_dbg_i2c_status_rxack_seen;
+wire ch1_dbg_i2c_status_busy_seen;
+wire ch1_dbg_i2c_status_al_seen;
+wire ch1_dbg_i2c_status_tip_seen;
+wire ch1_dbg_i2c_status_rxack_prebyte_seen;
+wire ch1_dbg_i2c_status_rxack_devaddr_seen;
+wire ch1_dbg_i2c_status_rxack_reg_high_seen;
+wire ch1_dbg_i2c_status_rxack_reg_low_seen;
+wire ch1_dbg_i2c_status_rxack_data_seen;
+wire [7:0] ch1_dbg_i2c_last_status;
 wire [31:0] ch0_raw8_4pix;
 wire [31:0] ch1_raw8_4pix;
 wire [15:0] ch0_bayer_2pix;
@@ -877,10 +916,41 @@ reg [1:0] ch0_i2c_scl_sync = 2'b11;
 reg [1:0] ch0_i2c_sda_sync = 2'b11;
 reg ch0_i2c_scl_edge_seen = 1'b0;
 reg ch0_i2c_sda_edge_seen = 1'b0;
+reg ch0_i2c_scl_low_seen = 1'b0;
+reg ch0_i2c_sda_low_seen = 1'b0;
+reg ch0_i2c_sda_oe_seen = 1'b0;
+reg [1:0] ch1_i2c_scl_sync = 2'b11;
+reg [1:0] ch1_i2c_sda_sync = 2'b11;
+reg ch1_i2c_scl_edge_seen = 1'b0;
+reg ch1_i2c_sda_edge_seen = 1'b0;
+reg ch1_i2c_scl_low_seen = 1'b0;
+reg ch1_i2c_sda_low_seen = 1'b0;
+reg ch1_i2c_sda_oe_seen = 1'b0;
 reg ch0_mipi_clk_hs_seen = 1'b0;
 reg ch0_mipi_lane_hs_seen = 1'b0;
 reg ch0_mipi_fifo_nonempty_seen = 1'b0;
 reg ch0_mipi_fifo_rd_seen = 1'b0;
+reg ch0_mipi_byteclk_toggle = 1'b0;
+reg [2:0] ch0_mipi_byteclk_toggle_sync = 3'b000;
+reg ch0_mipi_byteclk_seen = 1'b0;
+reg [1:0] ch0_mipi_clk_lp_sample = 2'b00;
+reg [1:0] ch0_mipi_lane0_lp_sample = 2'b00;
+reg [7:0] ch0_mipi_data_lp_sample = 8'd0;
+reg ch0_mipi_lp_sample_valid = 1'b0;
+reg ch0_mipi_clk_lp_seen = 1'b0;
+reg ch0_mipi_lane0_lp_seen = 1'b0;
+reg ch0_mipi_data_lp_toggle_seen = 1'b0;
+reg [31:0] ch0_mipi_hs_sample = 32'd0;
+reg ch0_mipi_hs_sample_valid = 1'b0;
+reg ch0_mipi_hs_data_seen = 1'b0;
+reg ch0_mipi_hs_term_seen = 1'b0;
+reg ch0_i2c_wr_en_seen = 1'b0;
+reg ch0_i2c_wr_done_seen = 1'b0;
+reg ch0_i2c_init_done_seen = 1'b0;
+reg ch0_i2c_cfg_done_seen = 1'b0;
+reg ch0_i2c_last_index_seen_latch = 1'b0;
+reg ch0_i2c_stream_on_index_reached_latch = 1'b0;
+reg ch0_i2c_stream_on_seen_latch = 1'b0;
 
 assign ch0_raw8_4pix = raw10_4pix_to_raw8_4pix(rx_out_data[39:0]);
 assign ch1_raw8_4pix = raw10_4pix_to_raw8_4pix(rx_out_data1[39:0]);
@@ -929,6 +999,16 @@ always @(posedge mipi_clk or negedge arst_n) begin
         ch0_i2c_sda_sync      <= 2'b11;
         ch0_i2c_scl_edge_seen <= 1'b0;
         ch0_i2c_sda_edge_seen <= 1'b0;
+        ch0_i2c_scl_low_seen  <= 1'b0;
+        ch0_i2c_sda_low_seen  <= 1'b0;
+        ch0_i2c_sda_oe_seen   <= 1'b0;
+        ch1_i2c_scl_sync      <= 2'b11;
+        ch1_i2c_sda_sync      <= 2'b11;
+        ch1_i2c_scl_edge_seen <= 1'b0;
+        ch1_i2c_sda_edge_seen <= 1'b0;
+        ch1_i2c_scl_low_seen  <= 1'b0;
+        ch1_i2c_sda_low_seen  <= 1'b0;
+        ch1_i2c_sda_oe_seen   <= 1'b0;
     end else begin
         ch0_i2c_scl_sync <= {ch0_i2c_scl_sync[0], S0_io_cam_scl_IN};
         ch0_i2c_sda_sync <= {ch0_i2c_sda_sync[0], S0_io_cam_sda_IN};
@@ -936,7 +1016,32 @@ always @(posedge mipi_clk or negedge arst_n) begin
             ch0_i2c_scl_edge_seen <= 1'b1;
         if (ch0_i2c_sda_sync[1] ^ ch0_i2c_sda_sync[0])
             ch0_i2c_sda_edge_seen <= 1'b1;
+        if (!S0_io_cam_scl_IN)
+            ch0_i2c_scl_low_seen <= 1'b1;
+        if (!S0_io_cam_sda_IN)
+            ch0_i2c_sda_low_seen <= 1'b1;
+        if (S0_io_cam_sda_OE)
+            ch0_i2c_sda_oe_seen <= 1'b1;
+        ch1_i2c_scl_sync <= {ch1_i2c_scl_sync[0], S1_io_cam_scl_IN};
+        ch1_i2c_sda_sync <= {ch1_i2c_sda_sync[0], S1_io_cam_sda_IN};
+        if (ch1_i2c_scl_sync[1] ^ ch1_i2c_scl_sync[0])
+            ch1_i2c_scl_edge_seen <= 1'b1;
+        if (ch1_i2c_sda_sync[1] ^ ch1_i2c_sda_sync[0])
+            ch1_i2c_sda_edge_seen <= 1'b1;
+        if (!S1_io_cam_scl_IN)
+            ch1_i2c_scl_low_seen <= 1'b1;
+        if (!S1_io_cam_sda_IN)
+            ch1_i2c_sda_low_seen <= 1'b1;
+        if (S1_io_cam_sda_OE)
+            ch1_i2c_sda_oe_seen <= 1'b1;
     end
+end
+
+always @(posedge mipi_rx_ck0_CLKOUT or negedge arst_n) begin
+    if (!arst_n)
+        ch0_mipi_byteclk_toggle <= 1'b0;
+    else
+        ch0_mipi_byteclk_toggle <= ~ch0_mipi_byteclk_toggle;
 end
 
 always @(posedge i_sysclk_div2 or negedge arst_n) begin
@@ -945,7 +1050,56 @@ always @(posedge i_sysclk_div2 or negedge arst_n) begin
         ch0_mipi_lane_hs_seen      <= 1'b0;
         ch0_mipi_fifo_nonempty_seen <= 1'b0;
         ch0_mipi_fifo_rd_seen      <= 1'b0;
+        ch0_mipi_byteclk_toggle_sync <= 3'b000;
+        ch0_mipi_byteclk_seen      <= 1'b0;
+        ch0_mipi_clk_lp_sample     <= 2'b00;
+        ch0_mipi_lane0_lp_sample   <= 2'b00;
+        ch0_mipi_data_lp_sample    <= 8'd0;
+        ch0_mipi_lp_sample_valid   <= 1'b0;
+        ch0_mipi_clk_lp_seen       <= 1'b0;
+        ch0_mipi_lane0_lp_seen     <= 1'b0;
+        ch0_mipi_data_lp_toggle_seen <= 1'b0;
+        ch0_mipi_hs_sample         <= 32'd0;
+        ch0_mipi_hs_sample_valid   <= 1'b0;
+        ch0_mipi_hs_data_seen      <= 1'b0;
+        ch0_mipi_hs_term_seen      <= 1'b0;
+        ch0_i2c_wr_en_seen         <= 1'b0;
+        ch0_i2c_wr_done_seen       <= 1'b0;
+        ch0_i2c_init_done_seen     <= 1'b0;
+        ch0_i2c_cfg_done_seen      <= 1'b0;
+        ch0_i2c_last_index_seen_latch <= 1'b0;
+        ch0_i2c_stream_on_index_reached_latch <= 1'b0;
+        ch0_i2c_stream_on_seen_latch <= 1'b0;
     end else begin
+        ch0_mipi_byteclk_toggle_sync <= {ch0_mipi_byteclk_toggle_sync[1:0], ch0_mipi_byteclk_toggle};
+        if (ch0_mipi_byteclk_toggle_sync[2] ^ ch0_mipi_byteclk_toggle_sync[1])
+            ch0_mipi_byteclk_seen <= 1'b1;
+        if ({mipi_rx_ck0_LP_P_IN, mipi_rx_ck0_LP_N_IN} != 2'b00)
+            ch0_mipi_clk_lp_seen <= 1'b1;
+        if ({mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN} != 2'b00)
+            ch0_mipi_lane0_lp_seen <= 1'b1;
+        if (ch0_mipi_lp_sample_valid &&
+            ({mipi_rx_dp03_LP_P_IN, mipi_rx_dp03_LP_N_IN,
+              mipi_rx_dp02_LP_P_IN, mipi_rx_dp02_LP_N_IN,
+              mipi_rx_dp01_LP_P_IN, mipi_rx_dp01_LP_N_IN,
+              mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN} != ch0_mipi_data_lp_sample))
+            ch0_mipi_data_lp_toggle_seen <= 1'b1;
+        ch0_mipi_clk_lp_sample <= {mipi_rx_ck0_LP_P_IN, mipi_rx_ck0_LP_N_IN};
+        ch0_mipi_lane0_lp_sample <= {mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN};
+        ch0_mipi_data_lp_sample <= {mipi_rx_dp03_LP_P_IN, mipi_rx_dp03_LP_N_IN,
+                                    mipi_rx_dp02_LP_P_IN, mipi_rx_dp02_LP_N_IN,
+                                    mipi_rx_dp01_LP_P_IN, mipi_rx_dp01_LP_N_IN,
+                                    mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN};
+        ch0_mipi_lp_sample_valid <= 1'b1;
+        if ((mipi_rx_dp00_HS_IN | mipi_rx_dp01_HS_IN | mipi_rx_dp02_HS_IN | mipi_rx_dp03_HS_IN) != 8'd0)
+            ch0_mipi_hs_data_seen <= 1'b1;
+        if (ch0_mipi_hs_sample_valid &&
+            ({mipi_rx_dp03_HS_IN, mipi_rx_dp02_HS_IN, mipi_rx_dp01_HS_IN, mipi_rx_dp00_HS_IN} != ch0_mipi_hs_sample))
+            ch0_mipi_hs_data_seen <= 1'b1;
+        ch0_mipi_hs_sample <= {mipi_rx_dp03_HS_IN, mipi_rx_dp02_HS_IN, mipi_rx_dp01_HS_IN, mipi_rx_dp00_HS_IN};
+        ch0_mipi_hs_sample_valid <= 1'b1;
+        if (mipi_rx_ck0_HS_TERM | mipi_rx_dp00_HS_TERM | mipi_rx_dp01_HS_TERM | mipi_rx_dp02_HS_TERM | mipi_rx_dp03_HS_TERM)
+            ch0_mipi_hs_term_seen <= 1'b1;
         if (mipi_rx_ck0_HS_ENA)
             ch0_mipi_clk_hs_seen <= 1'b1;
         if (mipi_rx_dp00_HS_ENA | mipi_rx_dp01_HS_ENA | mipi_rx_dp02_HS_ENA | mipi_rx_dp03_HS_ENA)
@@ -954,12 +1108,28 @@ always @(posedge i_sysclk_div2 or negedge arst_n) begin
             ch0_mipi_fifo_nonempty_seen <= 1'b1;
         if (mipi_rx_dp00_FIFO_RD | mipi_rx_dp01_FIFO_RD | mipi_rx_dp02_FIFO_RD | mipi_rx_dp03_FIFO_RD)
             ch0_mipi_fifo_rd_seen <= 1'b1;
+        if (ch0_dbg_i2c_wr_en)
+            ch0_i2c_wr_en_seen <= 1'b1;
+        if (ch0_dbg_i2c_wr_done)
+            ch0_i2c_wr_done_seen <= 1'b1;
+        if (ch0_dbg_i2c_init_done)
+            ch0_i2c_init_done_seen <= 1'b1;
+        if (ch0_dbg_i2c_cfg_done)
+            ch0_i2c_cfg_done_seen <= 1'b1;
+        if (ch0_dbg_i2c_last_index_seen)
+            ch0_i2c_last_index_seen_latch <= 1'b1;
+        if (ch0_dbg_i2c_stream_on_index_reached)
+            ch0_i2c_stream_on_index_reached_latch <= 1'b1;
+        if (ch0_dbg_i2c_stream_on_seen)
+            ch0_i2c_stream_on_seen_latch <= 1'b1;
     end
 end
 
 
   soft_mipi_rx_top # (
-    .PACK_BIT(PACK_BIT)
+    .PACK_BIT(PACK_BIT),
+    .I2C_DEVICE_ADDR(CH0_I2C_DEVICE_ADDR),
+    .I2C_RST_DELAY_BIT(CAM_I2C_RST_DELAY_BIT)
   )
   soft_mipi_rx_top_inst (
     .mipi_clk                   (   mipi_clk                   ),
@@ -1016,12 +1186,32 @@ end
     .rx_out_datatype            (   rx_out_datatype            ),
     .rx_out_pixel_per_clk       (   rx_out_pixel_per_clk       ),
     .dbg_reset_pixel_n          (   ch0_dbg_reset_pixel_n      ),
-    .dbg_i2c_rst_n              (   ch0_dbg_i2c_rst_n          )
+    .dbg_i2c_rst_n              (   ch0_dbg_i2c_rst_n          ),
+    .dbg_i2c_init_done          (   ch0_dbg_i2c_init_done      ),
+    .dbg_i2c_wr_en              (   ch0_dbg_i2c_wr_en          ),
+    .dbg_i2c_wr_done            (   ch0_dbg_i2c_wr_done        ),
+    .dbg_i2c_cfg_done           (   ch0_dbg_i2c_cfg_done       ),
+    .dbg_i2c_last_index_seen    (   ch0_dbg_i2c_last_index_seen),
+    .dbg_i2c_stream_on_index_reached(ch0_dbg_i2c_stream_on_index_reached),
+    .dbg_i2c_stream_on_seen     (   ch0_dbg_i2c_stream_on_seen ),
+    .dbg_i2c_status_sample_seen (   ch0_dbg_i2c_status_sample_seen),
+    .dbg_i2c_status_rxack_seen  (   ch0_dbg_i2c_status_rxack_seen),
+    .dbg_i2c_status_busy_seen   (   ch0_dbg_i2c_status_busy_seen),
+    .dbg_i2c_status_al_seen     (   ch0_dbg_i2c_status_al_seen),
+    .dbg_i2c_status_tip_seen    (   ch0_dbg_i2c_status_tip_seen),
+    .dbg_i2c_status_rxack_prebyte_seen(ch0_dbg_i2c_status_rxack_prebyte_seen),
+    .dbg_i2c_status_rxack_devaddr_seen(ch0_dbg_i2c_status_rxack_devaddr_seen),
+    .dbg_i2c_status_rxack_reg_high_seen(ch0_dbg_i2c_status_rxack_reg_high_seen),
+    .dbg_i2c_status_rxack_reg_low_seen(ch0_dbg_i2c_status_rxack_reg_low_seen),
+    .dbg_i2c_status_rxack_data_seen(ch0_dbg_i2c_status_rxack_data_seen),
+    .dbg_i2c_last_status        (   ch0_dbg_i2c_last_status    )
   );
 
 
   soft_mipi_rx_top # (
-    .PACK_BIT(PACK_BIT)
+    .PACK_BIT(PACK_BIT),
+    .I2C_DEVICE_ADDR(CH1_I2C_DEVICE_ADDR),
+    .I2C_RST_DELAY_BIT(CAM_I2C_RST_DELAY_BIT)
   )
   soft_mipi_rx_top_inst1 (
     .mipi_clk                   (   mipi_clk                   ),
@@ -1082,7 +1272,25 @@ end
     .rx_out_datatype            (   rx_out_datatype1            ),
     .rx_out_pixel_per_clk       (   rx_out_pixel_per_clk1       ),
     .dbg_reset_pixel_n          (   ch1_dbg_reset_pixel_n       ),
-    .dbg_i2c_rst_n              (   ch1_dbg_i2c_rst_n           )
+    .dbg_i2c_rst_n              (   ch1_dbg_i2c_rst_n           ),
+    .dbg_i2c_init_done          (   ch1_dbg_i2c_init_done       ),
+    .dbg_i2c_wr_en              (   ch1_dbg_i2c_wr_en           ),
+    .dbg_i2c_wr_done            (   ch1_dbg_i2c_wr_done         ),
+    .dbg_i2c_cfg_done           (   ch1_dbg_i2c_cfg_done        ),
+    .dbg_i2c_last_index_seen    (   ch1_dbg_i2c_last_index_seen ),
+    .dbg_i2c_stream_on_index_reached(ch1_dbg_i2c_stream_on_index_reached),
+    .dbg_i2c_stream_on_seen     (   ch1_dbg_i2c_stream_on_seen  ),
+    .dbg_i2c_status_sample_seen (   ch1_dbg_i2c_status_sample_seen),
+    .dbg_i2c_status_rxack_seen  (   ch1_dbg_i2c_status_rxack_seen),
+    .dbg_i2c_status_busy_seen   (   ch1_dbg_i2c_status_busy_seen),
+    .dbg_i2c_status_al_seen     (   ch1_dbg_i2c_status_al_seen),
+    .dbg_i2c_status_tip_seen    (   ch1_dbg_i2c_status_tip_seen),
+    .dbg_i2c_status_rxack_prebyte_seen(ch1_dbg_i2c_status_rxack_prebyte_seen),
+    .dbg_i2c_status_rxack_devaddr_seen(ch1_dbg_i2c_status_rxack_devaddr_seen),
+    .dbg_i2c_status_rxack_reg_high_seen(ch1_dbg_i2c_status_rxack_reg_high_seen),
+    .dbg_i2c_status_rxack_reg_low_seen(ch1_dbg_i2c_status_rxack_reg_low_seen),
+    .dbg_i2c_status_rxack_data_seen(ch1_dbg_i2c_status_rxack_data_seen),
+    .dbg_i2c_last_status        (   ch1_dbg_i2c_last_status     )
   );
 `ifdef  FRAME_BUFFER
 
@@ -1111,6 +1319,9 @@ end
   wire ch0_dbg_wr_frame_done_seen;
   wire ch0_dbg_rd_start_seen;
   wire ch0_dbg_arvalid_seen;
+  wire ch0_dbg_frame_en;
+  wire ch0_dbg_tx_underflow_seen;
+  wire ch0_dbg_fifo_rd_frame_end_seen;
   assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
@@ -1163,6 +1374,9 @@ frame_buffer #(
     .dbg_wr_frame_done_seen(ch0_dbg_wr_frame_done_seen),
     .dbg_rd_start_seen  (ch0_dbg_rd_start_seen),
     .dbg_arvalid_seen   (ch0_dbg_arvalid_seen),
+    .dbg_frame_en       (ch0_dbg_frame_en),
+    .dbg_tx_underflow_seen(ch0_dbg_tx_underflow_seen),
+    .dbg_fifo_rd_frame_end_seen(ch0_dbg_fifo_rd_frame_end_seen),
 
     .H_FRONT_PORCH 	(HDMI_H_FRONT_PORCH),
     .H_SYNC 		(HDMI_H_SYNC       ),
@@ -1295,6 +1509,9 @@ wire ch1_dbg_awvalid_seen;
 wire ch1_dbg_wr_frame_done_seen;
 wire ch1_dbg_rd_start_seen;
 wire ch1_dbg_arvalid_seen;
+wire ch1_dbg_frame_en;
+wire ch1_dbg_tx_underflow_seen;
+wire ch1_dbg_fifo_rd_frame_end_seen;
 assign ch1_bayer_2pix = CH1_BAYER_SWAP_PIXELS ? {ch1_b, ch1_g} : {ch1_g, ch1_b};
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
@@ -1342,6 +1559,9 @@ frame_buffer #(
    .dbg_wr_frame_done_seen(ch1_dbg_wr_frame_done_seen),
    .dbg_rd_start_seen (ch1_dbg_rd_start_seen),
    .dbg_arvalid_seen  (ch1_dbg_arvalid_seen),
+   .dbg_frame_en      (ch1_dbg_frame_en),
+   .dbg_tx_underflow_seen(ch1_dbg_tx_underflow_seen),
+   .dbg_fifo_rd_frame_end_seen(ch1_dbg_fifo_rd_frame_end_seen),
 
    .H_FRONT_PORCH 	(HDMI_H_FRONT_PORCH),
     .H_SYNC 		(HDMI_H_SYNC       ),
@@ -1705,13 +1925,15 @@ white_balance u1_white_balance (
   );
 
 //=============================================================================
-//DSI / MIPI TX port tie-off (DSI lane not used; P0/P1 LCD off)
+//DSI / MIPI TX port tie-off (DSI lane not used).
 // To restore DSI: re-instantiate inst_tx_byteclk_rst + color_bar_rgb_inst
 // + dsi_tx_top_inst1 and delete this block.
+// Keep LCD power enables high for a controlled camera power-rail test while
+// the DSI data/clock lanes below remain Hi-Z.
 //=============================================================================
-assign P0_lcd_power_en = 1'b0;
+assign P0_lcd_power_en = 1'b1;
 assign P0_lcd_rstp     = 1'b0;
-assign P1_lcd_power_en = 1'b0;
+assign P1_lcd_power_en = 1'b1;
 assign P1_o_lcd_rstn   = 1'b0;
 
 
@@ -1834,6 +2056,9 @@ assign mipi_tx_dp13_RST      = 1'b1;
   wire selected_dbg_frame_stable;
   wire selected_dbg_wr_frame_done;
   wire selected_dbg_rd_frame_available;
+  wire selected_dbg_frame_en;
+  wire selected_dbg_tx_underflow_seen;
+  wire selected_dbg_fifo_rd_frame_end_seen;
   wire ch0_dbg_any_write_start;
 
   // SW4 touch-button debounce + toggle (active-low button, default high)
@@ -1977,27 +2202,30 @@ assign selected_dbg_ddr_read_gap = channel_sel ? ch1_dbg_ddr_read_gap : ch0_dbg_
 assign selected_dbg_frame_stable = channel_sel ? ch1_dbg_frame_stable : ch0_dbg_frame_stable;
 assign selected_dbg_wr_frame_done = channel_sel ? ch1_dbg_wr_frame_done : ch0_dbg_wr_frame_done;
 assign selected_dbg_rd_frame_available = channel_sel ? ch1_dbg_rd_frame_available : ch0_dbg_rd_frame_available;
+assign selected_dbg_frame_en = channel_sel ? ch1_dbg_frame_en : ch0_dbg_frame_en;
+assign selected_dbg_tx_underflow_seen = channel_sel ? ch1_dbg_tx_underflow_seen : ch0_dbg_tx_underflow_seen;
+assign selected_dbg_fifo_rd_frame_end_seen = channel_sel ? ch1_dbg_fifo_rd_frame_end_seen : ch0_dbg_fifo_rd_frame_end_seen;
 assign selected_csi_format_ok = channel_sel ? ch1_csi_format_ok_cdc[1] : ch0_csi_format_ok_cdc[1];
 assign selected_frame_ok_hdmi = selected_frame_ready_cdc[2] & ~selected_fifo_underflow_cdc[1];
 assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   //===================================================================
-  // HDMI stripe debug LED map, 2026-07-07 current/stable HDMI gate probe set:
+  // HDMI stripe debug LED map, 2026-07-08 forced-input HDMI gate probe:
   //   LED18 led[0] (B2)  = DDR configured
   //   LED19 led[1] (E3)  = ch0 selected (~channel_sel)
-  //   LED20 led[2] (F3)  = current selected framebuffer ready
-  //   LED21 led[3] (F2)  = current selected frame_ok_hdmi
-  //   LED22 dbg_ddr_ok (G2)        = current selected CDC bridge active
-  //   LED23 dbg_fb0_ready (K6)     = current selected CDC bridge underflow, 1=BAD
-  //   LED24 dbg_fb0_underflow (J3) = current raw hdmi_video_ready
-  //   LED25 dbg_csi_fmt_ok (L6)    = hdmi_top input_stable
-  //   LED26 dbg_bridge_active (K4) = hdmi_top use_input_video
-  //   LED27 dbg_bridge_under (K3)  = selected framebuffer ready held stable
-  //   LED28 dbg_video_ready (M5)   = selected CDC bridge active held stable
-  //   LED29 dbg_input_stable (M6)  = raw hdmi_video_ready held stable
-  //   LED30 dbg_led30 (N7)         = hdmi_top use_input_video held stable
-  //   LED31 dbg_led31 (P7)         = hdmi_top input pixel data changed
-  //   LED32 dbg_led32 (P6)         = selected DDR read gap seen, 1=BAD
-  //   LED33 dbg_led33 (R6)         = selected CSI RAW10/4ppc format
+  //   LED20 led[2] (F3)  = global reset released (arst_n)
+  //   LED21 led[3] (F2)  = ch0 delayed I2C controller reset released
+  //   LED22 dbg_ddr_ok (G2)        = ch0 I2C status register sampled
+  //   LED23 dbg_fb0_ready (K6)     = ch0 I2C no aggregate NACK after sampling
+  //   LED24 dbg_fb0_underflow (J3) = hdmi_top video_path_ready
+  //   LED25 dbg_csi_fmt_ok (L6)    = hdmi_top vid_info_det frame_stable
+  //   LED26 dbg_bridge_active (K4) = hdmi_top active size is 960x1080
+  //   LED27 dbg_bridge_under (K3)  = BAD: HDMI h_active_error seen
+  //   LED28 dbg_video_ready (M5)   = BAD: HDMI v_active_error seen
+  //   LED29 dbg_input_stable (M6)  = BAD: HDMI v_total_error seen
+  //   LED30 dbg_led30 (N7)         = BAD: HDMI h_total_error seen
+  //   LED31 dbg_led31 (P7)         = BAD: HDMI h_sync_error seen
+  //   LED32 dbg_led32 (P6)         = hdmi_top input pixel data changes under DE
+  //   LED33 dbg_led33 (R6)         = hdmi_top is using input video (gate bypassed)
   //===================================================================
 
   // Bring ch0 signals into hdmi_tx_slow_clk domain with 2-stage sync.
@@ -2037,6 +2265,11 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   reg dbg_selected_rd_frame_available_seen;
   reg dbg_selected_ddr_rd_seen_latch;
   reg dbg_selected_ddr_read_gap_seen;
+  reg dbg_hdmi_h_active_error_seen;
+  reg dbg_hdmi_v_active_error_seen;
+  reg dbg_hdmi_v_total_error_seen;
+  reg dbg_hdmi_h_total_error_seen;
+  reg dbg_hdmi_h_sync_error_seen;
   always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
       if (!sys_rst_n) begin
           dbg_selected_frame_ready_seen <= 1'b0;
@@ -2052,6 +2285,11 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
           dbg_selected_rd_frame_available_seen <= 1'b0;
           dbg_selected_ddr_rd_seen_latch <= 1'b0;
           dbg_selected_ddr_read_gap_seen <= 1'b0;
+          dbg_hdmi_h_active_error_seen <= 1'b0;
+          dbg_hdmi_v_active_error_seen <= 1'b0;
+          dbg_hdmi_v_total_error_seen <= 1'b0;
+          dbg_hdmi_h_total_error_seen <= 1'b0;
+          dbg_hdmi_h_sync_error_seen <= 1'b0;
       end else begin
           if (selected_frame_ready_cdc[2])
               dbg_selected_frame_ready_seen <= 1'b1;
@@ -2079,6 +2317,16 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
               dbg_selected_ddr_rd_seen_latch <= 1'b1;
           if (selected_dbg_ddr_read_gap)
               dbg_selected_ddr_read_gap_seen <= 1'b1;
+          if (hdmi_h_active_error_dbg)
+              dbg_hdmi_h_active_error_seen <= 1'b1;
+          if (hdmi_v_active_error_dbg)
+              dbg_hdmi_v_active_error_seen <= 1'b1;
+          if (hdmi_v_total_error_dbg)
+              dbg_hdmi_v_total_error_seen <= 1'b1;
+          if (hdmi_h_total_error_dbg)
+              dbg_hdmi_h_total_error_seen <= 1'b1;
+          if (hdmi_h_sync_error_dbg)
+              dbg_hdmi_h_sync_error_seen <= 1'b1;
       end
   end
 
@@ -2130,10 +2378,12 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   end
 
   reg [23:0] dbg_frame_ready_hold_cnt = 24'd0;
+  reg [23:0] dbg_frame_en_hold_cnt = 24'd0;
   reg [23:0] dbg_bridge_active_hold_cnt = 24'd0;
   reg [23:0] dbg_hdmi_ready_hold_cnt = 24'd0;
   reg [23:0] dbg_use_input_hold_cnt = 24'd0;
   wire dbg_frame_ready_stable = &dbg_frame_ready_hold_cnt;
+  wire dbg_frame_en_stable = &dbg_frame_en_hold_cnt;
   wire dbg_bridge_active_stable = &dbg_bridge_active_hold_cnt;
   wire dbg_hdmi_ready_stable = &dbg_hdmi_ready_hold_cnt;
   wire dbg_use_input_stable = &dbg_use_input_hold_cnt;
@@ -2141,6 +2391,7 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
       if (!sys_rst_n) begin
           dbg_frame_ready_hold_cnt <= 24'd0;
+          dbg_frame_en_hold_cnt <= 24'd0;
           dbg_bridge_active_hold_cnt <= 24'd0;
           dbg_hdmi_ready_hold_cnt <= 24'd0;
           dbg_use_input_hold_cnt <= 24'd0;
@@ -2150,6 +2401,13 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
                   dbg_frame_ready_hold_cnt <= dbg_frame_ready_hold_cnt + 1'b1;
           end else begin
               dbg_frame_ready_hold_cnt <= 24'd0;
+          end
+
+          if (selected_dbg_frame_en) begin
+              if (!dbg_frame_en_stable)
+                  dbg_frame_en_hold_cnt <= dbg_frame_en_hold_cnt + 1'b1;
+          end else begin
+              dbg_frame_en_hold_cnt <= 24'd0;
           end
 
           if (selected_bridge_active) begin
@@ -2177,24 +2435,24 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
 
   assign led[0]             = ddr_cfg_ok_sync[1];             // LED18
   assign led[1]             = ~channel_sel;                   // LED19
-  assign led[2]             = selected_frame_ready_cdc[2];    // LED20
-  assign led[3]             = selected_frame_ok_hdmi;         // LED21
-  assign dbg_ddr_ok         = selected_bridge_active;         // LED22
-  assign dbg_fb0_ready      = selected_bridge_underflow;      // LED23, BAD
-  assign dbg_fb0_underflow  = hdmi_video_ready;               // LED24
-  assign dbg_csi_fmt_ok     = hdmi_input_stable;              // LED25
-  assign dbg_bridge_active  = hdmi_use_input_video_dbg;       // LED26
-  assign dbg_bridge_under   = dbg_frame_ready_stable;         // LED27
-  assign dbg_video_ready    = dbg_bridge_active_stable;       // LED28
-  assign dbg_input_stable   = dbg_hdmi_ready_stable;          // LED29
-  assign dbg_led30          = dbg_use_input_stable;           // LED30
-  assign dbg_led31          = hdmi_input_data_change_seen_dbg; // LED31
-  assign dbg_led32          = dbg_selected_ddr_read_gap_seen; // LED32, BAD
-  assign dbg_led33          = selected_csi_format_ok;         // LED33
+  assign led[2]             = arst_n;                         // LED20
+  assign led[3]             = ch0_dbg_i2c_rst_n;              // LED21
+  assign dbg_ddr_ok         = ch0_dbg_i2c_status_sample_seen; // LED22
+  assign dbg_fb0_ready      = ch0_dbg_i2c_status_sample_seen & ~ch0_dbg_i2c_status_rxack_seen; // LED23
+  assign dbg_fb0_underflow  = hdmi_video_path_ready_dbg;      // LED24
+  assign dbg_csi_fmt_ok     = hdmi_vidinfo_stable_dbg;        // LED25
+  assign dbg_bridge_active  = hdmi_timing_size_ok_dbg;        // LED26
+  assign dbg_bridge_under   = dbg_hdmi_h_active_error_seen;   // LED27, BAD
+  assign dbg_video_ready    = dbg_hdmi_v_active_error_seen;   // LED28, BAD
+  assign dbg_input_stable   = dbg_hdmi_v_total_error_seen;    // LED29, BAD
+  assign dbg_led30          = dbg_hdmi_h_total_error_seen;    // LED30, BAD
+  assign dbg_led31          = dbg_hdmi_h_sync_error_seen;     // LED31, BAD
+  assign dbg_led32          = hdmi_input_data_change_seen_dbg; // LED32
+  assign dbg_led33          = hdmi_use_input_video_dbg;       // LED33
   //=== end debug LED bank drive ===
 
   hdmi_top #(
-    .USE_INPUT_STABLE_GATE(1'b1)
+    .USE_INPUT_STABLE_GATE(1'b0)
   ) hdmi_top_inst (
     .hdmi_tx_locked(1'b1),
     .i_video_ready(hdmi_video_ready),
