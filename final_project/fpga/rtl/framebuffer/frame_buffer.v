@@ -50,6 +50,9 @@ output  wire                                dbg_awvalid_seen,
 output  wire                                dbg_wr_frame_done_seen,
 output  wire                                dbg_rd_start_seen,
 output  wire                                dbg_arvalid_seen,
+output  wire                                dbg_frame_en,
+output  wire                                dbg_tx_underflow_seen,
+output  wire                                dbg_fifo_rd_frame_end_seen,
 input  wire               out_sync,
 
 input	wire 	[12:0]						H_FRONT_PORCH 	,
@@ -334,6 +337,8 @@ reg       dbg_awvalid_seen_r = 1'b0;
 reg       dbg_wr_frame_done_seen_r = 1'b0;
 reg       dbg_rd_start_seen_r = 1'b0;
 reg       dbg_arvalid_seen_r = 1'b0;
+reg       dbg_tx_underflow_seen_r = 1'b0;
+reg       dbg_fifo_rd_frame_end_seen_r = 1'b0;
 
 always @(posedge axi_clk or negedge axi_clk_rst_n)
 begin
@@ -369,6 +374,9 @@ assign dbg_awvalid_seen = dbg_awvalid_seen_r;
 assign dbg_wr_frame_done_seen = dbg_wr_frame_done_seen_r;
 assign dbg_rd_start_seen = dbg_rd_start_seen_r;
 assign dbg_arvalid_seen = dbg_arvalid_seen_r;
+assign dbg_frame_en = frame_en;
+assign dbg_tx_underflow_seen = dbg_tx_underflow_seen_r;
+assign dbg_fifo_rd_frame_end_seen = dbg_fifo_rd_frame_end_seen_r;
 
 always @(posedge i_clk or negedge rst_n)
 begin
@@ -429,6 +437,19 @@ begin
         fifo_rd_period_d <= 1'b0;
     else
         fifo_rd_period_d <= fifo_rd_period;
+end
+
+always @(posedge o_clk or negedge o_clk_rst_n)
+begin
+    if (!o_clk_rst_n) begin
+        dbg_tx_underflow_seen_r <= 1'b0;
+        dbg_fifo_rd_frame_end_seen_r <= 1'b0;
+    end else begin
+        if (tx_fifo_rd_underflow)
+            dbg_tx_underflow_seen_r <= 1'b1;
+        if (fifo_rd_frame_end)
+            dbg_fifo_rd_frame_end_seen_r <= 1'b1;
+    end
 end
 
 always @(posedge o_clk or negedge o_clk_rst_n)

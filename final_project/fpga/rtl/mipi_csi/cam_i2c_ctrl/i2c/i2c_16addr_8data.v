@@ -21,6 +21,17 @@ module i2c_16addr_8data #(
 	output		reg					wr_done,
 	output		reg					rd_done,
 	output		wire				dout_valid,
+	output		reg					dbg_status_sample_seen,
+	output		reg					dbg_status_rxack_seen,
+	output		reg					dbg_status_busy_seen,
+	output		reg					dbg_status_al_seen,
+	output		reg					dbg_status_tip_seen,
+	output		reg					dbg_status_rxack_prebyte_seen,
+	output		reg					dbg_status_rxack_devaddr_seen,
+	output		reg					dbg_status_rxack_reg_high_seen,
+	output		reg					dbg_status_rxack_reg_low_seen,
+	output		reg					dbg_status_rxack_data_seen,
+	output		reg		[7:0]		dbg_last_status,
 	
 	output		wire	[2:0]		i2c_address,
   	output		wire				i2c_write   ,
@@ -374,6 +385,47 @@ begin
 				rd_done <= 1'b1;
 		else
 				rd_done <= 1'b0;
+end
+
+always @( posedge clk or negedge rst_n )
+begin
+		if( ~rst_n ) begin
+				dbg_status_sample_seen <= 1'b0;
+				dbg_status_rxack_seen  <= 1'b0;
+				dbg_status_busy_seen   <= 1'b0;
+				dbg_status_al_seen     <= 1'b0;
+				dbg_status_tip_seen    <= 1'b0;
+				dbg_status_rxack_prebyte_seen <= 1'b0;
+				dbg_status_rxack_devaddr_seen <= 1'b0;
+				dbg_status_rxack_reg_high_seen <= 1'b0;
+				dbg_status_rxack_reg_low_seen <= 1'b0;
+				dbg_status_rxack_data_seen <= 1'b0;
+				dbg_last_status        <= 8'd0;
+		end else if( (wr_state == S_WR_TIP_CHK) || (rd_state == S_RD_TIP_CHK) ) begin
+				dbg_status_sample_seen <= 1'b1;
+				dbg_last_status        <= i2c_readdata;
+				if( i2c_readdata[7] ) begin
+						if( !dbg_status_rxack_seen && (wr_state == S_WR_TIP_CHK) ) begin
+								if( wr_cnt == 3'd0 )
+										dbg_status_rxack_prebyte_seen <= 1'b1;
+								else if( wr_cnt == 3'd1 )
+										dbg_status_rxack_devaddr_seen <= 1'b1;
+								else if( wr_cnt == 3'd2 )
+										dbg_status_rxack_reg_high_seen <= 1'b1;
+								else if( wr_cnt == 3'd3 )
+										dbg_status_rxack_reg_low_seen <= 1'b1;
+								else if( wr_cnt == 3'd4 )
+										dbg_status_rxack_data_seen <= 1'b1;
+						end
+						dbg_status_rxack_seen <= 1'b1;
+				end
+				if( i2c_readdata[6] )
+						dbg_status_busy_seen <= 1'b1;
+				if( i2c_readdata[5] )
+						dbg_status_al_seen <= 1'b1;
+				if( i2c_readdata[1] )
+						dbg_status_tip_seen <= 1'b1;
+		end
 end
 assign dout_valid = rd_done;
 
