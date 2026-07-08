@@ -172,6 +172,42 @@
         <efxpt:comp_gpio name="led[3]" gpio_def="GPIOB_P_17" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
             <efxpt:output_config name="led[3]" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
         </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_ddr_ok" gpio_def="GPIOB_N_17" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_ddr_ok" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_fb0_ready" gpio_def="GPIOB_P_25" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_fb0_ready" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_fb0_underflow" gpio_def="GPIOB_N_28" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_fb0_underflow" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_csi_fmt_ok" gpio_def="GPIOB_N_25" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_csi_fmt_ok" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_bridge_active" gpio_def="GPIOB_N_29" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_bridge_active" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_bridge_under" gpio_def="GPIOB_P_29" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_bridge_under" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_video_ready" gpio_def="GPIOB_P_22" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_video_ready" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_input_stable" gpio_def="GPIOB_N_22" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_input_stable" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_led30" gpio_def="GPIOB_P_08" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_led30" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_led31" gpio_def="GPIOB_N_08" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_led31" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_led32" gpio_def="GPIOB_P_05" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_led32" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="dbg_led33" gpio_def="GPIOB_N_05" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="dbg_led33" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
         <efxpt:global_unused_config state="input with weak pullup"/>
         <efxpt:bus name="i_sw" mode="input" msb="1" lsb="0"/>
         <efxpt:bus name="led" mode="output" msb="3" lsb="0"/>

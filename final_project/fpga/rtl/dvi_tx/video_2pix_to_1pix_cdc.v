@@ -15,7 +15,9 @@ module video_2pix_to_1pix_cdc #(
     output reg         o_de,
     output reg  [23:0] o_data,
     output reg         o_active,
-    output reg         o_underflow
+    output reg         o_underflow,
+    output wire        o_level_ready,
+    output wire        o_level_low
 );
 
     wire [COUNT_WIDTH-1:0] fifo_wr_usedw;
@@ -33,6 +35,8 @@ module video_2pix_to_1pix_cdc #(
     localparam [1:0]      PH_HIGH    = 2'd2;
     localparam [COUNT_WIDTH-1:0] START_LEVEL_W = START_LEVEL;
     wire                  enough_fifo_level = fifo_rd_usedw >= START_LEVEL_W;
+    assign o_level_ready = enough_fifo_level;
+    assign o_level_low = fifo_rd_usedw < (START_LEVEL_W >> 1);
 
     DC_FIFO #(
         .DATA_WIDTH(51),

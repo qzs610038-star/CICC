@@ -37,7 +37,21 @@ module hdmi_top
 	output tmds_data1_TX_RST,
 	output tmds_data2_TX_RST,
 	output tmds_clk_TX_RST,
-  output        o_input_stable
+  output        o_input_stable,
+  output        o_video_path_ready,
+  output        o_use_input_video,
+  output        o_vidinfo_stable,
+  output        o_timing_size_ok,
+  output        o_h_active_error,
+  output        o_v_active_error,
+  output        o_v_total_error,
+  output        o_h_total_error,
+  output        o_h_sync_error,
+  output        o_input_de_seen,
+  output        o_input_vs_seen,
+  output        o_input_hs_seen,
+  output        o_input_data_nonzero_seen,
+  output        o_input_data_change_seen
 
 );
 
@@ -134,6 +148,51 @@ reg  [3:0] input_good_frame_cnt = 4'd0;
 reg  input_stable_seen = 1'b0;
 wire use_input_video = video_path_ready & (!USE_INPUT_STABLE_GATE || input_stable_seen);
 assign o_input_stable = video_path_ready & input_stable_seen;
+assign o_video_path_ready = video_path_ready;
+assign o_use_input_video = use_input_video;
+assign o_vidinfo_stable = i_stable;
+assign o_timing_size_ok = input_timing_size_ok;
+assign o_h_active_error = input_h_active_error;
+assign o_v_active_error = input_v_active_error;
+assign o_v_total_error = input_v_total_error;
+assign o_h_total_error = input_h_total_error;
+assign o_h_sync_error = input_h_sync_error;
+
+reg input_de_seen = 1'b0;
+reg input_vs_seen = 1'b0;
+reg input_hs_seen = 1'b0;
+reg input_data_nonzero_seen = 1'b0;
+reg input_data_change_seen = 1'b0;
+reg [23:0] input_data_d = 24'd0;
+
+assign o_input_de_seen = input_de_seen;
+assign o_input_vs_seen = input_vs_seen;
+assign o_input_hs_seen = input_hs_seen;
+assign o_input_data_nonzero_seen = input_data_nonzero_seen;
+assign o_input_data_change_seen = input_data_change_seen;
+
+always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
+    if (!sys_rst_n) begin
+        input_de_seen <= 1'b0;
+        input_vs_seen <= 1'b0;
+        input_hs_seen <= 1'b0;
+        input_data_nonzero_seen <= 1'b0;
+        input_data_change_seen <= 1'b0;
+        input_data_d <= 24'd0;
+    end else begin
+        input_data_d <= {i_rdata, i_gdata, i_bdata};
+        if (i_de)
+            input_de_seen <= 1'b1;
+        if (i_vs)
+            input_vs_seen <= 1'b1;
+        if (i_hs)
+            input_hs_seen <= 1'b1;
+        if (i_de && (|{i_rdata, i_gdata, i_bdata}))
+            input_data_nonzero_seen <= 1'b1;
+        if (i_de && ({i_rdata, i_gdata, i_bdata} != input_data_d))
+            input_data_change_seen <= 1'b1;
+    end
+end
 
 always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
     if (!sys_rst_n) begin

@@ -65,7 +65,9 @@ module soft_mipi_rx_top #(
    output      rx_out_vs,
    output      [PACK_BIT-1:0] rx_out_data,
    output      [5:0] rx_out_datatype,
-   output      [3:0] rx_out_pixel_per_clk
+   output      [3:0] rx_out_pixel_per_clk,
+   output      dbg_reset_pixel_n,
+   output      dbg_i2c_rst_n
 
 
 
@@ -222,6 +224,8 @@ begin
        i2c_rst_cnt <= i2c_rst_cnt[12] ? i2c_rst_cnt : i2c_rst_cnt + 1'b1;
 end
 wire i2c_rst_n = i2c_rst_cnt[12];
+assign dbg_reset_pixel_n = reset_pixel_n;
+assign dbg_i2c_rst_n = i2c_rst_n;
 
 i2c_master_ctrl_top u2_i2c_master_ctrl_top(
   /*i*/.clk			(mipi_clk),
