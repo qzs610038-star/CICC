@@ -1,0 +1,43 @@
+================================================================================
+  CPU Recognition Notes
+================================================================================
+
+Purpose:
+  Personal notes for understanding and adjusting the CPU-side recognition plan.
+  This file records assumptions, calibration conclusions, and interface boundary
+  decisions before Claude changes code.
+
+2026-07-08 - Size recognition / camera setup
+--------------------------------------------------------------------------------
+  Confirmed assumptions:
+    - Object position is fixed during recognition.
+    - Cam0 position is fixed.
+    - Cam1 position is fixed.
+    - l1 and l2 should be recorded as installation parameters:
+        l1: distance from Cam0 to the object plane.
+        l2: distance from Cam1 to the object side plane.
+
+  Size recognition decision:
+    - CPU does not know real object size directly.
+    - CPU only sees FPGA-provided pixel features, especially Cam1 height_px.
+    - First version should classify size by calibration table:
+        height_px_20mm
+        height_px_25mm
+        height_px_30mm
+    - Current values may be placeholders.
+    - Final values must come from board/camera measurement after installation.
+
+  Wide-angle / perspective handling:
+    - Because object position and camera position are fixed, do not model camera
+      FOV or lens distortion in the first version.
+    - Any fixed camera perspective effect is absorbed into the measured
+      height_px calibration table.
+    - If later object position is allowed to move over a wide image area, add
+      center-based correction or a multi-region calibration table.
+
+  Current formal output to teammate / integration:
+    - color_id
+    - shape_id
+    - size_cm_x10
+    - match_action
+    - grab_center is reserved but not part of the current formal interface.
