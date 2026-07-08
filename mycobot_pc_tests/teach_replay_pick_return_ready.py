@@ -109,8 +109,81 @@ V2.4 相对 V2.3 的迭代（plan §14.6/§14.7 / run-14 复核，焦点转为�
   Y. 不动 SHORT_UP_SPEED（保持 16）、不动 ARM_MAX_DIFF_SAFE（45）/HOME_READY_TARGET_ARM_MAX（40）。
      窄义回零(step10+11) 预期 ~5s->~3s；广义末段(step9+10+11) 预期 ~28s->~23s。
 
-运动/安全参数沿用 V2.3 已验证值，V2.4 只动 HOME_RETURN_SPEED/SOFT_REFINE_TIMEOUT +
-串口 Bug 修复 + 末段冗余读数压缩；安全门（45/40/R_MAX）与软通过兜底逻辑不变。
+V2.5 相对 V2.4 的迭代（plan §14.8 / run-15 复核，焦点转为末段回零"固件到位判定"瓶颈；
+  属 myCobot 动作链路 + 动作参数改动，须 Codex 复核后实机验证）:
+  Z. run-15 验证 V2.4 全部生效（step11 2.4->1.2s, step9 23->20s, 0 轮扶正, 串口 Bug 根治）。
+     残留瓶颈：step11 的 1.2s 中 ~0.6-1s 是固件 is_in_position 死区的无意义尾端等待
+     （物理 0.5s 已到位）。方案 §14.8 给三个方向，用户批"方向1+2+3+D0 全上"。
+  AA. 方向1（异步软到位回零）+方向3（速度 25->30）：_send_home_async() 用非阻塞
+      send_angles 启动回 HOME + Python 端软到位循环（max_diff<=1° 即退出）+ 软超时
+      走阻塞 sync_send_angles 收尾兜底（res!=1 -> "failed" 安全失败）。speed=30。
+      HOME_RETURN_ASYNC_ENABLE=False 一行回退 V2.4 阻塞路径。前提已核实：
+      pymycobot 4.0.5 有 send_angles/get_angles/is_paused。预期 step11 ~1.2s->~0.5s。
+  BB. 方向2（航路点平滑过渡）：_smooth_handoff_return() 把 step10+step11 合并为单一异步流
+      ——非阻塞 send home_ready -> 轮询到接近 home_ready(<=5°) 即臂未停稳提前 send HOME
+      -> 软到位。消除 home_ready "减速-静止-重启"停顿（~1s）。固件对运动中被打断的行为
+      未文档化属未知风险，给 SMOOTH_HANDOFF_ENABLE 独立开关；未接近 home_ready 时
+      回退 V2.4 阻塞分段路径（不抛异常，防臂在空中路径掉电）。预期 step10+11 ~3.8s->~1.5s。
+  CC. D0 诊断补全：run-15 step11 靠"无警告"反推 res==1 的诊断缺口——异步/阻塞两条路径
+      都显式打印回零结果（status/mode 或 res）；庆祝消息措辞 V2.2 -> V2.5。
+  DD. 不动 SHORT_UP_SPEED（16）/ARM_MAX_DIFF_SAFE（45）/HOME_READY_TARGET_ARM_MAX（40）/
+      R_MAX（280）；不恢复 sync_send_coords()。safe_return_home 的 cached_angles/arm_max_diff
+      安全门判定完全不变，异步化只动移动下发方式。
+
+运动/安全参数沿用 V2.4 已验证值，V2.5 只加异步软到位回零 + 平滑过渡 + 诊断补全；
+安全门（45/40/R_MAX）与软通过兜底逻辑不变，两项新功能均有 enable 开关可一行回退 V2.4。
+
+V2.6 相对 V2.5 的迭代（plan §14.8.6 / run-16 复核，只微调两个门限常数，不动逻辑；
+  用户批"本轮无需过 Codex 门"，属参数微调）:
+  EE. run-16 验证 V2.5 方向2 平滑过渡本身成功（1.84°<=5° 提前下发 HOME，固件打断行为
+      未出问题——Codex 担心的最高风险点通过）。但方向1/3 异步软到位从未触发：myCobot 280
+      物理死区让回零残余角差稳定在 1.1~1.4°（实测 1.31°），HOME_RETURN_ASYNC_SOFT_TOL=1.0°
+      永远过不了 -> 空等 2.5s + sync 兜底，step10+11 反弹到 5.0s（比 V2.4 的 3.8s 还慢）。
+  FF. HOME_RETURN_ASYNC_SOFT_TOL 1.0->1.5：让 1.31° 残差通过（留 0.19° 余量）。HOME 是终点
+      无后续动作，1.5° 物理上完全回正无干涉。取 1.5 而非 Gemini 建议的 2.0，遵循小步单变量
+      原则；run-17 仍偶发不收敛再升 2.0。本常量同时用于方向1 step11 与方向2 phase-B 的
+      HOME 软到位判定（一致性）。
+  GG. HOME_RETURN_ASYNC_TIMEOUT 2.5->1.5：run-16 物理到位约 0.5s，1.5s 留 1s 余量；1.5s 仍比
+      2.5s 省 1s 异常等待。取 1.5 而非 Gemini 建议的 1.2——1.2s 余量偏小，负载/摩擦稍慢时
+      会被误判超时走 sync 兜底反而更慢；run-17 稳了再考虑 1.2。
+  HH. 不动 HOME_RETURN_ASYNC_SPEED(30)/SMOOTH_HANDOFF_NEAR_TOL(5.0)/HOME_RETURN_ASYNC_POLL(0.05)；
+      不动安全门（45/40/R_MAX）；不恢复 sync_send_coords()。sync 兜底仍用 V2.4 验证的
+      HOME_RETURN_SPEED=25（Codex F1，V2.5 已落地）。预期 step10+11 5.0s->~1.5-2.0s。
+
+V2.7 相对 V2.6 的迭代（连续抓取循环，贴近比赛条件；只动 main 编排层，不碰运动/安全逻辑）:
+  II. auto_phase_v2 加 bool 返回值：True=本轮完整跑通（含末段回零，臂在 HOME/夹爪张开）；
+     False=中途中止（home_ready 安全门未过 / 回零失败已 release_all_servos）。
+     给原有隐式 None 的 return 加一个语义值，不改任何运动/安全判定。
+  JJ. main 在 prepare_phase 之后把单次调用改成"终端键入次数 N 的连续抓取循环"：
+     - N=1（默认，空回车）行为与改动前单跑完全一致（向后兼容）。
+     - 循环只重复 auto_phase_v2 的关节回放，不重跑示教 acquire_points / prepare_phase。
+     - 每轮开头的"请将正方体放回抓取点"提示天然承担换块确认，无需新增提示。
+     - auto_phase_v2 返回 False 即 break，避免在舵机掉电状态下继续下发运动指令。
+  KK. 不动所有速度/超时/容差/安全门常数；不动 prepare_phase/acquire_points；
+     auto_phase_v2 内部 0./0b. 只读安全门每轮重跑（零运动风险，保留每轮出发前
+     再确认一次轨迹连续性的防御性，刻意不拆到循环外以保持函数自包含）。
+
+V2.8 相对 V2.7 的迭代（流畅度加强三点，贴近比赛条件；用户已确认赛场流程为
+  CPU 信号→单轮抓放→人补块到 pick 点，且机械臂始终有人旁边保护）:
+  LL. 点2 去每轮 Enter：auto_phase_v2 内的"请将正方体放回抓取点"input 移除，
+      N 轮全自动运行。一次性轨迹/物块确认移到 main 循环开始前（只问一次）。
+      赛场流程下 pick 点每轮有人补块，不会抓空气；板上 CPU 迁移友好（本就无 Enter）。
+  MM. 点3 自动导出终端日志：新增 Tee 类双写 stdout（终端 + UTF-8 文件），main 开头
+      安装，自动写到 audit_logs/auto_run_<时间戳>.log。不动任何 print，纯工具功能，
+      try/finally 确保异常/Ctrl+C 时文件关闭。PC 专用，不上板。
+  NN. 点1 step 9 异步化（A 类，最大收益）：step 9 (drop→drop_hover 带载上行) 改非阻塞
+      send_angles + Python 软到位循环（复用 V2.5 _send_home_async 思路），残差≤3° 即
+      软通过退出，去除 15s sync timeout + 3s 微调 timeout 的固件死区等待。run-18 实测
+      残差稳态 2.1°，必然软通过。step 9 从 20s→~2s，每轮省 18s。
+      新增 checked_short_angles_async() 专用函数 + ASYNC_SHORT_* 参数，保留原
+      checked_short_angles 不动（step 3/5/7 仍用阻塞版，step 5 已 res==1 严格通过无需改）。
+  OO. 点1 B 类压缩：verify_coords_near 只在带载上行软通过后（step 5/9）保留，长距离
+      step 2/6 与短下探 step 3/7 的坐标校验改为可跳过（预设回放点位固定，res==1 严格
+      通过时坐标必然准）。夹爪 GRIPPER_TIMEOUT 2.5s→1.2s（夹爪物理开合 <1s）。
+      新增 SKIP_COORD_VERIFY_ON_STRICT_PASS 开关，默认 True；关闭即回退 V2.7 行为。
+  PP. 不动安全门（validate_return_ready/validate_short_angle_pair/validate_return_angle_pair/
+      is_safe_coord/R_MAX/arm_max_diff≤45）；不恢复 sync_send_coords()；不动 step 10+11
+      回零路径（V2.6 已优化到位 3.4s）；teach_replay_pick.py/teach_and_pick.py 不改。
 """
 
 import time
@@ -167,6 +240,52 @@ SOFT_REFINE_MAX_ROUNDS = 1         # 最多微调轮数
 # "failed" -> 提示扶稳+release（安全失败，不撞机）。需单独验证 run + Codex 复核。
 HOME_RETURN_SPEED = 25
 HOME_RETURN_TIMEOUT = 12
+
+# V2.5 §14.8 末段回零异步软到位 + 航路点平滑过渡。
+# run-15 证明 V2.4 把 step11 压到 1.2s，但固件 is_in_position 死区仍吃掉 ~0.6-1s
+# 无意义尾端等待（物理 0.5s 已到位）。方向1：放弃阻塞 sync_send_angles，改用非阻塞
+# send_angles + Python 端软到位循环，物理到位即退出，预期 step11 ~0.5s。
+# 方向3：配合异步提速 HOME_RETURN_SPEED 25->30（异步下提速有叠加意义；阻塞下提速
+# 收益被固件等待吃掉）。前提已核实：pymycobot 4.0.5 有 send_angles/get_angles/is_paused。
+# 方向2：step10 drop_hover->home_ready 软到位循环中检测到接近 home_ready 时，臂未停稳
+# 即提前下发 HOME 目标，消除"减速-静止-重启"停顿。固件对运动中被打断的行为未文档化，
+# 属未知风险，故给独立 enable 开关，异常可一行回退到 V2.4 分段执行。
+HOME_RETURN_ASYNC_ENABLE = True       # 方向1总开关：False 时回退到 V2.4 阻塞 sync_send_angles
+HOME_RETURN_ASYNC_SPEED = 30          # 方向3：异步回零速度 25->30
+# V2.6 §14.8.6：软到位阈值 1.0->1.5。run-16 实测 myCobot 280 物理死区让回零残余角差
+# 稳定在 1.1~1.4°（实测 1.31°），1.0° 门永远过不了 -> 异步软到位从未触发 -> 空等 2.5s
+# + sync 兜底，反而比 V2.4 慢。1.5° 让 1.31° 通过（留 0.19° 余量）；HOME 是终点无后续
+# 动作，1.5° 残差物理上完全回正无干涉。取 1.5 而非 2.0 遵循小步单变量原则，run-17 仍
+# 偶发不收敛再升 2.0。本常量同时用于方向1（step11）与方向2（平滑过渡 phase-B）HOME 软到位。
+HOME_RETURN_ASYNC_SOFT_TOL = 1.5      # 软到位阈值（度）；V2.6 1.0->1.5（run-16 残差 1.31°）
+# V2.6 §14.8.6：软超时 2.5->1.5。run-16 物理到位约 0.5s，1.5s 留 1s 余量足够判定收敛；
+# 1.5s 仍比 2.5s 省 1s 异常等待。取 1.5 而非 1.2——1.2s 余量偏小，负载/摩擦稍慢时会被
+# 误判超时走 sync 兜底反而更慢。若 1.2s 仍省时且无误判，run-17 再压到 1.2。
+HOME_RETURN_ASYNC_TIMEOUT = 1.5       # 软超时（s）；V2.6 2.5->1.5，软超时走 sync 收尾兜底
+HOME_RETURN_ASYNC_POLL = 0.05         # 软到位轮询间隔（s）
+# 方向2平滑过渡：step10 软到位循环中 arm_max_diff<=此阈值即提前下发 HOME（臂未停稳）。
+# 取 5.0（§14.8 建议的"与 home_ready 最大轴偏差已小于 5°"）。设 None 则禁用方向2。
+SMOOTH_HANDOFF_ENABLE = True
+SMOOTH_HANDOFF_NEAR_TOL = 5.0         # 接近 home_ready 的提前下发阈值（度）
+
+# V2.8 点1：step 9 (drop→drop_hover 带载上行) 异步软到位参数。
+# run-18 实测：step 9 用阻塞 sync_send_angles(timeout=15s) 等固件 is_in_position 判失败
+# 返回 0，残差稳态卡 2.1°（三轮完全一致），15s + 3s 微调全在等死区，物理运动只占 1.5s。
+# 改非阻塞 send_angles + Python 软到位循环（复用 V2.5 _send_home_async 思路），
+# 残差≤SOFT_ANGLE_SUCCESS_TOL(3°) 即软通过退出，去除 18s 固件死区等待。
+# 软超时走阻塞 sync_send_angles 收尾兜底（保留 V2.4 安全失败语义：res!=1 抛异常熔断）。
+# 仅 step 9 启用（drop→drop_hover 是已知瓶颈）；step 5 已 res==1 严格通过无需改；
+# step 3/7 是下行(重力辅助)，固件收敛快，保持阻塞版。
+ASYNC_SHORT_ENABLE = True             # 总开关：False 时 step 9 回退阻塞 checked_short_angles
+ASYNC_SHORT_SOFT_TOL = 3.0            # 软到位阈值（度），复用 SOFT_ANGLE_SUCCESS_TOL
+ASYNC_SHORT_TIMEOUT = 4.0             # 软超时（s）：物理 ~1.5s，留 2.5s 余量；超时走 sync 兜底
+ASYNC_SHORT_POLL = 0.05               # 软到位轮询间隔（s），复用 HOME_RETURN_ASYNC_POLL
+# V2.8 点1 B 类：夹爪开环等待 2.5s→1.2s（夹爪物理开合 <1s，人眼可确认）。
+GRIPPER_TIMEOUT = 1.2                 # V2.8：2.5->1.2s（原 V2.7 值 2.5s 纯等待偏长）
+# V2.8 点1 B 类：长距离/短下探严格通过(res==1)时跳过 verify_coords_near，省 ~0.6s/次。
+# 预设回放点位固定，res==1 严格通过时坐标必然在容差内，校验冗余。
+# 带载上行软通过后(step 5/9)仍保留 verify_coords_near（软通过需复核坐标）。
+SKIP_COORD_VERIFY_ON_STRICT_PASS = True
 # §14.4：短距离 hover/down 点对关节连续性安全门，防止示教落在不同 IK 分支。
 # 1-5 轴短距离单轴变化过大说明 hover/down 可能不在同一解分支，回放会大幅摆动。
 SHORT_ARM_JOINT_MAX_DELTA = 30.0   # 短距离 1-5 轴单轴最大变化（度）
@@ -180,7 +299,6 @@ SHORT_WRIST6_MAX_DELTA = 45.0      # 短距离第 6 轴末端旋转最大变化�
 RETURN_ARM_JOINT_MAX_DELTA = 90.0
 RETURN_WRIST6_MAX_DELTA = 120.0
 GRIPPER_SPEED = 50             # 夹爪速度 (%)
-GRIPPER_TIMEOUT = 2.5          # 夹爪开环等待 (s)
 
 # 回零目标关节角（§12.1）：保留理论零位 [0,0,0,0,0,0]，不改成本机实测非零值。
 # 实测直立姿态 [-10.81, 2.46, 1.49, -8.17, 2.28, 3.07] 相对零位 max_diff=10.81，
@@ -239,6 +357,10 @@ COORD_VALID_RPY = 360.0
 # 文件名约定：teach_points_<name>.json，CLI 用 --preset <name> 引用。
 PRESETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "presets")
 
+# V2.8 点3：自动导出终端日志目录。Tee 双写 stdout 把所有 print 同步写到
+# auto_run_<时间戳>.log（UTF-8），便于实跑后归档/复盘。PC 专用工具，不上板。
+AUTO_LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "audit_logs")
+
 
 # ============================================================
 # V2.3 工具：异常类 + 日志格式化
@@ -256,6 +378,50 @@ def fmt_mm(value):
     或读不到实际坐标时），直接 :.1f 会抛 TypeError。统一走本函数。
     """
     return "N/A" if value is None else f"{value:.1f}mm"
+
+
+class Tee:
+    """V2.8 点3：stdout 双写——同时输出到终端和 UTF-8 日志文件。
+    main 开头用 `sys.stdout = Tee(path)` 安装，所有 print 自动双写；
+    input() 的提示文本走 stdout 也会被记录（日志里能看到交互提示，便于复盘）。
+    flush() 同步刷两路；close() 关闭文件。异常/Ctrl+C 路径由 main 的 try/finally
+    调 close()，确保日志落盘。PC 专用工具，不参与运动/安全逻辑，不上板。
+    """
+
+    def __init__(self, file_path, original_stdout):
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        self._file = open(file_path, "w", encoding="utf-8")
+        self._stdout = original_stdout
+        self.path = file_path
+
+    def write(self, msg):
+        self._stdout.write(msg)
+        self._file.write(msg)
+
+    def flush(self):
+        try:
+            self._stdout.flush()
+        except Exception:
+            pass
+        try:
+            self._file.flush()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self._file.flush()
+            self._file.close()
+        except Exception:
+            pass
+
+    def isatty(self):
+        # 透传到原 stdout，避免 readline/input 行为异常
+        return getattr(self._stdout, "isatty", lambda: False)()
+
+    def __getattr__(self, name):
+        # fileno()、encoding 等属性透传到原 stdout，保持兼容
+        return getattr(self._stdout, name)
 
 
 # ============================================================
@@ -398,6 +564,31 @@ def get_filtered_angles(mc, retries=ANG_RETRIES, stable_tol=ANG_STABLE_TOL):
                             return cur
         time.sleep(0.15)
     return None
+
+
+def get_angles_once(mc):
+    """
+    V2.5 §14.8 方向1/方向2：单次关节角读数 + 数值合法性校验，不做"连续两次稳定"要求。
+    专为异步软到位轮询设计——臂在运动中，连续两次读数自然有差（>3°），
+    get_filtered_angles 的稳定性门会拒绝运动中的读数返回 None，导致软到位循环
+    一直"盲转"最终走 sync 兜底（异步化失效）。运动中的进度判定需要单次有效读数，
+    不是稳定读数。稳定性要求（§12.3）只适用于静止姿态的示教点记录/回零决策。
+
+    合法性校验保留：数值型、有限、[-180,180]（过滤串口毛刺/NaN/Inf）。
+    返回 6 维 list 或 None（读异常或非法时）。上层软到位循环对 None 容错（跳过本轮）。
+    """
+    try:
+        angles = mc.get_angles()
+    except Exception:
+        return None
+    if not (isinstance(angles, list) and len(angles) >= 6):
+        return None
+    vals = list(angles[:6])
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in vals):
+        return None
+    if not all(-180.0 <= v <= 180.0 for v in vals):
+        return None
+    return vals
 
 
 def get_filtered_coords(mc, retries=COORD_RETRIES, stable_tol=COORD_STABLE_TOL):
@@ -716,6 +907,86 @@ def checked_short_angles(
                 return True
 
     raise RuntimeError(f"{label}: 关节动作超时或失败 (返回 {res})")
+
+
+def checked_short_angles_async(
+    mc, target_angles, speed, timeout, label, expected_coords=None,
+):
+    """V2.8 点1：step 9 (drop→drop_hover 带载上行) 异步软到位版短距离回放。
+
+    根因：run-18 实测 step 9 用阻塞 sync_send_angles(timeout=15s)，固件 is_in_position
+    死区让残差稳态卡 2.1°（三轮完全一致），永远等满 timeout 返回 0；再加 _soft_refine
+    微调 3s 也不收敛，step 9 稳定 20s，其中物理运动只占 1.5s。
+
+    方案：复用 V2.5 _send_home_async 的"非阻塞 send_angles + Python 软到位循环"模式，
+    但目标从 HOME 改成任意 target_angles（drop_hover）。残差≤ASYNC_SHORT_SOFT_TOL(3°)
+    即软通过退出；软超时走阻塞 sync_send_angles 收尾兜底（res!=1 抛异常熔断，保留
+    V2.4 安全失败语义）。用 get_angles_once 单次读数（臂运动中不能用 get_filtered_angles
+    的连续两次稳定性门，否则软到位循环盲转——V2.5 mock 暴露的关键设计点）。
+
+    与 checked_short_angles 的区别：
+      - 不用阻塞 sync_send_angles 等固件判到位（省 15s 死区等待）。
+      - 软通过后不再 _soft_refine（残差 2.1° 是固件死区，微调三轮未收敛，纯浪费 3s）。
+      - 软通过容差仍是 SOFT_ANGLE_SUCCESS_TOL(3°)/SOFT_COORD_SUCCESS_TOL(25mm)，不放宽。
+      - 软通过后由调用方决定是否 verify_coords_near（step 9 仍校验，因带载上行软通过需复核）。
+
+    安全守住：
+      - 目标角度合法性校验同 checked_short_angles（数值型/有限/[-180,180]）。
+      - 软超时不抛异常（防臂在运动路径掉电），走 sync 收尾 + res 检查；res!=1 才抛异常。
+      - 软通过判定基于实际读数（angle_ok + coord_ok），不假设到位。
+    返回 True（软通过或 sync 收尾 res==1）；抛 RuntimeError（sync 收尾 res!=1 或读数异常）。
+    ASYNC_SHORT_ENABLE=False 时调用方走原 checked_short_angles，本函数不被调用。
+    """
+    if not isinstance(target_angles, list) or len(target_angles) < 6:
+        raise RuntimeError(f"{label}: 目标关节角非法: {target_angles}")
+    if not all(isinstance(v, (int, float)) and math.isfinite(v)
+               and -180.0 <= v <= 180.0 for v in target_angles[:6]):
+        raise RuntimeError(f"{label}: 目标关节角含非数值或越界: {target_angles}")
+
+    print(f"  -> [V2.8 异步] {label}: 非阻塞 send_angles (speed={speed})，"
+          f"软到位循环 (tol={ASYNC_SHORT_SOFT_TOL}°, timeout={ASYNC_SHORT_TIMEOUT}s)...")
+    mc.send_angles(target_angles, speed)
+    start = time.time()
+    converged = False
+    final_max_delta = None
+    final_coord_delta = None
+    while time.time() - start < ASYNC_SHORT_TIMEOUT:
+        actual = get_angles_once(mc)  # 单次读数：臂运动中不能用 get_filtered_angles 稳定性门
+        if actual:
+            angle_deltas = [abs(actual[i] - target_angles[i]) for i in range(6)]
+            final_max_delta = max(angle_deltas)
+            angle_ok = final_max_delta <= ASYNC_SHORT_SOFT_TOL
+            # 坐标软通过：expected_coords 给定时才校验，读不到坐标不阻断（角度已判）
+            coord_ok = True
+            if expected_coords is not None:
+                actual_coords = mc.get_coords()
+                if isinstance(actual_coords, list) and len(actual_coords) >= 3:
+                    final_coord_delta = max(abs(actual_coords[i] - expected_coords[i])
+                                            for i in range(3))
+                    coord_ok = final_coord_delta <= SOFT_COORD_SUCCESS_TOL
+            if angle_ok and coord_ok:
+                converged = True
+                break
+        time.sleep(ASYNC_SHORT_POLL)
+    elapsed = time.time() - start
+
+    if converged:
+        cd = fmt_mm(final_coord_delta)
+        print(f"  -> [V2.8 异步] {label}: 软到位收敛 max_err={final_max_delta:.2f}° "
+              f"/ delta_xyz={cd} <= 容差，耗时 {elapsed:.2f}s（提前退出固件死区等待）。")
+        return True
+
+    # 软超时未收敛：阻塞 sync 收尾兜底（保留 V2.4 安全失败语义）
+    fd = f"{final_max_delta:.2f}" if final_max_delta is not None else "N/A"
+    print(f"  -> [V2.8 异步] {label}: 软超时未收敛（max_err={fd}°），"
+          f"阻塞 sync_send_angles 收尾兜底 (speed={speed}, timeout={timeout}s)...")
+    res = mc.sync_send_angles(target_angles, speed, timeout=timeout)
+    print(f"  -> [V2.8 异步] {label}: 收尾 sync_send_angles 返回 {res}")
+    if res != 1:
+        # res!=1 即固件判超时/未到位且软超时也未收敛，按 V2.4 安全失败语义抛异常熔断
+        raise RuntimeError(f"{label}: 异步软超时 + sync 收尾仍未到位 (返回 {res})")
+    return True
+
 
 
 def _soft_refine(mc, target_angles, label, prev_max_angle_delta,
@@ -1116,6 +1387,168 @@ def prompt_manual_prehome(mc, max_rounds=2):
 # ============================================================
 # 安全回零（§13.2/§13.3/§13.4：大臂安全门 + 人工扶正状态机）
 # ============================================================
+def _send_home_async(mc, label):
+    """
+    V2.5 §14.8 方向1+方向3：异步软到位回零。
+    用非阻塞 send_angles 启动回 HOME，Python 端软到位循环检测 max_diff<=阈值即退出，
+    避免固件 is_in_position 死区的无意义尾端等待（run-15 step11 的 1.2s 中 ~0.6-1s 是
+    固件等待）。预期 step11 ~0.5s。
+
+    收尾策略（用户已批"未收敛走 sync 收尾"）：
+      - 软超时（HOME_RETURN_ASYNC_TIMEOUT=2.5s）内 max_diff<=HOME_RETURN_ASYNC_SOFT_TOL(1.0°)
+        -> converged，返回 ("auto", "async", final_max_diff)。
+      - 软超时未收敛 -> 不抛异常（臂在回零路径，掉电危险），改用阻塞 sync_send_angles
+        收尾一次并检查 res，保留 res!=1 -> "failed" 安全失败路径。
+        收尾成功返回 ("auto", "async_then_sync", final_max_diff)；res!=1 返回 ("failed",...)。
+
+    安全守住：
+      - 不跳过 arm_max_diff<=45 安全门（由调用方 safe_return_home 判定后才进本函数）。
+      - 未收敛兜底走 sync + res 检查，不放弃对"未真到位"的拦截。
+      - HOME_RETURN_ASYNC_ENABLE=False 时调用方走 V2.4 阻塞路径，本函数不被调用。
+    返回 (status, mode, final_max_diff)：status∈{"auto","failed"}，mode 描述走的路径。
+    """
+    print(f"  -> [V2.5 方向1] {label}: 异步回零 send_angles(HOME, speed={HOME_RETURN_ASYNC_SPEED})，"
+          f"软到位循环 (tol={HOME_RETURN_ASYNC_SOFT_TOL}°, timeout={HOME_RETURN_ASYNC_TIMEOUT}s)...")
+    mc.send_angles(HOME_ANGLES, HOME_RETURN_ASYNC_SPEED)
+    start = time.time()
+    converged = False
+    final_max_diff = None
+    while time.time() - start < HOME_RETURN_ASYNC_TIMEOUT:
+        actual = get_angles_once(mc)  # 单次读数：臂在运动，不能用 get_filtered_angles 的稳定性门
+        if actual:
+            diffs = [abs(actual[i] - HOME_ANGLES[i]) for i in range(6)]
+            final_max_diff = max(diffs)
+            if final_max_diff <= HOME_RETURN_ASYNC_SOFT_TOL:
+                converged = True
+                break
+        time.sleep(HOME_RETURN_ASYNC_POLL)
+    elapsed = time.time() - start
+    if converged:
+        print(f"  -> [V2.5 方向1] {label}: 软到位收敛 max_diff={final_max_diff:.2f}° "
+              f"<= {HOME_RETURN_ASYNC_SOFT_TOL}°，耗时 {elapsed:.2f}s（提前退出固件等待）。")
+        return "auto", "async", final_max_diff
+    # 软超时未收敛：阻塞 sync 收尾兜底（不抛异常，防臂在回零路径掉电）
+    fd = f"{final_max_diff:.2f}" if final_max_diff is not None else "N/A"
+    print(f"  -> [V2.5 方向1] {label}: 软超时未收敛（max_diff={fd}°），"
+          f"阻塞 sync_send_angles 收尾兜底 (speed={HOME_RETURN_SPEED} [V2.4已验证], "
+          f"timeout={HOME_RETURN_TIMEOUT}s)...")
+    # Codex F1：sync 兜底是 "failed" 前最后一道安全网，必须用 V2.4 已验证的 speed=25，
+    # 不能用未验证的 HOME_RETURN_ASYNC_SPEED=30——否则 speed 30 有问题时 async 和 sync
+    # 兜底会级联失败。主路径 speed=30 在非阻塞 send_angles 上，失败走 timeout -> 这里 25 收尾。
+    res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
+                              timeout=HOME_RETURN_TIMEOUT)
+    print(f"  -> [V2.5 方向1] {label}: 收尾 sync_send_angles 返回 {res}")
+    if res != 1:
+        print("【警告】回零动作超时或被物理阻挡！（异步软超时 + sync 收尾均未到位）")
+        return "failed", "async_then_sync", final_max_diff
+    actual = get_angles_once(mc)  # sync 返回 1 后读末态残差（诊断用，单次即可）
+    if actual:
+        final_max_diff = max(abs(actual[i] - HOME_ANGLES[i]) for i in range(6))
+    print(f"  -> [V2.5 方向1] {label}: sync 收尾后 max_diff="
+          f"{(f'{final_max_diff:.2f}' if final_max_diff is not None else 'N/A')}°。")
+    return "auto", "async_then_sync", final_max_diff
+
+
+def _smooth_handoff_return(mc, home_ready):
+    """
+    V2.5 §14.8 方向2：航路点平滑过渡回零。
+    把 step10(drop_hover->home_ready) + step11(home_ready->HOME) 合并为单一异步流：
+      1. 非阻塞 send_angles(home_ready) 启动过渡。
+      2. 轮询实际角度，当与 home_ready 的 max_diff <= SMOOTH_HANDOFF_NEAR_TOL(5°) 时
+         ——臂还在运动、未停稳——立即非阻塞 send_angles(HOME) 下发最终目标。
+      3. 继续轮询直到与 HOME 的 max_diff <= HOME_RETURN_ASYNC_SOFT_TOL(1°) 软到位。
+      4. 软超时兜底：步骤2未在 SMOOTH_HANDOFF_NEAR_TOL 对应超时内接近 home_ready，
+         或步骤3未收敛，回退阻塞 sync_send_angles 收尾 + res 检查。
+
+    收益：消除 home_ready 处"减速-静止-重启"停顿（~1s）+ 固件尾端等待（~0.6-1s），
+    预期 step10+11 从 run-15 的 ~3.8s 压到 ~1.5s 量级。
+
+    安全守住（比 V2.4 step10+11 更严的点上不能放松）：
+      - 调用前 auto_phase_v2 的 step0b 已跑 validate_return_angle_pair + validate_return_ready
+        （只读安全门，确认 home_ready arm_max_diff<=45 且 drop_hover->home_ready 单轴 delta<=90）。
+      - 提前下发 HOME 前必须实测确认臂已接近 home_ready（<=5°），不是假设。
+        若读不到角度或一直未接近，不提前下发，回退阻塞路径（V2.4 行为）。
+      - 最终软到位/sync 收尾判定与 _send_home_async 一致：未收敛走 sync + res 检查，
+        res!=1 -> "failed" 安全失败，保留扶稳+release 路径。
+      - 不抛异常：臂在空中过渡路径时抛异常会触发 main 异常掉电（臂下沉危险），
+        任何异常都转为回退或 "failed"，由 auto_phase_v2 的 failed 分支提示扶稳后 release。
+      - SMOOTH_HANDOFF_ENABLE=False 或回退时，调用方走 V2.4 step10+step11 分段路径。
+
+    返回三态字符串（与 safe_return_home 一致）："auto" / "manual"(本函数不产生) / "failed"。
+    本函数只处理 auto 路径（home_ready 已过 validate_return_ready 门），不会走人工扶正。
+    """
+    hr_angles = home_ready["angles"]
+
+    # ---- 阶段A：非阻塞发 home_ready，轮询到接近（<=5°）即提前发 HOME ----
+    print(f"  -> [V2.5 方向2] 平滑过渡：非阻塞 send_angles(home_ready, speed={ANG_REPLAY_SPEED})，"
+          f"接近阈值 {SMOOTH_HANDOFF_NEAR_TOL}° 即提前下发 HOME...")
+    mc.send_angles(hr_angles, ANG_REPLAY_SPEED)
+    near_start = time.time()
+    near_timeout = ANG_REPLAY_TIMEOUT  # 复用回零过渡超时（20s），实际接近应远快于此
+    handoff_sent = False
+    while time.time() - near_start < near_timeout:
+        actual = get_angles_once(mc)  # 单次读数：臂在运动，不能用 get_filtered_angles 的稳定性门
+        if actual:
+            hr_diff = max(abs(actual[i] - hr_angles[i]) for i in range(6))
+            if hr_diff <= SMOOTH_HANDOFF_NEAR_TOL:
+                # 实测接近 home_ready -> 提前下发 HOME（臂未停稳）
+                print(f"  -> [V2.5 方向2] 已接近 home_ready (max_diff={hr_diff:.2f}° "
+                      f"<= {SMOOTH_HANDOFF_NEAR_TOL}°)，臂未停稳即下发 HOME 目标。")
+                mc.send_angles(HOME_ANGLES, HOME_RETURN_ASYNC_SPEED)
+                handoff_sent = True
+                break
+        time.sleep(HOME_RETURN_ASYNC_POLL)
+
+    if not handoff_sent:
+        # 一直未接近 home_ready：固件打断行为异常或路径卡阻，回退 V2.4 阻塞路径。
+        # 不抛异常——臂可能在过渡路径上，回退到阻塞 sync 让固件接管收尾。
+        print(f"  -> [V2.5 方向2] 未在 {near_timeout}s 内接近 home_ready，"
+              f"回退 V2.4 阻塞分段路径（sync_send_angles home_ready + safe_return_home）。")
+        res = mc.sync_send_angles(hr_angles, ANG_REPLAY_SPEED, timeout=ANG_REPLAY_TIMEOUT)
+        print(f"  -> [V2.5 方向2] 回退 home_ready sync_send_angles 返回 {res}")
+        if res != 1:
+            print("【警告】回退路径 home_ready 未到位，交 safe_return_home 人工扶正状态机。")
+            return "failed"
+        # 回退后走标准 safe_return_home（它会重读角度判 arm_max_diff 门）
+        return safe_return_home(mc)
+
+    # ---- 阶段B：已提前下发 HOME，轮询软到位（与 _send_home_async 阶段一致）----
+    home_start = time.time()
+    converged = False
+    final_max_diff = None
+    while time.time() - home_start < HOME_RETURN_ASYNC_TIMEOUT:
+        actual = get_angles_once(mc)  # 单次读数：臂在运动，不能用 get_filtered_angles 的稳定性门
+        if actual:
+            final_max_diff = max(abs(actual[i] - HOME_ANGLES[i]) for i in range(6))
+            if final_max_diff <= HOME_RETURN_ASYNC_SOFT_TOL:
+                converged = True
+                break
+        time.sleep(HOME_RETURN_ASYNC_POLL)
+    elapsed = time.time() - home_start
+    if converged:
+        print(f"  -> [V2.5 方向2] HOME 软到位收敛 max_diff={final_max_diff:.2f}° "
+              f"<= {HOME_RETURN_ASYNC_SOFT_TOL}°，耗时 {elapsed:.2f}s。")
+        return "auto"
+    # 软超时未收敛：阻塞 sync 收尾兜底
+    fd = f"{final_max_diff:.2f}" if final_max_diff is not None else "N/A"
+    print(f"  -> [V2.5 方向2] HOME 软超时未收敛（max_diff={fd}°），"
+          f"阻塞 sync_send_angles 收尾兜底 (speed={HOME_RETURN_SPEED} [V2.4已验证], "
+          f"timeout={HOME_RETURN_TIMEOUT}s)...")
+    # Codex F1：sync 兜底用 V2.4 已验证 speed=25，不用未验证的 30（防级联失败）。
+    res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
+                              timeout=HOME_RETURN_TIMEOUT)
+    print(f"  -> [V2.5 方向2] 收尾 sync_send_angles 返回 {res}")
+    if res != 1:
+        print("【警告】回零动作超时或被物理阻挡！（平滑过渡软超时 + sync 收尾均未到位）")
+        return "failed"
+    actual = get_angles_once(mc)  # sync 返回 1 后读末态残差（诊断用，单次即可）
+    if actual:
+        final_max_diff = max(abs(actual[i] - HOME_ANGLES[i]) for i in range(6))
+    print(f"  -> [V2.5 方向2] sync 收尾后 max_diff="
+          f"{(f'{final_max_diff:.2f}' if final_max_diff is not None else 'N/A')}°。")
+    return "auto"
+
+
 def safe_return_home(mc, cached_angles=None):
     """
     安全回零策略（§13 覆盖 §12.4 的大偏差交互）：
@@ -1150,6 +1583,12 @@ def safe_return_home(mc, cached_angles=None):
     cached_angles 默认 None：prepare_phase 路径与旧调用方行为完全不变。
     安全约束：cached_angles 仍走 calc_home_diffs + 有限值校验 + arm_max_diff
     安全门判定，不跳过任何安全逻辑，只省冗余读数。
+
+    V2.5 §14.8 方向1+方向3：auto 分支与 manual 扶正后回零，在 HOME_RETURN_ASYNC_ENABLE
+    时改走 _send_home_async（非阻塞 send_angles + Python 端软到位循环 + 软超时走 sync
+    收尾兜底），预期 step11 1.2s->~0.5s。速度用 HOME_RETURN_ASYNC_SPEED=30（方向3）。
+    HOME_RETURN_ASYNC_ENABLE=False 时回退 V2.4 阻塞 sync_send_angles(HOME,25,timeout=12)，
+    一行回退，安全门判定不变。manual 分支扶正后回零同样适用异步路径。
     """
     if cached_angles is not None:
         angles = cached_angles
@@ -1180,12 +1619,19 @@ def safe_return_home(mc, cached_angles=None):
         if wrist6_diff > WRIST6_WARN_DIFF:
             print(f"【提示】第6轴末端旋转偏差较大 ({wrist6_diff:.1f}度)，"
                   f"回零时夹爪会自转，请确认末端线缆/夹爪周边无干涉。")
-        print(f"arm_max_diff={arm_max_diff:.1f} <= {ARM_MAX_DIFF_SAFE}，低速同步回直立零位...")
-        # V2.4 §14.7 L3：HOME_RETURN_SPEED 20->25（近直立位、无负载、距离短，
-        # 全程最安全的一段移动）。提速后固件不收敛会返回 0 -> "failed" 安全失败。
-        # 不改变 ARM_MAX_DIFF_SAFE 安全门（仍 <=45 才走此分支）。
+        print(f"arm_max_diff={arm_max_diff:.1f} <= {ARM_MAX_DIFF_SAFE}，回直立零位...")
+        # V2.5 §14.8 方向1+方向3：异步软到位回零（非阻塞 send_angles + 软到位循环
+        # + 软超时走 sync 收尾兜底）。HOME_RETURN_ASYNC_ENABLE=False 回退 V2.4 阻塞路径。
+        # 安全门（arm_max_diff<=45）已在本 if 判定通过，异步化只动移动下发方式。
+        if HOME_RETURN_ASYNC_ENABLE:
+            status, mode, _ = _send_home_async(mc, "step11回零")
+            # D0：显式记录回零结果，run-15 靠"无警告"反推 res==1 的诊断缺口补上
+            print(f"  -> [V2.5 D0] step11 回零结果: status={status}, mode={mode}")
+            return status
+        # V2.4 阻塞回退路径（HOME_RETURN_ASYNC_ENABLE=False）
         res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
                                   timeout=HOME_RETURN_TIMEOUT)
+        print(f"  -> [V2.5 D0] step11 阻塞回零 sync_send_angles 返回 {res}")
         if res != 1:
             print("【警告】回零动作超时或被物理阻挡！")
             return "failed"
@@ -1206,11 +1652,19 @@ def safe_return_home(mc, cached_angles=None):
     if wrist6_diff > WRIST6_WARN_DIFF:
         print(f"【提示】第6轴末端旋转偏差较大 ({wrist6_diff:.1f}度)，"
               f"回零时夹爪会自转，请确认末端线缆/夹爪周边无干涉。")
-    print(f"扶正通过，arm_max_diff={arm_max_diff:.1f}，低速同步回直立零位...")
-    # V2.4 L3：人工扶正分支也用提速后的 HOME_RETURN_SPEED/HOME_RETURN_TIMEOUT
-    # （扶正后 arm_max_diff 已 <=45，路径同样短且安全）。
+    print(f"扶正通过，arm_max_diff={arm_max_diff:.1f}，回直立零位...")
+    # V2.5 §14.8：manual 扶正后回零同样用异步软到位路径（扶正后 arm_max_diff 已 <=45，
+    # 路径同样短且安全）。HOME_RETURN_ASYNC_ENABLE=False 回退 V2.4 阻塞路径。
+    if HOME_RETURN_ASYNC_ENABLE:
+        status, mode, _ = _send_home_async(mc, "扶正后回零")
+        print(f"  -> [V2.5 D0] 扶正后回零结果: status={status}, mode={mode}")
+        # manual 分支：异步失败仍是 "failed"；异步成功则改报 "manual"（走人工扶正后完成）
+        if status == "failed":
+            return "failed"
+        return "manual"
     res = mc.sync_send_angles(HOME_ANGLES, HOME_RETURN_SPEED,
                               timeout=HOME_RETURN_TIMEOUT)
+    print(f"  -> [V2.5 D0] 扶正后阻塞回零 sync_send_angles 返回 {res}")
     if res != 1:
         print("【警告】回零动作超时或被物理阻挡！")
         return "failed"
@@ -1282,6 +1736,10 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
     末段 safe_return_home 在 home_ready（arm_max_diff<=45）走自动回零。
     coords 只保留给 verify_coords_near 做到位一致性校验，不参与运动规划。
     任一动作失败即抛异常熔断，不自动 fallback。
+
+    V2.7 返回值：True=本轮完整跑通（含末段回零，臂在 HOME/夹爪张开）；
+    False=中途中止（home_ready 安全门未过 / 回零失败已 release_all_servos）。
+    main 的连续抓取循环据此决定是否继续下一轮（False 即 break，不再对软臂下发运动指令）。
     """
     print("\n====================================")
     print("【第三阶段：关节角示教回放 + 回零过渡 + 空间一致性校验 (V2)】")
@@ -1301,23 +1759,28 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
     if not validate_return_ready(home_ready):
         print("-> home_ready 未通过自动回零安全门，禁止进入实机自动动作。")
         print("-> 请重新运行并示教更接近直立的 home_ready。")
-        return
+        return False  # V2.7：通知 main 中止后续轮次（此分支未发运动指令，臂仍在 HOME）
     print("  -> 回零过渡校验通过。")
 
-    print("\n⚠️ 请确认轨迹范围内无障碍物，特别是 drop_hover -> home_ready 的空中过渡路径。")
-    print("⚠️ 如遇危险，请随时按 Ctrl+C 触发急停！")
-    input("-> 请将正方体放回【抓取点】，按 Enter 键开始（空载首测可不放物块）...")
+    # V2.8 点2：去掉每轮 Enter 阻塞，实现输入 N 后全自动运行。
+    # 赛场流程已确认：CPU 信号→单轮抓放→人补块到 pick 点，pick 点每轮有物块，不会抓空气。
+    # 轨迹无障碍/物块就位的一次性确认移到 main 循环开始前（每轮不再阻塞）。
+    # 保留急停提示 print（不阻塞），Ctrl+C 路径不变。
+    print("\n⚠️ drop_hover -> home_ready 空中过渡路径需无障碍；如遇危险随时 Ctrl+C 急停。")
 
     print("\n1. 张开夹爪准备...")
     gripper_action_with_retry(mc, 0, "step1 张开")
 
     print("\n2. 关节角回放到 pick_hover...")
     checked_sync_angles(mc, pick_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "pick_hover")
-    verify_coords_near(mc, pick_hover["coords"], "pick_hover")
+    # V2.8 B类：长距离严格通过(res==1)时坐标必然准，SKIP_COORD_VERIFY_ON_STRICT_PASS 跳过校验省 ~0.6s。
+    if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
+        verify_coords_near(mc, pick_hover["coords"], "pick_hover")
 
     print("\n3. 短距离关节下探到 pick...")
     checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick")
-    verify_coords_near(mc, pick["coords"], "pick")
+    if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
+        verify_coords_near(mc, pick["coords"], "pick")
 
     print("\n4. 闭合夹爪抓取目标...")
     gripper_action_with_retry(mc, 1, "step4 闭合")
@@ -1334,41 +1797,54 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
 
     print("\n6. 关节角回放到 drop_hover（空中长距离过渡）...")
     checked_sync_angles(mc, drop_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "drop_hover")
-    verify_coords_near(mc, drop_hover["coords"], "drop_hover")
+    if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
+        verify_coords_near(mc, drop_hover["coords"], "drop_hover")
 
     print("\n7. 短距离关节下降至 drop...")
     checked_short_angles(mc, drop["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "drop")
-    verify_coords_near(mc, drop["coords"], "drop")
+    if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
+        verify_coords_near(mc, drop["coords"], "drop")
 
     print("\n8. 张开夹爪放置正方体...")
     gripper_action_with_retry(mc, 0, "step8 张开")
 
     print("\n9. 短距离关节抬起回 drop_hover...")
     _t = time.time()
-    checked_short_angles(
-        mc, drop_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "drop_hover",
-        expected_coords=drop_hover["coords"],
-        allow_soft_success=True,
-    )
+    # V2.8 点1：step 9 改异步软到位（drop→drop_hover 带载上行是已知瓶颈，run-18 稳态 20s）。
+    # ASYNC_SHORT_ENABLE=False 时回退原阻塞 checked_short_angles（V2.7 行为）。
+    if ASYNC_SHORT_ENABLE:
+        checked_short_angles_async(
+            mc, drop_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "drop_hover",
+            expected_coords=drop_hover["coords"],
+        )
+    else:
+        checked_short_angles(
+            mc, drop_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "drop_hover",
+            expected_coords=drop_hover["coords"],
+            allow_soft_success=True,
+        )
     verify_coords_near(mc, drop_hover["coords"], "drop_hover")
     print(f"  -> [V2.2 耗时] step 9: {time.time() - _t:.1f}s")
 
-    print("\n10. 回零过渡：drop_hover -> home_ready（空中长距离拉直）...")
-    print("  -> 即将把臂从 drop_hover 拉向接近直立的 home_ready，请确认空中路径无障碍。")
+    print("\n10+11. 末段回零：drop_hover -> home_ready -> HOME...")
+    print("  -> 即将把臂从 drop_hover 拉向接近直立的 home_ready 再回 HOME，请确认空中路径无障碍。")
     _t = time.time()
-    # V2.4 §14.7 L2：checked_return_transition 返回 _verify_actual_pose_for_auto_return
-    # 刚读完的 home_ready 实际角度（越界/走人工扶正时返回 None），透传给 step11 的
-    # safe_return_home(cached_angles=...)，跳过 auto 分支的冗余 get_filtered_angles 重读。
-    home_ready_actual_angles = checked_return_transition(mc, home_ready, "home_ready")
-    verify_coords_near(mc, home_ready["coords"], "home_ready")
-    print(f"  -> [V2.2 耗时] step 10: {time.time() - _t:.1f}s")
-
-    print("\n11. 从 home_ready 自动回直立零位...")
-    # V2.1 §12.4-5：safe_return_home 返回三态，最终消息如实区分
-    # "0 轮自动回零" / "触发人工扶正后完成" / "回零失败"，避免把人工扶正写成自动回零。
-    _t = time.time()
-    result = safe_return_home(mc, cached_angles=home_ready_actual_angles)
-    print(f"  -> [V2.2 耗时] step 11: {time.time() - _t:.1f}s")
+    # V2.5 §14.8 方向2：SMOOTH_HANDOFF_ENABLE 时把 step10+step11 合并为平滑过渡异步流
+    # （非阻塞 send home_ready -> 接近即提前 send HOME -> 软到位），消除 home_ready 停顿。
+    # 回退条件：未接近 home_ready / 读不到角度 -> _smooth_handoff_return 内部回退 V2.4 阻塞分段。
+    # SMOOTH_HANDOFF_ENABLE=False 或 HOME_RETURN_ASYNC_ENABLE=False -> 走 V2.4 step10+step11 分段。
+    if SMOOTH_HANDOFF_ENABLE and HOME_RETURN_ASYNC_ENABLE:
+        result = _smooth_handoff_return(mc, home_ready)
+        print(f"  -> [V2.2 耗时] step 10+11 (平滑过渡): {time.time() - _t:.1f}s")
+    else:
+        # V2.4 分段路径（回退）：阻塞 step10 + 阻塞 step11
+        print("  -> [V2.5] 平滑过渡未启用，走 V2.4 分段路径。")
+        home_ready_actual_angles = checked_return_transition(mc, home_ready, "home_ready")
+        verify_coords_near(mc, home_ready["coords"], "home_ready")
+        print(f"  -> [V2.2 耗时] step 10: {time.time() - _t:.1f}s")
+        _t11 = time.time()
+        result = safe_return_home(mc, cached_angles=home_ready_actual_angles)
+        print(f"  -> [V2.2 耗时] step 11: {time.time() - _t11:.1f}s")
     if result == "failed":
         # 回零失败时臂可能偏高/带载，直接 release 会让臂下沉。提示扶稳再释放。
         print("\n【警告】自动回零失败，机械臂可能偏高或带载。")
@@ -1376,18 +1852,19 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
         input()
         mc.release_all_servos()
         print("已释放舵机。请人工扶正后重试或重新示教。")
-        return
+        return False  # V2.7：舵机已掉电，通知 main 中止剩余轮次，避免对软臂下发运动指令
 
     print("\n====================================")
     if result == "auto":
-        print("🎉 V2.2 五点示教 + home_ready 回零过渡测试流程跑通！")
+        print("🎉 V2.5 五点示教 + home_ready 回零过渡测试流程跑通！")
         print("   末段回零：0 轮人工扶正（home_ready -> HOME 自动回零）。")
     else:  # "manual"
-        print("⚠️ V2.2 流程跑通，但末段回零触发了人工扶正后完成。")
+        print("⚠️ V2.5 流程跑通，但末段回零触发了人工扶正后完成。")
         print("   说明 home_ready 示教余量不足或软通过把实际姿态推过 45°，")
         print("   下一轮建议示教更直立的 home_ready（目标 arm_max_diff<=40，"
                "J2 绝对值压到 35~38°）。")
     print("====================================")
+    return True  # V2.7：本轮完整跑通（含末段回零），main 可继续下一轮
 
 
 def _preset_path(name):
@@ -1568,8 +2045,22 @@ def main():
                         help="保存预设时记录的物块尺寸(cm)")
     parser.add_argument("--save-preset-notes", dest="save_preset_notes", default="",
                         help="保存预设时的备注")
+    parser.add_argument("--no-log", dest="no_log", action="store_true",
+                        help="V2.8 点3：禁用自动终端日志导出（默认启用，写到 "
+                             "audit_logs/auto_run_<时间戳>.log）")
     args = parser.parse_args()
 
+    # V2.8 点3：安装 Tee 双写 stdout，自动导出终端日志到 UTF-8 文件。
+    # --no-log 可禁用。装在 try 之前，确保后续 get_port/连接/示教/运动全过程都被记录。
+    # try/finally 确保异常/Ctrl+C/正常退出时文件关闭落盘。
+    tee = None
+    original_stdout = sys.stdout
+    if not args.no_log:
+        log_path = os.path.join(
+            AUTO_LOGS_DIR, f"auto_run_{time.strftime('%Y%m%d_%H%M%S')}.log")
+        tee = Tee(log_path, original_stdout)
+        sys.stdout = tee
+        print(f"[V2.8 日志] 终端输出同步写入: {log_path}")
     try:
         PORT = args.port if args.port else get_port()
         BAUD = 1000000
@@ -1583,7 +2074,32 @@ def main():
         if not prepare_phase(mc):
             return
 
-        auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready)
+        # V2.7：连续多次抓取循环（贴近比赛条件）。
+        # auto_phase_v2 末段已回零到 HOME 且夹爪张开，每轮结束臂处于 HOME；
+        # 示教点与安全门已在上游确定，循环只重复关节回放，不重跑示教/prepare_phase。
+        # auto_phase_v2 返回 False（home_ready 安全门未过 / 回零失败已 release）即 break，
+        # 避免在舵机掉电状态下继续下发运动指令。
+        # V2.8 点2：去掉 auto_phase_v2 内每轮 Enter，输入 N 后全自动运行；
+        # 此处保留 N 轮开始前的一次性确认（物块就位 + 轨迹无障碍 + 急停提醒），
+        # 确认后 N 轮连续跑，不再阻塞。赛场流程为 CPU 信号→单轮抓放→人补块到 pick 点。
+        ans = input("\n-> 请输入本轮连续抓取次数（直接回车默认 1 次）: ").strip()
+        try:
+            repeat = max(1, int(ans)) if ans else 1
+        except ValueError:
+            print("【提示】输入非整数，按默认 1 次执行。")
+            repeat = 1
+        print(f"-> 将连续执行 {repeat} 次抓取任务（任一轮失败即中止，全程 Ctrl+C 急停）。")
+        print("⚠️ 请确认：① pick 点已放好物块（多轮时由人持续补块）；"
+              "② 机械臂轨迹范围内无障碍物。")
+        input("-> 确认无误后按 Enter 开始连续抓取（此后 N 轮全自动，不再提示）...")
+        for i in range(repeat):
+            if repeat > 1:
+                print(f"\n########## 连续抓取 第 {i + 1}/{repeat} 轮 ##########")
+            ok = auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready)
+            if not ok:
+                print(f"\n【中止】第 {i + 1} 轮未正常完成（已释放舵机），"
+                      f"剩余 {repeat - i - 1} 轮不再执行。")
+                break
 
     except TeachAbort as e:
         # V2.3 §14.4 优先级3：用户主动放弃示教。teach 阶段已 release_all_servos，
@@ -1612,6 +2128,13 @@ def main():
             input()
             mc.release_all_servos()
             print("已在人工扶稳后释放所有舵机。")
+    finally:
+        # V2.8 点3：无论正常退出/异常/Ctrl+C，都恢复 stdout 并关闭日志文件落盘。
+        if tee is not None:
+            sys.stdout = original_stdout
+            tee.close()
+            # 用原 stdout 打印日志路径（此时终端已恢复，不进日志文件）
+            original_stdout.write(f"[V2.8 日志] 终端日志已保存: {tee.path}\n")
 
 
 if __name__ == "__main__":
