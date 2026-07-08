@@ -263,6 +263,13 @@ HOME_RETURN_ASYNC_SOFT_TOL = 1.5      # 软到位阈值（度）；V2.6 1.0->1.5
 # 误判超时走 sync 兜底反而更慢。若 1.2s 仍省时且无误判，run-17 再压到 1.2。
 HOME_RETURN_ASYNC_TIMEOUT = 1.5       # 软超时（s）；V2.6 2.5->1.5，软超时走 sync 收尾兜底
 HOME_RETURN_ASYNC_POLL = 0.05         # 软到位轮询间隔（s）
+# V2.10：末段回零二次读数确认。语义同 ASYNC_SHORT_CONFIRM_COUNT——连续 N 次读数 max_diff
+# 都 <= HOME_RETURN_ASYNC_SOFT_TOL(1.5°) 才判收敛，任一帧回升则归零计数器继续轮询。
+# 根因：run-19~22 四批共 11 轮里 3 次（~27%）末段回零走 sync 兜底，每次都因"臂未停稳提前下发
+# HOME"后单次读数读到运动中瞬态 ~39° 跳变 → 判未收敛 → sync 7.2s 尖峰（最坏单轮）。
+# confirm=2 拒绝单帧下探假收敛，与 step5/9 同构治法。timeout 暂保持 1.5s 不动（隔离归因：
+# 先验"单帧瞬态是否兜底主因"，若兜底率不降再单独调 timeout）。
+HOME_RETURN_ASYNC_CONFIRM_COUNT = 2     # 末段/初始回零软到位连续确认次数（1=单次，V2.5/V2.9 行为）
 # 方向2平滑过渡：step10 软到位循环中 arm_max_diff<=此阈值即提前下发 HOME（臂未停稳）。
 # 取 5.0（§14.8 建议的"与 home_ready 最大轴偏差已小于 5°"）。设 None 则禁用方向2。
 SMOOTH_HANDOFF_ENABLE = True
@@ -277,9 +284,20 @@ SMOOTH_HANDOFF_NEAR_TOL = 5.0         # 接近 home_ready 的提前下发阈值�
 # 仅 step 9 启用（drop→drop_hover 是已知瓶颈）；step 5 已 res==1 严格通过无需改；
 # step 3/7 是下行(重力辅助)，固件收敛快，保持阻塞版。
 ASYNC_SHORT_ENABLE = True             # 总开关：False 时 step 9 回退阻塞 checked_short_angles
+# V2.9：step 5 (pick→pick_hover 带载上行) 异步软到位。与 step 9 同构（逆重力带载短距离
+# 回放到 hover 点），run-19 第2/3轮 step 5 卡 3.4~3.5s 固件 is_in_position 死区，根因同 step 9。
+# 复用 checked_short_angles_async；独立开关以保留回滚粒度——step 9 已验证，step 5 是新改动，
+# 一旦 step 5 出问题可单独回退而不连带关掉 step 9。
+ASYNC_SHORT_STEP5_ENABLE = True        # step 5 专用：False 时回退阻塞 checked_short_angles
 ASYNC_SHORT_SOFT_TOL = 3.0            # 软到位阈值（度），复用 SOFT_ANGLE_SUCCESS_TOL
 ASYNC_SHORT_TIMEOUT = 4.0             # 软超时（s）：物理 ~1.5s，留 2.5s 余量；超时走 sync 兜底
 ASYNC_SHORT_POLL = 0.05               # 软到位轮询间隔（s），复用 HOME_RETURN_ASYNC_POLL
+# V2.9：二次读数确认。常态 1；设 >1 时，软到位判定要求**连续 N 次**读数都 ≤tol 才判收敛，
+# 否则重置计数器继续轮询。修"减速振荡中单帧瞬态下探 ≤tol 造成假收敛"（臂还在晃就退出）。
+# 注意本参数只提升退出稳健性，不向下压"单帧瞬态上蹿 >tol 造成延迟退出"那一类方差。
+# 取 2：单次确认(N=1)的稳健性补强，对 happy path（真稳定）增加 ~0.05s 确认读数；已稳定的物理
+# 收敛点必连续两次 ≤tol，振荡瞬态点（单帧下探）会因下一帧回升而被拒、继续轮询到真稳态。
+ASYNC_SHORT_CONFIRM_COUNT = 2       # 软到位连续确认次数（1=单次确认，即 V2.8 行为）
 # V2.8 点1 B 类：夹爪开环等待 2.5s→1.2s（夹爪物理开合 <1s，人眼可确认）。
 GRIPPER_TIMEOUT = 1.2                 # V2.8：2.5->1.2s（原 V2.7 值 2.5s 纯等待偏长）
 # V2.8 点1 B 类：长距离/短下探严格通过(res==1)时跳过 verify_coords_near，省 ~0.6s/次。
@@ -395,7 +413,14 @@ class Tee:
         self.path = file_path
 
     def write(self, msg):
-        self._stdout.write(msg)
+        try:
+            self._stdout.write(msg)
+        except UnicodeEncodeError:
+            enc = getattr(self._stdout, "encoding", None) or "gbk"
+            try:
+                self._stdout.write(msg.encode(enc, errors="replace").decode(enc))
+            except Exception:
+                pass
         self._file.write(msg)
 
     def flush(self):
@@ -934,6 +959,8 @@ def checked_short_angles_async(
       - 目标角度合法性校验同 checked_short_angles（数值型/有限/[-180,180]）。
       - 软超时不抛异常（防臂在运动路径掉电），走 sync 收尾 + res 检查；res!=1 才抛异常。
       - 软通过判定基于实际读数（angle_ok + coord_ok），不假设到位。
+      - V2.9 二次读数确认：连续 ASYNC_SHORT_CONFIRM_COUNT 次读数都 ≤tol 才判收敛，
+        拒绝减速振荡中"单帧瞬态下探 ≤tol"的假收敛。N=1 退化为 V2.8 单次确认。
     返回 True（软通过或 sync 收尾 res==1）；抛 RuntimeError（sync 收尾 res!=1 或读数异常）。
     ASYNC_SHORT_ENABLE=False 时调用方走原 checked_short_angles，本函数不被调用。
     """
@@ -944,12 +971,15 @@ def checked_short_angles_async(
         raise RuntimeError(f"{label}: 目标关节角含非数值或越界: {target_angles}")
 
     print(f"  -> [V2.8 异步] {label}: 非阻塞 send_angles (speed={speed})，"
-          f"软到位循环 (tol={ASYNC_SHORT_SOFT_TOL}°, timeout={ASYNC_SHORT_TIMEOUT}s)...")
+          f"软到位循环 (tol={ASYNC_SHORT_SOFT_TOL}°, timeout={ASYNC_SHORT_TIMEOUT}s, "
+          f"confirm={ASYNC_SHORT_CONFIRM_COUNT})...")
     mc.send_angles(target_angles, speed)
     start = time.time()
     converged = False
     final_max_delta = None
     final_coord_delta = None
+    confirm_count = 0               # V2.9：连续确认计数器
+    none_count = 0                  # V2.12：get_angles_once 返回 None 的帧数（Codex B 诊断）
     while time.time() - start < ASYNC_SHORT_TIMEOUT:
         actual = get_angles_once(mc)  # 单次读数：臂运动中不能用 get_filtered_angles 稳定性门
         if actual:
@@ -965,8 +995,22 @@ def checked_short_angles_async(
                                             for i in range(3))
                     coord_ok = final_coord_delta <= SOFT_COORD_SUCCESS_TOL
             if angle_ok and coord_ok:
-                converged = True
-                break
+                # V2.9 二次读数确认：要求连续 ASYNC_SHORT_CONFIRM_COUNT 次读数都 ≤tol 才判收敛，
+                # 拒绝减速振荡中"单帧瞬态下探 ≤tol"的假收敛（臂还在晃就退出）。
+                # N=1 时即原 V2.8 单次确认行为。
+                # V2.12（Codex B）：None 不重置 confirm_count——语义是"连续有效 OK 读数"
+                # 而非严格"连续轮询 OK 读数"，偶发一帧 None 被容差（优点）。
+                confirm_count += 1
+                if confirm_count >= ASYNC_SHORT_CONFIRM_COUNT:
+                    converged = True
+                    break
+                # 未达连续确认次数：继续轮询（不 break），下一帧再读
+            else:
+                # 任一条件未满足：重置连续确认计数器
+                confirm_count = 0
+        else:
+            # V2.12（Codex B 诊断）：累计 None 帧数，便于区分"运动未收敛" vs "串口读数不可用"
+            none_count += 1
         time.sleep(ASYNC_SHORT_POLL)
     elapsed = time.time() - start
 
@@ -976,15 +1020,75 @@ def checked_short_angles_async(
               f"/ delta_xyz={cd} <= 容差，耗时 {elapsed:.2f}s（提前退出固件死区等待）。")
         return True
 
-    # 软超时未收敛：阻塞 sync 收尾兜底（保留 V2.4 安全失败语义）
+    # V2.12（Codex B 诊断）：软超时未收敛时打印 None 帧数 + 末态 confirm_count，
+    # 让下一次熔断能区分"运动真未收敛"与"读数不可用"。
     fd = f"{final_max_delta:.2f}" if final_max_delta is not None else "N/A"
-    print(f"  -> [V2.8 异步] {label}: 软超时未收敛（max_err={fd}°），"
+    print(f"  -> [V2.8 异步] {label}: 软超时未收敛（max_err={fd}°, "
+          f"none_count={none_count}, confirm_count={confirm_count}），"
           f"阻塞 sync_send_angles 收尾兜底 (speed={speed}, timeout={timeout}s)...")
     res = mc.sync_send_angles(target_angles, speed, timeout=timeout)
     print(f"  -> [V2.8 异步] {label}: 收尾 sync_send_angles 返回 {res}")
     if res != 1:
-        # res!=1 即固件判超时/未到位且软超时也未收敛，按 V2.4 安全失败语义抛异常熔断
-        raise RuntimeError(f"{label}: 异步软超时 + sync 收尾仍未到位 (返回 {res})")
+        # V2.12（Codex C 缺陷B 修复）：sync 返回 0 不直接熔断——固件可能"假失败"
+        # （实测 step9 在残差 2.1° 上行 sync 可返回 0，历史参数见 L204-L212/L278-L283）。
+        # 先做 post-failure 复读（角度+坐标），区分"真没到位" vs "固件确认假失败"：
+        #   - 复读在软容差内 → 软通过 + 强警告（return True，不熔断）；
+        #   - 复读超容差 → 重发 1 次已验证低速关节目标（speed=8）再复读；
+        #   - 仍超容差 → 按 V2.4 安全失败语义抛异常熔断（保守失败边界保留）。
+        # 有界：仅重试 1 次；不无限循环；retry 期间不释放舵机（臂在路径上不掉电）。
+        # 板上 CPU 固件迁移时下放同等策略（AGENTS.md 决赛主线硬边界：PC 仅调试，不进闭环）。
+        post_angles = get_filtered_angles(mc)
+        post_coords = get_filtered_coords(mc)
+        post_max_err = None
+        post_delta = None
+        if post_angles:
+            post_max_err = max(abs(post_angles[i] - target_angles[i]) for i in range(6))
+        if expected_coords is not None and post_coords:
+            post_delta = max(abs(post_coords[i] - expected_coords[i]) for i in range(3))
+        print(f"  -> [V2.8 异步] {label}: post-failure 复读 max_err="
+              f"{(f'{post_max_err:.2f}' if post_max_err is not None else 'N/A')}° / "
+              f"delta_xyz={fmt_mm(post_delta)}")
+        # 判定 1：复读在软容差内 → 软通过 + 强警告（保留 SOFT_REFINE_WARN_COORD 强警告语义）
+        post_angle_ok = post_max_err is not None and post_max_err <= ASYNC_SHORT_SOFT_TOL
+        post_coord_ok = post_delta is None or post_delta <= SOFT_COORD_SUCCESS_TOL
+        if post_angle_ok and post_coord_ok:
+            warn = ""
+            if post_delta is not None and post_delta > SOFT_REFINE_WARN_COORD:
+                warn = f" 【强警告】残差 delta_xyz={post_delta:.1f}mm > {SOFT_REFINE_WARN_COORD}mm，3cm 物块有抓取失败风险。"
+            print(f"  -> [V2.8 异步] {label}: sync 返回 {res} 但复读实测在软容差内，"
+                  f"按软通过处理（不熔断）。{warn}")
+            return True
+        # 判定 2：复读超容差 → 重发 1 次低速关节目标再复读
+        print(f"  -> [V2.8 异步] {label}: 复读超容差，重发低速关节目标 "
+              f"(speed={SOFT_REFINE_SPEED}, timeout={SOFT_REFINE_TIMEOUT}s) 再判熔断...")
+        try:
+            mc.sync_send_angles(target_angles, SOFT_REFINE_SPEED,
+                                timeout=SOFT_REFINE_TIMEOUT)
+        except Exception as e:
+            print(f"  -> [V2.8 异步] {label}: 重发 sync 抛异常 {e}，按熔断处理。")
+            raise RuntimeError(f"{label}: 异步软超时 + sync res={res} + 重发异常 ({e})")
+        time.sleep(SOFT_SETTLE_SECONDS)
+        rt_angles = get_filtered_angles(mc)
+        rt_coords = get_filtered_coords(mc)
+        rt_max_err = None
+        rt_delta = None
+        if rt_angles:
+            rt_max_err = max(abs(rt_angles[i] - target_angles[i]) for i in range(6))
+        if expected_coords is not None and rt_coords:
+            rt_delta = max(abs(rt_coords[i] - expected_coords[i]) for i in range(3))
+        print(f"  -> [V2.8 异步] {label}: 重发后复读 max_err="
+              f"{(f'{rt_max_err:.2f}' if rt_max_err is not None else 'N/A')}° / "
+              f"delta_xyz={fmt_mm(rt_delta)}")
+        rt_angle_ok = rt_max_err is not None and rt_max_err <= ASYNC_SHORT_SOFT_TOL
+        rt_coord_ok = rt_delta is None or rt_delta <= SOFT_COORD_SUCCESS_TOL
+        if rt_angle_ok and rt_coord_ok:
+            print(f"  -> [V2.8 异步] {label}: 重发后复读在软容差内，按软通过处理（不熔断）。")
+            return True
+        # 判定 3：重发后仍超容差 → 抛异常熔断（V2.4 安全失败语义）
+        fd2 = f"{rt_max_err:.2f}" if rt_max_err is not None else (
+            f"{post_max_err:.2f}" if post_max_err is not None else "N/A")
+        raise RuntimeError(
+            f"{label}: 异步软超时 + sync res={res} + 重发后仍超容差 (max_err={fd2}°)")
     return True
 
 
@@ -1408,19 +1512,27 @@ def _send_home_async(mc, label):
     返回 (status, mode, final_max_diff)：status∈{"auto","failed"}，mode 描述走的路径。
     """
     print(f"  -> [V2.5 方向1] {label}: 异步回零 send_angles(HOME, speed={HOME_RETURN_ASYNC_SPEED})，"
-          f"软到位循环 (tol={HOME_RETURN_ASYNC_SOFT_TOL}°, timeout={HOME_RETURN_ASYNC_TIMEOUT}s)...")
+          f"软到位循环 (tol={HOME_RETURN_ASYNC_SOFT_TOL}°, timeout={HOME_RETURN_ASYNC_TIMEOUT}s, "
+          f"confirm={HOME_RETURN_ASYNC_CONFIRM_COUNT})...")
     mc.send_angles(HOME_ANGLES, HOME_RETURN_ASYNC_SPEED)
     start = time.time()
     converged = False
     final_max_diff = None
+    confirm_count = 0               # V2.10：连续确认计数器
     while time.time() - start < HOME_RETURN_ASYNC_TIMEOUT:
         actual = get_angles_once(mc)  # 单次读数：臂在运动，不能用 get_filtered_angles 的稳定性门
         if actual:
             diffs = [abs(actual[i] - HOME_ANGLES[i]) for i in range(6)]
             final_max_diff = max(diffs)
             if final_max_diff <= HOME_RETURN_ASYNC_SOFT_TOL:
-                converged = True
-                break
+                # V2.10 二次读数确认：连续 N 次读数都 <=tol 才判收敛，
+                # 拒绝减速/回零过程中"单帧瞬态下探"的假收敛。N=1 退化 V2.5 行为。
+                confirm_count += 1
+                if confirm_count >= HOME_RETURN_ASYNC_CONFIRM_COUNT:
+                    converged = True
+                    break
+            else:
+                confirm_count = 0
         time.sleep(HOME_RETURN_ASYNC_POLL)
     elapsed = time.time() - start
     if converged:
@@ -1516,13 +1628,20 @@ def _smooth_handoff_return(mc, home_ready):
     home_start = time.time()
     converged = False
     final_max_diff = None
+    confirm_count = 0               # V2.10：连续确认计数器（同 _send_home_async 阶段）
     while time.time() - home_start < HOME_RETURN_ASYNC_TIMEOUT:
         actual = get_angles_once(mc)  # 单次读数：臂在运动，不能用 get_filtered_angles 的稳定性门
         if actual:
             final_max_diff = max(abs(actual[i] - HOME_ANGLES[i]) for i in range(6))
             if final_max_diff <= HOME_RETURN_ASYNC_SOFT_TOL:
-                converged = True
-                break
+                # V2.10 二次读数确认：拒绝"臂未停稳提前下发 HOME 后读运动中瞬态 ~39° 跳变"
+                # 判假收敛/假未收敛。N=1 退化原 V2.5 单次确认行为。
+                confirm_count += 1
+                if confirm_count >= HOME_RETURN_ASYNC_CONFIRM_COUNT:
+                    converged = True
+                    break
+            else:
+                confirm_count = 0
         time.sleep(HOME_RETURN_ASYNC_POLL)
     elapsed = time.time() - home_start
     if converged:
@@ -1787,11 +1906,24 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
 
     print("\n5. 短距离关节抬起回 pick_hover...")
     _t = time.time()
-    checked_short_angles(
-        mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover",
-        expected_coords=pick_hover["coords"],
-        allow_soft_success=True,
-    )
+    # V2.9：step 5 改异步软到位（与 step 9 同构——逆重力带载短距离回放 hover 点，
+    # run-19 第2/3轮卡 3.4~3.5s 固件 is_in_position 死区，根因同 step 9）。
+    # ASYNC_SHORT_STEP5_ENABLE=False 时回退原阻塞 checked_short_angles（V2.8 行为）。
+    # 复用 checked_short_angles_async：软超时走 sync 收尾 + res 熔断，保留 V2.4 安全失败语义。
+    # 取舍：异步软通过跳过同步版的 _soft_refine 微调（step 9 已证明该死区微调不收敛、纯浪费 3s）；
+    # step 5 历史上多为 res==1 严格通过、几乎不触发微调，跳过影响可忽略。残差由 <1° 可能变为 ≤3°，
+    # step 5 是抓起后悬停，≤3° 不影响夹爪保持——run-19 实测 step 9 在 2.1° 残差下放置精度稳定可佐证。
+    if ASYNC_SHORT_STEP5_ENABLE:
+        checked_short_angles_async(
+            mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover",
+            expected_coords=pick_hover["coords"],
+        )
+    else:
+        checked_short_angles(
+            mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover",
+            expected_coords=pick_hover["coords"],
+            allow_soft_success=True,
+        )
     verify_coords_near(mc, pick_hover["coords"], "pick_hover")
     print(f"  -> [V2.2 耗时] step 5: {time.time() - _t:.1f}s")
 
@@ -2125,9 +2257,27 @@ def main():
                 mc.stop()
             except Exception:
                 pass
-            input()
-            mc.release_all_servos()
-            print("已在人工扶稳后释放所有舵机。")
+            # V2.11 缺陷A修复（run-23 EOF 死锁）：管道喂入启动时 stdin 在 input() 前耗尽
+            # 会抛 EOFError，绕过 release_all_servos() 进程死亡 → 臂上电锁死悬空发热。
+            # 修复：包住 input()，EOF 或任何异常都立即 release（放弃"扶稳再释放"语义，
+            # 烫伤/机械锁死比缓慢下沉更危险——run-23 已由人工手动 release 解救过一次）。
+            arm_released = False
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                print("-> ⚠️ stdin 不可用（EOF/中断），跳过扶稳确认，立即释放舵机防上电锁死。")
+                arm_released = True
+            finally:
+                # 无论 input() 走哪条路径（正常 Enter / EOF / KeyboardInterrupt），都释放。
+                # 正常路径：用户已扶稳再释放；EOF 路径：立即释放防卡死。
+                try:
+                    mc.release_all_servos()
+                    if arm_released:
+                        print("已紧急释放所有舵机（EOF 兜底，请人工扶回安全姿态）。")
+                    else:
+                        print("已在人工扶稳后释放所有舵机。")
+                except Exception as release_e:
+                    print(f"-> ⚠️ 释放舵机指令发送失败: {release_e}，请人工断电扶稳。")
     finally:
         # V2.8 点3：无论正常退出/异常/Ctrl+C，都恢复 stdout 并关闭日志文件落盘。
         if tee is not None:
