@@ -52,6 +52,15 @@ extern "C" {
 #  define FG_AREA_AVAILABLE  0
 #endif
 
+/* TARGET_SEL_AVAILABLE: FPGA 实现了 TARGET_SEL 寄存器时改为 1。
+   默认 0 → task_matcher_read_target_from_fpga() 直接返回 -1，
+   不触碰 0x06C 地址，防止读到未实现的寄存器。
+   改为 1 → 启用拨码/按键目标选择，从 TARGET_SEL 读取 color_sel + size_sel + target_valid。
+   必须等 FPGA 队友确认地址和位定义后再打开。 */
+#ifndef TARGET_SEL_AVAILABLE
+#  define TARGET_SEL_AVAILABLE  0
+#endif
+
 /* 合并握手模式尚未定义具体协议；若 FPGA 方要求改为 MERGED，
    必须先补充 STATUS/ACK 合并规则再解除此 error。 */
 #if HANDSHAKE_MODE == HANDSHAKE_MERGED
@@ -73,12 +82,12 @@ extern "C" {
  *--------------------------------------------------------------------------*/
 static inline void mmio_write32(uint32_t addr, uint32_t val)
 {
-    *(volatile uint32_t *)addr = val;
+    *(volatile uint32_t *)(uintptr_t)addr = val;
 }
 
 static inline uint32_t mmio_read32(uint32_t addr)
 {
-    return *(volatile uint32_t *)addr;
+    return *(volatile uint32_t *)(uintptr_t)addr;
 }
 
 /*--------------------------------------------------------------------------
@@ -91,6 +100,7 @@ static inline uint32_t mmio_read32(uint32_t addr)
 #define OFF_CPU_HEARTBEAT       0x010u   /* R/W 32-bit 递增心跳 */
 #define OFF_CPU_ARM_STATE       0x064u   /* R/W 机械臂状态机阶段，跟 CAM_COMMIT_GLOBAL */
 #define OFF_CPU_ERROR_CODE      0x068u   /* R/W 错误码，跟 CAM_COMMIT_GLOBAL */
+#define OFF_TARGET_SEL          0x06Cu   /* R   目标选择：[4]=valid,[3:2]=size,[1:0]=color */
 
 /* SYS_CTRL bit 定义 */
 #define SYS_CTRL_CAM0_EN        0x01u
@@ -98,6 +108,20 @@ static inline uint32_t mmio_read32(uint32_t addr)
 #define SYS_CTRL_CAM1_EN        0x04u
 #define SYS_CTRL_CAM1_OSD       0x08u
 #define SYS_CTRL_HDMI_SEL       0x10u   /* R: 0=Cam0, 1=Cam1 */
+
+/* TARGET_SEL bit 定义 */
+#define TARGET_SEL_COLOR_MASK   0x03u   /* bits [1:0] */
+#define TARGET_SEL_COLOR_ANY    0x00u
+#define TARGET_SEL_COLOR_RED    0x01u
+#define TARGET_SEL_COLOR_BLUE   0x02u
+#define TARGET_SEL_COLOR_YEL    0x03u
+#define TARGET_SEL_SIZE_SHIFT   2
+#define TARGET_SEL_SIZE_MASK    0x0Cu   /* bits [3:2] */
+#define TARGET_SEL_SIZE_ANY     0x00u
+#define TARGET_SEL_SIZE_SMALL   0x04u
+#define TARGET_SEL_SIZE_MED     0x08u
+#define TARGET_SEL_SIZE_LARGE   0x0Cu
+#define TARGET_SEL_VALID        0x10u   /* bit [4] */
 
 /* === 2.2 Camera 0 寄存器（俯视）=== */
 #define OFF_CAM0_BASE           0x000u   /* Cam0 区域基偏移 */
@@ -219,7 +243,8 @@ typedef struct {
     uint8_t  color;             /* 0=unknown,1=white,2=black,3=red,4=blue,5=yellow */
     uint8_t  shape;             /* 0=unknown,1=cube,2=cylinder,3=cone */
     uint8_t  size_cm_x10;       /* 0.1cm: 20=2.0cm, 25=2.5cm, 30=3.0cm */
-    uint8_t  match_action;      /* [0]match, [1]grab, [2]skip, [3]error */
+    uint8_t  match_action;      /* MATCH_ACTION_* — Cam0/Cam1 两路写同一个融合后 action，
+                                   保证 HDMI/OSD 切任一通道都看到一致的抓取/跳过/报错状态 */
     uint32_t osd_bbox_min;      /* OSD 红框 min */
     uint32_t osd_bbox_max;      /* OSD 红框 max */
     uint32_t osd_ctrl;          /* OSD 控制字 */
@@ -281,6 +306,28 @@ void board_io_heartbeat(void);
 
 /* 读全局 SYS_CTRL（HDMI 选择位、各通道使能/OSD） */
 uint32_t board_io_read_sys_ctrl(void);
+
+/* 读 FPGA TARGET_SEL 寄存器原始值（直接读，无 staging/commit）。
+ * 解码逻辑由 task_matcher 负责；board_io 只提供原始访问。
+ *
+ * 当 TARGET_SEL_AVAILABLE=0 时返回 0（target_valid 位清零），
+ * 防止读到未实现寄存器。FPGA 队友确认地址/位定义后改为 1。 */
+static inline uint32_t board_io_read_target_sel_raw(void)
+{
+#if TARGET_SEL_AVAILABLE
+    return mmio_read32(REG_ADDR(OFF_TARGET_SEL));
+#else
+    return 0u;  /* target_valid=0 → task_matcher 自动清空目标 */
+#endif
+}
+
+/* 便捷打包：分类结果 + 快照 → result_writeback_t。
+ * 调用方在主循环中填充 match_action 后再 write_results。
+ * snap 可为 NULL（此时 OSD bbox 字段填 0）。 */
+void board_io_build_writeback(uint8_t color, uint8_t shape,
+                              uint8_t size_cm_x10, uint8_t action,
+                              const feature_snapshot_t *snap,
+                              result_writeback_t *wb);
 
 #ifdef __cplusplus
 }

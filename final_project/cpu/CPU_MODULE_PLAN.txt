@@ -1,8 +1,8 @@
 ﻿================================================================================
-  CPU 端 6 大模块开发计划
+  CPU 端 5 大模块开发计划（识别侧）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
-  更新: 2026-07-05
+  更新: 2026-07-08
 ================================================================================
 
 模块一览
@@ -10,18 +10,17 @@
   [1] board_io          ✅ 已完成     FPGA↔CPU APB3 寄存器读写
   [2] vision_classifier ✅ 已完成 (29/29 单测通过, 2026-07-07)  颜色/形状/尺寸分类
   [3] param_table       ✅ 已完成 (68/68 单测通过, 2026-07-07)  阈值/标定参数管理
-  [4] task_matcher      ⬜ 待开发     目标匹配与动作决策
-  [5] arm_controller    ⬜ 待开发     机械臂控制 + mycobot 协议
-  [6] main              ⬜ 待开发     主循环集成
+  [4] task_matcher      ✅ 已完成 (73/73 单测通过, 2026-07-08)  目标匹配与动作决策
+  [5] main              ⬜ 待开发     识别主循环集成 + 对队友接口输出
 
 ================================================================================
   [1] board_io  —  FPGA↔CPU 寄存器读写层
 ================================================================================
-  状态: ✅ 已完成 (V2 双路版, 2026-07-05)
+  状态: ✅ 已完成 (V2 双路版, 2026-07-05 · 2026-07-08 安全加固)
   文件: app/include/board_io.h, app/src/board_io.c
   依赖: Efinity 生成 soc.h (提供 APB_VISION_BASE)
 
-  实现:
+  功能:
     - MMIO 原子读写 (mmio_read32 / mmio_write32)
     - 上电握手验证 (board_io_validate → 读 REG_MAGIC 高 16-bit)
     - CamN 配置写入 (write_config → staging, commit_config → active)
@@ -30,14 +29,30 @@
     - 全局状态写入 (write_global_state → staging, commit_global → active)
     - 心跳维护 (board_io_heartbeat)
     - SYS_CTRL 读取 (HDMI 选择位/通道使能/OSD 状态)
+    - TARGET_SEL 读取 + 解码 (board_io_read_target_sel_raw → task_matcher)
+
+  2026-07-08 安全加固:
+    - [P1] cam 合法性检查: 所有接受 cam 参数的 API 入口加 VALID_CAM(c) 宏,
+      cam ∉ {0,1} 直接拒绝 (write_config/ack_frame 静默 return;
+      commit_config/read_features/write_results 返回 -1)
+    - [P1] seq NULL 检查: board_io_commit_config 入口加 seq==NULL → return -1,
+      间接保护 commit_results / commit_global (均委托到 commit_config)
+    - [P1] TARGET_SEL_AVAILABLE 编译开关: 默认 0 (不读 0x06C 寄存器),
+      board_io_read_target_sel_raw() 返回 0, task_matcher_read_target_from_fpga()
+      直接返回 -1; FPGA 队友确认地址/位定义后改为 1
+    - [P2] match_action 注释语义: result_writeback_t.match_action 和
+      board_io_build_writeback() 注释明确 Cam0/Cam1 两路写同一个融合后 action,
+      保证 HDMI/OSD 切任一通道都看到一致的抓取/跳过/报错状态
 
   协议要点:
     - Staging → Commit → Active 影子寄存器协议
     - CFG_COMMIT 16-bit 全值比较, VSYNC 边界生效
     - valid/ack + frame_id 握手, 独立 per camera
-    - 编译期适配开关: HANDSHAKE_MODE, CAM_ENABLED(n), CAM_COMMIT_GLOBAL
+    - 编译期适配开关: HANDSHAKE_MODE, CAM_ENABLED(n), CAM_COMMIT_GLOBAL,
+      FG_AREA_AVAILABLE, TARGET_SEL_AVAILABLE
 
   待定:
+    - TARGET_SEL 寄存器地址 0x06C 仅建议值, 需 FPGA 队友确认
     - LIVE_FG_AREA 寄存器 (bbox 内前景像素数) 待加到手冊 v2.1
       → Cam0: offset 0x0B0, Cam1: offset 0x1B0
       → 用于填充率精确计算 (区分方/圆/三角的关键信号)
@@ -73,10 +88,24 @@
     ✅ [4] test_filter_size_jitter 注释/名字误导
            → 修正：实际验证尺寸参与投票键且多数胜出，不是"无多数"
 
+  2026-07-08 修改方案 (已规划, 待实施):
+    待修项 (按优先级):
+      [P1] 裸机崩溃防御 — classify_frame / mf_filter_update / mf_filter_reset /
+           classifier_cfg_default 缺 NULL 指针检查, 传错即 hardfault
+      [P1] cam 参数合法性 — classify_frame 入口不校验 cam∈{0,1}
+      [P2] Cam1 CONE 下限硬编码 — 0.25f 不在 classifier_cfg_t 中,
+           现场标定调不了; 需加 cone_fill_lo 字段 (默认 0.25f)
+      [P2] cyl_fill_lo 注释 — 默认 0.70 但注释写 π/4≈78%, 需说明余量
+      [P3] _bbox_x_min / _bbox_x_max 同实现 — 函数体相同易误导, 加注释
+      [P3] fuse_results UNKNOWN 路径 — 单路 UNKNOWN→融合 UNKNOWN 仅 fall-through, 加注释
+      [可选] VALID_CAM 宏提升到 board_io.h — 避免各模块重复定义
+    测试增量: 7 条新测试 (29→36), 覆盖 NULL 防御 + cam 边界 + cone_fill_lo
+
   未验证项:
     - PC 单测: ✅ 本机 gcc 14.2.0 (d:\CICC w\tools\mingw64\) 全部通过
     - RISC-V 交叉编译: riscv-none-embed-gcc 8.3.0 编译通过 (0 error, 仅预期 warning), 上板待验证
     - 所有阈值仍需现场标定
+    - 尺寸识别的 height_px_20mm/25mm/30mm 当前可先用占位值，最终必须在固定 Cam1/固定物块位置下实测标定
 
   重构方向 (用户确定):
     第1步: 找到物块轮廓/bbox
@@ -88,6 +117,14 @@
             - 俯视=圆 + 侧面=方 → CYLINDER
             - 俯视=圆 + 侧面=三 → CONE
     第4步: 颜色提取 (在轮廓/bbox 范围内取色, 而非全局 argmax)
+
+  尺寸识别约定:
+    - 物块位置、Cam0 位置、Cam1 位置均固定。
+    - l1/l2 作为安装距离参数记录，首版不直接参与 CPU 几何计算。
+    - CPU 不直接知道真实尺寸，只根据 Cam1 侧面 height_px 查表分类。
+    - height_px_20mm / height_px_25mm / height_px_30mm 是现场标定值。
+    - 当前代码中的默认像素值只作为 placeholder；最终以实测 Cam1 height_px 为准。
+    - 首版不建广角/畸变模型；固定位置下的广角影响由实测标定表吸收。
 
   数据流:
     FPGA LIVE_* 寄存器 ──→ feature_snapshot_t ──→ classify_frame()
@@ -128,88 +165,101 @@
 ================================================================================
   [4] task_matcher  —  目标匹配与动作决策
 ================================================================================
-  状态: ⬜ 待开发
+  状态: ✅ 已完成 (2026-07-08, 73/73 单测通过)
   计划文件: app/include/task_matcher.h, app/src/task_matcher.c
+  测试: tests/test_task_matcher.c (73 条, gcc 14.2.0 x86-64 全通过)
   依赖: vision_classifier (vision_result_t 输入)
 
-  功能:
+  实现:
     - 接收稳定后的 vision_result_t (颜色+形状+尺寸)
     - 与任务目标比对 (目标物块属性)
     - 决策动作: 抓取 / 跳过 / 报错
     - 输出 match_action (回写到 FPGA OSD 显示)
 
-  任务输入 (从哪个接口获取待定):
-    方案A: 编译期硬编码任务序列 (比赛任务固定)
-    方案B: 通过 UART/按键 动态设置目标
+  任务输入 (本轮讨论结论, 2026-07-08):
+    - 比赛目标顺序未知, 不采用固定顺序任务表作为首选方案。
+    - 由于本人识别侧只抓正方体, target_shape 首版固定为 SHAPE_CUBE。
+    - 目标输入只需要颜色 + 尺寸 + 有效位:
+        color_sel[1:0]  00=通配(颜色必过), 01=红, 10=蓝, 11=黄
+        size_sel [1:0]  00=通配(尺寸必过), 01=小, 10=中, 11=大
+        target_valid    0=暂不匹配/不抓取, 1=目标有效
+      说明: 当 color_sel=00 且 size_sel=00 且 target_valid=1 时,
+            等价于“看到正方体就抓”, 即只按形状过滤。
+    - FPGA 侧读取剩余拨码/按键并完成同步/消抖/编码, 暴露 CPU 可读
+      TARGET_SEL 寄存器; CPU 不直接处理物理开关引脚。
+    - target_valid 首版也使用拨码位, 不用瞬时按键, 避免现场误触和状态保持问题。
+    - TARGET_SEL 地址未确认; 0x06C 仅作为建议占位, 需 FPGA 队友确认后定版。
+      若 FPGA 侧暂未实现, C 代码需用 TARGET_SEL_AVAILABLE=0 默认保护。
+    - 当前正式工程只引出了 i_sw[0]/i_sw[1]:
+        i_sw[0] 已用于复位相关, i_sw[1] 已用于 HDMI 通道切换。
+      板上物理拨码资源虽多, 但实际可用位必须由 FPGA 队友确认后分配。
 
   决策逻辑:
-    if (observed.color != target.color) → SKIP (颜色不对)
-    if (observed.shape != target.shape) → SKIP (形状不对)
-    if (observed.size   != target.size)   → SKIP (尺寸不对)
-    if (all match)                       → GRAB + 输出抓取坐标
+    if (!target_valid)                  → NONE
+    target.shape = SHAPE_CUBE           → 只抓正方体
+    if (observed.color != target.color) → SKIP (颜色不对; color_sel=00 时跳过)
+    if (observed.shape != SHAPE_CUBE)   → SKIP/ERROR (不是正方体不抓)
+    if (observed.size   != target.size) → SKIP (尺寸不对; size_sel=00 时跳过)
+    if (all match)                      → GRAB + 输出识别侧结果
 
   接口草案:
     typedef struct {
       uint8_t target_color;
-      uint8_t target_shape;
+      uint8_t target_shape;          // 首版由 CPU 固定为 SHAPE_CUBE
       uint8_t target_size_cm_x10;
     } task_target_t;
 
+    /* FPGA→CPU 目标选择寄存器草案: TARGET_SEL
+       地址: 0x06C 为建议值, 未经 FPGA 确认前不得当作硬件事实 */
+    bits [1:0] color_sel;
+    bits [3:2] size_sel;
+    bit  [4]   target_valid;
+
     void     task_matcher_set_target(const task_target_t *t);
-    uint8_t  task_matcher_evaluate(const vision_result_t *obs);  // 返回 match_action
-    int      task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy); // 抓取点坐标
+    uint8_t  task_matcher_evaluate(const vision_result_t *obs,
+                                    uint16_t center_x, uint16_t center_y);
+    int      task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy);
+    const task_target_t *task_matcher_get_target(void);
 
 ================================================================================
-  [5] arm_controller  —  机械臂控制
+  识别侧协作边界 — 给队友 / 从队友获取
+================================================================================
+  本人负责范围:
+    - Cam0/Cam1 特征读取、颜色/形状/尺寸分类、参数表、目标匹配
+    - 输出给队友/系统集成方:
+        color_id        颜色 (COLOR_*)
+        shape_id        形状 (SHAPE_*)
+        size_cm_x10     尺寸, 0.1cm 单位 (20/25/30)
+        match_action    是否抓取/跳过/报错 (MATCH_ACTION_*)
+        // grab_center  抓取中心点预留，先不作为正式交付字段
+        //               若后续启用，来自 Cam0 snap.center 解包:
+        //               x = center[15:0], y = center[31:16]
+
+  队友负责输入:
+    - 两个摄像头的视频信号:
+        Cam0 俯视视频
+        Cam1 侧面视频
+    - FPGA 视频前端需把两路视频转成 CPU 可读的 LIVE_* 特征寄存器:
+        red/blue/yel area, bbox_min/max, center, fg_area, height_px, frame_id
+    - 目标输入寄存器:
+        FPGA 队友从剩余拨码/按键中分配 4~5 位, 生成 TARGET_SEL:
+          color_sel[1:0] + size_sel[1:0] + target_valid
+        CPU 根据 TARGET_SEL 设置 task_target_t, 且 target_shape 固定为 SHAPE_CUBE。
+        target_valid 使用拨码位; 00 颜色/尺寸编码表示通配, 不是无效。
+        实际占用哪些 SW 位必须和队友确认, 避免占用复位、HDMI 通道切换、
+        调试和机械臂控制用途。
+
+  不在本人范围:
+    - myCobot 串口协议、动作状态机、夹爪控制、机械臂安全互锁
+    - FPGA-to-机械臂接线、电平确认、真实动作测试
+
+================================================================================
+  [5] main  —  识别主循环集成
 ================================================================================
   状态: ⬜ 待开发
-  计划文件: app/include/arm_controller.h,   app/src/arm_controller.c
-            app/include/mycobot_protocol.h, app/src/mycobot_protocol.c
-  依赖: board_io (CPU_ARM_STATE 状态回写)
-
-  硬件接口:
-    myCobot 280 机械臂, 通信接口待确认 (UART? I2C? SPI?)
-
-  mycobot_protocol 层:
-    - 串口初始化 (波特率/数据位/停止位, 查 myCobot 280 手册)
-    - 指令打包: 关节角度 / 末端坐标 / 夹爪控制
-    - 应答解析: 状态反馈 / 错误码
-    - 超时重传机制
-
-  arm_controller 层:
-    - 状态机: IDLE → MOVING → GRASPING → LIFTING → PLACING → RETURNING → IDLE
-    - 坐标变换: 像素坐标 → 机械臂坐标系 (需标定)
-        Cam0 俯视 (x, y) → 物块在桌面的平面位置
-        Cam1 侧面 height_px → 物块高度 (决定夹爪下探深度)
-    - 预设位置: 拍照位、预抓位、放置位、安全位
-    - 错误处理: 堵转/超限/通信超时 → 回写 CPU_ERROR_CODE
-    - 状态回写: board_io_write_global_state(arm_state, error_code)
-
-  状态机阶段:
-    ARM_IDLE        (0)  等待指令
-    ARM_MOVE_TO_PRE (1)  移动到预抓位置
-    ARM_APPROACH    (2)  接近物块
-    ARM_GRASP       (3)  闭合夹爪
-    ARM_LIFT        (4)  抬起物块
-    ARM_MOVE_TO_DST (5)  移动到放置位置
-    ARM_RELEASE     (6)  释放夹爪
-    ARM_RETRACT     (7)  退回安全位
-    ARM_ERROR       (255) 错误状态
-
-  接口草案:
-    int  arm_init(void);                                  // 初始化串口 + 归零
-    int  arm_move_to_preset(int preset_id);               // 移动到预设位置
-    int  arm_grasp_at(uint16_t cx, uint16_t cy, uint8_t size_cm);  // 在指定坐标抓取
-    int  arm_place_at(int preset_id);                     // 在指定位置放置
-    int  arm_emergency_stop(void);                        // 急停
-    int  arm_get_state(uint8_t *state, uint16_t *error);  // 查询状态
-
-================================================================================
-  [6] main  —  主循环集成
-================================================================================
-  状态: ✅ 已完成 (2026-07-07, 68/68 单测通过)
   计划文件: app/src/main.c
-  依赖: 以上全部 5 个模块
+  依赖: board_io + vision_classifier + param_table + task_matcher
+        arm_controller 由队友集成；识别侧只输出 match_action/分类结果
 
   主循环伪代码:
 
@@ -219,11 +269,10 @@
 
         // 2. 初始化
         param_table_init();              // 加载分类器配置
-        arm_init();                      // 机械臂归零
         mf_filter_t filt_cam0, filt_cam1;
         mf_filter_reset(&filt_cam0);
         mf_filter_reset(&filt_cam1);
-        uint16_t seq_cam0 = 0, seq_cam1 = 0, seq_global = 0;
+        uint16_t seq_cam0 = 0, seq_cam1 = 0;
         const classifier_cfg_t *cfg = param_table_get();
 
         // 3. 写入初始配置到两路 staging + commit
@@ -238,12 +287,17 @@
 
             // ---- 处理 Cam0 ----
             feature_snapshot_t snap0;
+            uint16_t obj_cx = 0, obj_cy = 0;   /* 物块 bbox 中心（俯视） */
             if (board_io_read_features(0, &snap0) == 0) {
                 vision_result_t r0 = classify_frame(&snap0, 0, cfg);
                 vision_result_t s0 = mf_filter_update(&filt_cam0, &r0, cfg);
+                obj_cx = (uint16_t)(snap0.center & 0xFFFF);       /* [15:0]X_CEN */
+                obj_cy = (uint16_t)((snap0.center >> 16) & 0xFFFF); /* [31:16]Y_CEN */
                 board_io_ack_frame(0, snap0.frame_id);
-                // 回写结果
-                result_writeback_t wb0 = build_writeback(&s0);
+                // 先回写分类结果（match_action 先填 0，等融合决策后两路统一更新）
+                result_writeback_t wb0;
+                board_io_build_writeback(s0.color_id, s0.shape_id,
+                                          s0.size_cm_x10, 0, &snap0, &wb0);
                 board_io_write_results(0, &wb0);
                 board_io_commit_results(0, &seq_cam0);
             }
@@ -254,8 +308,10 @@
                 vision_result_t r1 = classify_frame(&snap1, 1, cfg);
                 vision_result_t s1 = mf_filter_update(&filt_cam1, &r1, cfg);
                 board_io_ack_frame(1, snap1.frame_id);
-                // 回写结果
-                result_writeback_t wb1 = build_writeback(&s1);
+                // 先回写分类结果（match_action 先填 0，等融合决策后两路统一更新）
+                result_writeback_t wb1;
+                board_io_build_writeback(s1.color_id, s1.shape_id,
+                                          s1.size_cm_x10, 0, &snap1, &wb1);
                 board_io_write_results(1, &wb1);
                 board_io_commit_results(1, &seq_cam1);
             }
@@ -264,27 +320,37 @@
             vision_result_t fused = fuse_results(
                 &filt_cam0.stable, &filt_cam1.stable, cfg);
 
-            // ---- 任务匹配 ----
-            uint8_t action = task_matcher_evaluate(&fused);
-            if (action == MATCH_ACTION_GRAB) {
-                uint16_t cx, cy;
-                task_matcher_get_grab_coord(&cx, &cy);
-                arm_grasp_at(cx, cy, fused.size_cm_x10);
-                arm_place_at(PLACE_DEST);
-            }
+            // ---- 目标输入 ----
+            // 从 FPGA TARGET_SEL 寄存器读取：color_sel[1:0] + size_sel[1:0] + target_valid
+            // shape 固定为 SHAPE_CUBE（识别侧只抓正方体）。
+            // target_valid=0 时自动清空目标，evaluate() 返回 NONE。
+            task_matcher_read_target_from_fpga();
 
-            // ---- 全局状态回写 ----
-            uint8_t arm_st; uint16_t arm_err;
-            arm_get_state(&arm_st, &arm_err);
-            board_io_write_global_state(arm_st, arm_err);
-            board_io_commit_global(&seq_global);
+            // ---- 任务匹配 / 识别侧输出 ----
+            // obj_cx/obj_cy 来自 Cam0 快照的 bbox 中心（见上方 snap0.center 解包）
+            uint8_t action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
+            // 输出给队友/系统集成:
+            //   fused.color_id, fused.shape_id, fused.size_cm_x10, action
+            // 最终 match_action 首版推荐 Cam0/Cam1 两路都写同一个 action,
+            // 这样 HDMI/OSD 切任一通道都能看到一致的抓取/跳过/报错状态。
+            // 抓取中心点暂不作为正式交付字段，后续需要时再打开:
+            //   uint16_t cx, cy;
+            //   if (action == MATCH_ACTION_GRAB &&
+            //       task_matcher_get_grab_coord(&cx, &cy) == 0) {
+            //       // pass cx/cy to arm_controller teammate interface
+            //   }
+
+            // ---- 识别侧到队友接口边界 ----
+            // 本人侧到此结束；机械臂状态/错误码/动作执行由队友 arm_controller 负责。
+            // 若后续联调需要，可在这里调用队友提供的非阻塞接口。
         }
     }
 
   待定:
     - 两路相机是轮询还是等 VSYNC 中断? (当前方案: 独立轮询)
-    - 机械臂动作是否阻塞主循环? (当前假设: 阻塞, 抓完再看下一帧)
-    - 任务序列如何输入? (编译期硬编码 vs UART 动态设定)
+    - TARGET_SEL 寄存器地址/位定义由 FPGA 队友确认；0x06C 只是建议值
+    - 具体占用哪些拨码/按键位由队友确认; CPU 只读寄存器
+    - 队友的 arm_controller 接口是否需要抓取中心点; 当前默认不交付 grab_center
 
 ================================================================================
   模块依赖关系
@@ -298,11 +364,10 @@
        ↑
     task_matcher  ←── 依赖 vision_classifier (vision_result_t)
        ↑
-    arm_controller  ←── 依赖 board_io (CPU_ARM_STATE 回写)
-       ↑
-    main  ←── 依赖以上全部
+    main  ←── 识别侧依赖 [1]~[4]，与 arm_controller 仅通过接口对接
 
-  开发顺序: [1] → [2] → [3] → [4] + [5] → [6]
+  开发顺序: [1] → [2] → [3] → [4] → [5识别侧集成]
+            机械臂控制由队友并行开发，后续做接口联调
   (param_table 可在 vision_classifier 完成后并行开发)
 
 ================================================================================
@@ -316,9 +381,20 @@
     - valid/ack + frame_id 握手
 
   ■ 待确认/待新增:
+    - 队友提供 Cam0/Cam1 两路摄像头视频信号及稳定视频前端
     - LIVE_FG_AREA @ Cam0 0x0B0, Cam1 0x1B0 (bbox 内前景像素总数)
     - 颜色面积是否限定 bbox 内部 (当前为全帧)
-    - 机械臂通信接口 (UART? 波特率?)
+    - TARGET_SEL 目标输入寄存器:
+        建议 bit[1:0]=color_sel, bit[3:2]=size_sel, bit[4]=target_valid
+        建议地址 0x06C 未定版; 若 FPGA 不接受该地址, 需回到用户确认新地址
+        target_valid 用拨码位, 不用瞬时按键
+        color_sel=00 / size_sel=00 表示该维度通配; 两者都为 00 且 valid=1 时“看到正方体就抓”
+        形状不从拨码输入, CPU 固定为 SHAPE_CUBE
+        FPGA 负责物理开关同步/消抖/编码, CPU 只读稳定寄存器
+        具体 SW 位需确认空闲资源; 当前 i_sw[0]/i_sw[1] 已被复位/HDMI 切换占用
+    - 与机械臂队友确认识别输出字段: color/shape/size/match_action
+    - 最终 match_action 首版推荐 Cam0/Cam1 两路都写同一个融合后 action
+    - grab_center 是否启用；默认先注释保留，不作为当前正式接口
     - 是否有 VSYNC 中断可用 (优化轮询)
 
 ================================================================================
