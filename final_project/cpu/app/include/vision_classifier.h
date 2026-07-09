@@ -72,6 +72,7 @@ typedef struct {
     /* 形状：填充率下限（有色像素 / bbox 总面积），低于此视为 cone */
     float    cube_fill_lo;
     float    cyl_fill_lo;
+    float    cone_fill_lo;
 
     /* 尺寸：Cam1 高度→cm 查表（需标定，见 size_calibration.c） */
     uint16_t height_px_20mm;     /* 2.0cm 物块在侧面图里的像素高度 */

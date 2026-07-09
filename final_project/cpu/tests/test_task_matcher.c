@@ -220,6 +220,36 @@ static void test_size_mismatch_skip(void)
     PASS();
 }
 
+static void test_size_unavailable_returns_none(void)
+{
+    TEST("eval: target has size but obs.size=0 → NONE (wait Cam1)");
+    task_matcher_init();
+    task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
+    task_matcher_set_target(&t);
+
+    /* Cam0-only snapshot: color+shape OK but size=0 (Cam1 not ready) */
+    vision_result_t obs = make_obs(COLOR_RED, SHAPE_CUBE, 0);
+    CHECK_EQ(task_matcher_evaluate(&obs, 100, 200), MATCH_ACTION_NONE);
+
+    /* grab should NOT be valid — we didn't GRAB */
+    uint16_t cx = 99, cy = 99;
+    CHECK_EQ(task_matcher_get_grab_coord(&cx, &cy), -1);
+    PASS();
+}
+
+static void test_size_unavailable_but_wildcard_ok(void)
+{
+    TEST("eval: target_size=0 wildcard + obs.size=0 → GRAB (no Cam1 needed)");
+    task_matcher_init();
+    /* size_sel=00 (wildcard): any size is OK, including 0 */
+    task_target_t t = make_target(COLOR_BLUE, SHAPE_CUBE, 0);
+    task_matcher_set_target(&t);
+
+    vision_result_t obs = make_obs(COLOR_BLUE, SHAPE_CUBE, 0);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_GRAB);
+    PASS();
+}
+
 static void test_multi_mismatch_skip(void)
 {
     TEST("eval: both color+shape mismatch → SKIP");
@@ -233,41 +263,44 @@ static void test_multi_mismatch_skip(void)
 }
 
 /*==========================================================================
- *  测试组 4: 观测无效 → ERROR
+ *  测试组 4: 观测无效 → NONE（正式主线 DEBUG_MODE=0 行为）
+ *
+ *  注意：DEBUG_MODE=1 时这些用例应返回 MATCH_ACTION_ERROR。
+ *  当前编译默认 DEBUG_MODE=0，验证正式主线安全策略。
  *==========================================================================*/
 
-static void test_unknown_color_error(void)
+static void test_unknown_color_none(void)
 {
-    TEST("eval: color=UNKNOWN → ERROR");
+    TEST("eval: color=UNKNOWN → NONE (production mode)");
     task_matcher_init();
     task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
     task_matcher_set_target(&t);
 
     vision_result_t obs = make_obs(COLOR_UNKNOWN, SHAPE_CUBE, 20);
-    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_ERROR);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_NONE);
     PASS();
 }
 
-static void test_unknown_shape_error(void)
+static void test_unknown_shape_none(void)
 {
-    TEST("eval: shape=UNKNOWN → ERROR");
+    TEST("eval: shape=UNKNOWN → NONE (production mode)");
     task_matcher_init();
     task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
     task_matcher_set_target(&t);
 
     vision_result_t obs = make_obs(COLOR_RED, SHAPE_UNKNOWN, 20);
-    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_ERROR);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_NONE);
     PASS();
 }
 
-static void test_null_obs_error(void)
+static void test_null_obs_none(void)
 {
-    TEST("eval: NULL obs → ERROR (defense against baremetal crash)");
+    TEST("eval: NULL obs → NONE (production: defense without false alarm)");
     task_matcher_init();
     task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
     task_matcher_set_target(&t);
 
-    CHECK_EQ(task_matcher_evaluate(0, 100, 200), MATCH_ACTION_ERROR);
+    CHECK_EQ(task_matcher_evaluate(0, 100, 200), MATCH_ACTION_NONE);
     PASS();
 }
 
@@ -390,13 +423,14 @@ static void test_no_grab_after_skip(void)
     PASS();
 }
 
-static void test_no_grab_after_error(void)
+static void test_no_grab_after_invalid(void)
 {
-    TEST("coord: get_grab_coord returns -1 after ERROR");
+    TEST("coord: get_grab_coord returns -1 after non-GRAB (NONE/NULL obs)");
     task_matcher_init();
     task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
     task_matcher_set_target(&t);
 
+    /* UNKNOWN → NONE in production mode；grab_valid cleared by evaluate() */
     vision_result_t obs = make_obs(COLOR_UNKNOWN, SHAPE_CUBE, 20);
     (void)task_matcher_evaluate(&obs, 100, 100);
 
@@ -469,7 +503,48 @@ static void test_get_target_returns_set_values(void)
 }
 
 /*==========================================================================
- *  测试组 9: 边界条件
+ *  测试组 9: read_target_from_fpga 行为 (TARGET_SEL_AVAILABLE=0, DEBUG_MODE=0)
+ *==========================================================================*/
+
+static void test_read_target_clears_on_unavailable(void)
+{
+    TEST("fpga: read_target w/ TARGET_SEL=0 clears target (production)");
+    task_matcher_init();
+
+    /* Set a manual target first */
+    task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
+    task_matcher_set_target(&t);
+    CHECK(task_matcher_get_target() != 0);
+
+    /* TARGET_SEL_AVAILABLE=0 + DEBUG_MODE=0 → must clear target */
+    int rc = task_matcher_read_target_from_fpga();
+    CHECK_EQ(rc, -1);
+    CHECK(task_matcher_get_target() == 0);
+
+    /* After clear, evaluate returns NONE */
+    vision_result_t obs = make_obs(COLOR_RED, SHAPE_CUBE, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_NONE);
+    PASS();
+}
+
+static void test_both_unknown_returns_none(void)
+{
+    TEST("eval: both color+shape UNKNOWN → NONE (production)");
+    task_matcher_init();
+    task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
+    task_matcher_set_target(&t);
+
+    vision_result_t obs = make_obs(COLOR_UNKNOWN, SHAPE_UNKNOWN, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_NONE);
+
+    /* grab should NOT be valid */
+    uint16_t cx = 99, cy = 99;
+    CHECK_EQ(task_matcher_get_grab_coord(&cx, &cy), -1);
+    PASS();
+}
+
+/*==========================================================================
+ *  测试组 10: 边界条件
  *==========================================================================*/
 
 static void test_grab_coord_boundary_zero(void)
@@ -513,9 +588,9 @@ static void test_skip_clears_old_grab(void)
     PASS();
 }
 
-static void test_error_clears_old_grab(void)
+static void test_invalid_obs_clears_old_grab(void)
 {
-    TEST("boundary: ERROR after GRAB invalidates old grab coords");
+    TEST("boundary: invalid obs after GRAB invalidates old grab coords");
     task_matcher_init();
     task_target_t t = make_target(COLOR_RED, SHAPE_CUBE, 20);
     task_matcher_set_target(&t);
@@ -523,9 +598,9 @@ static void test_error_clears_old_grab(void)
     vision_result_t good = make_obs(COLOR_RED, SHAPE_CUBE, 20);
     CHECK_EQ(task_matcher_evaluate(&good, 111, 222), MATCH_ACTION_GRAB);
 
-    /* Then: ERROR (UNKNOWN obs) */
+    /* Then: UNKNOWN obs → NONE (production mode), but grab still cleared */
     vision_result_t bad = make_obs(COLOR_UNKNOWN, SHAPE_CUBE, 20);
-    CHECK_EQ(task_matcher_evaluate(&bad, 0, 0), MATCH_ACTION_ERROR);
+    CHECK_EQ(task_matcher_evaluate(&bad, 0, 0), MATCH_ACTION_NONE);
 
     uint16_t cx = 99, cy = 99;
     int rc = task_matcher_get_grab_coord(&cx, &cy);
@@ -576,16 +651,18 @@ int main(void)
     test_grab_stores_coords();
     test_grab_overwrites_old_coords();
 
-    printf("\n[3] Mismatch → SKIP\n");
+    printf("\n[3] Mismatch → SKIP / NONE (size unavailable)\n");
     test_color_mismatch_skip();
     test_shape_mismatch_skip();
     test_size_mismatch_skip();
+    test_size_unavailable_returns_none();
+    test_size_unavailable_but_wildcard_ok();
     test_multi_mismatch_skip();
 
-    printf("\n[4] Invalid observation → ERROR\n");
-    test_unknown_color_error();
-    test_unknown_shape_error();
-    test_null_obs_error();
+    printf("\n[4] Invalid observation → NONE (production mode)\n");
+    test_unknown_color_none();
+    test_unknown_shape_none();
+    test_null_obs_none();
 
     printf("\n[5] Wildcard targets\n");
     test_target_color_wildcard();
@@ -596,7 +673,7 @@ int main(void)
     printf("\n[6] Grab coords unavailable\n");
     test_no_grab_before_eval();
     test_no_grab_after_skip();
-    test_no_grab_after_error();
+    test_no_grab_after_invalid();
     test_grab_coord_null_ptr();
 
     printf("\n[7] Target switching\n");
@@ -605,10 +682,14 @@ int main(void)
     printf("\n[8] get_target\n");
     test_get_target_returns_set_values();
 
-    printf("\n[9] Boundary conditions\n");
+    printf("\n[9] FPGA target read & edge cases\n");
+    test_read_target_clears_on_unavailable();
+    test_both_unknown_returns_none();
+
+    printf("\n[10] Boundary conditions\n");
     test_grab_coord_boundary_zero();
     test_skip_clears_old_grab();
-    test_error_clears_old_grab();
+    test_invalid_obs_clears_old_grab();
     test_set_target_clears_old_grab();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",

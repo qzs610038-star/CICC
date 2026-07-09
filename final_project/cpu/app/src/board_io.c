@@ -14,15 +14,35 @@
 #include "board_io.h"
 
 /*==========================================================================
- *  内部常量
+ *  内部常量 & helper
  *==========================================================================*/
 
 /* commit / valid 轮询超时（迭代次数；QCRV32 主频待确认后调整） */
 #define COMMIT_POLL_MAX   100000u
 #define VALID_POLL_MAX    100000u
 
-/* cam 参数合法性 — 必须是 0（俯视）或 1（侧面） */
-#define VALID_CAM(c)  ((c) == 0 || (c) == 1)
+/* 内部：写 CFG_COMMIT 并轮询 active_seq，不做 CAM_ENABLED/VALID_CAM 检查。
+ * 返回 0 成功，-1 超时。
+ * 由 board_io_commit_config()（含 CAM_ENABLED 门控）和
+ * board_io_commit_global()（全局寄存器不受 CAM_ENABLED 限制）共用。 */
+static int _commit_raw(int cam, uint16_t config_seq)
+{
+    uint32_t i;
+    uint32_t status;
+    uint16_t active;
+
+    mmio_write32(REG_ADDR(OFF_CFG_COMMIT(cam)), (uint32_t)config_seq);
+
+    for (i = 0; i < COMMIT_POLL_MAX; i++) {
+        status = mmio_read32(REG_ADDR(OFF_CFG_STATUS(cam)));
+        active = (uint16_t)((status >> 16) & 0xFFFFu);
+
+        if (active == config_seq)
+            return 0;
+    }
+
+    return -1;  /* 超时 */
+}
 
 /*==========================================================================
  *  公共 API
@@ -81,33 +101,21 @@ void board_io_write_config(int cam,
  *  写入 config_seq 到 CFG_COMMIT，轮询 CFG_STATUS 直到
  *  active_seq (bits [31:16]) == config_seq，或超时。
  *
- *  *seq 在本函数内递增；调用方传入持久变量即可。
- *  返回 0 成功，-1 超时。
+ *  *seq 仅在成功时更新为本次 config_seq；超时 / CAM_ENABLED==0 时保持不变。
+ *  调用方传入持久变量即可。返回 0 成功，-1 失败。
  *--------------------------------------------------------------------------*/
 int board_io_commit_config(int cam, uint16_t *seq)
 {
-    uint32_t i;
-    uint32_t status;
-    uint16_t active;
-
     if (!VALID_CAM(cam) || !CAM_ENABLED(cam) || seq == 0)
         return -1;
 
-    uint16_t config_seq = ++(*seq);
+    uint16_t config_seq = (*seq) + 1u;   /* 计算目标值，先不推进调用方变量 */
 
-    /* 写 CFG_COMMIT 触发 VSYNC 边界生效 */
-    mmio_write32(REG_ADDR(OFF_CFG_COMMIT(cam)), (uint32_t)config_seq);
-
-    /* 轮询等待 active_seq == config_seq */
-    for (i = 0; i < COMMIT_POLL_MAX; i++) {
-        status = mmio_read32(REG_ADDR(OFF_CFG_STATUS(cam)));
-        active = (uint16_t)((status >> 16) & 0xFFFFu);
-
-        if (active == config_seq)
-            return 0;
+    int rc = _commit_raw(cam, config_seq);
+    if (rc == 0) {
+        *seq = config_seq;               /* 成功后才推进 */
     }
-
-    return -1;  /* 超时 */
+    return rc;
 }
 
 /*--------------------------------------------------------------------------
@@ -156,6 +164,17 @@ int board_io_read_features(int cam, feature_snapshot_t *snap)
     else
         snap->height_px = 0;
 
+    /* 二次确认：重读 STATUS，frame_id 应不变。
+     * 当前手册 v2 约定 "FPGA 在 ack 前不覆盖快照"，此检查属于防御性措施。
+     * 若 frame_id 发生变化（RTL 未遵守锁存约定），返回 -1 丢弃本次读取。 */
+    {
+        uint32_t status2 = mmio_read32(REG_ADDR(OFF_SYS_STATUS(cam)));
+        uint16_t fid2    = (uint16_t)((status2 >> 16) & 0xFFFFu);
+        if (fid2 != snap->frame_id || !(status2 & 0x1u)) {
+            return -1;  /* 快照在读期间被覆盖 → 数据可能不一致，丢弃 */
+        }
+    }
+
     return 0;
 }
 
@@ -181,7 +200,8 @@ void board_io_write_results(int cam, const result_writeback_t *r)
     mmio_write32(REG_ADDR(OFF_CPU_RESULT_COLOR(cam)),  (uint32_t)r->color);
     mmio_write32(REG_ADDR(OFF_CPU_RESULT_SHAPE(cam)),  (uint32_t)r->shape);
     mmio_write32(REG_ADDR(OFF_CPU_RESULT_SIZE(cam)),   (uint32_t)r->size_cm_x10);
-    mmio_write32(REG_ADDR(OFF_CPU_MATCH_ACTION(cam)),  (uint32_t)r->match_action);
+    mmio_write32(REG_ADDR(OFF_CPU_MATCH_ACTION(cam)),
+                 match_action_to_hw(r->match_action));
 
     mmio_write32(REG_ADDR(OFF_CPU_OSD_BBOX_MIN(cam)),  r->osd_bbox_min);
     mmio_write32(REG_ADDR(OFF_CPU_OSD_BBOX_MAX(cam)),  r->osd_bbox_max);
@@ -206,11 +226,27 @@ void board_io_write_global_state(uint8_t arm_state, uint16_t error_code)
 }
 
 /*--------------------------------------------------------------------------
- *  全局提交：对 CAM_COMMIT_GLOBAL 摄像头执行 commit
+ *  全局提交：对 CAM_COMMIT_GLOBAL 通道执行 commit。
+ *
+ *  全局寄存器 (ARM_STATE/ERROR_CODE) 的 commit 独立于 CAM_ENABLED：
+ *  即使 Cam0 视频链路未启用，全局状态仍需通过此通道同步到 FPGA。
+ *  因此不走 board_io_commit_config()（其内部有 CAM_ENABLED 门控），
+ *  直接操作 commit 寄存器。
+ *
+ *  *seq 仅在成功时更新；失败时保持不变。
  *--------------------------------------------------------------------------*/
 int board_io_commit_global(uint16_t *seq)
 {
-    return board_io_commit_config(CAM_COMMIT_GLOBAL, seq);
+    if (seq == 0)
+        return -1;
+
+    uint16_t config_seq = (*seq) + 1u;
+
+    int rc = _commit_raw(CAM_COMMIT_GLOBAL, config_seq);
+    if (rc == 0) {
+        *seq = config_seq;
+    }
+    return rc;
 }
 
 /*--------------------------------------------------------------------------

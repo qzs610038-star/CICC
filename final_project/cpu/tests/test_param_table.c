@@ -235,6 +235,23 @@ static void test_validate_fill_cyl_ge_cube(void)
     PASS();
 }
 
+static void test_validate_fill_cone_bounds(void)
+{
+    TEST("validate: cone_fill_lo bounds/order -> ERR_FILL_RANGE");
+    classifier_cfg_t c = valid_cfg();
+    c.cone_fill_lo = 0.05f;
+    CHECK(param_table_validate(&c) == PARAM_ERR_FILL_RANGE);
+
+    c = valid_cfg();
+    c.cone_fill_lo = 0.65f;
+    CHECK(param_table_validate(&c) == PARAM_ERR_FILL_RANGE);
+
+    c = valid_cfg();
+    c.cone_fill_lo = c.cyl_fill_lo;
+    CHECK(param_table_validate(&c) == PARAM_ERR_FILL_RANGE);
+    PASS();
+}
+
 /*==========================================================================
  *  测试组 6: 校验 — 尺寸查表
  *==========================================================================*/
@@ -381,6 +398,25 @@ static void test_set_default_slot_no_flag(void)
     c.filter_window = 6;
     (void)param_table_set(PARAM_SLOT_DEFAULT, &c);
     CHECK(param_table_is_calibrated() == 0);
+    PASS();
+}
+
+static void test_set_invalid_slot(void)
+{
+    TEST("set: invalid slot → PARAM_ERR_SLOT");
+    param_table_init();
+    classifier_cfg_t c = valid_cfg();
+
+    /* slot < 0 */
+    int rc = param_table_set(-1, &c);
+    CHECK(rc == PARAM_ERR_SLOT);
+
+    /* slot >= PARAM_SLOT_COUNT */
+    rc = param_table_set(2, &c);
+    CHECK(rc == PARAM_ERR_SLOT);
+
+    rc = param_table_set(99, &c);
+    CHECK(rc == PARAM_ERR_SLOT);
     PASS();
 }
 
@@ -533,6 +569,8 @@ static void test_strerror_coverage(void)
     CHECK(param_table_strerror(PARAM_ERR_THRESHOLD)   != 0);
     CHECK(param_table_strerror(PARAM_ERR_WINDOW)      != 0);
     CHECK(param_table_strerror(PARAM_ERR_LUMA_RATIO)  != 0);
+    CHECK(param_table_strerror(PARAM_ERR_NULL)        != 0);
+    CHECK(param_table_strerror(PARAM_ERR_SLOT)        != 0);
     CHECK(param_table_strerror(999)                   != 0);  /* unknown */
     PASS();
 }
@@ -578,6 +616,15 @@ static void test_validate_validator_twice_idempotent(void)
     PASS();
 }
 
+static void test_null_inputs_rejected(void)
+{
+    TEST("boundary: NULL config pointers are rejected");
+    CHECK(param_table_validate(0) == PARAM_ERR_NULL);
+    CHECK(param_table_set(PARAM_SLOT_CALIBRATED, 0) == PARAM_ERR_NULL);
+    CHECK(param_table_strerror(PARAM_ERR_NULL) != 0);
+    PASS();
+}
+
 /*==========================================================================
  *  main
  *==========================================================================*/
@@ -611,6 +658,7 @@ int main(void)
     test_validate_fill_cube_too_low();
     test_validate_fill_cube_too_high();
     test_validate_fill_cyl_ge_cube();
+    test_validate_fill_cone_bounds();
 
     printf("\n[6] Validation — size lookup table\n");
     test_validate_height_px_monotonic();
@@ -629,6 +677,7 @@ int main(void)
     test_set_invalid_refused();
     test_set_calibrated_sets_flag();
     test_set_default_slot_no_flag();
+    test_set_invalid_slot();
 
     printf("\n[9] Calibration flow\n");
     test_calibration_flow();
@@ -648,6 +697,7 @@ int main(void)
     printf("\n[12] Boundary & reset\n");
     test_set_then_init_resets();
     test_validate_validator_twice_idempotent();
+    test_null_inputs_rejected();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            _test_count - _test_failures, _test_count, _test_failures);

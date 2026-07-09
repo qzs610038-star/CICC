@@ -72,10 +72,60 @@ extern "C" {
 #  define CAM_ENABLED(n)  (1)     /* 默认两路都启用 */
 #endif
 
-/* 全局寄存器跟哪个摄像头的 commit 通道：CAM0(0) 或 CAM1(1) */
+/* cam 参数合法性 — 运行时防御：必须是 0（俯视）或 1（侧面）。
+   各模块统一使用此宏，不要手写 cam != 0 && cam != 1。 */
+#define VALID_CAM(c)  ((c) == 0 || (c) == 1)
+
+/* 全局寄存器跟哪个摄像头的 commit 通道：CAM0(0) 或 CAM1(1)
+ *
+ * 注意：全局寄存器 (ARM_STATE/ERROR_CODE) 的 commit 通道独立于 CAM_ENABLED，
+ * 即使 Cam0 视频链路未启用，FPGA 仍然需要 CAM_COMMIT_GLOBAL 通道来同步全局状态。
+ * 因此 board_io_commit_global() 不走 CAM_ENABLED 检查，直接操作 commit 寄存器。
+ *
+ * CAM_COMMIT_GLOBAL 只能是 0 或 1，分别对应 Cam0/Cam1 的 commit 通道。
+ * 配成其他值会被下面的编译期检查拦截，防止错误映射到不存在的寄存器。 */
 #ifndef CAM_COMMIT_GLOBAL
 #  define CAM_COMMIT_GLOBAL  0    /* 默认跟 Cam0 */
 #endif
+
+#if (CAM_COMMIT_GLOBAL) != 0 && (CAM_COMMIT_GLOBAL) != 1
+#  error "CAM_COMMIT_GLOBAL must be 0 (Cam0) or 1 (Cam1). Other values map to undefined register offsets."
+#endif
+
+/*--------------------------------------------------------------------------
+ *  CPU_MATCH_ACTION 寄存器位域编码（与手册 §2.2 offset 0x060 对齐）
+ *
+ *  寄存器是 bitfield，不是枚举值：
+ *    bit[0] = match    分类完成 / 匹配成立
+ *    bit[1] = grab     抓取动作
+ *    bit[2] = skip     跳过动作
+ *    bit[3] = error    错误
+ *    bits[31:16] = 保留（目标编号，首版不用）
+ *
+ *  task_matcher.h 的 MATCH_ACTION_* 是软件逻辑码 (NONE=0,GRAB=1,SKIP=2,ERROR=3)，
+ *  不能直接写入寄存器。用下面的转换函数映射到硬件位域。
+ *--------------------------------------------------------------------------*/
+#define MATCH_HW_MATCH  0x01u
+#define MATCH_HW_GRAB   0x02u
+#define MATCH_HW_SKIP   0x04u
+#define MATCH_HW_ERROR  0x08u
+
+/* 将 task_matcher.h 逻辑动作码转换为 CPU_MATCH_ACTION 寄存器位域。
+ *   NONE  → 0x00  空闲，无动作
+ *   GRAB  → 0x03  match + grab（匹配成立，执行抓取）
+ *   SKIP  → 0x05  match + skip（匹配成立，但属性不符，跳过）
+ *   ERROR → 0x08  error（分类失败/观测无效，无 match 位）
+ *
+ * 用 numeric literal 避免依赖 task_matcher.h（board_io.h 不 include 它）。 */
+static inline uint32_t match_action_to_hw(uint8_t logical_action)
+{
+    switch (logical_action) {
+    case 1:  return MATCH_HW_MATCH | MATCH_HW_GRAB;   /* GRAB */
+    case 2:  return MATCH_HW_MATCH | MATCH_HW_SKIP;   /* SKIP */
+    case 3:  return MATCH_HW_ERROR;                    /* ERROR */
+    default: return 0u;                                /* NONE */
+    }
+}
 
 /*--------------------------------------------------------------------------
  *  内存映射 I/O 原子操作
@@ -273,8 +323,13 @@ void board_io_write_config(int cam,
                            uint16_t luma_min, uint16_t luma_max);
 
 /* 写 CamN 的 CFG_COMMIT，阻塞到 active_seq == config_seq 或超时。
- * *seq 会被更新为本次成功的 config_seq；调用方每次传入不同值。
- * CFG_COMMIT 是 16-bit 全值比较，不是截位。 */
+ *
+ * *seq：调用方持久变量。
+ *   成功 → *seq = 本次 config_seq（即 *seq + 1）
+ *   失败（超时/CAM_ENABLED(n)==0）→ *seq 不变，调用方可选择重试或报错
+ *
+ * CFG_COMMIT 是 16-bit 全值比较，不是截位。
+ * 要求 CAM_ENABLED(n)==1（视频链路启用），否则直接返回 -1。 */
 int board_io_commit_config(int cam, uint16_t *seq);
 
 /* 等待 CamN 的 feature_valid，读完整 LIVE_* 特征快照。
@@ -293,11 +348,13 @@ void board_io_write_results(int cam, const result_writeback_t *r);
 int board_io_commit_results(int cam, uint16_t *seq);
 
 /* 写全局 ARM_STATE + ERROR_CODE 到 staging（不触发 commit）。
- * 随后需要用 board_io_commit_config(CAM_COMMIT_GLOBAL, seq) 提交，
+ * 随后需要用 board_io_commit_global(seq) 提交，
  * 因为手册规定全局寄存器跟 CAM_COMMIT_GLOBAL 的 commit 通道生效。 */
 void board_io_write_global_state(uint8_t arm_state, uint16_t error_code);
 
-/* 全局提交：对 CAM_COMMIT_GLOBAL 摄像头做 commit。
+/* 全局提交：对 CAM_COMMIT_GLOBAL 通道做 commit。
+ * 不经过 CAM_ENABLED 门控——即使 Cam0 视频链路未启用，
+ * 全局状态 (ARM_STATE/ERROR_CODE) 仍需通过此通道同步到 FPGA。
  * 在一帧 write_results + write_global_state 全部完成后调用一次即可。 */
 int board_io_commit_global(uint16_t *seq);
 

@@ -58,6 +58,9 @@ static uint32_t _crc32(const void *data, uint32_t len)
 
 int param_table_validate(const classifier_cfg_t *cfg)
 {
+    if (cfg == 0)
+        return PARAM_ERR_NULL;
+
     /* ---- 颜色阈值 ---- */
     /* min_*_area 是 uint32_t，只需确保不会溢出到不合理范围。
      * 上限设 10M 像素（远超 1080p 全帧）作为防御。 */
@@ -93,8 +96,16 @@ int param_table_validate(const classifier_cfg_t *cfg)
         return PARAM_ERR_FILL_RANGE;
     if (cfg->cyl_fill_lo  < 0.30f || cfg->cyl_fill_lo  > 0.85f)
         return PARAM_ERR_FILL_RANGE;
+    /* cone_fill_lo 校验范围 [0.10, 0.60]：
+     *   下界 0.10 远低于默认值 0.25，给极端窄三角留空间；
+     *   上界 0.60 必须低于 cyl_fill_lo 下界 0.30 的合法最大值 0.85，
+     *   防止 cone/cyl 区间重叠导致形状分类歧义。 */
+    if (cfg->cone_fill_lo < 0.10f || cfg->cone_fill_lo > 0.60f)
+        return PARAM_ERR_FILL_RANGE;
     if (cfg->cyl_fill_lo >= cfg->cube_fill_lo)
         return PARAM_ERR_FILL_RANGE;   /* 圆填充率必须低于方填充率 */
+    if (cfg->cone_fill_lo >= cfg->cyl_fill_lo)
+        return PARAM_ERR_FILL_RANGE;
 
     /* ---- 尺寸查表 ---- */
     if (cfg->height_px_20mm < 5 || cfg->height_px_20mm > 4095)
@@ -137,7 +148,10 @@ void param_table_init(void)
     g_calibrated  = 0;
     g_calibrating = 0;
 
-    /* 尝试加载 NVM 标定值 */
+    /* 尝试加载 NVM 标定值。
+     * 外层 if() 在 NVM=0 构建中完全消除函数调用开销；
+     * param_table_load_calibrated() 内部另有独立的 #if 守卫作为第二道安全网。
+     * 两层守卫功能上冗余，但各自服务于不同优化层级（编译期死代码消除 vs 运行时安全）。 */
     if (PARAM_TABLE_NVM_AVAILABLE) {
         int rc = param_table_load_calibrated();
         if (rc == 0) {
@@ -154,7 +168,7 @@ const classifier_cfg_t *param_table_get(void)
 int param_table_set(int slot, const classifier_cfg_t *cfg)
 {
     if (slot < 0 || slot >= PARAM_SLOT_COUNT)
-        return PARAM_ERR_WINDOW;   /* 任何非零错误码均可 */
+        return PARAM_ERR_SLOT;
 
     int err = param_table_validate(cfg);
     if (err != PARAM_OK)
@@ -214,6 +228,8 @@ int param_table_load_calibrated(void)
 
 int param_table_save_calibrated(void)
 {
+    /* 编译期门控：NVM=0 直接短路，避免链接缺少 nvm_write 符号时报错。
+     * 函数体内的 #if 块提供独立的第二道安全网（同 init() 的分层策略）。 */
     if (!PARAM_TABLE_NVM_AVAILABLE)
         return -1;
 
@@ -269,6 +285,8 @@ const char *param_table_strerror(int err)
     case PARAM_ERR_THRESHOLD:   return "color threshold out of range";
     case PARAM_ERR_WINDOW:      return "filter window/confirm invalid";
     case PARAM_ERR_LUMA_RATIO:  return "white/black luma ratio invalid";
+    case PARAM_ERR_NULL:        return "null parameter pointer";
+    case PARAM_ERR_SLOT:        return "slot index out of range";
     default:                    return "unknown error";
     }
 }
