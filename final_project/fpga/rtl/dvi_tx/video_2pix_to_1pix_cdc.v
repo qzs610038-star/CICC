@@ -27,8 +27,10 @@ module video_2pix_to_1pix_cdc #(
     wire [50:0]           fifo_q;
     wire                  fifo_rd_en;
     wire                  fifo_reset = ~rst_n;
+    wire                  fifo_wr_en;
     reg                   fifo_rd_valid = 1'b0;
     reg [50:0]            active_word = 51'd0;
+    reg                   input_started = 1'b0;
     reg [1:0]             phase = 2'd0;
     localparam [1:0]      PH_REQUEST = 2'd0;
     localparam [1:0]      PH_LOW     = 2'd1;
@@ -36,7 +38,8 @@ module video_2pix_to_1pix_cdc #(
     localparam [COUNT_WIDTH-1:0] START_LEVEL_W = START_LEVEL;
     wire                  enough_fifo_level = fifo_rd_usedw >= START_LEVEL_W;
     assign o_level_ready = enough_fifo_level;
-    assign o_level_low = fifo_rd_usedw < (START_LEVEL_W >> 1);
+    assign o_level_low = o_active & (fifo_rd_usedw < (START_LEVEL_W >> 1));
+    assign fifo_wr_en = input_started | i_vs | i_de;
 
     DC_FIFO #(
         .DATA_WIDTH(51),
@@ -44,7 +47,7 @@ module video_2pix_to_1pix_cdc #(
     ) u_video_cdc_fifo (
         .Reset(fifo_reset),
         .WrClk(wr_clk),
-        .WrEn(1'b1),
+        .WrEn(fifo_wr_en & ~fifo_full),
         .WrDNum(fifo_wr_usedw),
         .WrFull(fifo_full),
         .WrData({i_vs, i_hs, i_de, i_data}),
@@ -58,6 +61,13 @@ module video_2pix_to_1pix_cdc #(
 
     assign fifo_rd_en = o_active & ~fifo_empty &
                         ((phase == PH_REQUEST) | (phase == PH_HIGH));
+
+    always @(posedge wr_clk or negedge rst_n) begin
+        if (!rst_n)
+            input_started <= 1'b0;
+        else if (i_vs | i_de)
+            input_started <= 1'b1;
+    end
 
     always @(posedge rd_clk or negedge rst_n) begin
         if (!rst_n) begin

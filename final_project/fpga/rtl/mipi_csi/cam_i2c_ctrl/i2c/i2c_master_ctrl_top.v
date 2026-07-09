@@ -3,7 +3,7 @@ module i2c_master_ctrl_top #(
 	parameter I2C_REG_ADDR_WIDTH = 16,
 	parameter I2C_DATA_WIDTH = 8,
 	parameter I2C_DEVICE_ADDR = 8'h60,
-	parameter CLK_DIV = 16'd199
+	parameter CLK_DIV = 16'd499
 
 )(
 input		wire	clk,
@@ -23,6 +23,9 @@ output dbg_cfg_done,
 output dbg_last_index_seen,
 output dbg_stream_on_index_reached,
 output dbg_stream_on_seen,
+output dbg_stream_on_done,
+output dbg_stream_on_clean,
+output dbg_stream_on_error,
 output dbg_i2c_status_sample_seen,
 output dbg_i2c_status_rxack_seen,
 output dbg_i2c_status_busy_seen,
@@ -59,6 +62,11 @@ wire			 dbg_cfg_done_w;
 wire			 dbg_last_index_seen_w;
 wire			 dbg_stream_on_index_reached_w;
 wire			 dbg_stream_on_seen_w;
+wire			 dbg_stream_on_done_w;
+wire			 dbg_stream_on_clean_w;
+wire			 dbg_stream_on_error_w;
+wire			 dbg_wr_done_clean_w;
+wire			 dbg_wr_done_error_w;
 wire			 dbg_i2c_status_sample_seen_w;
 wire			 dbg_i2c_status_rxack_seen_w;
 wire			 dbg_i2c_status_busy_seen_w;
@@ -82,6 +90,8 @@ i2c_master_reg_set #(
 	/*i*/	.init_done(init_done),
 	/*i*/	.rd_done(rd_done),
 	/*i*/	.wr_done(wr_done),
+	/*i*/	.wr_done_clean(dbg_wr_done_clean_w),
+	/*i*/	.wr_done_error(dbg_wr_done_error_w),
 	/*o*/ .wr_en(wr_en),
 	/*o*/ .rd_en(rd_en),
 	/*o*/ .addr(addr),
@@ -90,7 +100,10 @@ i2c_master_reg_set #(
 	/*o*/.dbg_cfg_done(dbg_cfg_done_w),
 	/*o*/.dbg_last_index_seen(dbg_last_index_seen_w),
 	/*o*/.dbg_stream_on_index_reached(dbg_stream_on_index_reached_w),
-	/*o*/.dbg_stream_on_seen(dbg_stream_on_seen_w)
+	/*o*/.dbg_stream_on_seen(dbg_stream_on_seen_w),
+	/*o*/.dbg_stream_on_done(dbg_stream_on_done_w),
+	/*o*/.dbg_stream_on_clean(dbg_stream_on_clean_w),
+	/*o*/.dbg_stream_on_error(dbg_stream_on_error_w)
 	
 );
 
@@ -114,6 +127,8 @@ i2c_16addr_8data #(
 	.din(set_data),
 	.dout(get_data),
 	.dout_valid(get_valid),
+	.dbg_wr_done_clean   (dbg_wr_done_clean_w),
+	.dbg_wr_done_error   (dbg_wr_done_error_w),
 	.dbg_status_sample_seen(dbg_i2c_status_sample_seen_w),
 	.dbg_status_rxack_seen (dbg_i2c_status_rxack_seen_w),
 	.dbg_status_busy_seen  (dbg_i2c_status_busy_seen_w),
@@ -159,6 +174,9 @@ assign dbg_cfg_done = dbg_cfg_done_w;
 assign dbg_last_index_seen = dbg_last_index_seen_w;
 assign dbg_stream_on_index_reached = dbg_stream_on_index_reached_w;
 assign dbg_stream_on_seen = dbg_stream_on_seen_w;
+assign dbg_stream_on_done = dbg_stream_on_done_w;
+assign dbg_stream_on_clean = dbg_stream_on_clean_w;
+assign dbg_stream_on_error = dbg_stream_on_error_w;
 assign dbg_i2c_status_sample_seen = dbg_i2c_status_sample_seen_w;
 assign dbg_i2c_status_rxack_seen = dbg_i2c_status_rxack_seen_w;
 assign dbg_i2c_status_busy_seen = dbg_i2c_status_busy_seen_w;

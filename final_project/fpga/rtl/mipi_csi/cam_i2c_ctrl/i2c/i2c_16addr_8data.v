@@ -21,6 +21,8 @@ module i2c_16addr_8data #(
 	output		reg					wr_done,
 	output		reg					rd_done,
 	output		wire				dout_valid,
+	output		reg					dbg_wr_done_clean,
+	output		reg					dbg_wr_done_error,
 	output		reg					dbg_status_sample_seen,
 	output		reg					dbg_status_rxack_seen,
 	output		reg					dbg_status_busy_seen,
@@ -128,6 +130,7 @@ reg		  wr_wr = 1'b0;
 reg	[7:0] wr_wrdata = 0;
 reg	[2:0] wr_cnt = 0;
 reg	[2:0] wait_cnt = 0;
+reg       wr_error_seen = 1'b0;
 always @( posedge clk or negedge rst_n )
 begin
 		if( ~rst_n ) begin
@@ -138,6 +141,7 @@ begin
 				wr_state <= S_WR_IDLE;
 				wr_cnt <= 'd0;
 				wait_cnt <= 'd0;
+				wr_error_seen <= 1'b0;
 		end else begin
 				case( wr_state ) 
 				S_WR_IDLE : begin //S_WR_IDLE 	= 3'b000;
@@ -147,6 +151,7 @@ begin
 						wr_wrdata <= 0;
 						wait_cnt <= 'd0;
 						if( init_done & (wr_en || wr_cnt != 0)) begin
+							wr_error_seen <= 1'b0;
 							wr_state <= S_WR_RD_TIP;
 						end
 				end
@@ -168,6 +173,8 @@ begin
 				end
 				S_WR_TIP_CHK: begin //S_WR_TIP_CHK 	= 3'b011;
 						wr_cs <= 1'b0;
+						if( i2c_readdata[7] || i2c_readdata[5] )
+								wr_error_seen <= 1'b1;
 						if( i2c_readdata[1] == 1'b0 ) begin
 								wr_state <= wr_cnt == 4 ? S_WR_WR_OVER : S_WR_WR_DATA;
 						end 
@@ -237,12 +244,19 @@ end
 
 always @( posedge clk or negedge rst_n )
 begin
-		if( ~rst_n ) 
+		if( ~rst_n ) begin
 				wr_done <= 1'b0;
-		else if(wr_state == S_WR_SET_WAIT )
+				dbg_wr_done_clean <= 1'b0;
+				dbg_wr_done_error <= 1'b0;
+		end else if(wr_state == S_WR_SET_WAIT ) begin
 				wr_done <= 1'b1;
-		else
+				dbg_wr_done_clean <= ~wr_error_seen;
+				dbg_wr_done_error <= wr_error_seen;
+		end else begin
 				wr_done <= 1'b0;
+				dbg_wr_done_clean <= 1'b0;
+				dbg_wr_done_error <= 1'b0;
+		end
 end
 
 //================================================================

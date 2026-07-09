@@ -2897,3 +2897,1933 @@ Reassign LED24-33 to expose the terms that generate `hdmi_video_ready` before th
 - synchronized `hdmi_video_ready`
 - selected bridge input data activity
 - `hdmi_top` use-input output
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` so the HDMI input-stability gate remains bypassed for this diagnostic step.
+- Reassigned LED24-33 to the exact upstream terms that generate `hdmi_video_ready`.
+- Added a sticky latch for selected CDC bridge output data changes under DE. This lets LED32 show whether `video_2pix_to_1pix_cdc` is still producing changing pixels even if `hdmi_top` itself is not ready.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | selected framebuffer ready, synchronized |
+| LED25 | L6 | BAD: selected framebuffer underflow |
+| LED26 | K4 | selected frame_ok_hdmi |
+| LED27 | K3 | selected CDC bridge active |
+| LED28 | M5 | selected CDC bridge level_ready |
+| LED29 | M6 | BAD: selected CDC bridge level_low |
+| LED30 | N7 | `hdmi_video_ready` synchronized into `hdmi_top` |
+| LED31 | P7 | BAD: selected CDC bridge underflow |
+| LED32 | P6 | selected CDC bridge output data changes under DE |
+| LED33 | R6 | `hdmi_top` is using input video |
+
+### How to read the next board result
+
+- LED24 OFF: framebuffer ready is not stable.
+- LED25 ON: framebuffer underflow is blocking `frame_ok`.
+- LED26 OFF with LED24 ON and LED25 OFF: ready synchronization or frame_ok expression needs inspection.
+- LED27 OFF: the 2-pixel to 1-pixel CDC bridge is not active.
+- LED28 OFF or LED29 ON: bridge FIFO level is not sufficient.
+- LED30 OFF: the combined `hdmi_video_ready` expression is not reaching `hdmi_top`.
+- LED32 ON with LED30 OFF: pixels exist at the bridge output, but the ready qualification is blocking them.
+- LED33 ON: `hdmi_top` is using input video.
+
+## 55. 2026-07-09 forty-fifth board feedback: CDC bridge ready but framebuffer ready is false (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23, LED27, LED28.
+- LEDs OFF: LED24-26, LED29-33.
+- Timing screenshot:
+  - WNS: 1.521 ns
+  - WHS: 0.026 ns
+  - axi0_ACLK: 287.439 MHz
+  - i_fb_clk: 226.296 MHz
+  - mipi_clk: 233.536 MHz
+  - i_sysclk_div2: 152.952 MHz
+  - hdmi_tx_slow_clk: 270.124 MHz
+  - mipi_rx_ck0_CLKOUT: 213.083 MHz
+  - mipi_rx_ck1_CLKOUT: 409.500 MHz
+- Picture: unchanged noisy colored block/stripe pattern captured in user screenshot.
+
+### Interpretation
+
+Using the LED map from iteration 54:
+
+- LED18-23 ON confirms the basic DDR/ch0/reset/I2C path remained good.
+- LED27 ON means the selected `video_2pix_to_1pix_cdc` bridge is active.
+- LED28 ON means the selected CDC bridge has reached `level_ready`.
+- LED29 OFF and LED31 OFF mean no current CDC low-level/underflow blocker was observed by this probe.
+- LED24 OFF means `selected_frame_ready_cdc[2]` is false.
+- LED25 OFF means selected framebuffer underflow is not the blocker.
+- LED26 OFF follows from LED24 OFF because `selected_frame_ok_hdmi = selected_frame_ready_cdc[2] & ~selected_fifo_underflow_cdc[1]`.
+- LED30 OFF and LED33 OFF follow because `hdmi_video_ready` cannot assert while `selected_frame_ok_hdmi` is false.
+
+This narrows the current blocker to the framebuffer ready expression, not HDMI input selection and not the CDC bridge. In `frame_buffer.v`, the relevant expression is:
+
+```verilog
+assign frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched;
+assign frame_en = rd_frame_en_r[1] & rd_frame_available;
+```
+
+The next probe must split `frame_stable`, write-frame completion, read-frame availability, `frame_en`, `out_sync`, and framebuffer underflow.
+
+---
+
+## 56. 2026-07-09 forty-sixth iteration: decompose selected framebuffer ready (Codex)
+
+### RTL intent
+
+Keep the HDMI input-stability gate bypassed, but move LED24-33 one level upstream from `hdmi_video_ready` to the selected `frame_buffer.frame_ready` terms.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to expose the selected framebuffer readiness terms:
+  - `selected_dbg_frame_stable`
+  - sticky selected `wr_frame_done`
+  - selected `rd_frame_available`
+  - selected `frame_en`
+  - `out_sync`
+  - selected framebuffer underflow
+  - synchronized selected `frame_ready`
+  - selected FIFO read period
+  - sticky selected DDR read gap
+  - synchronized `hdmi_video_ready`
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | selected `frame_stable` |
+| LED25 | L6 | selected `wr_frame_done` seen |
+| LED26 | K4 | selected `rd_frame_available` |
+| LED27 | K3 | selected `frame_en` |
+| LED28 | M5 | `out_sync` released |
+| LED29 | M6 | BAD: selected framebuffer underflow |
+| LED30 | N7 | selected framebuffer ready, synchronized |
+| LED31 | P7 | selected FIFO read period |
+| LED32 | P6 | BAD: selected DDR read gap seen |
+| LED33 | R6 | `hdmi_video_ready` synchronized into `hdmi_top` |
+
+### How to read the next board result
+
+- LED24 OFF: frame-size stability detector is still not happy; inspect camera/frame dimensions and `frame_info_det`.
+- LED25 OFF: write frame completion is missing; inspect write-side AXI/framebuffer path.
+- LED26 OFF with LED25 ON: write completion happened but read-frame availability did not cross into output clock domain.
+- LED27 OFF with LED24/26 ON: `frame_en` generation is not staying true.
+- LED28 OFF: startup `out_sync` delay never released, likely reset or `pixel_data_en` issue.
+- LED29 ON: framebuffer underflow is blocking ready.
+- LED30 OFF while LED24/27/28 ON and LED29 OFF: inspect `frame_ready` CDC/synchronization.
+- LED31 ON: framebuffer read period is active.
+- LED32 ON: DDR read gap was observed and may explain noisy/striped output.
+- LED33 ON: HDMI ready is now true; then the next issue is image content/pixel packing.
+
+---
+
+## 57. 2026-07-09 forty-sixth board feedback: out_sync released but frame_stable/write path absent (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23, LED28.
+- LEDs OFF: LED24-27, LED29-33.
+- Timing screenshot:
+  - WNS: 1.797 ns
+  - WHS: 0.026 ns
+  - axi0_ACLK: 312.207 MHz
+  - i_fb_clk: 269.687 MHz
+  - mipi_clk: 224.669 MHz
+  - i_sysclk_div2: 144.760 MHz
+  - hdmi_tx_slow_clk: 270.783 MHz
+  - mipi_rx_ck0_CLKOUT: 173.732 MHz
+  - mipi_rx_ck1_CLKOUT: 407.664 MHz
+- Picture: still noisy colored block/stripe pattern; monitor OSD shows USB3.0 UHD overlay.
+
+### Interpretation
+
+Using the LED map from iteration 56:
+
+- LED18-23 ON: DDR/ch0/reset/I2C still pass the basic checks.
+- LED28 ON: `out_sync` released, so the startup delay is not blocking `frame_ready`.
+- LED24 OFF: selected `frame_stable` is false.
+- LED25 OFF: selected write-frame completion was not seen.
+- LED26 OFF: selected read-frame availability is false.
+- LED27 OFF: selected `frame_en` is false.
+- LED29 OFF: selected framebuffer underflow is not currently asserted.
+- LED30/33 OFF follow from missing framebuffer readiness.
+
+This points upstream of `frame_ready` into the `frame_buffer` input/write side. `frame_buffer.v` shows:
+
+```verilog
+assign wr_start = frame_start & frame_stable;
+assign frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched;
+assign frame_en = rd_frame_en_r[1] & rd_frame_available;
+```
+
+Because `frame_stable` is false, `wr_start` cannot occur even if CSI VS/DE exists. The next probe must split ch0 CSI/framebuffer-entry milestones: VS, DE, RAW10/4ppc, `frame_start`, write FIFO data, `wr_start`, AXI AWVALID, write-frame done, and `frame_stable`.
+
+---
+
+## 58. 2026-07-09 forty-seventh iteration: expose ch0 framebuffer input/write milestones (Codex)
+
+### RTL intent
+
+Move LED24-33 from final framebuffer-ready terms to ch0 input/write-side milestones before `frame_stable` and `wr_start`.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to ch0-specific latched milestones that already exist in `top.v`/`frame_buffer.v`.
+- Added two HDMI-clock-domain sticky latches for existing ch0 write-side debug outputs:
+  - `dbg_ch0_wr_start_seen_hdmi`
+  - `dbg_ch0_awvalid_seen_hdmi`
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 CSI VS seen |
+| LED25 | L6 | ch0 CSI DE seen |
+| LED26 | K4 | ch0 CSI RAW10 and 4ppc format seen |
+| LED27 | K3 | ch0 `frame_start` seen inside framebuffer |
+| LED28 | M5 | ch0 framebuffer input FIFO write seen |
+| LED29 | M6 | ch0 `wr_start` seen |
+| LED30 | N7 | ch0 AXI AWVALID seen |
+| LED31 | P7 | ch0 write-frame done seen |
+| LED32 | P6 | ch0 `frame_stable` |
+| LED33 | R6 | `out_sync` released |
+
+### How to read the next board result
+
+- LED24 OFF: CSI VS is not reaching ch0 framebuffer input.
+- LED25 OFF with LED24 ON: CSI has frame sync but no active data enable.
+- LED26 OFF with LED24/25 ON: datatype or pixel-per-clock no longer matches RAW10/4ppc at this probe point.
+- LED27 OFF with LED24 ON: `frame_info_det` is not detecting frame_start from the VS polarity/edge.
+- LED28 OFF with LED25 ON: `frame_info_det` is not producing write FIFO data from DE.
+- LED29 OFF with LED27 ON: `frame_start` exists but `frame_stable` is false, so `wr_start = frame_start & frame_stable` never fires.
+- LED30 OFF with LED29 ON: write start occurred but AXI AWVALID did not issue.
+- LED31 OFF with LED30 ON: AXI write command started but a full frame write did not complete.
+- LED32 OFF with LED24/25/27 ON: frame-length stability detector is rejecting the frame; inspect VS polarity and `frame_info_det` length history.
+- LED33 OFF: startup output sync has regressed.
+
+---
+
+## 59. 2026-07-09 forty-seventh board feedback: no ch0 CSI/framebuffer-entry activity in this build (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23, LED33.
+- LEDs OFF: LED24-32.
+- Timing screenshot:
+  - WNS: 1.955 ns
+  - WHS: 0.022 ns
+  - axi0_ACLK: 328.407 MHz
+  - i_fb_clk: 244.918 MHz
+  - mipi_clk: 234.797 MHz
+  - i_sysclk_div2: 161.421 MHz
+  - hdmi_tx_slow_clk: 261.165 MHz
+  - mipi_rx_ck0_CLKOUT: 155.521 MHz
+  - mipi_rx_ck1_CLKOUT: 378.501 MHz
+- Picture: unchanged noisy colored block/stripe pattern.
+
+### Interpretation
+
+Using the LED map from iteration 58:
+
+- LED18-23 ON: DDR/ch0/reset/I2C status sampling and no aggregate ACK fault still pass.
+- LED33 ON: `out_sync` released.
+- LED24 OFF: no ch0 `rx_out_vs` was latched in this build.
+- LED25 OFF: no ch0 `rx_out_de` was latched.
+- LED26 OFF: no ch0 RAW10/4ppc format was latched.
+- LED27/28 OFF: no framebuffer `frame_start` or input FIFO write was seen, expected if VS/DE are absent.
+
+This conflicts with earlier runs where downstream CDC/bridge activity appeared. For this build, the immediate blocker is before framebuffer write: ch0 soft CSI output is not producing visible VS/DE/datatype milestones. The next probe must step one level earlier into MIPI/CSI receiver status: byte clock, LP/HS activity, lane FIFO nonempty/read, datatype nonzero, RAW10, 4ppc, and VS/DE.
+
+---
+
+## 60. 2026-07-09 forty-eighth iteration: expose ch0 MIPI/CSI receiver milestones (Codex)
+
+### RTL intent
+
+Move LED24-33 upstream from framebuffer input to the ch0 MIPI/CSI receiver boundary, using already-existing top-level sticky signals.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to ch0 MIPI/CSI receiver milestones:
+  - byte-clock toggle seen
+  - LP activity seen
+  - HS termination/enable seen
+  - HS data changed/nonzero
+  - MIPI lane FIFO nonempty
+  - MIPI lane FIFO read
+  - CSI datatype nonzero
+  - CSI RAW10 datatype
+  - CSI 4 pixels/clock
+  - CSI VS or DE output seen
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 MIPI byte clock toggled |
+| LED25 | L6 | ch0 MIPI LP activity seen |
+| LED26 | K4 | ch0 MIPI HS termination/enable seen |
+| LED27 | K3 | ch0 MIPI HS data changed or nonzero |
+| LED28 | M5 | ch0 MIPI lane FIFO nonempty seen |
+| LED29 | M6 | ch0 MIPI lane FIFO read seen |
+| LED30 | N7 | ch0 CSI datatype nonzero seen |
+| LED31 | P7 | ch0 CSI RAW10 datatype seen |
+| LED32 | P6 | ch0 CSI 4 pixels/clock seen |
+| LED33 | R6 | ch0 CSI VS or DE seen |
+
+### How to read the next board result
+
+- LED24 OFF: ch0 MIPI byte clock is not toggling; inspect DPHY clock/reset/physical camera stream.
+- LED24 ON but LED25/26 OFF: byte clock exists but LP/HS receiver activity is not visible.
+- LED26 ON but LED27 OFF: HS receiver enables/terminates, but lane data is not changing.
+- LED27 ON but LED28 OFF: HS data exists, but lane FIFO is never nonempty.
+- LED28 ON but LED29 OFF: FIFO has data but CSI controller is not reading it.
+- LED29 ON but LED30 OFF: CSI controller reads lanes but does not decode any nonzero datatype.
+- LED30 ON but LED31 OFF: packets decode, but datatype is not RAW10.
+- LED31 ON but LED32 OFF: RAW10 appears but pixel-per-clock is not 4.
+- LED31/32 ON but LED33 OFF: valid RAW10/4ppc metadata exists, but no VS/DE reaches ch0 output.
+- LED33 ON: CSI output exists again; return to framebuffer `frame_start/frame_stable` probe.
+
+---
+
+## 61. 2026-07-09 forty-eighth board feedback: MIPI LP only, no byte clock or HS/CSI decode (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23, LED25.
+- LEDs OFF: LED24, LED26-33.
+- Timing screenshot:
+  - WNS: 1.869 ns
+  - WHS: 0.018 ns
+  - axi0_ACLK: 319.387 MHz
+  - i_fb_clk: 250.313 MHz
+  - mipi_clk: 235.294 MHz
+  - i_sysclk_div2: 173.551 MHz
+  - hdmi_tx_slow_clk: 285.225 MHz
+  - mipi_rx_ck0_CLKOUT: 185.460 MHz
+  - mipi_rx_ck1_CLKOUT: 411.184 MHz
+- Picture: unchanged noisy colored block/stripe pattern.
+
+### Interpretation
+
+Using the LED map from iteration 60:
+
+- LED18-23 ON: DDR/ch0/reset/I2C status sampling and no aggregate ACK fault still pass.
+- LED25 ON: ch0 MIPI LP activity is visible at the physical pins.
+- LED24 OFF: ch0 MIPI byte clock toggle was not observed.
+- LED26 OFF: no HS termination/enable activity was latched.
+- LED27 OFF: no HS data change/nonzero was latched.
+- LED28/29 OFF: no MIPI lane FIFO nonempty/read activity was observed.
+- LED30-33 OFF: no CSI datatype/RAW10/4ppc/VS-DE output was observed.
+
+This points before CSI packet decode. The receiver sees LP/idle-level activity, but the camera does not appear to enter MIPI HS streaming on ch0. The next hypothesis is that I2C initialization may not be reaching the stream-on register write (`0x0100 = 0x01`) or may be stopping before the final register table entries. The next probe must split ch0 I2C configuration completion, stream-on index, stream-on write, last index, and ACK errors.
+
+---
+
+## 62. 2026-07-09 forty-ninth iteration: expose ch0 I2C stream-on completion (Codex)
+
+### RTL intent
+
+Move LED24-33 from MIPI receiver activity to ch0 I2C/reset/stream-on completion so the next board run can distinguish camera-not-streaming from DPHY/CSI receiver failure.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to ch0 I2C/reset milestones:
+  - reset_pixel_n released
+  - I2C init_done
+  - I2C write enable seen
+  - I2C write done seen
+  - I2C config done
+  - stream-on index reached
+  - stream-on register write seen
+  - last register index seen
+  - ACK error seen
+  - MIPI LP activity retained as a physical-pin reference
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 `reset_pixel_n` released |
+| LED25 | L6 | ch0 I2C `init_done` |
+| LED26 | K4 | ch0 I2C write enable seen |
+| LED27 | K3 | ch0 I2C write done seen |
+| LED28 | M5 | ch0 I2C config done |
+| LED29 | M6 | ch0 stream-on index reached |
+| LED30 | N7 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED31 | P7 | ch0 last register index seen |
+| LED32 | P6 | BAD: ch0 I2C ACK error seen |
+| LED33 | R6 | ch0 MIPI LP activity seen |
+
+### How to read the next board result
+
+- LED24 OFF: ch0 soft CSI pixel-side reset is not released.
+- LED25 OFF: I2C low-level init did not finish.
+- LED26 OFF: register writer did not issue writes after init.
+- LED27 OFF with LED26 ON: writes were requested but not completed.
+- LED28 OFF with LED27 ON: table did not complete.
+- LED29 OFF: register table never reached the stream-on region.
+- LED30 OFF with LED29 ON: table reached stream-on region but never wrote `0x0100 = 0x01`.
+- LED31 OFF with LED30 ON: stream-on was written but table did not reach the final index.
+- LED32 ON: ACK error occurred; split ACK phase next.
+- LED33 OFF: physical LP activity disappeared, suggesting camera/pin/reset regression.
+- LED28/30/31 ON and LED32 OFF with no MIPI byte clock in the prior probe would shift focus to camera reset polarity, sensor mode table, or physical MIPI clock lane.
+
+---
+
+## 63. 2026-07-09 forty-ninth board feedback: I2C stream-on completes, picture changes to dynamic bars (Codex)
+
+### Board feedback from user
+
+- LEDs: only LED32 is OFF; all other LEDs in LED18-33 are ON.
+- Timing screenshot:
+  - WNS: 1.866 ns
+  - WHS: 0.022 ns
+  - axi0_ACLK: 319.081 MHz
+  - i_fb_clk: 237.079 MHz
+  - mipi_clk: 240.038 MHz
+  - i_sysclk_div2: 154.631 MHz
+  - hdmi_tx_slow_clk: 286.533 MHz
+  - mipi_rx_ck0_CLKOUT: 210.172 MHz
+  - mipi_rx_ck1_CLKOUT: 384.320 MHz
+- Picture: changed from previous noisy block pattern. User reports the camera image is changing/jumping, with colored vertical bars and black bars changing continuously. Screenshot shows a stable upper color-bar-like region and dark/lined lower region.
+
+### Interpretation
+
+Using the LED map from iteration 62:
+
+- LED24 ON: ch0 soft CSI pixel-side reset is released.
+- LED25 ON: I2C low-level init completed.
+- LED26 ON: register writer issued writes.
+- LED27 ON: I2C write completion occurred.
+- LED28 ON: register-table configuration completed.
+- LED29 ON: stream-on index region was reached.
+- LED30 ON: stream-on write `0x0100 = 0x01` was observed.
+- LED31 ON: last register index was seen.
+- LED32 OFF: no aggregate I2C ACK error was observed.
+- LED33 ON: ch0 MIPI LP activity remains visible.
+
+This clears the main I2C/stream-on hypothesis. The camera is configured through stream-on with no observed ACK error, and the visible HDMI picture changed materially. The next focus returns to the post-stream-on MIPI/CSI/video path: byte clock, HS activity, lane FIFO, RAW10/4ppc, VS/DE, and whether `hdmi_top` is showing input video.
+
+---
+
+## 64. 2026-07-09 fiftieth iteration: post stream-on MIPI/CSI and HDMI input probe (Codex)
+
+### RTL intent
+
+After confirming I2C stream-on, re-expose ch0 MIPI/CSI receiver milestones while keeping one LED for `hdmi_top` input selection.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - ch0 stream-on write seen as the retained I2C proof
+  - MIPI byte clock
+  - MIPI HS term/enable
+  - MIPI HS data
+  - MIPI lane FIFO nonempty/read
+  - CSI RAW10 and 4ppc
+  - CSI VS/DE
+  - `hdmi_top` using input video
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED25 | L6 | ch0 MIPI byte clock toggled |
+| LED26 | K4 | ch0 MIPI HS termination/enable seen |
+| LED27 | K3 | ch0 MIPI HS data changed or nonzero |
+| LED28 | M5 | ch0 MIPI lane FIFO nonempty seen |
+| LED29 | M6 | ch0 MIPI lane FIFO read seen |
+| LED30 | N7 | ch0 CSI RAW10 datatype seen |
+| LED31 | P7 | ch0 CSI 4 pixels/clock seen |
+| LED32 | P6 | ch0 CSI VS or DE seen |
+| LED33 | R6 | `hdmi_top` is using input video |
+
+### How to read the next board result
+
+- LED24 OFF: I2C stream-on did not recur in the new build; revisit I2C.
+- LED25 OFF with LED24 ON: stream-on was issued but no MIPI byte clock is seen.
+- LED26 OFF with LED25 ON: byte clock exists but HS receiver enable/termination is not observed.
+- LED27 OFF with LED26 ON: receiver entered HS handling but lane data does not change.
+- LED28 OFF with LED27 ON: HS data exists but lane FIFO is not becoming nonempty.
+- LED29 OFF with LED28 ON: lane FIFO has data but CSI controller is not reading it.
+- LED30 OFF with LED29 ON: CSI reads lane data but RAW10 datatype is absent.
+- LED31 OFF with LED30 ON: RAW10 exists but pixel-per-clock is not 4.
+- LED32 OFF with LED30/31 ON: RAW10/4ppc metadata exists but no VS/DE reaches ch0 output.
+- LED33 ON: HDMI is using input video; then debug the content/timing/packing of the dynamic bars.
+
+---
+
+## 65. 2026-07-09 fiftieth board feedback: full stream-on/MIPI/CSI/HDMI-input chain is alive (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-33 all ON.
+- Timing screenshot:
+  - WNS: 1.688 ns
+  - WHS: 0.026 ns
+  - axi0_ACLK: 301.932 MHz
+  - i_fb_clk: 204.457 MHz
+  - mipi_clk: 216.169 MHz
+  - i_sysclk_div2: 155.328 MHz
+  - hdmi_tx_slow_clk: 270.270 MHz
+  - mipi_rx_ck0_CLKOUT: 193.050 MHz
+  - mipi_rx_ck1_CLKOUT: 390.930 MHz
+- Picture: changes continuously. User reports the first observed image was a large color-bar/black-block pattern; later it became a noisy multi-color block pattern. Both screenshots show input-like changing content, not the prior static fallback-only state.
+
+### Interpretation
+
+Using the LED map from iteration 64:
+
+- LED24 ON: ch0 stream-on register write was seen again.
+- LED25 ON: ch0 MIPI byte clock toggled.
+- LED26 ON: ch0 MIPI HS termination/enable was seen.
+- LED27 ON: ch0 MIPI HS data changed or was nonzero.
+- LED28 ON: ch0 MIPI lane FIFO became nonempty.
+- LED29 ON: ch0 MIPI lane FIFO was read.
+- LED30 ON: ch0 CSI RAW10 datatype was seen.
+- LED31 ON: ch0 CSI 4 pixels/clock was seen.
+- LED32 ON: ch0 CSI VS or DE was seen.
+- LED33 ON: `hdmi_top` is using input video.
+
+This is the first board result that proves the full intended live path is active: I2C stream-on, MIPI HS, CSI RAW10/4ppc, CSI VS/DE, and HDMI input selection. The remaining issue is no longer bring-up reachability; it is input video content/timing/packing stability. The visible symptoms are consistent with at least one of:
+
+- framebuffer read/write instability or DDR read gaps,
+- CDC bridge underflow/low-water behavior,
+- HDMI input timing/size qualification mismatch,
+- pixel packing/Bayer/RGB ordering still wrong after valid input reaches HDMI.
+
+The next probe should preserve LED33 as input-video proof and expose bad-state blockers around framebuffer, DDR read, CDC, and HDMI timing.
+
+---
+
+## 66. 2026-07-09 fifty-first iteration: input-video content/timing fault probe (Codex)
+
+### RTL intent
+
+Now that the whole live chain is proven active, move LED24-33 to diagnose why the input image is unstable/wrong.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to selected framebuffer, DDR read, CDC bridge, HDMI timing, and HDMI input-selection signals:
+  - selected framebuffer ready
+  - selected frame stable
+  - selected write-frame done
+  - selected read-frame available
+  - framebuffer underflow
+  - DDR read gap
+  - CDC bridge underflow
+  - CDC bridge low-water
+  - HDMI timing size/error
+  - `hdmi_top` using input video
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | selected framebuffer ready |
+| LED25 | L6 | selected frame stable seen |
+| LED26 | K4 | selected write-frame done seen |
+| LED27 | K3 | selected read-frame available |
+| LED28 | M5 | BAD: selected framebuffer underflow |
+| LED29 | M6 | BAD: DDR read gap seen |
+| LED30 | N7 | BAD: CDC bridge underflow |
+| LED31 | P7 | BAD: CDC bridge level low |
+| LED32 | P6 | BAD: HDMI timing size/error seen |
+| LED33 | R6 | `hdmi_top` is using input video |
+
+### How to read the next board result
+
+- LED24 OFF: framebuffer ready is not staying true even though live CSI exists.
+- LED25 OFF: frame-size stability is still not reliable.
+- LED26 OFF: write-frame completion is missing or intermittent.
+- LED27 OFF: read-frame availability is missing after writes.
+- LED28 ON: framebuffer underflow is corrupting the displayed content.
+- LED29 ON: DDR read gap was observed and may explain black/noisy bands.
+- LED30 ON: CDC bridge underflow is corrupting HDMI input.
+- LED31 ON: CDC bridge FIFO level is too low.
+- LED32 ON: HDMI input timing/size detector sees mismatch/error.
+- LED33 OFF: HDMI fell back away from input video; return to ready-gate debugging.
+- If LED24-27 and LED33 are ON while LED28-32 are OFF, the next likely focus is pixel packing/Bayer/RGB ordering rather than reachability/timing.
+
+---
+
+## 67. 2026-07-09 fifty-first board feedback: HDMI input path regressed, timing error observed (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23, LED32.
+- LEDs OFF: LED24-31, LED33.
+- Timing screenshot:
+  - WNS: 1.574 ns
+  - WHS: 0.013 ns
+  - axi0_ACLK: 291.886 MHz
+  - i_fb_clk: 272.405 MHz
+  - mipi_clk: 219.974 MHz
+  - i_sysclk_div2: 156.740 MHz
+  - hdmi_tx_slow_clk: 294.118 MHz
+  - mipi_rx_ck0_CLKOUT: 217.108 MHz
+  - mipi_rx_ck1_CLKOUT: 384.320 MHz
+- Picture: user reports it returned to the previous noisy/blocky pattern.
+
+### Interpretation
+
+Using the LED map from iteration 66:
+
+- LED24 OFF: selected framebuffer ready is not true in this run.
+- LED25 OFF: selected frame stability was not seen by the current held probe.
+- LED26 OFF: selected write-frame completion was not seen by the current held probe.
+- LED27 OFF: selected read-frame availability is false.
+- LED28-31 OFF: no framebuffer underflow, DDR read gap, CDC underflow, or CDC low-water was exposed by this map.
+- LED32 ON: HDMI timing size/error path observed a mismatch/error.
+- LED33 OFF: `hdmi_top` is not using input video in this run.
+
+This is a regression from the prior all-LEDs-ON run. The immediate issue is not pixel packing; the design fell back from the proven input-video state. The next probe should combine the previously successful stream-on/MIPI/CSI proof chain with the two most important downstream state bits: selected framebuffer ready and HDMI input/timing status.
+
+---
+
+## 68. 2026-07-09 fifty-second iteration: chain regression plus ready/timing probe (Codex)
+
+### RTL intent
+
+Expose whether the proven chain regressed before or after CSI output, while retaining selected framebuffer ready and HDMI timing/input indicators.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - ch0 stream-on write seen
+  - ch0 MIPI byte clock
+  - ch0 MIPI HS term/enable
+  - ch0 MIPI FIFO nonempty/read
+  - ch0 CSI RAW10 and 4ppc
+  - ch0 CSI VS or DE
+  - selected framebuffer ready
+  - `hdmi_top` using input video
+  - HDMI timing size/error bad state
+  - framebuffer/DDR/CDC bad state aggregate
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED25 | L6 | ch0 MIPI byte clock toggled |
+| LED26 | K4 | ch0 MIPI HS termination/enable seen |
+| LED27 | K3 | ch0 MIPI lane FIFO nonempty/read seen |
+| LED28 | M5 | ch0 CSI RAW10 and 4ppc seen |
+| LED29 | M6 | ch0 CSI VS or DE seen |
+| LED30 | N7 | selected framebuffer ready |
+| LED31 | P7 | `hdmi_top` is using input video |
+| LED32 | P6 | BAD: HDMI timing size/error seen |
+| LED33 | R6 | BAD: framebuffer underflow / DDR read gap / CDC underflow / CDC low-water |
+
+### How to read the next board result
+
+- LED24 OFF: stream-on did not recur; return to I2C probe.
+- LED25/26/27 OFF after LED24 ON: MIPI/DPHY receiver activity regressed after stream-on.
+- LED28 OFF after LED25-27 ON: CSI datatype/ppc decode regressed.
+- LED29 OFF after LED28 ON: CSI metadata exists but no VS/DE reaches output.
+- LED30 OFF after LED29 ON: CSI output exists but framebuffer ready is still false.
+- LED31 OFF after LED30 ON: framebuffer ready exists but HDMI is not using input; inspect ready gate/timing.
+- LED32 ON: HDMI input timing/size error is active or latched.
+- LED33 ON: downstream bad state from framebuffer/DDR/CDC is active or latched.
+
+---
+
+## 69. 2026-07-09 fifty-second board feedback: stream-on seen, MIPI activity absent (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-24, LED32.
+- LEDs OFF: LED25-31, LED33.
+- Timing screenshot:
+  - WNS: 1.289 ns
+  - WHS: 0.024 ns
+  - axi0_ACLK: 269.469 MHz
+  - i_fb_clk: 283.688 MHz
+  - mipi_clk: 238.949 MHz
+  - i_sysclk_div2: 163.988 MHz
+  - hdmi_tx_slow_clk: 244.021 MHz
+  - mipi_rx_ck0_CLKOUT: 199.880 MHz
+  - mipi_rx_ck1_CLKOUT: 382.702 MHz
+- Picture: noisy/blocky pattern remains.
+
+### Interpretation
+
+Using the LED map from iteration 68:
+
+- LED24 ON: ch0 stream-on write (`0x0100 = 0x01`) was seen.
+- LED25 OFF: no ch0 MIPI byte-clock toggle was captured.
+- LED26 OFF: no ch0 MIPI HS termination/enable was seen.
+- LED27 OFF: no ch0 MIPI lane FIFO nonempty/read was seen.
+- LED28 OFF: CSI RAW10/4ppc was not decoded in this run.
+- LED29 OFF: CSI VS/DE was not seen.
+- LED30 OFF: selected framebuffer ready is not true.
+- LED31 OFF: `hdmi_top` is not using input video.
+- LED32 ON: HDMI timing size/error path latched a bad state.
+- LED33 OFF: no downstream framebuffer/DDR/CDC bad-state aggregate was exposed by this map.
+
+The failure is now before CSI/framebuffer: I2C can reach stream-on, but this run does not show the MIPI byte-clock/HS/FIFO activity that was present in the earlier all-LEDs-on run. The next probe should split the post-stream-on physical/MIPI side into reset output, LP activity, byte clock, HS enable/data, and FIFO activity.
+
+---
+
+## 70. 2026-07-09 fifty-third iteration: post-stream-on MIPI bring-up probe (Codex)
+
+### RTL intent
+
+Keep the proven basic/I2C checkpoints, then split LED24-33 across the earliest camera/MIPI receive states after stream-on. This distinguishes camera reset/LP-idle behavior from DPHY byte-clock/HS receive failure.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - ch0 pixel-domain reset released,
+  - ch0 camera reset output high,
+  - ch0 stream-on write seen,
+  - ch0 MIPI LP clock activity,
+  - ch0 MIPI LP lane0 activity,
+  - ch0 MIPI LP data toggle,
+  - ch0 MIPI byte-clock toggle,
+  - ch0 MIPI HS term/enable,
+  - HDMI timing size/error bad state,
+  - ch0 MIPI HS data or FIFO activity.
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 pixel-domain reset released (`ch0_dbg_reset_pixel_n`) |
+| LED25 | L6 | ch0 camera reset output high (`S0_o_cam_rst_p`) |
+| LED26 | K4 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED27 | K3 | ch0 MIPI LP clock activity seen |
+| LED28 | M5 | ch0 MIPI LP lane0 activity seen |
+| LED29 | M6 | ch0 MIPI LP data toggle seen |
+| LED30 | N7 | ch0 MIPI byte clock toggled |
+| LED31 | P7 | ch0 MIPI HS termination/enable seen |
+| LED32 | P6 | BAD: HDMI timing size/error seen |
+| LED33 | R6 | ch0 MIPI HS data or FIFO activity seen |
+
+### How to read the next board result
+
+- LED24 OFF: ch0 pixel-domain reset never released; inspect `reset_pixel_n` generation.
+- LED25 OFF with LED24 ON: camera reset output is held low; inspect camera reset polarity/path before changing CSI/framebuffer.
+- LED26 OFF: stream-on write did not recur; return to I2C register sequencing.
+- LED27/28 OFF after LED26 ON: camera/receiver LP state is not visible after stream-on; suspect camera reset/power/LP input path.
+- LED29 OFF while LED27/28 ON: LP lines are present but not changing enough for the current toggle probe.
+- LED30 OFF after LED26-29 ON: no byte clock starts; focus on camera stream start or DPHY clock lane.
+- LED31 OFF with LED30 ON: byte clock toggles but HS enable/termination is not asserted.
+- LED33 OFF with LED31 ON: HS control exists but no HS data/FIFO activity reaches the lane receivers.
+- LED32 ON remains a downstream HDMI timing symptom; for this probe, prioritize LED24-31/33 to locate why live MIPI does not reappear.
+
+---
+
+## 71. 2026-07-09 fifty-third board feedback: LP idle visible, no MIPI stream (Codex)
+
+### Board feedback from user
+
+- LEDs OFF: LED25, LED29, LED30, LED31, LED33.
+- LEDs ON: all other LEDs in LED18-33.
+- Picture: no visible change.
+- WNS/WHS: not reported in this message.
+
+### Interpretation
+
+Using the LED map from iteration 70:
+
+- LED24 ON: ch0 pixel-domain reset is released.
+- LED25 OFF: `S0_o_cam_rst_p` is low. In the current RTL, `soft_mipi_rx_top` drives `o_cam_rst_p = ~arst_n`, so this may be the expected released state rather than a fault.
+- LED26 ON: at least one ch0 stream-on register write (`0x0100 = 0x01`) was seen.
+- LED27 ON and LED28 ON: MIPI LP clock/lane0 activity is visible at the receiver pins.
+- LED29 OFF: no LP data-line toggle was captured.
+- LED30 OFF: no MIPI byte-clock toggle was captured.
+- LED31 OFF: no MIPI HS termination/enable was seen.
+- LED33 OFF: no HS data or MIPI FIFO activity was seen.
+
+This narrows the failure to after I2C stream-on but before MIPI HS streaming. Because the current SC431HAI register table has two stream-on writes (`ROM[8'h90]` and final `ROM[8'ha1]`), the current LED26 only proves at least one stream-on write; it does not prove the table reached the final window registers and final stream-on. The next probe should confirm table completion/final index and I2C bad status while retaining LP/MIPI-start reference bits.
+
+---
+
+## 72. 2026-07-09 fifty-fourth iteration: I2C table completion vs MIPI-start probe (Codex)
+
+### RTL intent
+
+Distinguish "stream-on happened early but the table did not finish cleanly" from "full I2C table finished but the camera still never starts MIPI byte-clock/HS".
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - ch0 pixel-domain reset released,
+  - ch0 camera reset output low,
+  - ch0 I2C config table completed,
+  - ch0 final ROM entry write seen,
+  - ch0 stream-on index reached,
+  - ch0 stream-on write seen,
+  - I2C ACK error,
+  - I2C arbitration lost,
+  - MIPI LP clock/lane activity,
+  - MIPI byte-clock/HS/FIFO aggregate activity.
+- Did not change the I2C ROM, camera reset logic, MIPI/CSI logic, constraints, or Efinity project files.
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | ch0 pixel-domain reset released (`ch0_dbg_reset_pixel_n`) |
+| LED25 | L6 | ch0 camera reset output low (`~S0_o_cam_rst_p`) |
+| LED26 | K4 | ch0 I2C config table completed |
+| LED27 | K3 | ch0 final ROM entry write seen |
+| LED28 | M5 | ch0 stream-on index reached |
+| LED29 | M6 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED30 | N7 | BAD: ch0 I2C ACK error seen |
+| LED31 | P7 | BAD: ch0 I2C arbitration-lost seen |
+| LED32 | P6 | ch0 MIPI LP clock or lane0 activity seen |
+| LED33 | R6 | ch0 MIPI byte-clock / HS / FIFO activity seen |
+
+### How to read the next board result
+
+- LED24 OFF: ch0 pixel reset regressed.
+- LED25 OFF with LED24 ON: camera reset output is high; verify whether this is intended active reset for the sensor.
+- LED26 OFF: the I2C register table did not complete.
+- LED27 OFF with LED26 ON: table completion logic reached `DATA_LENGTH`, but the final ROM entry was not observed as a write.
+- LED28 OFF: the register sequencer never reached the stream-on index region.
+- LED29 OFF with LED28 ON: the sequencer reached the stream-on region but did not write `0x0100 = 0x01`.
+- LED30 ON: ACK error occurred; split ACK phase next if it recurs.
+- LED31 ON: I2C arbitration-lost occurred.
+- LED32 OFF: MIPI LP activity disappeared; focus on reset/power/physical pins.
+- LED33 OFF while LED26/27/29 are ON and LED30/31 are OFF: full I2C table likely completed cleanly, but the camera still did not enter MIPI byte-clock/HS streaming; next focus becomes reset polarity, sensor mode table, or physical DPHY clock lane.
+
+---
+
+## 73. 2026-07-09 fifty-fourth board feedback: full I2C table and MIPI activity, color-bar/black-band image (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-29, LED31-33.
+- LEDs OFF: LED30 only.
+- Timing screenshot:
+  - WNS: 1.46 ns
+  - WHS: 0.016 ns
+  - axi0_ACLK: 282.486 MHz
+  - i_fb_clk: 271.223 MHz
+  - mipi_clk: 205.846 MHz
+  - i_sysclk_div2: 166.472 MHz
+  - hdmi_tx_slow_clk: 289.101 MHz
+  - mipi_rx_ck0_CLKOUT: 206.271 MHz
+  - mipi_rx_ck1_CLKOUT: 409.668 MHz
+- Picture: large stable color bars with black band/black lower or middle region. This is a substantial visual change from the prior noisy/blocky fallback-like output.
+
+### Interpretation
+
+Using the LED map from iteration 72:
+
+- LED26 ON: ch0 I2C config table completed.
+- LED27 ON: ch0 final ROM entry write was seen.
+- LED28 ON and LED29 ON: the stream-on index was reached and a `0x0100 = 0x01` write was seen.
+- LED30 OFF: no I2C ACK error was observed. This is good because LED30 is a BAD-state probe in this map.
+- LED31 ON: I2C arbitration-lost was observed by the current latch. This needs to be retained as a bad-state reference, but it did not prevent the table/MIPI milestones from being reached in this run.
+- LED32 ON: MIPI LP activity was seen.
+- LED33 ON: MIPI byte-clock/HS/FIFO aggregate activity was seen.
+
+This result proves the prior regression was not a persistent I2C-table-completion failure. The design reached full table completion and MIPI activity, and the displayed image changed to a stable color-bar/black-band pattern. The next probe should move downstream again: MIPI activity -> CSI RAW10/4ppc -> CSI VS/DE -> framebuffer frame_start/input FIFO/write done -> `hdmi_video_ready` -> `hdmi_top` using input video. Keep I2C arbitration-lost as a bad-state reference.
+
+---
+
+## 74. 2026-07-09 fifty-fifth iteration: post-MIPI CSI/HDMI input probe (Codex)
+
+### RTL intent
+
+Determine whether the stable color-bar/black-band image is still HDMI fallback/test behavior or whether decoded CSI/framebuffer data is now feeding `hdmi_top`.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - I2C arbitration-lost bad state,
+  - ch0 MIPI byte-clock/HS/FIFO activity,
+  - ch0 CSI RAW10 and 4ppc,
+  - ch0 CSI VS or DE,
+  - ch0 framebuffer frame_start,
+  - ch0 framebuffer input FIFO write,
+  - ch0 framebuffer write-frame done,
+  - `hdmi_video_ready`,
+  - `hdmi_top` using input video,
+  - aggregate HDMI timing/framebuffer/DDR/CDC bad state.
+- Did not change the I2C ROM, camera reset logic, MIPI/CSI logic, constraints, or Efinity project files.
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | BAD: ch0 I2C arbitration-lost seen |
+| LED25 | L6 | ch0 MIPI byte-clock / HS / FIFO activity seen |
+| LED26 | K4 | ch0 CSI RAW10 and 4ppc seen |
+| LED27 | K3 | ch0 CSI VS or DE seen |
+| LED28 | M5 | ch0 framebuffer `frame_start` seen |
+| LED29 | M6 | ch0 framebuffer input FIFO write seen |
+| LED30 | N7 | ch0 framebuffer write-frame done seen |
+| LED31 | P7 | `hdmi_video_ready` asserted |
+| LED32 | P6 | `hdmi_top` is using input video |
+| LED33 | R6 | BAD: HDMI timing / framebuffer / DDR / CDC bad state seen |
+
+### How to read the next board result
+
+- LED24 ON: I2C arbitration-lost still occurred; keep watching whether it correlates with unstable MIPI/CSI.
+- LED25 OFF: MIPI activity regressed again.
+- LED26 OFF with LED25 ON: MIPI activity exists but CSI RAW10/4ppc decode is missing.
+- LED27 OFF with LED26 ON: CSI metadata exists but no VS/DE reaches ch0 output.
+- LED28 OFF with LED27 ON: CSI VS/DE exists but framebuffer `frame_start` is not detected.
+- LED29 OFF with LED27 ON: active CSI data is not writing into the framebuffer input FIFO.
+- LED30 OFF with LED28/29 ON: framebuffer input starts but a full frame write does not complete.
+- LED31 OFF after LED30 ON: written frames exist but the HDMI ready qualification is still false.
+- LED32 OFF after LED31 ON: ready is true but `hdmi_top` is not selecting input video.
+- LED33 ON: downstream bad state from HDMI timing, framebuffer, DDR read, or CDC occurred and may explain the black bands.
+- LED25-32 ON with LED33 OFF: input path is active and stable; remaining issue shifts toward pixel packing/Bayer/test-pattern sensor configuration.
+
+---
+
+## 75. 2026-07-09 fifty-fifth board feedback: MIPI/CSI/HDMI input regressed again, AL bad-state seen (Codex)
+
+### Board feedback from user
+
+- LEDs OFF: LED25-32.
+- LEDs ON: LED18-24, LED33.
+- Timing screenshot:
+  - WNS: 1.919 ns
+  - WHS: 0.026 ns
+  - axi0_ACLK: 324.570 MHz
+  - i_fb_clk: 251.762 MHz
+  - mipi_clk: 229.568 MHz
+  - i_sysclk_div2: 167.280 MHz
+  - hdmi_tx_slow_clk: 295.421 MHz
+  - mipi_rx_ck0_CLKOUT: 171.556 MHz
+  - mipi_rx_ck1_CLKOUT: 384.911 MHz
+- Picture: noisy multicolor tiled/stripe pattern.
+
+### Interpretation
+
+Using the LED map from iteration 74:
+
+- LED24 ON: ch0 I2C arbitration-lost status was latched by the current debug signal.
+- LED25 OFF: ch0 MIPI byte-clock/HS/FIFO aggregate activity was not seen in this run.
+- LED26 OFF: CSI RAW10/4ppc was not seen.
+- LED27 OFF: CSI VS/DE was not seen.
+- LED28-30 OFF: framebuffer input/write milestones did not occur.
+- LED31 OFF: `hdmi_video_ready` is false.
+- LED32 OFF: `hdmi_top` is not using input video.
+- LED33 ON: downstream bad-state aggregate is set. With LED25-32 OFF, this is likely a symptom of fallback/timing/bad-state latches rather than a live camera-frame corruption diagnosis.
+
+This run regressed before MIPI activity again, and it is the first run where the current downstream probe clearly shows I2C arbitration-lost alongside missing MIPI/CSI. The AL signal is a sticky "ever seen" latch in `i2c_16addr_8data.v`, sampled while polling the I2C controller status register; it may be transient. The next probe should split ever-AL vs last-status-AL, ACK error, table completion/final entry/stream-on, and LP/byteclock/HS/FIFO activity.
+
+---
+
+## 76. 2026-07-09 fifty-sixth iteration: I2C AL vs MIPI-start correlation probe (Codex)
+
+### RTL intent
+
+Determine whether the unstable MIPI-start behavior correlates with a persistent I2C arbitration-lost status, a transient AL latch, or an otherwise completed I2C table followed by missing MIPI byteclock/HS.
+
+### RTL changes
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED24-33 to:
+  - I2C arbitration-lost ever seen,
+  - I2C last sampled status AL bit,
+  - I2C config table completion,
+  - final ROM entry write,
+  - stream-on write,
+  - I2C ACK error ever seen,
+  - MIPI LP activity,
+  - MIPI byte-clock,
+  - MIPI HS term/enable or HS data,
+  - MIPI FIFO nonempty/read.
+- Did not change the I2C ROM, camera reset logic, MIPI/CSI logic, constraints, or Efinity project files.
+- Kept `USE_INPUT_STABLE_GATE(1'b0)` for diagnostic continuity.
+- No synthesis, P&R, or programming was run by Codex.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | BAD: ch0 I2C arbitration-lost ever seen |
+| LED25 | L6 | BAD: ch0 I2C last sampled status has AL set |
+| LED26 | K4 | ch0 I2C config table completed |
+| LED27 | K3 | ch0 final ROM entry write seen |
+| LED28 | M5 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED29 | M6 | BAD: ch0 I2C ACK error ever seen |
+| LED30 | N7 | ch0 MIPI LP clock or lane0 activity seen |
+| LED31 | P7 | ch0 MIPI byte clock toggled |
+| LED32 | P6 | ch0 MIPI HS term/enable or HS data seen |
+| LED33 | R6 | ch0 MIPI FIFO nonempty/read seen |
+
+### How to read the next board result
+
+- LED24 ON and LED25 ON: AL is still present in the last sampled I2C status; treat I2C controller/bus state as the immediate blocker.
+- LED24 ON and LED25 OFF: AL occurred transiently earlier, but the last sampled status cleared it; correlate with LED26-33 before changing I2C logic.
+- LED26/27/28 ON and LED29 OFF with LED31-33 OFF: I2C table and stream-on completed without ACK error, but MIPI did not start; focus returns to camera reset/mode table/physical DPHY start.
+- LED29 ON: ACK error occurred; split ACK phase next.
+- LED30 OFF: no LP activity; suspect reset/power/pin state.
+- LED31 OFF with LED30 ON: LP is visible but byte clock did not start.
+- LED32 OFF with LED31 ON: byte clock exists but HS control/data did not appear.
+- LED33 OFF with LED32 ON: HS is visible but lane FIFO did not receive/read data.
+- LED31-33 ON: MIPI is active again; return to CSI/HDMI input probe.
+
+---
+
+## 77. 2026-07-09 strategy change: combine small fixes with LED probes (Codex)
+
+### User direction
+
+The user explicitly requested a more ordered process: avoid ineffective repeated LED-only probing, and allow each round to include both a focused fix attempt and a corresponding LED probe.
+
+### Updated debugging rule
+
+From this point, each board iteration should include:
+
+1. One concrete hypothesis.
+2. One minimal, reversible RTL fix or configuration adjustment when there is a plausible low-risk candidate.
+3. A LED map that directly proves whether the fix hit the hypothesis.
+4. No broad unrelated RTL refactor.
+
+### Current narrowed fault range
+
+The primary unstable region is after I2C/register programming and before stable MIPI byte-clock/HS/FIFO startup:
+
+- Reset, DDR, channel selection, and basic I2C status sampling have repeatedly passed.
+- Full I2C table completion and MIPI activity have occurred at least once.
+- The full path has also reached CSI/HDMI input at least once.
+- Several later runs regressed before MIPI byte-clock/HS/FIFO.
+- I2C arbitration-lost (`AL`) has been observed by a sticky status latch during at least one regression run.
+
+The immediate working hypothesis is that I2C timing/controller status robustness contributes to intermittent camera stream startup. The current `i2c_master_ctrl_top` uses `mipi_clk` as the I2C controller clock, and `CLK_DIV=16'd199`; with build-to-build `mipi_clk` variation this is a few-hundred-kHz I2C bus. This may be valid in ideal conditions, but is a reasonable first low-risk knob for the observed intermittent AL/startup behavior.
+
+---
+
+## 78. 2026-07-09 fifty-seventh iteration: conservative I2C prescaler fix plus AL/MIPI probe (Codex)
+
+### Hypothesis
+
+The camera sometimes fails to enter stable MIPI streaming because the I2C controller/register writes are too close to the board/sensor timing margin. Slowing the I2C controller clock should reduce I2C status anomalies and improve repeatability of MIPI byte-clock/HS startup.
+
+### RTL changes
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_ctrl_top.v`
+
+- Changed `CLK_DIV` default from `16'd199` to `16'd499`.
+- This keeps the same I2C sequencer and register table, but makes SCL substantially slower when driven by `mipi_clk`.
+- This is intentionally conservative and reversible.
+
+`final_project/fpga/rtl/top/top.v`
+
+- Kept the current I2C AL vs MIPI-start LED map from iteration 76:
+  - ever-AL,
+  - last-status AL,
+  - table completion,
+  - final table entry,
+  - stream-on,
+  - ACK error,
+  - LP,
+  - byteclock,
+  - HS,
+  - FIFO.
+
+### Expected result
+
+If I2C timing margin was contributing to the intermittent startup:
+
+- LED24 should preferably turn OFF or at least LED25 should turn OFF, showing AL is not persistent in the last sampled status.
+- LED26/27/28 should remain ON, proving the slower I2C still completes the table and stream-on.
+- LED31/32/33 should become more consistently ON across boots, proving MIPI byte-clock/HS/FIFO startup is more repeatable.
+
+If LED26/27/28 turn OFF, the slower I2C change broke or stalled the register sequence and should be reverted or retuned.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 delayed I2C controller reset released |
+| LED22 | G2 | ch0 I2C status register sampled |
+| LED23 | K6 | ch0 I2C sampled with no aggregate NACK |
+| LED24 | J3 | BAD: ch0 I2C arbitration-lost ever seen |
+| LED25 | L6 | BAD: ch0 I2C last sampled status has AL set |
+| LED26 | K4 | ch0 I2C config table completed |
+| LED27 | K3 | ch0 final ROM entry write seen |
+| LED28 | M5 | ch0 stream-on register write seen (`0x0100 = 0x01`) |
+| LED29 | M6 | BAD: ch0 I2C ACK error ever seen |
+| LED30 | N7 | ch0 MIPI LP clock or lane0 activity seen |
+| LED31 | P7 | ch0 MIPI byte clock toggled |
+| LED32 | P6 | ch0 MIPI HS term/enable or HS data seen |
+| LED33 | R6 | ch0 MIPI FIFO nonempty/read seen |
+
+### How to read the next board result
+
+- LED26/27/28 ON and LED29 OFF: slower I2C still programs the sensor and writes stream-on.
+- LED24 OFF and LED25 OFF: AL disappeared.
+- LED24 ON but LED25 OFF: AL may be transient/history only; compare with MIPI LEDs.
+- LED24/25 ON: AL remains active in the last sampled status; I2C/controller state is still suspect.
+- LED31/32/33 ON: MIPI is active; next step should return to CSI/HDMI input stability.
+- LED31/32/33 OFF with LED26/27/28 ON and LED29 OFF: I2C table completed cleanly but MIPI still did not start; next fix should target sensor reset/start sequencing or final stream-on timing, not more LED-only probing.
+
+---
+
+## 79. 2026-07-09 fifty-eighth iteration result: slower I2C passed, issue moved downstream (Codex)
+
+### Board result reported by user
+
+With the iteration-78 I2C AL/MIPI-start probe:
+
+- LED24 OFF
+- LED25 OFF
+- LED29 OFF
+- All other LED18-33 ON
+- Picture/video still not a clean camera image.
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.593 ns |
+| WHS | 0.026 ns |
+| axi0_ACLK | 293.513 MHz |
+| i_fb_clk | 245.278 MHz |
+| mipi_clk | 226.501 MHz |
+| i_sysclk_div2 | 171.233 MHz |
+| hdmi_tx_slow_clk | 286.779 MHz |
+| mipi_rx_ck0_CLKOUT | 206.654 MHz |
+| mipi_rx_ck1_CLKOUT | 409.500 MHz |
+
+### Video observation
+
+User provided `D:\20306\Pictures\Camera Roll\WIN_20260709_19_50_21_Pro.mp4`.
+
+Frames extracted with local `ffmpeg.exe` show:
+
+- frame 1: full HDMI fallback color bars;
+- frame 2: fallback color bars mixed with a dark/striped input region;
+- frame 3: mostly dark input with fine horizontal stripe/noise.
+
+This is not a pure fixed color-bar output for the whole clip, and it is not yet a clean camera image.
+
+### Interpretation
+
+The slower I2C prescaler change is tentatively effective:
+
+- I2C table completion, final entry, and stream-on were observed.
+- Sticky AL, last-status AL, and ACK-error LEDs were all OFF in this run.
+- MIPI LP/byteclock/HS/FIFO LEDs were ON.
+
+The immediate fault range is no longer I2C register programming or MIPI startup. The current focus is downstream:
+
+- CSI RAW10/VS/DE validity,
+- framebuffer frame start/write completion/read availability,
+- CDC bridge level/underflow,
+- HDMI stable input gate/use-input transition,
+- then RAW10 unpack/Bayer/pixel order if the path is proven continuous.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/top/top.v`
+
+- Restored `hdmi_top.USE_INPUT_STABLE_GATE(1'b1)` so HDMI does not switch to input until its own timing-stability checker passes.
+- Replaced the I2C/MIPI startup LED map with a downstream video-path LED map.
+
+The I2C slowdown fix remains in place:
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_ctrl_top.v`
+
+- `CLK_DIV = 16'd499`
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 stream-on plus MIPI byteclock/FIFO seen |
+| LED22 | G2 | ch0 CSI RAW10/4ppc seen |
+| LED23 | K6 | ch0 CSI VS and DE seen |
+| LED24 | J3 | ch0 framebuffer frame_start seen |
+| LED25 | L6 | BAD: framebuffer output underflow seen |
+| LED26 | K4 | ch0 framebuffer write FIFO and write-frame done |
+| LED27 | K3 | selected DDR read data and read-frame available |
+| LED28 | M5 | CDC bridge active and level-ready seen |
+| LED29 | M6 | BAD: CDC bridge underflow or level-low seen |
+| LED30 | N7 | hdmi_video_ready seen |
+| LED31 | P7 | hdmi_top input-stable gate passed |
+| LED32 | P6 | hdmi_top input data changed under DE |
+| LED33 | R6 | hdmi_top is using input video |
+
+### How to read the next board result
+
+- LED21 OFF: startup regressed before or at MIPI FIFO; return to I2C/MIPI start stability.
+- LED22 OFF with LED21 ON: MIPI FIFO is active but CSI does not report RAW10/4ppc.
+- LED23 OFF with LED22 ON: CSI format is right, but VS/DE is not reaching the downstream path.
+- LED24 OFF with LED23 ON: framebuffer is not seeing frame_start.
+- LED26 OFF with LED24 ON: framebuffer sees frames but does not complete write-frame path.
+- LED27 OFF with LED26 ON: write completes, but DDR read/read-frame availability is failing.
+- LED25 ON: framebuffer output underflow is corrupting or blocking the displayed input.
+- LED28 OFF or LED29 ON: CDC bridge fill/underflow is the immediate issue.
+- LED30 OFF with LED27/28 ON: `hdmi_video_ready` qualification is blocking the HDMI path.
+- LED31 OFF with LED30 ON: HDMI input timing-stability gate is rejecting the selected input timing.
+- LED33 OFF with LED31 ON: HDMI gate passed but `hdmi_top` did not switch to input video.
+- LED33 ON with LED32 ON and LED25/29 OFF: the whole display path is active; then debug image content/pixel packing/Bayer order.
+
+---
+
+## 80. 2026-07-09 fifty-ninth iteration result: downstream probe exposed CDC false-start risk (Codex)
+
+### Board result reported by user
+
+With the iteration-79 downstream video-path probe:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED28 ON
+- LED29 ON
+- All other LED21-27 and LED30-33 OFF
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.152 ns |
+| WHS | 0.026 ns |
+| axi0_ACLK | 259.875 MHz |
+| i_fb_clk | 237.023 MHz |
+| mipi_clk | 220.167 MHz |
+| i_sysclk_div2 | 189.000 MHz |
+| hdmi_tx_slow_clk | 276.472 MHz |
+| mipi_rx_ck0_CLKOUT | 220.410 MHz |
+| mipi_rx_ck1_CLKOUT | 408.998 MHz |
+
+User screenshot shows full-screen random colored noise with broad horizontal color bands.
+
+### Interpretation
+
+Under the iteration-79 LED map:
+
+- LED18/19/20 ON confirms DDR configured, ch0 selected, and global reset released.
+- LED21 OFF means the aggregated `stream-on + MIPI byteclock + MIPI FIFO` condition did not pass.
+- LED22/23/24 OFF means CSI RAW10/VS/DE/framebuffer frame_start were not proven in that run.
+- LED28 and LED29 ON are suspicious because the CDC bridge appeared active/level-ready and also reported underflow/level-low while upstream video checkpoints were not proven.
+
+This points to a false-start/false-fill risk in `video_2pix_to_1pix_cdc`: it was writing one FIFO word every write-clock cycle regardless of whether real input video (`i_vs` or `i_de`) had ever appeared. That can fill the CDC FIFO with blank/stale timing words, assert bridge level/active flags, and then produce misleading HDMI/CDC LEDs and noisy output even when CSI/framebuffer input is not valid.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v`
+
+- Added an `input_started` latch in the write-clock domain.
+- The CDC FIFO now writes only after input video has started (`i_vs` or `i_de` seen), instead of writing unconditionally every write-clock cycle.
+- `o_level_low` is now reported only when the bridge is already active, reducing false bad-state reports before real video begins.
+
+`final_project/fpga/rtl/top/top.v`
+
+- Replaced the aggregated LED21 condition with split upstream checkpoints:
+  - stream-on,
+  - MIPI byteclock,
+  - MIPI FIFO,
+  - CSI RAW10/4ppc,
+  - CSI VS,
+  - CSI DE,
+  - framebuffer frame_start.
+- Kept CDC/HDMI readiness LEDs after those split upstream checkpoints.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 stream-on register write seen |
+| LED22 | G2 | ch0 MIPI byte clock toggled |
+| LED23 | K6 | ch0 MIPI FIFO nonempty/read seen |
+| LED24 | J3 | ch0 CSI RAW10/4ppc seen |
+| LED25 | L6 | ch0 CSI VS seen |
+| LED26 | K4 | ch0 CSI DE seen |
+| LED27 | K3 | ch0 framebuffer frame_start seen |
+| LED28 | M5 | CDC bridge active and level-ready seen |
+| LED29 | M6 | BAD: CDC bridge underflow or level-low seen |
+| LED30 | N7 | hdmi_video_ready seen |
+| LED31 | P7 | hdmi_top input-stable gate passed |
+| LED32 | P6 | hdmi_top input data changed under DE |
+| LED33 | R6 | hdmi_top is using input video |
+
+### How to read the next board result
+
+- LED21 OFF: sensor stream-on write did not complete; return to I2C/start sequencing.
+- LED21 ON and LED22 OFF: sensor was commanded on, but MIPI byte clock did not appear.
+- LED22 ON and LED23 OFF: byte clock exists but FIFO data/read did not appear.
+- LED23 ON and LED24 OFF: MIPI FIFO is active, but CSI parser is not reporting RAW10/4ppc.
+- LED24 ON and LED25/26 OFF: CSI format is correct, but frame timing (`VS`/`DE`) is missing.
+- LED25/26 ON and LED27 OFF: framebuffer is not seeing frame_start.
+- LED27 ON and LED28 OFF: upstream video entered framebuffer, but CDC bridge did not become ready.
+- LED29 ON: CDC bridge still underflowed or dropped below level after real video started.
+- LED30/31/33 decide whether HDMI readiness/stability/use-input is blocking after CDC is clean.
+
+---
+
+## 81. 2026-07-09 sixtieth iteration result: final stream-on seen but MIPI byte clock absent (Codex)
+
+### Board result reported by user
+
+With the iteration-80 MIPI/CSI split probe:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED21 ON
+- All other LED22-33 OFF
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.663 ns |
+| WHS | 0.013 ns |
+| axi0_ACLK | 299.670 MHz |
+| i_fb_clk | 231.857 MHz |
+| mipi_clk | 227.118 MHz |
+| i_sysclk_div2 | 180.995 MHz |
+| hdmi_tx_slow_clk | 261.575 MHz |
+| mipi_rx_ck0_CLKOUT | 204.248 MHz |
+| mipi_rx_ck1_CLKOUT | 383.436 MHz |
+
+User screenshot still shows full-screen random colored noise with broad horizontal color bands.
+
+### Interpretation
+
+The new split probe makes the current blocker specific:
+
+- LED21 ON means the camera register table wrote stream-on (`0x0100 = 0x01`).
+- LED22 OFF means ch0 MIPI byte clock was not observed by the FPGA after stream-on.
+- LED23-27 OFF are downstream consequences: without byte clock/FIFO, CSI RAW10/VS/DE/framebuffer cannot be expected.
+- LED28/29 are now OFF after the CDC false-start fix, confirming the previous CDC active/level-low LEDs were at least partly false activity from unconditional CDC FIFO writes.
+
+The immediate focus is therefore sensor stream-on sequencing and MIPI receiver start, not framebuffer, CDC, HDMI, RAW10 unpack, or Bayer order.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_reg_rom.v`
+
+- Changed the earlier mid-table `ROM[8'h90] = {16'h0100, 8'h01, 1'b0}` to standby:
+  - `ROM[8'h90] = {16'h0100, 8'h00, 1'b0}`
+- Kept the final `ROM[8'ha1] = {16'h0100, 8'h01, 1'b0}` as the only actual stream-on after final window registers are written.
+- Rationale: the table previously commanded stream-on at `0x90`, then continued changing window registers `0x3200..0x3213`, then repeated stream-on at `0xa1`. The current symptom is exactly "stream-on write seen, but byte clock absent"; making stream-on happen only after the final window registers is a small, reversible sequencing fix.
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_reg_set.v`
+
+- Moved `STREAM_ON_INDEX_VALUE` from `8'h90` to `8'ha1` so the debug "stream-on index reached" marker matches the final stream-on entry.
+
+### Next LED18-33 map
+
+The LED map remains the iteration-80 split probe:
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | final ch0 stream-on register write seen |
+| LED22 | G2 | ch0 MIPI byte clock toggled |
+| LED23 | K6 | ch0 MIPI FIFO nonempty/read seen |
+| LED24 | J3 | ch0 CSI RAW10/4ppc seen |
+| LED25 | L6 | ch0 CSI VS seen |
+| LED26 | K4 | ch0 CSI DE seen |
+| LED27 | K3 | ch0 framebuffer frame_start seen |
+| LED28 | M5 | CDC bridge active and level-ready seen |
+| LED29 | M6 | BAD: CDC bridge underflow or level-low seen |
+| LED30 | N7 | hdmi_video_ready seen |
+| LED31 | P7 | hdmi_top input-stable gate passed |
+| LED32 | P6 | hdmi_top input data changed under DE |
+| LED33 | R6 | hdmi_top is using input video |
+
+### How to read the next board result
+
+- LED21 OFF: final stream-on no longer completed; inspect I2C sequence/ACK after the ROM change.
+- LED21 ON and LED22 OFF again: final stream-on completed but the camera still does not start MIPI byte clock; next target should be sensor reset/start delay, MIPI receiver enable/termination, or camera power/LP/HS status.
+- LED22 ON and LED23 OFF: byte clock exists but lane FIFO does not receive/read.
+- LED23 ON and LED24 OFF: MIPI FIFO active but CSI parser does not report RAW10/4ppc.
+- LED24-27 ON: upstream video is back; proceed again to CDC/HDMI or pixel-content debugging.
+
+---
+
+## 82. 2026-07-09 sixty-first iteration result: final stream-on sequencing fix did not restore byte clock (Codex)
+
+### Board result reported by user
+
+With the iteration-81 final-stream-on-only change:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED21 ON
+- All other LED22-33 OFF
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.7 ns |
+| WHS | 0.026 ns |
+| axi0_ACLK | 303.030 MHz |
+| i_fb_clk | 254.130 MHz |
+| mipi_clk | 244.618 MHz |
+| i_sysclk_div2 | 170.882 MHz |
+| hdmi_tx_slow_clk | 285.878 MHz |
+| mipi_rx_ck0_CLKOUT | 203.832 MHz |
+| mipi_rx_ck1_CLKOUT | 386.399 MHz |
+
+User screenshot still shows full-screen random colored noise with broad horizontal color bands.
+
+### Interpretation
+
+The iteration-81 sequencing fix did not restore ch0 MIPI byte clock:
+
+- LED21 ON: the final stream-on write still completed after moving the true stream-on entry to `0xa1`.
+- LED22 OFF: ch0 MIPI byte clock still was not observed.
+- LED23-33 OFF: no MIPI FIFO, CSI, framebuffer, CDC, or HDMI input milestones followed.
+
+The current blocker remains between final camera stream-on and MIPI byte-clock/HS entry. The next probe should no longer spend LEDs on framebuffer/CDC/HDMI. It should split the MIPI physical boundary:
+
+- pixel-side reset release,
+- clock/data LP activity,
+- LP data toggling,
+- CSI receiver HS enable/termination outputs,
+- HS data visibility,
+- byte-clock/FIFO,
+- I2C ACK/AL bad states.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED22-33 to the ch0 MIPI LP/HS boundary and I2C bad-state checks.
+- No sensor register-table change in this iteration.
+- Kept previous fixes in place:
+  - slower I2C prescaler,
+  - CDC false-start guard,
+  - final-only stream-on.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | final ch0 stream-on register write seen |
+| LED22 | G2 | ch0 soft CSI pixel reset released |
+| LED23 | K6 | ch0 MIPI clock-lane LP activity seen |
+| LED24 | J3 | ch0 MIPI data-lane0 LP activity seen |
+| LED25 | L6 | ch0 MIPI data-lane LP toggled |
+| LED26 | K4 | ch0 MIPI clock-lane HS enable seen |
+| LED27 | K3 | ch0 MIPI data-lane HS enable seen |
+| LED28 | M5 | ch0 MIPI HS termination seen |
+| LED29 | M6 | ch0 MIPI HS data changed/nonzero |
+| LED30 | N7 | ch0 MIPI byte clock toggled |
+| LED31 | P7 | ch0 MIPI FIFO nonempty/read seen |
+| LED32 | P6 | BAD: ch0 I2C ACK error ever seen |
+| LED33 | R6 | BAD: ch0 I2C arbitration-lost ever seen |
+
+### How to read the next board result
+
+- LED22 OFF: reset/pixel-side release is broken before MIPI can start.
+- LED23/24 OFF with LED21 ON: camera was commanded on but LP clock/data pins do not show expected activity; suspect camera reset/power/physical lane state.
+- LED23/24 ON and LED25 OFF: lanes are present but not toggling; camera may stay in LP idle.
+- LED25 ON and LED26/27/28 OFF: LP toggles but receiver does not enter HS enable/termination.
+- LED26/27/28 ON and LED29 OFF: receiver tries HS, but HS data is not visible.
+- LED29 ON and LED30 OFF: HS data exists but byte clock/reset crossing is not being observed.
+- LED30 ON and LED31 OFF: byte clock exists but lane FIFO remains empty/not read.
+- LED32 or LED33 ON: I2C bad state returned; split ACK/AL phase again before more MIPI changes.
+
+---
+
+## 83. 2026-07-09 sixty-second iteration result: stream-on was launched but I2C AL makes it untrusted (Codex)
+
+### Board result reported by user
+
+With the iteration-82 MIPI LP/HS boundary probe:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED21 ON
+- LED22 ON
+- LED23 ON
+- LED24 ON
+- LED33 ON
+- LED25-32 OFF
+
+Timing report from the user screenshots / handoff context:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.555 ns |
+| WHS | 0.008 ns |
+| axi0_ACLK | 290.276 MHz |
+| i_fb_clk | 246.548 MHz |
+| mipi_clk | 231.965 MHz |
+| i_sysclk_div2 | 174.978 MHz |
+| hdmi_tx_slow_clk | 261.917 MHz |
+| mipi_rx_ck0_CLKOUT | 182.749 MHz |
+| mipi_rx_ck1_CLKOUT | 389.105 MHz |
+
+The screen still shows random colored noise / bands.
+
+### Interpretation
+
+The result narrows the failure to the final camera start / MIPI entry boundary, with I2C reliability now the first suspect:
+
+- LED21 ON means the final `0100=01` stream-on write was launched.
+- LED22 ON means the soft MIPI pixel-side reset released.
+- LED23/24 ON mean ch0 MIPI clock/data LP pins are not dead.
+- LED25-31 OFF mean no LP toggling, no HS enable/termination/data, no byte clock, and no FIFO activity was observed.
+- LED33 ON is bad: the I2C controller observed arbitration lost (`AL`) at least once.
+
+Because the previous LED21 was driven by the `wr_en` launch condition, not by a clean I2C completion, it did not prove the sensor accepted the final stream-on write. The next iteration therefore splits final stream-on into launched / completed / clean / error before making another MIPI-side change.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_16addr_8data.v`
+
+- Added per-write debug pulses:
+  - `dbg_wr_done_clean`: write transaction reached `wr_done` without RXACK or AL being sampled during that transaction.
+  - `dbg_wr_done_error`: write transaction reached `wr_done` after RXACK or AL was sampled during that transaction.
+- This is diagnostic only; it does not change the write FSM sequencing yet.
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_reg_set.v`
+
+- Added final stream-on completion latches:
+  - `dbg_stream_on_done`
+  - `dbg_stream_on_clean`
+  - `dbg_stream_on_error`
+- Kept final stream-on index at `8'ha1`.
+
+`final_project/fpga/rtl/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_ctrl_top.v`
+and `final_project/fpga/rtl/mipi_csi/soft_mipi_rx_top.v`
+
+- Routed the new debug signals to `top.v`.
+
+`final_project/fpga/rtl/top/top.v`
+
+- Reassigned LED21-33 to final-stream-on quality plus MIPI boundary signals.
+- Kept `hdmi_top.USE_INPUT_STABLE_GATE(1'b1)`.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | final ch0 stream-on write launched |
+| LED22 | G2 | final ch0 stream-on write completed |
+| LED23 | K6 | final ch0 stream-on write completed cleanly, without RXACK/AL |
+| LED24 | J3 | BAD: final ch0 stream-on write completed with RXACK/AL |
+| LED25 | L6 | ch0 soft CSI pixel reset released |
+| LED26 | K4 | ch0 MIPI clock-lane LP activity seen |
+| LED27 | K3 | ch0 MIPI data-lane0 LP activity seen |
+| LED28 | M5 | ch0 MIPI data-lane LP toggled |
+| LED29 | M6 | ch0 MIPI HS enable/termination seen |
+| LED30 | N7 | ch0 MIPI HS data changed/nonzero |
+| LED31 | P7 | ch0 MIPI byte clock or FIFO activity seen |
+| LED32 | P6 | BAD: ch0 I2C ACK error ever seen |
+| LED33 | R6 | BAD: ch0 I2C arbitration-lost ever seen |
+
+### How to read the next board result
+
+- LED21 OFF: final stream-on write was not even launched.
+- LED21 ON and LED22 OFF: the final stream-on transaction started but did not complete; inspect I2C FSM/core stall.
+- LED22 ON, LED23 ON, LED24 OFF, LED32/33 OFF: final stream-on was clean; if LED28-31 still stay OFF, shift back to MIPI receiver / lane entry.
+- LED24 ON or LED32/33 ON: final stream-on or earlier I2C sequence is dirty; next fix should add an I2C retry/reset path or remove the condition causing AL before trusting MIPI symptoms.
+- LED23 ON plus LED29/30/31 ON: sensor likely entered HS; continue downstream CSI/DDR/HDMI content debugging.
+
+---
+
+## 84. 2026-07-09 sixty-third iteration result: I2C clean and MIPI HS/FIFO active; move to CSI/framebuffer/content (Codex)
+
+### Board result reported by user
+
+With the iteration-83 final stream-on quality + MIPI boundary probe:
+
+- LED24 OFF
+- LED32 OFF
+- LED33 OFF
+- All other LED18-23 and LED25-31 ON
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.798 ns |
+| WHS | 0.008 ns |
+| axi0_ACLK | 312.305 MHz |
+| i_fb_clk | 246.002 MHz |
+| mipi_clk | 225.479 MHz |
+| i_sysclk_div2 | 150.761 MHz |
+| hdmi_tx_slow_clk | 288.101 MHz |
+| mipi_rx_ck0_CLKOUT | 208.986 MHz |
+| mipi_rx_ck1_CLKOUT | 386.698 MHz |
+
+The image is still full-screen random colored noise / horizontal bands.
+
+### Interpretation
+
+This result clears the previous I2C suspicion:
+
+- LED21/22/23 ON and LED24 OFF mean the final `0100=01` stream-on was launched, completed, and completed cleanly.
+- LED32/33 OFF mean no aggregate RXACK or arbitration-lost was observed.
+- LED29/30/31 ON mean the receiver saw HS enable/termination, HS data, and byte clock/FIFO activity.
+
+The active fault is now downstream of MIPI physical entry:
+
+- CSI packet decode / RAW10 + 4ppc qualification,
+- RAW10-to-RAW8 packing,
+- framebuffer write/read,
+- debayer/Bayer phase and RGB ordering,
+- HDMI input selection / content path.
+
+Because the screen is colored noise while the raw camera stream is Bayer/RAW, the next build intentionally bypasses debayer/white-balance for HDMI and displays a grayscale copy of the framebuffer raw samples. This is both a minimal content fix and a diagnostic split:
+
+- If the image becomes a coherent grayscale camera view, CSI/DDR/HDMI are alive and the next fix is Bayer phase/debayer.
+- If the image remains random noise, focus on RAW10 unpacking / CSI payload alignment before debayer.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/top/top.v`
+
+- Added `HDMI_RAW_GRAY_BYPASS = 1'b1`.
+- HDMI path now uses ch0/ch1 framebuffer raw two-pixel output as grayscale RGB:
+  - `{gray0, gray0, gray0, gray1, gray1, gray1}`
+  - timing comes directly from `ch*_hs/vs/de`.
+- Debayer and white-balance remain instantiated but are bypassed for HDMI output in this probe.
+- Reassigned LED21-33 to CSI/framebuffer/HDMI-content checkpoints.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | final ch0 stream-on completed cleanly |
+| LED22 | G2 | ch0 MIPI byte clock or FIFO activity seen |
+| LED23 | K6 | ch0 CSI datatype RAW10 seen |
+| LED24 | J3 | ch0 CSI pixel-per-clock 4 seen |
+| LED25 | L6 | ch0 CSI RAW10/4ppc seen |
+| LED26 | K4 | ch0 framebuffer input VS seen |
+| LED27 | K3 | ch0 framebuffer input DE seen |
+| LED28 | M5 | ch0 framebuffer write FIFO accepted pixels |
+| LED29 | M6 | ch0 DDR write frame done |
+| LED30 | N7 | ch0 DDR read started and returned data |
+| LED31 | P7 | selected HDMI CDC active, level-ready, and data changing |
+| LED32 | P6 | hdmi_top is using input video |
+| LED33 | R6 | BAD: framebuffer/CDC underflow or `hdmi_video_ready` low |
+
+### How to read the next board result
+
+- LED23/24/25 OFF while LED22 ON: MIPI data exists but CSI parser format/pixel-per-clock is not the expected RAW10/4ppc.
+- LED26/27 OFF with LED25 ON: CSI parser reports format, but frame timing is not reaching framebuffer.
+- LED28 OFF with LED27 ON: framebuffer input timing exists but write FIFO is not accepting pixels.
+- LED29/30 OFF with LED28 ON: DDR write/read path is the blocker.
+- LED31 ON, LED32 ON, LED33 OFF: HDMI is consuming the selected raw-gray input; judge image content.
+- If the picture becomes coherent grayscale: next step is debayer/Bayer phase/RGB order.
+- If it remains random noise with LED23-32 ON and LED33 OFF: next step is RAW10 byte/pixel unpacking and lane alignment.
+
+---
+
+## 85. 2026-07-09 sixty-fourth board result: RAW-gray probe regressed ready/MIPI-visible LEDs (Codex)
+
+### Board result reported by user
+
+With the iteration-84 RAW-gray HDMI bypass + CSI/framebuffer/HDMI probe:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED33 ON
+- LED21-32 OFF
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.714 ns |
+| WHS | 0.026 ns |
+| axi0_ACLK | 304.321 MHz |
+| i_fb_clk | 246.063 MHz |
+| mipi_clk | 232.775 MHz |
+| i_sysclk_div2 | 158.680 MHz |
+| hdmi_tx_slow_clk | 259.538 MHz |
+| mipi_rx_ck0_CLKOUT | 181.127 MHz |
+| mipi_rx_ck1_CLKOUT | 374.813 MHz |
+
+The image still shows the same full-screen colored noise / bands.
+
+### Interpretation
+
+This result conflicts with the immediately previous build, where final stream-on was clean and MIPI HS/FIFO activity was visible. The iteration-84 RTL only changed HDMI content selection and the LED map; it should not have intentionally disabled I2C or MIPI.
+
+The most likely explanation is that the probe itself became too fragile:
+
+- LED21 used an I2C clean pulse observed after crossing into the `i_sysclk_div2` latch path; a narrow pulse can be missed.
+- The RAW-gray bypass moved HDMI timing/data directly to framebuffer raw outputs, making the HDMI-ready BAD LED33 dominate when framebuffer readiness is not stable.
+- Therefore this result should not be interpreted as proof that camera stream-on or MIPI HS permanently failed.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/top/top.v`
+
+- Disabled the RAW-gray HDMI bypass:
+  - `HDMI_RAW_GRAY_BYPASS = 1'b0`
+- Restored the normal RGB/debayer HDMI path for this confirmation build.
+- Added mipi-clock-domain sticky latches for final stream-on clean/error:
+  - `ch0_i2c_stream_on_clean_mipi_latch`
+  - `ch0_i2c_stream_on_error_mipi_latch`
+- Synchronized those sticky latches into `i_sysclk_div2` before driving LEDs.
+- LED21 now uses the stable synchronized stream-on-clean latch instead of the earlier pulse-derived latch.
+- LED33 remains BAD, now including stream-on error plus framebuffer/CDC/ready failures.
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | final ch0 stream-on completed cleanly, mipi_clk sticky |
+| LED22 | G2 | ch0 MIPI byte clock or FIFO activity seen |
+| LED23 | K6 | ch0 CSI datatype RAW10 seen |
+| LED24 | J3 | ch0 CSI pixel-per-clock 4 seen |
+| LED25 | L6 | ch0 CSI RAW10/4ppc seen |
+| LED26 | K4 | ch0 framebuffer input VS seen |
+| LED27 | K3 | ch0 framebuffer input DE seen |
+| LED28 | M5 | ch0 framebuffer write FIFO accepted pixels |
+| LED29 | M6 | ch0 DDR write frame done |
+| LED30 | N7 | ch0 DDR read started and returned data |
+| LED31 | P7 | selected HDMI CDC active, level-ready, and data changing |
+| LED32 | P6 | hdmi_top is using input video |
+| LED33 | R6 | BAD: final stream-on error, framebuffer/CDC underflow, or `hdmi_video_ready` low |
+
+### How to read the next board result
+
+- If LED21 returns ON and LED22-31 also return ON, the iteration-84 regression was caused by the RAW-gray probe / fragile LED crossing; continue content debugging without that bypass.
+- If LED21 remains OFF, final stream-on clean really is not being captured even by the mipi-clock sticky latch; return to I2C stream-on/AL/RXACK.
+- If LED21 ON but LED22 OFF, stream-on is clean but MIPI byte/FIFO activity is absent in this build; re-run the MIPI LP/HS boundary split.
+- If LED31/32 ON and LED33 OFF with the normal RGB path restored, HDMI is consuming input again; continue with debayer/Bayer phase or RAW10 unpacking based on picture content.
+
+---
+
+## 86. 2026-07-09 sixty-fifth board result: stable stream-on latch still absent, return to direct I2C split (Codex)
+
+### Board result reported by user
+
+With the iteration-85 normal RGB path restored and mipi-clock sticky stream-on latch:
+
+- LED18 ON
+- LED19 ON
+- LED20 ON
+- LED33 ON
+- LED21-32 OFF
+
+Timing report from the user screenshot:
+
+| Item | Value |
+|------|-------|
+| WNS | 1.243 ns |
+| WHS | 0.006 ns |
+| axi0_ACLK | 266.170 MHz |
+| i_fb_clk | 220.070 MHz |
+| mipi_clk | 235.073 MHz |
+| i_sysclk_div2 | 160.102 MHz |
+| hdmi_tx_slow_clk | 288.268 MHz |
+| mipi_rx_ck0_CLKOUT | 206.441 MHz |
+| mipi_rx_ck1_CLKOUT | 408.998 MHz |
+
+The screenshot still shows full-screen colored noise / bands.
+
+### Interpretation
+
+This is the second consecutive build where only the base reset/DDR/channel LEDs plus BAD LED33 are ON. Because iteration 85 already disabled the RAW-gray bypass and made stream-on clean/error sticky in the `mipi_clk` domain, the next useful step is no longer downstream CSI/DDR/HDMI probing.
+
+Current focused hypothesis:
+
+- The selected ch0 reset and I2C release path may not be reaching the final stream-on sequence in this build.
+- Or the ROM/index reaches the stream-on entry, but the `0100=01` write launch/done/clean detection is missing.
+- Or the final stream-on write is attempted but completes with RXACK/AL/error.
+
+### RTL changes prepared for next build
+
+`final_project/fpga/rtl/top/top.v`
+
+- Kept the normal RGB/debayer HDMI path selected.
+- Reassigned LED18-33 to a direct ch0 reset/I2C/stream-on split.
+- Added `mipi_clk` sticky latches for:
+  - I2C init done
+  - any I2C write enable
+  - any I2C write done
+  - I2C config done
+  - stream-on index reached
+  - stream-on `0100=01` write launched
+  - stream-on write done
+  - stream-on clean/error
+  - aggregate RXACK / arbitration-lost status
+
+### Next LED18-33 map
+
+| LED | Pin | Meaning |
+|-----|-----|---------|
+| LED18 | B2 | DDR configured |
+| LED19 | E3 | ch0 selected (`~channel_sel`) |
+| LED20 | F3 | global reset released |
+| LED21 | F2 | ch0 `reset_pixel_n` released |
+| LED22 | G2 | ch0 `i2c_rst_n` released |
+| LED23 | K6 | ch0 I2C `init_done` seen |
+| LED24 | J3 | ch0 any I2C `wr_en` seen |
+| LED25 | L6 | ch0 any I2C `wr_done` seen |
+| LED26 | K4 | ch0 I2C `cfg_done` reached |
+| LED27 | K3 | ch0 stream-on index reached |
+| LED28 | M5 | ch0 stream-on write launched (`0100=01`) |
+| LED29 | M6 | ch0 stream-on write done |
+| LED30 | N7 | ch0 stream-on completed cleanly |
+| LED31 | P7 | BAD: ch0 stream-on write completed with error |
+| LED32 | P6 | BAD: ch0 aggregate I2C RXACK seen |
+| LED33 | R6 | BAD: ch0 aggregate I2C arbitration lost seen |
+
+### How to read the next board result
+
+- LED21 OFF: ch0 pixel-domain reset is not released; stop at reset/clocking.
+- LED22 OFF with LED21 ON: delayed I2C reset is not releasing; inspect `i2c_rst_cnt` / `I2C_RST_DELAY_BIT`.
+- LED23 OFF with LED22 ON: I2C master initialization did not complete.
+- LED24 OFF with LED23 ON: register sequencer did not launch writes.
+- LED25 OFF with LED24 ON: write transaction did not complete.
+- LED26 OFF with LED25 ON: writes happen but full ROM config does not finish.
+- LED27 OFF with LED26 possibly OFF/ON: sequencer did not reach the stream-on ROM index.
+- LED28 OFF with LED27 ON: stream-on index was reached but the `0100=01` launch detector missed or ROM data is not as expected.
+- LED29 OFF with LED28 ON: final stream-on write launched but did not complete.
+- LED30 ON and LED31/32/33 OFF: final stream-on path is clean; return to MIPI/CSI boundary.
+- LED31/32/33 ON: final stream-on or earlier I2C transaction has an explicit error condition; inspect ACK/arbitration and I2C status sampling.

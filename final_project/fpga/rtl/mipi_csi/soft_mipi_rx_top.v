@@ -77,6 +77,9 @@ module soft_mipi_rx_top #(
    output      dbg_i2c_last_index_seen,
    output      dbg_i2c_stream_on_index_reached,
    output      dbg_i2c_stream_on_seen,
+   output      dbg_i2c_stream_on_done,
+   output      dbg_i2c_stream_on_clean,
+   output      dbg_i2c_stream_on_error,
    output      dbg_i2c_status_sample_seen,
    output      dbg_i2c_status_rxack_seen,
    output      dbg_i2c_status_busy_seen,
@@ -253,6 +256,9 @@ wire dbg_i2c_cfg_done_w;
 wire dbg_i2c_last_index_seen_w;
 wire dbg_i2c_stream_on_index_reached_w;
 wire dbg_i2c_stream_on_seen_w;
+wire dbg_i2c_stream_on_done_w;
+wire dbg_i2c_stream_on_clean_w;
+wire dbg_i2c_stream_on_error_w;
 wire dbg_i2c_status_sample_seen_w;
 wire dbg_i2c_status_rxack_seen_w;
 wire dbg_i2c_status_busy_seen_w;
@@ -271,6 +277,9 @@ assign dbg_i2c_cfg_done = dbg_i2c_cfg_done_w;
 assign dbg_i2c_last_index_seen = dbg_i2c_last_index_seen_w;
 assign dbg_i2c_stream_on_index_reached = dbg_i2c_stream_on_index_reached_w;
 assign dbg_i2c_stream_on_seen = dbg_i2c_stream_on_seen_w;
+assign dbg_i2c_stream_on_done = dbg_i2c_stream_on_done_w;
+assign dbg_i2c_stream_on_clean = dbg_i2c_stream_on_clean_w;
+assign dbg_i2c_stream_on_error = dbg_i2c_stream_on_error_w;
 assign dbg_i2c_status_sample_seen = dbg_i2c_status_sample_seen_w;
 assign dbg_i2c_status_rxack_seen = dbg_i2c_status_rxack_seen_w;
 assign dbg_i2c_status_busy_seen = dbg_i2c_status_busy_seen_w;
@@ -301,6 +310,9 @@ i2c_master_ctrl_top #(
   /*o*/.dbg_last_index_seen(dbg_i2c_last_index_seen_w),
   /*o*/.dbg_stream_on_index_reached(dbg_i2c_stream_on_index_reached_w),
   /*o*/.dbg_stream_on_seen(dbg_i2c_stream_on_seen_w),
+  /*o*/.dbg_stream_on_done(dbg_i2c_stream_on_done_w),
+  /*o*/.dbg_stream_on_clean(dbg_i2c_stream_on_clean_w),
+  /*o*/.dbg_stream_on_error(dbg_i2c_stream_on_error_w),
   /*o*/.dbg_i2c_status_sample_seen(dbg_i2c_status_sample_seen_w),
   /*o*/.dbg_i2c_status_rxack_seen(dbg_i2c_status_rxack_seen_w),
   /*o*/.dbg_i2c_status_busy_seen(dbg_i2c_status_busy_seen_w),
