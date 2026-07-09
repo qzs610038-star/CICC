@@ -69,6 +69,13 @@ TOOL_ACTION_MAP: dict[str, str] = {
 }
 
 
+def _redacted_token_detail(confirm_token: Optional[str]) -> str:
+    """Return an audit-safe token marker without storing the secret value."""
+    if not confirm_token:
+        return "confirm_token=missing"
+    return "confirm_token=present_redacted"
+
+
 class SafetyManager:
     """安全门控管理器。
 
@@ -155,6 +162,9 @@ class SafetyManager:
 
         # ── HARDWARE_SIDE_EFFECT ──
         if level == SafetyLevel.HARDWARE_SIDE_EFFECT:
+            if dry_run:
+                self._log_audit(tool_name, level, True, detail="dry_run")
+                return True, "dry-run 模式，不执行硬件副作用，允许生成执行计划"
             if not self.allow_hardware:
                 self._log_audit(tool_name, level, False, detail="allow_hardware_actions=false")
                 return False, (
@@ -190,7 +200,7 @@ class SafetyManager:
                             f"confirm_token '{confirm_token}' 格式不匹配。"
                             f"支持的 action_type: {', '.join(CONFIRM_PREFIXES.keys())}"
                         )
-            self._log_audit(tool_name, level, True, detail=f"confirm_token={confirm_token}")
+            self._log_audit(tool_name, level, True, detail=_redacted_token_detail(confirm_token))
             return True, "硬件副作用操作已确认，允许执行"
 
         self._log_audit(tool_name, level, False, detail="未知安全等级")

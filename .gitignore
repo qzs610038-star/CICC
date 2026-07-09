@@ -5,8 +5,10 @@ Desktop.ini
 .vscode/
 .idea/
 .qoder/
+.codex/
 .vs/
 *.tmp
+tmp_*.txt
 *.bak
 *.swp
 
@@ -49,6 +51,7 @@ vish_stacktrace.vstf
 tcl_stacktrace.txt
 
 # RISC-V / C build outputs
+final_project/cpu/build/
 *.o
 *.elf
 *.hex

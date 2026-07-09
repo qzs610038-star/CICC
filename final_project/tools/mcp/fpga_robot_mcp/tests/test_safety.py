@@ -41,6 +41,16 @@ def test_write_file_dryrun_allowed():
     assert allowed is True
 
 
+def test_hardware_dryrun_allowed_without_config():
+    """硬件副作用 dry-run 只生成计划，应默认允许。"""
+    sm = _make_manager(allow_hardware=False)
+    allowed, msg = sm.check_tool_allowed(
+        "efinity_program_bitstream", SafetyLevel.HARDWARE_SIDE_EFFECT, dry_run=True
+    )
+    assert allowed is True
+    assert "dry-run" in msg
+
+
 def test_hardware_denied_without_config():
     """硬件副作用操作在未配置时应拒绝。"""
     sm = _make_manager(allow_hardware=False)
@@ -69,6 +79,9 @@ def test_hardware_allowed_with_token():
         confirm_token=token,
     )
     assert allowed is True
+    logs = sm.get_recent_audit()
+    assert token not in str(logs)
+    assert "present_redacted" in str(logs)
 
 
 def test_bad_token_rejected():

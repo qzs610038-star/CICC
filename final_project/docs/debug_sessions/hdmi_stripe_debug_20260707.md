@@ -1,16 +1,25 @@
-# HDMI 横纹调试上下�?�?Phase 2
+# HDMI 横纹调试上下文与排障记录 Phase 2
 
 > 日期: 2026-07-07 (更新)
 > 分支: dev/libaoxun688
-> 目标: 摄像头画面通过 FPGA �?HDMI �?电脑正常显示
-> 上板状�? HDMI 有画面但有横纹，LED24 + LED27 持续亮（�?FIFO 下溢 + CDC 桥下溢）
+> 目标: 摄像头画面通过 FPGA -> HDMI 在电脑端正常显示
+> 初始现象: HDMI 有画面但有横纹，LED24 + LED27 持续亮（framebuffer 读侧异常 + CDC 桥下溢）
 
 ---
 
+> 清理说明: 本文件前半段存在历史写入留下的少量乱码；阅读和继续上板时，请优先参考后部较新的时间戳记录，以及第 54/55 节的 live RTL 核对结果。
+
+## 0. 快速清理版摘要（给后续接手者）
+
+- 已排除：单纯的 DDR 总带宽不足、ch1 写入竞争，不足以解释当前现象。
+- 已确认过的链路里程碑：后续多轮实验已经证明，问题曾经跨过 I2C、MIPI D-PHY、CSI、framebuffer 写入、DDR 回读，并最终收敛到 `hdmi_video_ready` / `hdmi_top` 输入选路这一层。
+- 当前 live RTL 不应再按“2026-07-07 起始阶段”重新打一遍所有早期 patch；最新有效探针请直接看第 54 节。
+- 若目标是回答“为什么强制输入后仍没切到真实视频”，关键点不是 `USE_INPUT_STABLE_GATE`，而是 `video_path_ready = sys_rst_n & i_video_ready` 这条更上游的 ready 门控仍在生效。
+
 ## 1. 板上 Debug LED 定义（关键排障工具）
 
-### 1.1 板卡 LED 物理映射�?026-07-07 用户确认�?
-| LED 编号 | 信号名称 | 管脚�?| 所�?Bank |
+### 1.1 板卡 LED 物理映射（2026-07-07 用户确认）
+| LED 编号 | 信号名称 | 管脚 | 所属 Bank |
 |----------|----------|--------|-----------|
 | LED11 | USER_LED_2 | T4 | BANKBL3 |
 | LED12 | USER_LED_3 | C13 | BANKTR1 |
@@ -34,212 +43,245 @@
 | LED32 | USER_LED_26 | P6 | BANK4D |
 | LED33 | USER_LED_27 | R6 | BANK4D |
 
-Efinity GPIO 资源名以 outflow `Ti375C529_devkit.pinout.rpt` 核对：LED18=B2=`GPIOB_N_30_CDI8`，LED19=E3=`GPIOB_P_24_CDI15`，LED20=F3=`GPIOB_N_24_CDI14`，LED21=F2=`GPIOB_P_17_CLK4_P`，LED22=G2=`GPIOB_N_17_CLK4_N`，LED23=K6=`GPIOB_P_25_CDI13`，LED24=J3=`GPIOB_N_28`，LED25=L6=`GPIOB_N_25_CDI12`，LED26=K4=`GPIOB_N_29_CDI10`，LED27=K3=`GPIOB_P_29_CDI11_EXTFB`，LED28=M5=`GPIOB_P_22`，LED29=M6=`GPIOB_N_22`�?
+Efinity GPIO 资源名以 outflow `Ti375C529_devkit.pinout.rpt` 核对：LED18=B2=`GPIOB_N_30_CDI8`，LED19=E3=`GPIOB_P_24_CDI15`，LED20=F3=`GPIOB_N_24_CDI14`，LED21=F2=`GPIOB_P_17_CLK4_P`，LED22=G2=`GPIOB_N_17_CLK4_N`，LED23=K6=`GPIOB_P_25_CDI13`，LED24=J3=`GPIOB_N_28`，LED25=L6=`GPIOB_N_25_CDI12`，LED26=K4=`GPIOB_N_29_CDI10`，LED27=K3=`GPIOB_P_29_CDI11_EXTFB`，LED28=M5=`GPIOB_P_22`，LED29=M6=`GPIOB_N_22`。
 ### 1.2 Phase 2 Debug LED 映射
 
 | LED | 管脚 | 信号 | 含义 | 1= | 0= |
 |-----|------|------|------|----|----|
 | LED18 | B2 | led[0] | DDR 配置完成 | OK | BAD |
 | LED19 | E3 | led[1] | 当前选择通道 framebuffer ready | OK | BAD |
-| **LED20** | **F3** | **led[2]** | **当前选择通道 framebuffer �?FIFO 下溢** | **BAD** | OK |
+| **LED20** | **F3** | **led[2]** | **当前选择通道 framebuffer 读 FIFO 下溢** | **BAD** | OK |
 | LED21 | F2 | led[3] | 当前选择通道 CSI RAW10/4ppc 确认 | OK | BAD |
-| LED22 | G2 | dbg_ddr_ok | 当前选择通道 framebuffer 读周�?active | OK | BAD |
+| LED22 | G2 | dbg_ddr_ok | 当前选择通道 framebuffer 读周期 active | OK | BAD |
 | LED23 | K6 | dbg_fb0_ready | 当前选择通道 DDR 读数据曾到达 | OK | BAD |
-| **LED24** | **J3** | **dbg_fb0_underflow** | **当前选择通道 DDR 读数�?gap 过长（锁存）** | **BAD** | OK |
+| **LED24** | **J3** | **dbg_fb0_underflow** | **当前选择通道 DDR 读数据 gap 过长（锁存）** | **BAD** | OK |
 | LED25 | L6 | dbg_csi_fmt_ok | 当前选择通道 CDC FIFO 达到启动水位 | OK | BAD |
-| LED26 | K4 | dbg_bridge_active | 当前选择通道 CDC 2pix�?pix 桥输�?active | OK | BAD |
-| **LED27** | **K3** | **dbg_bridge_under** | **当前选择通道 CDC �?FIFO 下溢（锁存）** | **BAD** | OK |
-| LED28 | M5 | dbg_video_ready | i_video_ready �?hdmi_top | OK | BAD |
-| LED29 | M6 | dbg_input_stable | hdmi_top 接受输入时序�?CSI 格式 OK | OK | BAD |
+| LED26 | K4 | dbg_bridge_active | 当前选择通道 CDC 2pix->1pix 桥输出 active | OK | BAD |
+| **LED27** | **K3** | **dbg_bridge_under** | **当前选择通道 CDC 桥 FIFO 下溢（锁存）** | **BAD** | OK |
+| LED28 | M5 | dbg_video_ready | `i_video_ready` 送入 `hdmi_top` | OK | BAD |
+| LED29 | M6 | dbg_input_stable | `hdmi_top` 接受输入时序且 CSI 格式 OK | OK | BAD |
 
-代码位置: `final_project/fpga/rtl/top/top.v` 端口声明�?L205-214，驱动逻辑�?L1814-L1900；内部探针来�?`frame_buffer.v` �?`video_2pix_to_1pix_cdc.v`�?
+代码位置：`final_project/fpga/rtl/top/top.v`；内部探针来自 `frame_buffer.v` 与 `video_2pix_to_1pix_cdc.v`。
 **LED 排障原则**:
 - LED20 = 1 表示当前选择通道 framebuffer 内部的读 FIFO（`data_tx` 模块中的 `DC_FIFO`）在 `fifo_rd_empty & fifo_rd_en` 时发生了下溢
-- LED24 = 1 表示当前选择通道 AXI/DDR 读数据出现超�?1024 �?AXI 时钟周期的无 `ddr_rd_valid` gap
+- LED24 = 1 表示当前选择通道 AXI/DDR 读数据出现超过 1024 个 AXI 时钟周期的无 `ddr_rd_valid` gap
 - LED27 = 1 表示 CDC 桥（`video_2pix_to_1pix_cdc`）在输出端空了，即写入速度跟不上读出速度
-- 两个下溢信号都是锁存的——只要发生过就会保持亮，�?SW4 切换通道时清�?- 如果�?SW4 清零后立即重新亮�?�?对应错误是持续性的（每帧都在发生）
-- 如果�?SW4 清零后灭掉一段时间再亮起 �?对应错误是间歇性的
+- 两个下溢信号都是锁存的：只要发生过就会保持亮，直到 SW4 切换通道或复位后才清除。
+- 如果 SW4 清零后立即重新亮起，对应错误是持续性的（几乎每帧都在发生）。
+- 如果 SW4 清零后灭掉一段时间再亮起，对应错误更像是间歇性的。
 
 ---
 
 ## 2. 已排除的假设
 
-### 假设 A: DDR 读带宽不�?�?已排�?
-**原假�?*: 两个 framebuffer 同时竞争 DDR 读写，实际可用读带宽不够 1920×1080 @60fps�?
+### 假设 A: DDR 读带宽不足？已排除
+**原假设**: 两个 framebuffer 同时竞争 DDR 读写，实际可用读带宽不够 1920×1080 @60fps。
 **验证手段**:
-- Patch 1: 关闭 ch1 framebuffer �?CSI 输入（`.i_de = 1'b0`, `.vin = 32'd0`），只保�?ch0 独立使用 DDR
-- Patch 2: �?framebuffer 输出水平有效像素�?960 dual-pixel（对�?1920 single-pixel）降�?480 dual-pixel（对�?960 single-pixel），DDR 读带宽需求减�?- Patch 2b: `hdmi_top.v` �?`MAX_HRES` �?1920 同步改为 960
+- Patch 1: 关闭 ch1 framebuffer 的 CSI 输入（`.i_de = 1'b0`, `.vin = 32'd0`），只保留 ch0 独立使用 DDR。
+- Patch 2: 将 framebuffer 输出水平有效像素由 960 dual-pixel（对应 1920 single-pixel）降为 480 dual-pixel（对应 960 single-pixel），DDR 读带宽需求减半。
+- Patch 2b: `hdmi_top.v` 中 `MAX_HRES` 由 1920 同步改为 960。
 
-**验证结果�?026-07-07 上板�?*:
-- LED22-29 **全部亮起**，与改之前完全一�?- LED24 (fb0_underflow) = 亮（持续�?- LED27 (bridge_underflow) = 亮（持续�?- HDMI 画面横纹依旧存在
-- 即使 DDR 只服务一�?960×1080 输出，下溢仍然持�?
-**结论**: DDR 读带�?*不是**根因。问题在别处�?
-### 假设 B: ch1 竞争 DDR 写入带宽 �?已排�?
-Patch 1 已把 ch1 �?CSI 写输入全部清零，ch1 不写 DDR。下溢依旧�?
+**验证结果（2026-07-07 上板测试）**:
+- LED22-29 **全部亮起**，与改之前完全一致：
+- LED24 (fb0_underflow) = 亮（持续）
+- LED27 (bridge_underflow) = 亮（持续）
+- HDMI 画面横纹依旧存在
+- 即使 DDR 只服务一个 960×1080 输出，下溢仍然持续。
+**结论**: DDR 读带宽**不是**根因。问题在别处。
+### 假设 B: ch1 竞争 DDR 写入带宽？已排除
+Patch 1 已把 ch1 的 CSI 写输入全部清零，ch1 不写 DDR。下溢依旧。
 ---
 
 ## 3. 未被排除的假设（下一步排查方向）
 
 ### 假设 C: 时钟域不匹配 / CDC FIFO 深度不足
 
-**现象证据**: LED27（CDC 桥下溢）持续性亮。CDC 桥是 `video_2pix_to_1pix_cdc`，写侧时�?`i_sysclk_div2`（约�?14.286ns �?70MHz），读侧时钟 `hdmi_tx_slow_clk`（约�?7.143ns �?140MHz）�?
-**可疑�?*:
-- 70MHz 写侧�?2 pixels/clock 产生数据（对�?140M pixels/s�?- 140MHz 读侧�?1 pixel/clock 消耗数据（对应 140M pixels/s�?- 带宽理论上匹配，但实际像素吞吐可能因为消隐期占比不同而导致写/读速率不均
-- `START_LEVEL = 16` 可能太浅，无法吸收突发抖�?
+**现象证据**: LED27（CDC 桥下溢）持续性亮。CDC 桥是 `video_2pix_to_1pix_cdc`，写侧时钟 `i_sysclk_div2`（约 14.286ns，即 70MHz），读侧时钟 `hdmi_tx_slow_clk`（约 7.143ns，即 140MHz）。
+**可疑点**:
+- 70MHz 写侧以 2 pixels/clock 产生数据（对应 140M pixels/s）；
+- 140MHz 读侧以 1 pixel/clock 消耗数据（对应 140M pixels/s）；
+- 带宽理论上匹配，但实际像素吞吐可能因为消隐期占比不同而导致写/读速率不均；
+- `START_LEVEL = 16` 可能太浅，无法吸收突发抖动。
 **验证方法**:
 
-**Step 1: 增大 CDC FIFO 深度和启动水�?*
-- 修改 `video_2pix_to_1pix_cdc` 例化参数: `FIFO_DEPTH` �?1024 改为 4096，`START_LEVEL` �?16 改为 256
-- 位置: `top.v` L1695-1698 (ch0) �?L1714-1717 (ch1)
-- 编译烧录 �?观察 LED27 是否熄灭
+**Step 1: 增大 CDC FIFO 深度和启动水位**
+- 修改 `video_2pix_to_1pix_cdc` 例化参数: `FIFO_DEPTH` 由 1024 改为 4096，`START_LEVEL` 由 16 改为 256。
+- 位置: `top.v` L1695-1698 (ch0) 和 L1714-1717 (ch1)。
+- 编译烧录，观察 LED27 是否熄灭。
 
-**Step 2: �?CDC 桥内部增�?debug 探针**
-- �?`fifo_wr_usedw` / `fifo_rd_usedw` 引出�?spare LED，观�?FIFO 水位是否持续走低
+**Step 2: 在 CDC 桥内部增加 debug 探针**
+- 将 `fifo_wr_usedw` / `fifo_rd_usedw` 引出到 spare LED，观察 FIFO 水位是否持续走低。
 - 如果写侧 always 满（wr_usedw 接近 1024）→ 读不够快
-- 如果读侧 always �?�?写不够快
+- 如果读侧 always 空，则说明写不够快。
 
 ### 假设 D: Framebuffer 输出时序参数与实际不匹配
 
-**现象证据**: LED24（framebuffer �?FIFO 下溢）持续性亮。framebuffer 内部 `data_tx` 模块�?`par2ser_parse �?DC_FIFO �?时序生成器` 的路径中，如�?`H_VALID` 参数与实际像素数据速率不匹配，会导�?FIFO 读空�?
-**可疑�?*:
-- `frame_buffer.v` �?`fifo_rd_period` 信号控制 DDR 读端的使能。如果这个信号的占空比计算有误（如认为消隐期比实际长），DDR 读端会停太久，导致读 FIFO 被掏�?- `data_tx` 模块输出的时序参数（h_front_porch / h_sync / h_valid 等）是从 `frame_buffer` 的输入端口锁存后传递的，确认这些值在 dual-pixel 域下是否正确
+**现象证据**: LED24（framebuffer 读 FIFO 下溢）持续性亮。framebuffer 内部 `data_tx` 模块中 `par2ser_parse`、`DC_FIFO` 与 `时序生成器` 的路径中，如果 `H_VALID` 参数与实际像素数据速率不匹配，会导致 FIFO 读空。
+**可疑点**:
+- `frame_buffer.v` 中的 `fifo_rd_period` 信号控制 DDR 读端的使能。如果这个信号的占空比计算有误（如认为消隐期比实际长），DDR 读端会停太久，导致读 FIFO 被掏空。
+- `data_tx` 模块输出的时序参数（h_front_porch / h_sync / h_valid 等）是从 `frame_buffer` 的输入端口锁存后传递的，确认这些值在 dual-pixel 域下是否正确。
 
 **验证方法**:
 
-**Step 1: 确认 `fifo_rd_period` 的实际行�?*
-- `fifo_rd_period` �?`data_tx.v` L424 产生: `fifo_rd_period <= ~(v_state == S_V_SYNC && v_cnt == 0);`
-- 即除�?VSYNC 的第 0 行之外都�?1，表�?DDR 读在绝大部分时间都在工作
-- 这逻辑看起来正确，但需要确�?`v_state` 机是否真的在正常跳转
-- **建议添加 LED**: �?`fifo_rd_period` 的反（即 VSYNC 期间短暂亮一下），如果这�?LED 常亮 �?v_state 卡在 S_V_SYNC
+**Step 1: 确认 `fifo_rd_period` 的实际行为**
+- `fifo_rd_period` 由 `data_tx.v` L424 产生: `fifo_rd_period <= ~(v_state == S_V_SYNC && v_cnt == 0);
+- 即除了 VSYNC 的第 0 行之外都为 1，表示 DDR 读在绝大部分时间都在工作。
+- 这逻辑看起来正确，但需要确认 `v_state` 状态机是否真的在正常跳转。
+- **建议添加 LED**: 将 `fifo_rd_period` 的反（即 VSYNC 期间短暂亮一下）输出，如果这个 LED 常亮，则说明 v_state 卡在 S_V_SYNC。
 
-**Step 2: 检�?h_valid / v_valid 参数寄存器传�?*
+**Step 2: 检查 h_valid / v_valid 参数寄存器传递**
 - `frame_buffer.v` L293-303: `h_valid` 等参数在 `o_clk` 域用 `always @(posedge o_clk)` 锁存
-- �?`H_VALID` 输入来自 `top.v` �?`HDMI_H_VALID` localparam，是常量
-- 确认 `i_clk` �?`o_clk` 是否同源（两者都�?`i_sysclk_div2`）→ �?- 确认 `i_sysclk_div2` 实际频率是否�?70MHz �?需�?scope 确认
+- 而 `H_VALID` 输入来自 `top.v` 中的 `HDMI_H_VALID` localparam，是常量。
+- 确认 `i_clk` 与 `o_clk` 是否同源（两者都是 `i_sysclk_div2`）→ 是。
+- 确认 `i_sysclk_div2` 实际频率是否为 70MHz，需要 scope 确认。
 
-### 假设 E: AXI 读通道仲裁或响应延迟导�?DDR 读数据断�?
-**现象证据**: 即使 DDR 带宽足够，如�?AXI 读请求的响应延迟过大，DDR 读数据到�?`ddr_rd_buffer` 的间隔会拉长，导致下�?FIFO 被掏空�?
-**可疑�?*:
-- `ddr_rd_buffer.v` L259: `assign rready = 1'b1` �?读通道来者不拒，但这不代�?AXI 端的 `arvalid→rvalid` 延迟�?- 如果 DDR controller 的读延迟（CAS latency + controller pipeline）导致相�?burst 之间出现 gap，下�?FIFO 可能来不及补�?
+### 假设 E: AXI 读通道仲裁或响应延迟导致 DDR 读数据断流
+**现象证据**: 即使 DDR 带宽足够，如果 AXI 读请求的响应延迟过大，DDR 读数据到达 `ddr_rd_buffer` 的间隔会拉长，导致下游 FIFO 被掏空。
+**可疑点**:
+- `ddr_rd_buffer.v` L259: `assign rready = 1'b1`，读通道来者不拒，但这不代表 AXI 端的 `arvalid→rvalid` 延迟小。
+- 如果 DDR controller 的读延迟（CAS latency + controller pipeline）导致相邻 burst 之间出现 gap，下游 FIFO 可能来不及补齐。
 **验证方法**:
 
-**Step 1: �?LED 探测 DDR 读有效信号间�?*
-- �?`ddr_rd_buffer` 中取 `ddr_rd_valid`（即 `rvalid & rready`），驱动一个计数器
-- 如果 `ddr_rd_valid` �?burst 之间有长时间�?100 cycles @ 200MHz = >500ns）的 gap �?AXI 读延迟过�?- 简化版: �?`~ddr_rd_valid` 驱动 LED，如�?LED 明显亮（不止是短暂闪烁）�?读数据断�?
+**Step 1: 用 LED 探测 DDR 读有效信号间隔**
+- 从 `ddr_rd_buffer` 中取 `ddr_rd_valid`（即 `rvalid & rready`），驱动一个计数器。
+- 如果 `ddr_rd_valid` 的 burst 之间有长时间（如 100 cycles @ 200MHz，即 >500ns）的 gap，则 AXI 读延迟过大。
+- 简化版: 用 `~ddr_rd_valid` 驱动 LED，如果 LED 明显亮（不止是短暂闪烁），则说明读数据断流。
 **Step 2: 确认 axi0_ACLK 频率**
-- 约束文件: `create_clock -period 5.000 -name axi0_ACLK` �?200MHz
-- `i_fb_clk`: `create_clock -period 40.000` �?25MHz（DDR PHY 参考时钟？需确认�?- 如果 `axi0_ACLK` 实际不是 200MHz �?DDR 带宽显著下降
+- 约束文件: `create_clock -period 5.000 -name axi0_ACLK` 即 200MHz。
+- `i_fb_clk`: `create_clock -period 40.000` 即 25MHz（DDR PHY 参考时钟？需确认）。
+- 如果 `axi0_ACLK` 实际不是 200MHz，则 DDR 带宽显著下降。
 
-### 假设 F: CSI 输入端的帧率/分辨率与 framebuffer 期望不匹�?
-**可疑�?*: framebuffer �?`MAX_VID_WIDTH = 1920`, `MAX_VID_HIGHT = 1080`，但 CSI 实际进来的可能是不同分辨率。如�?`frame_stable` 不满足某条件导致写端不工作，但读端仍在跑 �?读空�?
+### 假设 F: CSI 输入端的帧率/分辨率与 framebuffer 期望不匹配
+**可疑点**: framebuffer 的 `MAX_VID_WIDTH = 1920`, `MAX_VID_HIGHT = 1080`，但 CSI 实际进来的可能是不同分辨率。如果 `frame_stable` 不满足某条件导致写端不工作，但读端仍在跑，会导致读空。
 **验证方法**:
-- LED23 (fb0_ready) = 亮说�?`frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched` 的第 1 �?`frame_en` �?1
-- `frame_en = rd_frame_en_r[1] & rd_frame_available`，其�?`rd_frame_en_r[1]` 来自 `frame_stable`
-- �?`frame_ready` 亮了不代表写端在正常工作
+- LED23 (fb0_ready) = 亮说明 `frame_ready = frame_en & out_sync & ~fifo_rd_underflow_latched` 的第 1 项 `frame_en` 为 1。
+- `frame_en = rd_frame_en_r[1] & rd_frame_available`，其中 `rd_frame_en_r[1]` 来自 `frame_stable`。
+- 但 `frame_ready` 亮了不代表写端在正常工作。
 
 ---
 
-## 4. 推荐的排障执行顺�?
+## 4. 推荐的排障执行顺序
 按由简到繁、由外到内的原则:
 
-### �?1 �? 增加 CDC FIFO 深度（假�?C，低风险�? 次编译）
+### 步骤 1：增加 CDC FIFO 深度（假设 C，低风险，1 次编译）
 
-修改 `top.v` 中两�?`video_2pix_to_1pix_cdc` 的例�?
+修改 `top.v` 中两处 `video_2pix_to_1pix_cdc` 的例化：
 ```verilog
-// L1695-1698 �?L1714-1717
+// L1695-1698 及 L1714-1717
 video_2pix_to_1pix_cdc #(
-    .FIFO_DEPTH(4096),     // 原来�?1024
-    .START_LEVEL(256)      // 原来�?16
+    .FIFO_DEPTH(4096),     // 原来为 1024
+    .START_LEVEL(256)      // 原来为 16
 ) u_hdmi0_video_cdc (...)
 ```
 
-**预期**: 如果 LED27 熄灭 �?CDC FIFO 深度不够是根因；否则继续�?
-### �?2 �? �?LED 探查 framebuffer 内部关键信号（假�?D/E�?-2 次编译）
+**预期**: 如果 LED27 熄灭，则 CDC FIFO 深度不够是根因；否则继续。
+### 步骤 2：用 LED 探查 framebuffer 内部关键信号（假设 D/E，1-2 次编译）
 
 **2a: 暴露 `fifo_rd_period` 反信号到 LED**
-- �?`top.v` 中把 `frame_buffer` 输出的某个未用信号（或新�?port）接�?LED
-- `fifo_rd_period` = 0 只在 VSYNC 期间，如�?LED 常亮 �?v_state 卡死
+- 在 `top.v` 中把 `frame_buffer` 输出的某个未用信号（或新增 port）接到 LED。
+- `fifo_rd_period` = 0 只在 VSYNC 期间，如果这个 LED 常亮，则 v_state 卡死。
 
 **2b: 暴露 DDR 读有效信号到 LED**
-- �?`ddr_rd_valid`（或 `~ddr_rd_valid`）直接输出到 LED
-- 如果 LED 明显不是微弱闪烁而是持续�?�?DDR 读断流严�?
-**2c: �?scope 实测时钟频率**
-- �?`i_sysclk_div2` 实际频率（期�?70MHz�?- �?`hdmi_tx_slow_clk` 实际频率（期�?140MHz�?- �?`axi0_ACLK` 实际频率（期�?200MHz�?- 如果实际频率与约束不�?�?PLL 配置有问�?
-### �?3 �? 绕过 DDR 做最小环路测试（假设全部，中风险�?-2 次编译）
+- 将 `ddr_rd_valid`（或 `~ddr_rd_valid`）直接输出到 LED。
+- 如果 LED 明显不是微弱闪烁而是持续亮，则 DDR 读断流严重。
+**2c: 用 scope 实测时钟频率**
+- 测 `i_sysclk_div2` 实际频率（期望 70MHz）；
+- 测 `hdmi_tx_slow_clk` 实际频率（期望 140MHz）；
+- 测 `axi0_ACLK` 实际频率（期望 200MHz）；
+- 如果实际频率与约束不符，则 PLL 配置有问题。
+### 步骤 3：绕过 DDR 做最小环路测试（假设全部，中风险，1-2 次编译）
 
-临时�?`top.v` 中新增一�?color bar 发生器（已在代码中被注释掉，�?L1128-1155 �?`color_bar_rgb`），直接产生 1920×1080 的彩�?�?debayer bypass �?CDC �?�?HDMI�?
+临时在 `top.v` 中新增一个 color bar 发生器（已在代码中被注释掉，见 L1128-1155 的 `color_bar_rgb`），直接产生 1920×1080 的彩条，经 debayer bypass 到 CDC，再到 HDMI。
 **预期**:
-- 如果彩条正常无横�?�?问题�?DDR/framebuffer 读写链路
-- 如果彩条也有横纹 �?问题�?CDC 桥或 HDMI TX 时钟�?
+- 如果彩条正常无横纹，则问题在 DDR/framebuffer 读写链路。
+- 如果彩条也有横纹，则问题在 CDC 桥或 HDMI TX 时钟。
 ---
 
-## 5. 修改涉及的文件清�?
+## 5. 修改涉及的文件清单
 | 文件 | 路径 |
 |------|------|
 | 顶层 | `final_project/fpga/rtl/top/top.v` |
-| CDC �?| `final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v` |
+| CDC 桥 | `final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v` |
 | HDMI TOP | `final_project/fpga/rtl/dvi_tx/hdmi_top.v` |
 | Framebuffer | `final_project/fpga/rtl/framebuffer/frame_buffer.v` |
-| DDR 读缓�?| `final_project/fpga/rtl/framebuffer/ddr_rd_buffer.v` |
+| DDR 读缓存 | `final_project/fpga/rtl/framebuffer/ddr_rd_buffer.v` |
 | 读端时序生成 | `final_project/fpga/rtl/framebuffer/data_tx.v` |
 | 约束 | `final_project/fpga/efinity/constrain.sdc` |
 | 管脚映射 | `final_project/fpga/efinity/mem_test.peri.xml` |
 
-**每次修改 C 盘后务必同步�?D �?*:
+**每次修改 C 盘后务必同步到 D 盘（注：此为历史旧流程，开发中不应默认沿用）**:
 ```powershell
 Copy-Item "C:\...\top.v" "D:\final_project\fpga\rtl\top\top.v" -Force
 ```
 
 ---
 
-## 6. 当前代码修改状态（2026-07-07�?
-以下修改**已在代码中生�?*，不要回退除非确认不需�?
+## 6. 当前代码修改状态（2026-07-07）
+以下修改**已在代码中生效**，不要回退除非确认不需要：
 
-1. `top.v` L629: `HDMI_H_VALID = 13'd480`（已�?960 减半�?2. `top.v` L1190-1191: ch1 framebuffer `.i_de = 1'b0`, `.vin = 32'd0`
-3. `hdmi_top.v` L50: `MAX_HRES = 12'd960`（已�?1920 减半�?4. `top.v` L206-216 + L1801-1868: 8 �?debug LED 驱动逻辑
+1. `top.v` L629: `HDMI_H_VALID = 13'd480`（已由 960 减半）
+2. `top.v` L1190-1191: ch1 framebuffer `.i_de = 1'b0`, `.vin = 32'd0`
+3. `hdmi_top.v` L50: `MAX_HRES = 12'd960`（已由 1920 减半）
+4. `top.v` L206-216 + L1801-1868: 8 个 debug LED 驱动逻辑
 
-**如果要做�?3 步（color bar 测试），建议先回退 Patch 1+2 �?H_VALID �?MAX_HRES 修改，恢复到 1920×1080 输出**�?
+**如果要做第 3 步（color bar 测试），建议先回退 Patch 1+2 的 H_VALID 和 MAX_HRES 修改，恢复到 1920×1080 输出。**
 ---
 
 ## 7. 时钟域速查
 
 ```
-i_sysclk_div2     ~70MHz     CSI 像素�?/ framebuffer 读写共用
-hdmi_tx_slow_clk  ~140MHz    HDMI TX 像素�?/ CDC 桥读�?hdmi_tx_fast_clk  ~700MHz    HDMI TX 串行�?(5x)
+i_sysclk_div2     ~70MHz     CSI 像素时钟 / framebuffer 读写共用
+hdmi_tx_slow_clk  ~140MHz    HDMI TX 像素时钟 / CDC 桥读侧
+hdmi_tx_fast_clk  ~700MHz    HDMI TX 串行时钟 (5x)
 axi0_ACLK         ~200MHz    AXI / DDR 控制器域
-i_fb_clk           ~25MHz    DDR PHY 参考时�?```
+i_fb_clk           ~25MHz    DDR PHY 参考时钟
 
-CDC 桥从 70MHz (2pix/clk = 140Mpix/s) �?140MHz (1pix/clk = 140Mpix/s)，理论带宽刚好匹配，�?**消隐期占比在两侧可能不同**（dual-pixel 域和 single-pixel 域的 H 消隐参数换算可能不一致），导致平均写入速率 < 平均读出速率�?
+CDC 桥从 70MHz (2pix/clk = 140Mpix/s) 到 140MHz (1pix/clk = 140Mpix/s)，理论带宽刚好匹配，但**消隐期占比在两侧可能不同**（dual-pixel 域和 single-pixel 域的 H 消隐参数换算可能不一致），导致 average write rate < average read rate。
 ---
 
-## 8. 2026-07-07 本轮执行记录（Codex�?
+## 8. 2026-07-07 本轮执行记录（Codex）
 ### 修改目标
 
-�?Phase 2 推荐顺序执行“增�?CDC FIFO 深度”，并同步加入可上板判读�?LED 探针，避免只�?HDMI 横纹现象猜测�?
-### 已修�?
+从 Phase 2 推荐顺序执行“增大 CDC FIFO 深度”，并同步加入可上板判读的 LED 探针，避免只凭 HDMI 横纹现象猜测。
+### 已修改
 1. `top.v`
-   - `u_hdmi0_video_cdc` / `u_hdmi1_video_cdc`: `FIFO_DEPTH 1024 -> 4096`，`START_LEVEL 16 -> 256`�?   - LED18-29 重新作为 HDMI 横纹排障灯组，覆�?DDR ready、framebuffer ready、framebuffer underflow、CSI 格式、framebuffer 读周期、DDR 读数据到达、DDR �?gap、CDC FIFO 水位、CDC active、CDC underflow、HDMI video ready、HDMI input stable�?2. `frame_buffer.v`
-   - 新增只读 debug 输出：`dbg_fifo_rd_period`、`dbg_ddr_rd_seen`、`dbg_ddr_read_gap`�?   - `dbg_ddr_read_gap` 表示读周期内连续 1024 �?AXI 时钟周期未见 `ddr_rd_valid`，用于粗略定�?AXI/DDR 读数据断流�?3. `video_2pix_to_1pix_cdc.v`
-   - 新增只读 debug 输出：`o_level_ready`、`o_level_low`�?   - 本轮 LED 使用 `o_level_ready`，表�?CDC FIFO 已达�?`START_LEVEL`�?4. `mem_test.peri.xml`
-   - 显式绑定 LED22-29 �?`dbg_*` 顶层端口�?BANK4C 管脚，避免依赖手�?Interface Designer 状态�?
+   - `u_hdmi0_video_cdc` / `u_hdmi1_video_cdc`: `FIFO_DEPTH 1024 -> 4096`，`START_LEVEL 16 -> 256`；
+   - LED18-29 重新作为 HDMI 横纹排障灯组，覆盖 DDR ready、framebuffer ready、framebuffer underflow、CSI 格式、framebuffer 读周期、DDR 读数据到达、DDR 读 gap、CDC FIFO 水位、CDC active、CDC underflow、HDMI video ready、HDMI input stable。
+   - 新增只读 debug 输出：`dbg_fifo_rd_period`、`dbg_ddr_rd_seen`、`dbg_ddr_read_gap`；
+   - `dbg_ddr_read_gap` 表示读周期内连续 1024 个 AXI 时钟周期未见 `ddr_rd_valid`，用于粗略定位 AXI/DDR 读数据断流。
+3. `video_2pix_to_1pix_cdc.v`
+   - 新增只读 debug 输出：`o_level_ready`、`o_level_low`；
+   - 本轮 LED 使用 `o_level_ready`，表示 CDC FIFO 已达到 `START_LEVEL`。
+4. `mem_test.peri.xml`
+   - 显式绑定 LED22-29 等 `dbg_*` 顶层端口到 BANK4C 管脚，避免依赖手动 Interface Designer 状态。
 ### 上板判读重点
 
-- �?LED18 亮、LED19 亮、LED20 亮：framebuffer �?ready 但读端仍下溢，优先看 LED22/23/24�?- �?LED22 常灭：`data_tx` 读周期没有进入正�?active，怀疑读端时序状态机�?frame_en/out_sync�?- �?LED23 灭：读周期内从未收到 DDR 读数据，优先�?AXI 读请�?DDR 响应�?- �?LED23 亮但 LED24 亮：DDR 数据能到，但存在�?gap，优先查 AXI 仲裁/读延�?burst 连续性�?- �?LED25 灭或 LED27 亮：CDC FIFO 没有维持足够水位，优先查 70MHz 写侧平均吞吐、消隐换算或 CDC 读写策略�?- �?LED28 灭：`hdmi_top` 仍未接收�?video ready，通常�?framebuffer/CDC 错误门控导致�?- �?LED29 灭但 LED28 亮：HDMI 输入时序/尺寸检测或 CSI 格式条件未满足�?
-### 待验�?
-- `efx_map` 前端综合已通过�?  - 命令：`D:\Efinity\2025.2\bin\efx_map.exe --project-xml mem_test.xml --root top --family Titanium --device TJ375N529 --work-dir work_syn_codex_hdmi_led_probe_v1 --output-dir work_syn_codex_hdmi_led_probe_v1`
+- 若 LED18 亮、LED19 亮、LED20 亮：framebuffer 已 ready 但读端仍下溢，优先看 LED22/23/24。
+- 若 LED22 常灭：`data_tx` 读周期没有进入正常 active，怀疑读端时序状态机或 frame_en/out_sync。
+- 若 LED23 灭：读周期内从未收到 DDR 读数据，优先查 AXI 读请求与 DDR 响应。
+- 若 LED23 亮但 LED24 亮：DDR 数据能到，但存在读 gap，优先查 AXI 仲裁/读延迟/burst 连续性。
+- 若 LED25 灭或 LED27 亮：CDC FIFO 没有维持足够水位，优先查 70MHz 写侧平均吞吐、消隐换算或者 CDC 读写策略。
+- 若 LED28 灭：`hdmi_top` 仍未接收到 video ready，通常由 framebuffer/CDC 错误门控导致。
+- 若 LED29 灭但 LED28 亮：HDMI 输入时序/尺寸检测或 CSI 格式条件未满足。
+### 待验证
+- `efx_map` 前端综合已通过：
+  - 命令：`D:\Efinity\2025.2\bin\efx_map.exe --project-xml mem_test.xml --root top --family Titanium --device TJ375N529 --work-dir work_syn_codex_hdmi_led_probe_v1 --output-dir work_syn_codex_hdmi_led_probe_v1`
   - 目录：`D:\final_project\fpga\efinity`
-  - 结果：exit code 0；综合日志中确认 `video_2pix_to_1pix_cdc(FIFO_DEPTH=4096,START_LEVEL=256)`�?  - `EFX.err.log` 无新增错误；`EFX.warn.log` 仍有既有未连接端�?位宽�?warning，本轮搜索未发现 `dbg_*` LED 端口绑定相关 warning�?- 仍需要完�?Efinity P&R/bitstream 生成并烧录，上板记录 LED18-29 状态�?- 若布局布线出现新的 I/O 绑定、Bank 电平�?timing warning，必须先记录 warning 原文再判断是否继续烧录�?
+  - 结果：exit code 0；综合日志中确认 `video_2pix_to_1pix_cdc(FIFO_DEPTH=4096,START_LEVEL=256)`；
+  - `EFX.err.log` 无新增错误；`EFX.warn.log` 仍有既有未连接端口/位宽等 warning，本轮搜索未发现 `dbg_*` LED 端口绑定相关 warning。
+- 仍需要完成 Efinity P&R/bitstream 生成并烧录，上板记录 LED18-29 状态。
+- 若布局布线出现新的 I/O 绑定、Bank 电平或 timing warning，必须先记录 warning 原文再判断是否继续烧录。
 ---
 
-## 参考文�?
-- 开发路�? `分赛区决赛实施开发路�?md`
+## 参考文献
+- 开发路径: `分赛区决赛实施开发路线.md`
 - 管线现状: `final_project/docs/architecture/dual_camera_hdmi_pipeline_current_2026-07-06.md`
 - Fix 计划: `final_project/docs/architecture/dual_camera_hdmi_fix_plan_2026-07-06.md`
 - 顶层 RTL: `final_project/fpga/rtl/top/top.v`
-- CDC �? `final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v`
+- CDC 桥: `final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v`
 - HDMI TOP: `final_project/fpga/rtl/dvi_tx/hdmi_top.v`
 - Framebuffer: `final_project/fpga/rtl/framebuffer/frame_buffer.v`
-- DDR 读缓�? `final_project/fpga/rtl/framebuffer/ddr_rd_buffer.v`
+- DDR 读缓存: `final_project/fpga/rtl/framebuffer/ddr_rd_buffer.v`
 - 读端时序生成: `final_project/fpga/rtl/framebuffer/data_tx.v`
 - 管脚映射: `final_project/fpga/efinity/mem_test.peri.xml`
 - 约束文件: `final_project/fpga/efinity/constrain.sdc`
@@ -2897,3 +2939,68 @@ Reassign LED24-33 to expose the terms that generate `hdmi_video_ready` before th
 - synchronized `hdmi_video_ready`
 - selected bridge input data activity
 - `hdmi_top` use-input output
+
+### Live RTL mapping checked on 2026-07-09
+
+Verified against:
+
+- `final_project/fpga/rtl/top/top.v`
+- `final_project/fpga/rtl/dvi_tx/hdmi_top.v`
+- `final_project/fpga/rtl/dvi_tx/video_2pix_to_1pix_cdc.v`
+
+Current LED24-33 mapping in live RTL:
+
+| LED | Pin | RTL signal | Meaning |
+|-----|-----|------------|---------|
+| LED24 | J3 | `selected_frame_ready_cdc[2]` | selected framebuffer `frame_ready` has crossed into HDMI clock domain |
+| LED25 | L6 | `selected_fifo_underflow_cdc[1]` | BAD: selected framebuffer underflow has been observed |
+| LED26 | K4 | `selected_frame_ok_hdmi` | selected framebuffer ready and not underflowing, after CDC |
+| LED27 | K3 | `selected_bridge_active` | selected 2pix->1pix CDC bridge is actively outputting |
+| LED28 | M5 | `selected_bridge_level_ready` | bridge FIFO has reached start level |
+| LED29 | M6 | `selected_bridge_level_low` | BAD: bridge FIFO dropped below low-water threshold |
+| LED30 | N7 | `hdmi_video_ready` | synchronized HDMI input-ready gate sent into `hdmi_top` |
+| LED31 | P7 | `selected_bridge_underflow` | BAD: selected 2pix->1pix bridge underflow has been observed |
+| LED32 | P6 | `hdmi_input_data_change_seen_dbg` | `hdmi_top` saw input pixel data change under DE |
+| LED33 | R6 | `hdmi_use_input_video_dbg` | `hdmi_top` is currently selecting the live input path |
+
+### How to read the current result
+
+- LED24 OFF: `frame_ready` never becomes visible in HDMI clock domain; first return to framebuffer frame completion / ready generation.
+- LED24 ON + LED25 ON: framebuffer did become ready, but underflow also occurred; `selected_frame_ok_hdmi` will be blocked.
+- LED26 OFF while LED24 ON and LED25 OFF: `frame_ready` and `~underflow` are not overlapping stably enough after CDC; inspect hold time and ready pulse width.
+- LED27 OFF: the selected CDC bridge never entered sustained active output; focus on `video_2pix_to_1pix_cdc`.
+- LED28 OFF with LED27 ON: the bridge is trying to run, but FIFO never reaches the configured start watermark.
+- LED29 ON: the bridge FIFO dropped into low-water; this is a real starvation hint even if LED31 has not latched yet.
+- LED30 OFF: `hdmi_video_ready` never formed or never held through synchronization; the current “forced-input” build is therefore only a partial bypass.
+- LED30 ON but LED33 OFF: upstream ready reached `hdmi_top`, but `hdmi_top` still did not stay on the live-input path.
+- LED33 ON and picture still wrong: the issue has moved past fallback selection and is now in pixel content / packing / color interpretation.
+
+### Important limitation of this iteration
+
+`hdmi_top` is currently instantiated with `USE_INPUT_STABLE_GATE(1'b0)`, but this only bypasses the internal stable-frame qualification. It does **not** bypass `video_path_ready = sys_rst_n & i_video_ready`.
+
+That means this iteration is **not** a full “force live input no matter what” build. If LED30 stays OFF and a true one-shot hard bypass is needed, the next diagnostic build should temporarily force either:
+
+- `i_video_ready = 1'b1` at the `hdmi_top` instance boundary, or
+- `video_path_ready = sys_rst_n` inside `hdmi_top`
+
+for one controlled probe build only, then revert immediately after conclusion.
+
+---
+
+## 55. 2026-07-09 Codex review summary for this document
+
+### Confirmed document issues
+
+1. The file contains real replacement characters (`U+FFFD`), not just terminal display noise. The early Chinese summary is the most affected area.
+2. The document mixes “historical Phase 2 starting assumptions” with “current live checkpoint” too tightly, so an operator can accidentally restart from already superseded steps.
+3. Section 54 originally stopped at “planned RTL intent” and did not record the actual live LED24-33 mapping now present in `top.v`.
+4. Earlier wording around “forced input” can be misunderstood as a full bypass, but the current RTL still depends on `i_video_ready`.
+5. The old “copy from C: to D:” mirror-sync note is machine-local and should not be treated as the normal workflow baseline.
+
+### Recommended handling
+
+- Use the later timestamped sections, especially section 54 onward, as the operational checkpoint.
+- Treat section 4 / section 6 as historical context only unless the live RTL is explicitly rolled back to match them.
+- If the next board result still shows LED30 OFF, run a one-build hard bypass of `i_video_ready` instead of continuing to infer from the partial bypass.
+- Keep all future LED maps tied to exact RTL signal names and note whether the signal is level, pulse, or sticky latch.

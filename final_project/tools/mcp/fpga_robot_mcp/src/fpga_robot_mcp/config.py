@@ -24,13 +24,25 @@ from typing import Any, Optional
 class EfinityConfig:
     home: str = "D:/Efinity/2025.2"
     bin: str = "D:/Efinity/2025.2/bin"
-    project_xml: str = "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml"
-    constrain_sdc: str = "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc"
+    project_xml: str = "final_project/fpga/efinity/mem_test.xml"
+    constrain_sdc: str = "final_project/fpga/efinity/constrain.sdc"
     device: str = "TJ375N529"
     timing_model: str = "I3"
     patch_dir: str = "赛方提供材料/efinity-2025.2.288.4.15-windows-x64-patch"
     pgm_fli: str = "D:/Efinity/2025.2/pgm/fli"
     toolchain_prefix: str = "riscv-none-embed-"
+    burn_project_root: str = "D:/final_project_shaolu"
+
+
+@dataclass
+class ProgrammerConfig:
+    setup_bat: str = "D:/Efinity/2025.2/bin/setup.bat"
+    ftdi_program_py: str = "D:/Efinity/2025.2/pgm/bin/efx_pgm/ftdi_program.py"
+    python_command: str = "python"
+    default_mode: str = "jtag"
+    default_url: str = ""
+    board_profile: str = "Generic Board Profile Using FT4232"
+    require_jtag_idcode: bool = True
 
 
 @dataclass
@@ -80,6 +92,7 @@ class FpgaRobotConfig:
 
     project_root: str = ""
     efinity: EfinityConfig = field(default_factory=EfinityConfig)
+    programmer: ProgrammerConfig = field(default_factory=ProgrammerConfig)
     riscv_ide: RiscvIdeConfig = field(default_factory=RiscvIdeConfig)
     board: BoardConfig = field(default_factory=BoardConfig)
     mycobot280: MycobotConfig = field(default_factory=MycobotConfig)
@@ -111,6 +124,15 @@ class FpgaRobotConfig:
 
     def constrain_sdc_path(self) -> Path:
         return self.resolve(self.efinity.constrain_sdc)
+
+    def burn_project_path(self) -> Path:
+        return Path(self.efinity.burn_project_root)
+
+    def programmer_setup_path(self) -> Path:
+        return Path(self.programmer.setup_bat)
+
+    def ftdi_program_path(self) -> Path:
+        return Path(self.programmer.ftdi_program_py)
 
     def evidence_path(self) -> Path:
         return self.resolve(self.safety.evidence_dir)

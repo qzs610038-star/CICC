@@ -4,6 +4,10 @@ Efinity / 开发板 / myCobot 280 的本地 MCP 工具，用于 FPGA 比赛项�
 
 **定位**：开发期辅助工具，不进入比赛正式闭环。
 
+队友从云端 `main` 同步后，优先阅读：
+
+- [docs/TEAMMATE_AGENT_SETUP.md](docs/TEAMMATE_AGENT_SETUP.md) — 本机配置、ASCII junction、Efinity 构建、JTAG 烧录和闭环测试 SOP。
+
 ## 快速开始
 
 ```bash

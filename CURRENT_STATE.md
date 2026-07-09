@@ -54,6 +54,20 @@
   - 证据路径：`mycobot_pc_tests/audit_logs/trial_run_22_logs.md`
   - 失效条件：板上 CPU 侧发现相同的二次确认逻辑需要额外的时延调整，或用户提出更高精度要求。
 
+- 日期：2026-07-09，来源 Agent：Antigravity (Gemini 3.5 Flash)
+  - 适用范围：待讨论议题（板上参数标定掉电保存方案）
+  - 最新结论：当前由于裸机缺少 Flash 物理驱动，系统无法断电保存现场调好的分类阈值和尺寸标定表。待与团队讨论是选择“在 FPGA 侧追加 SPI Flash 物理控制器及裸机驱动”，还是“调试完成后人工记录数值、直接在 C 语言源码中修改后重新编译烧录”。
+  - 替代了哪个旧结论：无（新增待讨论议题）。
+  - 证据路径：`final_project/cpu/app/src/param_table.c`、`cpu_target_vs_current.md`。
+  - 失效条件：团队讨论后定版并有明确的存储驱动实现或规程锁定。
+
+- 日期：2026-07-09，来源 Agent：Antigravity (Gemini 3.5 Flash)
+  - 适用范围：待讨论议题（拨码开关 TARGET_SEL 与 LIVE_FG_AREA 寄存器地址）
+  - 最新结论：任务目标物理拨码开关寄存器 `TARGET_SEL` 的 APB 地址（暂定 0x06C）及用于形状判定填充率的 `LIVE_FG_AREA` 寄存器（暂定 0x0B0/0x1B0）需要与 FPGA 侧队友锁定，并根据实际拨码物理引脚同步配置消抖与消重逻辑。
+  - 替代了哪个旧结论：无（新增待讨论议题）。
+  - 证据路径：`final_project/integration/register_map.md`、`CPU_MODULE_PLAN.txt`。
+  - 失效条件：FPGA 侧完成软核连线与寄存器锁定并更新接口文档。
+
 （随路线调整追加，每条按六字段填写。例：）
 
 - 日期：YYYY-MM-DD，来源 Agent：Claude

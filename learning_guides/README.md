@@ -1,0 +1,26 @@
+# 团队合并每日讲解指南（三轨学习系统）
+
+本目录用于存放每次个人分支合并后自动生成的日常三轨学习指南。这些指南旨在帮助团队成员（A/B/C 三位不同职责的角色）在 **10~15 分钟** 内快速掌握今日合并的核心改动与避坑经验，并给出推荐的自学切入点。
+
+## 📁 目录结构
+
+* [daily_guide_template.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_guide_template.md)：标准卡片式学习指南模板。
+* `daily_sync/`：按日期和合并分支归档的子目录。例如：
+  * [daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/)：7 月 8 日合并分支时生成的讲解指南。
+    * [guide_fpga_vision_front.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
+    * [guide_cpu_arm_control.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_cpu_arm_control.md)：嵌入式 CPU 控制与通信（面向角色 B）。
+    * [guide_system_integration.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_system_integration.md)：机械臂控制调试与项目系统维护更新（面向角色 C）。
+
+---
+
+## 🚀 交互触发生成机制
+
+在后续开发中，每当完成一次个人分支合并，您可以在对话框中直接使用如下指令唤醒我生成指南：
+
+> **“我刚刚完成了分支合并 `[分支名]`。今日的主要成果是 `[这里简要写一两句话，例如：调通了 PC 端 retry 熔断逻辑]`。请为我读取最近的 Handoff 文件和 Git Diff，生成今天的 3 份讲解指南。”**
+
+我将在接收到命令后：
+1. 运行 `git diff` / `git log` 分析最近的更改；
+2. 结合 `CURRENT_STATE.md` 中的增量条目与最新的 Handoff 文件（如 `SESSION_HANDOFF.md` / `debug_records/`）；
+3. 解析出业务逻辑，套用 `daily_guide_template.md` 格式；
+4. 按“日期+合并分支名”规范（如 `daily_sync/YYYY-MM-DD_merge_[分支名]/`）输出三份 markdown 指南文档。

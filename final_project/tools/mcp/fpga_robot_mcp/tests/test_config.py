@@ -27,6 +27,10 @@ def test_get_default_config():
     assert cfg.project_root == "D:/第十届集创赛-雄芯院材料"
     assert cfg.efinity.home == "D:/Efinity/2025.2"
     assert cfg.efinity.bin == "D:/Efinity/2025.2/bin"
+    assert cfg.efinity.project_xml == "final_project/fpga/efinity/mem_test.xml"
+    assert cfg.efinity.burn_project_root == "D:/final_project_shaolu"
+    assert cfg.programmer.ftdi_program_py.endswith("ftdi_program.py")
+    assert cfg.programmer.default_mode == "jtag"
     assert cfg.mycobot280.baudrate == 1000000
     assert cfg.mycobot280.allow_motion is False
     assert cfg.safety.allow_hardware_actions is False
@@ -90,6 +94,7 @@ def test_efinity_project_path():
     path = cfg.efinity_project_path()
     assert isinstance(path, Path)
     assert "mem_test.xml" in str(path)
+    assert "final_project" in str(path)
 
 
 def test_hide_sensitive():

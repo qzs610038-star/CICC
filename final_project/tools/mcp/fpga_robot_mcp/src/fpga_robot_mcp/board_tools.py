@@ -11,13 +11,9 @@ fpga_robot_mcp.board_tools — 开发板 UART/JTAG/接口契约工具。
 from __future__ import annotations
 
 import datetime
-import os
-import subprocess
 import time
-from typing import Any
 
-from fpga_robot_mcp import serial_probe
-from fpga_robot_mcp.config import load_config
+from fpga_robot_mcp import efinity_tools, serial_probe
 
 
 def list_uart_candidates() -> dict:
@@ -59,90 +55,24 @@ def check_jtag_chain() -> dict:
     """
     探测 JTAG 链上的设备。
 
-    通过 efx_pgm --scan 扫描 JTAG 链。
+    通过 Efinity ftdi_program.py --list_usb / --scan_usb 做只读探测。
     本工具只读，不烧录。
     """
-    cfg = load_config()
-    efx_pgm = cfg.efinity_bin_path() / "efx_pgm.exe"
-
-    if not efx_pgm.is_file():
-        return {
-            "status": "no_hardware",
-            "data": {
-                "efx_pgm_exists": False,
-                "message": "efx_pgm 未安装或路径不正确",
-                "next_step": "请确认 Efinity 安装路径 (D:\\Efinity\\2025.2\\bin\\) 和 FT4232 驱动",
-            },
-        }
-
-    # 先检查文件存在性
-    checks = {
-        "efx_pgm_path": str(efx_pgm),
-        "efx_pgm_exists": True,
-        "efx_pgm_size_kb": efx_pgm.stat().st_size // 1024,
+    programmer = efinity_tools.check_programmer()
+    data = programmer.get("data", {})
+    return {
+        "status": programmer.get("status", "error"),
+        "data": {
+            "usb_visible": data.get("usb_visible", False),
+            "jtag_idcode_visible": data.get("jtag_idcode_visible", False),
+            "ready_for_jtag_program": data.get("ready_for_jtag_program", False),
+            "recommended_url": data.get("recommended_url", ""),
+            "usb_targets": data.get("list_usb", {}).get("targets", []),
+            "scan_targets": data.get("scan_usb", {}).get("targets", []),
+            "message": data.get("message", programmer.get("message", "")),
+            "programmer_status": programmer.get("status", "error"),
+        },
     }
-
-    # 尝试扫描 JTAG 链
-    try:
-        result = subprocess.run(
-            [str(efx_pgm), "--scan"],
-            capture_output=True,
-            timeout=15,
-            encoding="utf-8",
-            errors="replace",
-        )
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        raw_output = (stdout + "\n" + stderr).strip()
-
-        # 解析输出 - 查找 JTAG 设备信息
-        devices = []
-        for line in stdout.splitlines():
-            line_lower = line.lower()
-            if "idcode" in line_lower or "device" in line_lower or "jtag" in line_lower:
-                devices.append({"raw": line.strip()})
-            # 也尝试查找"Found"或"Detected"模式
-            if "found" in line_lower or "detected" in line_lower:
-                devices.append({"raw": line.strip()})
-
-        jtag_found = result.returncode == 0
-
-        return {
-            "status": "ok" if jtag_found else "scan_failed",
-            "data": {
-                **checks,
-                "scan_successful": jtag_found,
-                "return_code": result.returncode,
-                "jtag_devices": devices if devices else [],
-                "raw_output": raw_output[:500] if raw_output else "",
-                "message": f"JTAG 链扫描{'成功' if jtag_found else '失败'}"
-                           f"{'，发现 ' + str(len(devices)) + ' 个设备' if devices else ''}",
-            },
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "status": "timeout",
-            "data": {
-                **checks,
-                "message": "JTAG 扫描超时（15 秒），请检查 JTAG 下载线连接和 FT4232 驱动",
-            },
-        }
-    except FileNotFoundError:
-        return {
-            "status": "error",
-            "data": {
-                **checks,
-                "message": f"efx_pgm 路径不存在: {efx_pgm}",
-            },
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "data": {
-                **checks,
-                "message": f"JTAG 扫描异常: {e}",
-            },
-        }
 
 
 def uart_loopback_test(port: str, baudrate: int = 115200) -> dict:

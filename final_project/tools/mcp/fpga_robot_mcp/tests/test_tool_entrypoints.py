@@ -17,6 +17,7 @@ from fpga_robot_mcp import (
     mycobot_tools,
     review_packet,
     efinity_tools,
+    server,
 )
 
 
@@ -154,6 +155,15 @@ def test_efinity_tools_collect_logs_callable():
     """efinity_tools.collect_logs() 可调用。"""
     result = efinity_tools.collect_logs()
     assert isinstance(result, dict)
+
+
+def test_server_efinity_run_build_dry_run_callable():
+    """MCP 服务层构建入口 dry-run 应可调用。"""
+    server._init()
+    result = server.efinity_run_build(dry_run=True)
+    assert isinstance(result, dict)
+    assert result["status"] == "ok"
+    assert result.get("data", {}).get("flow") == "compile"
 
 
 def test_mycobot_tools_control_gripper_no_port():

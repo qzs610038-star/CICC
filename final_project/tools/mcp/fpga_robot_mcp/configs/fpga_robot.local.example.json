@@ -3,13 +3,23 @@
   "efinity": {
     "home": "D:/Efinity/2025.2",
     "bin": "D:/Efinity/2025.2/bin",
-    "project_xml": "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml",
-    "constrain_sdc": "赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc",
+    "project_xml": "final_project/fpga/efinity/mem_test.xml",
+    "constrain_sdc": "final_project/fpga/efinity/constrain.sdc",
     "device": "TJ375N529",
     "timing_model": "I3",
     "patch_dir": "赛方提供材料/efinity-2025.2.288.4.15-windows-x64-patch",
     "pgm_fli": "D:/Efinity/2025.2/pgm/fli",
-    "toolchain_prefix": "riscv-none-embed-"
+    "toolchain_prefix": "riscv-none-embed-",
+    "burn_project_root": "D:/final_project_shaolu"
+  },
+  "programmer": {
+    "setup_bat": "D:/Efinity/2025.2/bin/setup.bat",
+    "ftdi_program_py": "D:/Efinity/2025.2/pgm/bin/efx_pgm/ftdi_program.py",
+    "python_command": "python",
+    "default_mode": "jtag",
+    "default_url": "",
+    "board_profile": "Generic Board Profile Using FT4232",
+    "require_jtag_idcode": true
   },
   "riscv_ide": {
     "home": "D:/Efinity/efinity-riscv-ide-2025.2",

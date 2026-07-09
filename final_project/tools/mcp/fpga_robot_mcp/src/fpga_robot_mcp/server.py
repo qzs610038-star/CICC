@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import sys
 import traceback
+import inspect
 from typing import Any, Callable, Optional
 
 from fpga_robot_mcp.config import load_config, hide_sensitive, FpgaRobotConfig
@@ -104,7 +105,10 @@ def _safety_wrapper(
             "message": msg,
             "next_step": "请检查安全配置或提供确认 token",
         }
-    return _safe_call(func, *args, **kwargs)
+    call_kwargs = dict(kwargs)
+    if "dry_run" in inspect.signature(func).parameters:
+        call_kwargs["dry_run"] = dry_run
+    return _safe_call(func, *args, **call_kwargs)
 
 
 # ── 导入各工具模块 ──────────────────────────────────────────
@@ -245,14 +249,21 @@ def efinity_list_artifacts(limit: int = 30, offset: int = 0) -> dict:
     return _safe_call(efinity_tools.list_artifacts, limit, offset)
 
 
-@mcp.tool(description="运行综合/布局布线流程。dry_run=true 时只做预检查。")
+@mcp.tool(description="运行 Efinity 工程 flow。默认 flow=compile，用于生成 bit/hex 且不跑仿真；dry_run=true 时只做预检查。")
 def efinity_run_build(
     project_xml: str = "",
     dry_run: bool = True,
+    flow: str = "compile",
+    output_dir: str = "",
+    work_dir: str = "",
+    timeout_seconds: int = 1800,
+    disable_debug: bool = False,
 ) -> dict:
     return _safety_wrapper(
         "efinity_run_build", SafetyLevel.WRITE_FILE,
-        efinity_tools.run_build, project_xml, dry_run,
+        efinity_tools.run_build, project_xml,
+        flow=flow, output_dir=output_dir, work_dir=work_dir,
+        timeout_seconds=timeout_seconds, disable_debug=disable_debug,
         dry_run=dry_run,
     )
 
@@ -268,11 +279,13 @@ def efinity_check_programmer() -> dict:
 def efinity_program_bitstream(
     bitstream_path: str,
     confirm_token: str = "",
-    dry_run: bool = False,
+    dry_run: bool = True,
+    mode: str = "",
+    url: str = "",
 ) -> dict:
     return _safety_wrapper(
         "efinity_program_bitstream", SafetyLevel.HARDWARE_SIDE_EFFECT,
-        efinity_tools.program_bitstream, bitstream_path,
+        efinity_tools.program_bitstream, bitstream_path, mode, url,
         confirm_token=confirm_token, dry_run=dry_run,
     )
 
