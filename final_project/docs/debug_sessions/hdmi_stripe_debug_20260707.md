@@ -2854,3 +2854,46 @@ This narrows the current blocker to the HDMI fallback/input-stability gate. The 
 - If LED33 turns ON but the screen is still noisy or wrongly colored, the pipeline is now showing real input and the next work is pixel packing / Bayer-to-RGB / frame format debugging.
 - If LED33 remains OFF, then `i_video_ready` itself is not staying true at `hdmi_top` despite LED31/32 evidence, so inspect `selected_frame_ok_hdmi`, bridge underflow, and the ready synchronizer.
 - LEDs LED27-31 are error LEDs: ON means that timing error was observed.
+
+---
+
+## 53. 2026-07-09 forty-fourth board feedback: forced-input build still lacks `video_path_ready` (Codex)
+
+### Board feedback from user
+
+- LEDs ON: LED18-23.
+- LEDs OFF: LED24-33.
+- Timing: not provided in this message.
+- Picture: not provided in this message.
+
+### Interpretation
+
+Under the forced-input HDMI gate probe:
+
+- LED18-23 ON means DDR/ch0/global reset/ch0 I2C status/no aggregate NACK are still good.
+- LED24 OFF means `hdmi_top video_path_ready` is not true.
+- In `hdmi_top`, `video_path_ready = sys_rst_n & i_video_ready`. Because HDMI reset should be local and stable after boot, the next likely blocker is upstream `i_video_ready`.
+- In `top.v`, `i_video_ready` is driven by `hdmi_video_ready`, which is synchronized from:
+  - `selected_frame_ok_hdmi`
+  - `selected_bridge_active`
+  - `~selected_bridge_underflow`
+
+This run therefore requires a more direct split of the HDMI-ready upstream terms. The previous run already proved pixels can reach `hdmi_top`; the current forced-input build did not keep the ready qualification true.
+
+---
+
+## 54. 2026-07-09 forty-fifth iteration: split HDMI `i_video_ready` upstream terms (Codex)
+
+### Planned RTL intent
+
+Reassign LED24-33 to expose the terms that generate `hdmi_video_ready` before they enter `hdmi_top`:
+
+- selected framebuffer ready
+- selected framebuffer underflow
+- selected frame_ok
+- selected CDC bridge active
+- selected CDC bridge underflow
+- bridge FIFO level ready / low
+- synchronized `hdmi_video_ready`
+- selected bridge input data activity
+- `hdmi_top` use-input output

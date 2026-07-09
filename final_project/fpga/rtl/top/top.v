@@ -2209,23 +2209,23 @@ assign selected_csi_format_ok = channel_sel ? ch1_csi_format_ok_cdc[1] : ch0_csi
 assign selected_frame_ok_hdmi = selected_frame_ready_cdc[2] & ~selected_fifo_underflow_cdc[1];
 assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   //===================================================================
-  // HDMI stripe debug LED map, 2026-07-08 forced-input HDMI gate probe:
+  // HDMI stripe debug LED map, 2026-07-09 HDMI i_video_ready upstream probe:
   //   LED18 led[0] (B2)  = DDR configured
   //   LED19 led[1] (E3)  = ch0 selected (~channel_sel)
   //   LED20 led[2] (F3)  = global reset released (arst_n)
   //   LED21 led[3] (F2)  = ch0 delayed I2C controller reset released
   //   LED22 dbg_ddr_ok (G2)        = ch0 I2C status register sampled
   //   LED23 dbg_fb0_ready (K6)     = ch0 I2C no aggregate NACK after sampling
-  //   LED24 dbg_fb0_underflow (J3) = hdmi_top video_path_ready
-  //   LED25 dbg_csi_fmt_ok (L6)    = hdmi_top vid_info_det frame_stable
-  //   LED26 dbg_bridge_active (K4) = hdmi_top active size is 960x1080
-  //   LED27 dbg_bridge_under (K3)  = BAD: HDMI h_active_error seen
-  //   LED28 dbg_video_ready (M5)   = BAD: HDMI v_active_error seen
-  //   LED29 dbg_input_stable (M6)  = BAD: HDMI v_total_error seen
-  //   LED30 dbg_led30 (N7)         = BAD: HDMI h_total_error seen
-  //   LED31 dbg_led31 (P7)         = BAD: HDMI h_sync_error seen
-  //   LED32 dbg_led32 (P6)         = hdmi_top input pixel data changes under DE
-  //   LED33 dbg_led33 (R6)         = hdmi_top is using input video (gate bypassed)
+  //   LED24 dbg_fb0_underflow (J3) = selected framebuffer ready, synchronized
+  //   LED25 dbg_csi_fmt_ok (L6)    = BAD: selected framebuffer underflow
+  //   LED26 dbg_bridge_active (K4) = selected frame_ok_hdmi
+  //   LED27 dbg_bridge_under (K3)  = selected CDC bridge active
+  //   LED28 dbg_video_ready (M5)   = selected CDC bridge level ready
+  //   LED29 dbg_input_stable (M6)  = BAD: selected CDC bridge level low
+  //   LED30 dbg_led30 (N7)         = hdmi_video_ready sync into hdmi_top
+  //   LED31 dbg_led31 (P7)         = BAD: selected CDC bridge underflow
+  //   LED32 dbg_led32 (P6)         = selected/hdmi_top input pixel data changes
+  //   LED33 dbg_led33 (R6)         = hdmi_top is using input video
   //===================================================================
 
   // Bring ch0 signals into hdmi_tx_slow_clk domain with 2-stage sync.
@@ -2439,14 +2439,14 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   assign led[3]             = ch0_dbg_i2c_rst_n;              // LED21
   assign dbg_ddr_ok         = ch0_dbg_i2c_status_sample_seen; // LED22
   assign dbg_fb0_ready      = ch0_dbg_i2c_status_sample_seen & ~ch0_dbg_i2c_status_rxack_seen; // LED23
-  assign dbg_fb0_underflow  = hdmi_video_path_ready_dbg;      // LED24
-  assign dbg_csi_fmt_ok     = hdmi_vidinfo_stable_dbg;        // LED25
-  assign dbg_bridge_active  = hdmi_timing_size_ok_dbg;        // LED26
-  assign dbg_bridge_under   = dbg_hdmi_h_active_error_seen;   // LED27, BAD
-  assign dbg_video_ready    = dbg_hdmi_v_active_error_seen;   // LED28, BAD
-  assign dbg_input_stable   = dbg_hdmi_v_total_error_seen;    // LED29, BAD
-  assign dbg_led30          = dbg_hdmi_h_total_error_seen;    // LED30, BAD
-  assign dbg_led31          = dbg_hdmi_h_sync_error_seen;     // LED31, BAD
+  assign dbg_fb0_underflow  = selected_frame_ready_cdc[2];    // LED24
+  assign dbg_csi_fmt_ok     = selected_fifo_underflow_cdc[1]; // LED25, BAD
+  assign dbg_bridge_active  = selected_frame_ok_hdmi;         // LED26
+  assign dbg_bridge_under   = selected_bridge_active;         // LED27
+  assign dbg_video_ready    = selected_bridge_level_ready;    // LED28
+  assign dbg_input_stable   = selected_bridge_level_low;      // LED29, BAD
+  assign dbg_led30          = hdmi_video_ready;               // LED30
+  assign dbg_led31          = selected_bridge_underflow;      // LED31, BAD
   assign dbg_led32          = hdmi_input_data_change_seen_dbg; // LED32
   assign dbg_led33          = hdmi_use_input_video_dbg;       // LED33
   //=== end debug LED bank drive ===
