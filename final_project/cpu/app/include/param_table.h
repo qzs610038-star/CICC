@@ -43,6 +43,8 @@ extern "C" {
 #define PARAM_ERR_THRESHOLD    4   /* 颜色阈值不合理 */
 #define PARAM_ERR_WINDOW       5   /* 滤波窗口/确认数不合理 */
 #define PARAM_ERR_LUMA_RATIO   6   /* 白/黑亮度比不合理 */
+#define PARAM_ERR_NULL         7   /* null parameter pointer */
+#define PARAM_ERR_SLOT         8   /* slot index out of range */
 
 /*--------------------------------------------------------------------------
  *  NVM 编译开关

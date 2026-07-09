@@ -18,6 +18,11 @@
  *  内部 helper — bbox 解包与面积
  *==========================================================================*/
 
+/* bbox_min 和 bbox_max 寄存器使用相同的位域编码：
+ *   [15:0]  = X 坐标（低 16-bit）
+ *   [31:16] = Y 坐标（高 16-bit）
+ * 因此 _x_min 和 _x_max 函数体相同、_y_min 和 _y_max 函数体相同，
+ * 不是复制粘贴错误 — 两者只是从不同寄存器解出各自的 X/Y 分量。 */
 static inline uint16_t _bbox_x_min(uint32_t v) { return v & 0xFFFFu; }
 static inline uint16_t _bbox_y_min(uint32_t v) { return (v >> 16) & 0xFFFFu; }
 static inline uint16_t _bbox_x_max(uint32_t v) { return v & 0xFFFFu; }
@@ -178,11 +183,11 @@ static uint8_t _classify_shape(const feature_snapshot_t *snap, int cam,
             if (t > 1.0f) t = 1.0f;
             *conf = (uint8_t)(55u + (uint8_t)(200.0f * t));
             return SHAPE_CUBE;       /* 侧面方形 → 可能是 cube 或 cylinder */
-        } else if (fill >= 0.25f) {
+        } else if (fill >= cfg->cone_fill_lo) {
             /* 填充率偏低 → 三角形（锥形侧面） */
             /* 离 cube_fill_lo 越远，越像三角 */
             float dist = cfg->cube_fill_lo - fill;
-            float t = dist / (cfg->cube_fill_lo - 0.25f + 0.001f);
+            float t = dist / (cfg->cube_fill_lo - cfg->cone_fill_lo + 0.001f);
             if (t > 1.0f) t = 1.0f;
             *conf = (uint8_t)(55u + (uint8_t)(200.0f * t));
             return SHAPE_CONE;       /* 侧面三角 → 可能是 cone */
@@ -226,6 +231,9 @@ static uint8_t _classify_size(uint16_t height_px, const classifier_cfg_t *cfg)
  *--------------------------------------------------------------------------*/
 void classifier_cfg_default(classifier_cfg_t *cfg)
 {
+    if (cfg == 0)
+        return;
+
     /* 颜色面积阈值 — 全帧像素数，需现场标定 */
     cfg->min_red_area  = 500;
     cfg->min_blue_area = 500;
@@ -243,7 +251,11 @@ void classifier_cfg_default(classifier_cfg_t *cfg)
 
     /* 填充率门限 */
     cfg->cube_fill_lo = 0.85f;    /* 方形 bbox 内 ≥85% 有色像素 */
-    cfg->cyl_fill_lo  = 0.70f;    /* 圆形 bbox 内 ≥70% 有色像素 (π/4≈78%) */
+    /* 圆形填充率理论值 π/4≈0.785。默认 0.70 比理论值低约 8%，
+     * 作为余量吸收 bbox 不精确、镜头畸变、边缘像素噪声等误差。
+     * 现场标定时可回推到接近 0.78，或根据实测误判率微调。 */
+    cfg->cyl_fill_lo  = 0.70f;
+    cfg->cone_fill_lo = 0.25f;    /* Cam1 triangle lower bound */
 
     /* 侧面高度 → 尺寸查表（像素值，需现场标定） */
     cfg->height_px_20mm = 100;
@@ -263,6 +275,9 @@ vision_result_t classify_frame(const feature_snapshot_t *snap, int cam,
 {
     vision_result_t r;
     memset(&r, 0, sizeof(r));
+
+    if (snap == 0 || cfg == 0 || !VALID_CAM(cam))
+        return r;
 
     uint8_t col_conf = 0;
     uint8_t shp_conf = 0;
@@ -290,12 +305,20 @@ vision_result_t classify_frame(const feature_snapshot_t *snap, int cam,
 
 void mf_filter_reset(mf_filter_t *f)
 {
+    if (f == 0)
+        return;
+
     memset(f, 0, sizeof(*f));
 }
 
 vision_result_t mf_filter_update(mf_filter_t *f, const vision_result_t *raw,
                                  const classifier_cfg_t *cfg)
 {
+    static const vision_result_t zero_result;   /* all-zero */
+
+    if (f == 0 || raw == 0 || cfg == 0)
+        return zero_result;
+
     uint8_t w = cfg->filter_window;
     if (w > 8)  w = 8;    /* history[] 容量上限 */
     if (w == 0) w = 5;    /* 防御 */
@@ -334,8 +357,6 @@ vision_result_t mf_filter_update(mf_filter_t *f, const vision_result_t *raw,
     uint8_t confirm = cfg->filter_confirm;
     if (confirm == 0) confirm = 3;     /* default first, then clamp to window */
     if (confirm > w) confirm = w;
-
-    static const vision_result_t zero_result;   /* all-zero */
 
     if (best_votes >= confirm) {
         f->stable.color_id  = best_color;
@@ -401,7 +422,11 @@ vision_result_t fuse_results(const vision_result_t *cam0,
      *   俯视=方 + 侧面=方 → CUBE
      *   俯视=圆 + 侧面=方 → CYLINDER
      *   俯视=圆 + 侧面=三角 → CONE
-     * Cam0 侧的 SHAPE_CYLINDER 含义是"俯视圆形，可能是圆柱也可能是圆锥" */
+     * Cam0 侧的 SHAPE_CYLINDER 含义是"俯视圆形，可能是圆柱也可能是圆锥"。
+     *
+     * 不在上述三种有效组合之列的情况（含任一 UNKNOWN / 其他形状 ID /
+     * 无效组合如 CYLINDER+CYLINDER）→ 落入 else 分支，输出 SHAPE_UNKNOWN。
+     * 这是有意为之：UNKNOWN 不单独分支处理，统一走 else fall-through。 */
     if (s0 == SHAPE_CUBE && s1 == SHAPE_CUBE) {
         fused.shape_id = SHAPE_CUBE;
     } else if (s0 == SHAPE_CYLINDER && s1 == SHAPE_CUBE) {

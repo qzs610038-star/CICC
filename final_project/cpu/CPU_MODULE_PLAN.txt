@@ -1,5 +1,5 @@
 ﻿================================================================================
-  CPU 端 5 大模块开发计划（识别侧）
+  CPU 端 5 大模块开发计划（识别侧 + 固定点抓取授权）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
   更新: 2026-07-08
@@ -8,10 +8,10 @@
 模块一览
 --------
   [1] board_io          ✅ 已完成     FPGA↔CPU APB3 寄存器读写
-  [2] vision_classifier ✅ 已完成 (29/29 单测通过, 2026-07-07)  颜色/形状/尺寸分类
-  [3] param_table       ✅ 已完成 (68/68 单测通过, 2026-07-07)  阈值/标定参数管理
-  [4] task_matcher      ✅ 已完成 (73/73 单测通过, 2026-07-08)  目标匹配与动作决策
-  [5] main              ⬜ 待开发     识别主循环集成 + 对队友接口输出
+  [2] vision_classifier ✅ 已完成 (31/31 单测通过, 2026-07-09)  颜色/形状/尺寸分类
+  [3] param_table       ✅ 已完成 (81/81 单测通过, 2026-07-09)  阈值/标定参数管理
+  [4] task_matcher      ✅ 已完成 (82/82 正式主线单测通过, 2026-07-09)  目标匹配与动作决策
+  [5] main              ✅ 已完成 (2026-07-09)     识别主循环集成 + 固定点抓取授权输出
 
 ================================================================================
   [1] board_io  —  FPGA↔CPU 寄存器读写层
@@ -43,6 +43,38 @@
     - [P2] match_action 注释语义: result_writeback_t.match_action 和
       board_io_build_writeback() 注释明确 Cam0/Cam1 两路写同一个融合后 action,
       保证 HDMI/OSD 切任一通道都看到一致的抓取/跳过/报错状态
+
+  2026-07-09 Codex bugfix (已合入):
+    - [P1] ✅ match_action 编码位域映射 — task_matcher.h 逻辑码 NONE/GRAB/SKIP/ERROR
+      (0/1/2/3) 不能直写 CPU_MATCH_ACTION 寄存器。手册定义该寄存器为 bitfield:
+      bit[0]=match, bit[1]=grab, bit[2]=skip, bit[3]=error。
+      修复: board_io.h 新增 match_action_to_hw() 静态内联函数 + MATCH_HW_* 位定义;
+      board_io_write_results() 改为调用 match_action_to_hw(r->match_action) 写入。
+      逻辑→硬件映射: NONE→0x00, GRAB→0x03 (match+grab), SKIP→0x05 (match+skip),
+      ERROR→0x08 (error only, no match)。
+      若不修: GRAB=1(0b01) 被 OSD 误读为"match", SKIP=2(0b10) 被误读为"grab",
+      ERROR=3(0b11) 被误读为"match+grab"。正式联调前必修。
+
+    - [P2] ✅ seq 失败语义修正 — board_io_commit_config() 原在超时前已 ++(*seq),
+      失败时调用方 seq 已推进。改为先计算 config_seq = (*seq)+1u, 仅在
+      active_seq==config_seq 成功后才 *seq = config_seq。
+      同时更新 board_io.h 注释明确"成功→更新, 失败→不变"。
+      重构: 抽取内部 _commit_raw() 轮询函数供 commit_config/commit_global 共用。
+
+    - [P3] ✅ commit_global 独立于 CAM_ENABLED(0) — 全局寄存器 (ARM_STATE/
+      ERROR_CODE) commit 原委托 board_io_commit_config(CAM_COMMIT_GLOBAL, seq),
+      若 CAM_ENABLED(0)==0 则直接返回 -1。手册规定全局寄存器跟随 Cam0 commit
+      通道, 但这是硬件通道选择, 不应受 CAM_ENABLED 视频链路使能开关影响。
+      修复: board_io_commit_global() 直接调用 _commit_raw(), 跳过 CAM_ENABLED 检查。
+      board_io.h CAM_COMMIT_GLOBAL 注释同步说明此独立性。
+
+    - [P3] ✅ frame_id 二次确认 — board_io_read_features() 读完 LIVE_* 后重读
+      SYS_STATUS, 确认 frame_id 未变且 valid 仍为 1。当前手册 v2 约定"FPGA 在
+      ack 前不覆盖快照", 此检查属防御性措施。若 RTL 未遵守锁存约定, 自动丢弃
+      不一致数据并返回 -1, 调用方重试。
+
+    - 测试: 全部 180/180 单测通过 (classifier 31 + param_table 76 + matcher 73),
+      gcc 14.2.0 x86-64. board_io.c 独立编译 0 error (仅占位符 warning)。
 
   协议要点:
     - Staging → Commit → Active 影子寄存器协议
@@ -88,21 +120,25 @@
     ✅ [4] test_filter_size_jitter 注释/名字误导
            → 修正：实际验证尺寸参与投票键且多数胜出，不是"无多数"
 
-  2026-07-08 修改方案 (已规划, 待实施):
+  2026-07-09 安全加固 (已实施):
+      ✅ [P1] 裸机崩溃防御 — classify_frame / mf_filter_update / mf_filter_reset /
+           classifier_cfg_default 增加 NULL 指针保护
+      ✅ [P1] cam 参数合法性 — classify_frame 非 cam∈{0,1} 返回 UNKNOWN
+      ✅ [P2] Cam1 CONE 下限参数化 — classifier_cfg_t 增加 cone_fill_lo
+           字段 (默认 0.25f), param_table 增加合法性校验
+      ✅ [P1] param_table_validate / param_table_set 增加 cfg NULL 检查
+      ✅ 测试增量: vision_classifier 29→31, param_table 70→76
+         覆盖 NULL 防御 + cam 边界 + cone_fill_lo
+
     待修项 (按优先级):
-      [P1] 裸机崩溃防御 — classify_frame / mf_filter_update / mf_filter_reset /
-           classifier_cfg_default 缺 NULL 指针检查, 传错即 hardfault
-      [P1] cam 参数合法性 — classify_frame 入口不校验 cam∈{0,1}
-      [P2] Cam1 CONE 下限硬编码 — 0.25f 不在 classifier_cfg_t 中,
-           现场标定调不了; 需加 cone_fill_lo 字段 (默认 0.25f)
-      [P2] cyl_fill_lo 注释 — 默认 0.70 但注释写 π/4≈78%, 需说明余量
-      [P3] _bbox_x_min / _bbox_x_max 同实现 — 函数体相同易误导, 加注释
-      [P3] fuse_results UNKNOWN 路径 — 单路 UNKNOWN→融合 UNKNOWN 仅 fall-through, 加注释
-      [可选] VALID_CAM 宏提升到 board_io.h — 避免各模块重复定义
-    测试增量: 7 条新测试 (29→36), 覆盖 NULL 防御 + cam 边界 + cone_fill_lo
+      ✅ [P2] cyl_fill_lo 注释 — 默认 0.70 但注释写 π/4≈78%, 需说明余量 (已修复 2026-07-09)
+      ✅ [P3] _bbox_x_min / _bbox_x_max 同实现 — 函数体相同易误导, 加注释 (已修复 2026-07-09)
+      ✅ [P3] fuse_results UNKNOWN 路径 — 单路 UNKNOWN→融合 UNKNOWN 仅 fall-through, 加注释 (已修复 2026-07-09)
+      ✅ VALID_CAM 宏提升到 board_io.h — vision_classifier 已改用统一宏 (2026-07-09)
 
   未验证项:
     - PC 单测: ✅ 本机 gcc 14.2.0 (d:\CICC w\tools\mingw64\) 全部通过
+      (vision_classifier 31/31, param_table 76/76, task_matcher 73/73)
     - RISC-V 交叉编译: riscv-none-embed-gcc 8.3.0 编译通过 (0 error, 仅预期 warning), 上板待验证
     - 所有阈值仍需现场标定
     - 尺寸识别的 height_px_20mm/25mm/30mm 当前可先用占位值，最终必须在固定 Cam1/固定物块位置下实测标定
@@ -162,6 +198,17 @@
   待定:
     - NVM 读写函数具体实现（依赖硬件 SPI Flash / EEPROM 驱动）
 
+  2026-07-09 代码修正 (本轮):
+    ✅ [P2] PARAM_ERR_SLOT 专用错误码 — param_table_set() slot 越界原返回
+           PARAM_ERR_WINDOW(滤波窗口错误)，语义不匹配。新增 PARAM_ERR_SLOT=8，
+           strerror 增加对应描述，测试覆盖 slot<0 / slot=2 / slot=99。
+    ✅ [P3] NVM 冗余守卫注释 — param_table_init() 和 param_table_save_calibrated()
+           各有两层 #if/if() 守卫（外层编译期消除 + 内层运行时安全），
+           加注释说明分层意图，避免误认为是重复代码。
+    ✅ [P3] cone_fill_lo 校验下界注释 — 下界 0.10 远低于默认值 0.25，
+           加注释说明为极端窄三角留余量，同时上界 0.60 保证不与 cyl 区间重叠。
+    测试增量: 76→81 (+5: PARAM_ERR_SLOT 3 条 + strerror 2 条)
+
 ================================================================================
   [4] task_matcher  —  目标匹配与动作决策
 ================================================================================
@@ -190,6 +237,9 @@
     - target_valid 首版也使用拨码位, 不用瞬时按键, 避免现场误触和状态保持问题。
     - TARGET_SEL 地址未确认; 0x06C 仅作为建议占位, 需 FPGA 队友确认后定版。
       若 FPGA 侧暂未实现, C 代码需用 TARGET_SEL_AVAILABLE=0 默认保护。
+    - 2026-07-09 用户决策: TARGET_SEL_AVAILABLE=0 或 target_valid=0 时,
+      正式主线必须清空目标并返回 NONE, 不允许沿用旧目标继续抓取。
+      如需手动设定目标, 只能作为显式调试模式单独打开, 不进入比赛默认路径。
     - 当前正式工程只引出了 i_sw[0]/i_sw[1]:
         i_sw[0] 已用于复位相关, i_sw[1] 已用于 HDMI 通道切换。
       板上物理拨码资源虽多, 但实际可用位必须由 FPGA 队友确认后分配。
@@ -197,6 +247,10 @@
   决策逻辑:
     if (!target_valid)                  → NONE
     target.shape = SHAPE_CUBE           → 只抓正方体
+    if (target.size != wildcard &&
+        Cam1 水平/侧面结果未稳定)       → NONE (不能仅靠 Cam0 判断尺寸)
+    if (observed.color/shape UNKNOWN)   → NONE (正式主线不抓、不报错;
+                                             显式调试模式可显示 ERROR)
     if (observed.color != target.color) → SKIP (颜色不对; color_sel=00 时跳过)
     if (observed.shape != SHAPE_CUBE)   → SKIP/ERROR (不是正方体不抓)
     if (observed.size   != target.size) → SKIP (尺寸不对; size_sel=00 时跳过)
@@ -221,19 +275,59 @@
     int      task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy);
     const task_target_t *task_matcher_get_target(void);
 
+  2026-07-09 代码修正 (本轮):
+    ✅ [P1] UNKNOWN 观测 → NONE（正式主线策略）
+           — task_matcher_evaluate() 中 color/shape UNKNOWN 或 obs=NULL 时：
+             DEBUG_MODE=0（默认正式主线）→ 返回 MATCH_ACTION_NONE
+             DEBUG_MODE=1（显式调试）  → 返回 MATCH_ACTION_ERROR
+           — 符合 2026-07-09 用户决策：避免偶然噪声帧触发误报错。
+           — 新增编译开关 TASK_MATCHER_DEBUG_MODE（默认 0），
+             两套行为通过 #if 编译期选择。
+    ✅ [P1] TARGET_SEL_AVAILABLE=0 时清空目标（正式主线安全策略）
+           — task_matcher_read_target_from_fpga() 中 TARGET_SEL=0 路径：
+             DEBUG_MODE=0 → task_matcher_set_target(0)，evaluate() 将返回 NONE
+             DEBUG_MODE=1 → 保持当前目标（调试期手动 set_target 测试用）
+           — 符合用户决策：不允许沿用旧目标继续抓取。
+    ✅ [P3] 注释更新 — task_matcher.h 的 evaluate/read_target 文档、
+           task_matcher.c 的 UNKNOWN/NULL 路径注释，均反映正式/调试双模式。
+    测试增量: 73→79 (+6: TARGET_SEL 清空目标 2 条 + 双 UNKNOWN 1 条 +
+              测试组名/断言从 ERROR 改为 NONE 的修正)
+    调试模式编译验证: -DTASK_MATCHER_DEBUG_MODE=1 编译通过，
+      行为正确切换到 ERROR/保持目标（7 个预期失败来自正式模式测试断言）。
+
+  2026-07-09 Codex 审查修复 (本轮):
+    ✅ [P1] 尺寸目标 + 尺寸不可用 → NONE（不再是 SKIP）
+           — task_matcher_evaluate() 尺寸检查拆分三路：
+             target_size=0   → 通配，跳过
+             obs.size=0      → Cam0-only，目标有尺寸要求时必须等 Cam1 → NONE
+             其他不匹配       → SKIP
+           — 符合 CPU_MODULE_PLAN §4：目标含尺寸要求且 Cam1 侧面未稳定时
+             返回 NONE，不能仅靠 Cam0 判断尺寸。
+           — 新增测试: target_size=20+obs.size=0→NONE,
+             target_size=0(wildcard)+obs.size=0→GRAB
+    ✅ [P3] task_matcher.h 顶部注释移除"送入 arm_controller"
+           — 修正为：grab_center 仅用于 OSD/日志/偏差检查，不作为机械臂
+             实时坐标接口。与固定点抓取授权边界一致。
+    测试增量: 79→82 (+2: 尺寸不可用 NONE + 通配尺寸 GRAB via Cam0-only)
+
 ================================================================================
   识别侧协作边界 — 给队友 / 从队友获取
 ================================================================================
   本人负责范围:
     - Cam0/Cam1 特征读取、颜色/形状/尺寸分类、参数表、目标匹配
+    - 根据识别结果输出“是否允许抓取”的 match_action。
+      match_action=GRAB 只表示允许机械臂执行预设固定 P_pick 抓取序列,
+      不表示 CPU 提供视觉坐标给机械臂实时抓取。
     - 输出给队友/系统集成方:
         color_id        颜色 (COLOR_*)
         shape_id        形状 (SHAPE_*)
         size_cm_x10     尺寸, 0.1cm 单位 (20/25/30)
         match_action    是否抓取/跳过/报错 (MATCH_ACTION_*)
-        // grab_center  抓取中心点预留，先不作为正式交付字段
-        //               若后续启用，来自 Cam0 snap.center 解包:
+        // grab_center  仅用于 OSD/日志/偏差检查, 不作为正式机械臂接口
+        //               来自 Cam0 snap.center 解包:
         //               x = center[15:0], y = center[31:16]
+        //               除非用户明确切换到视觉坐标闭环, 否则不得传给
+        //               arm_controller 作为实时抓取坐标。
 
   队友负责输入:
     - 两个摄像头的视频信号:
@@ -251,15 +345,25 @@
 
   不在本人范围:
     - myCobot 串口协议、动作状态机、夹爪控制、机械臂安全互锁
+    - 视觉中心点到机械臂坐标的实时映射/视觉伺服闭环
     - FPGA-to-机械臂接线、电平确认、真实动作测试
 
+  机械臂协作边界（来自《分赛区决赛实施开发路线.md》和
+  vision_module_decision_log_2026-07-02）:
+    - 正式主线采用固定抓取点 P_pick + 固定放置点/分拣点序列。
+    - CPU 识别侧只决定是否允许抓取; 机械臂侧执行预设点位表。
+    - Cam0 center / grab_center 只做 OSD、日志和偏差检查。
+    - 不做视觉坐标实时映射, 不做复杂视觉伺服。
+
 ================================================================================
-  [5] main  —  识别主循环集成
+  [5] main  —  识别主循环集成 + 固定点抓取授权
 ================================================================================
-  状态: ⬜ 待开发
-  计划文件: app/src/main.c
+  状态: ✅ 已完成 (2026-07-09)
+  计划文件: app/src/main.c (264 行, gcc 0 error)
   依赖: board_io + vision_classifier + param_table + task_matcher
-        arm_controller 由队友集成；识别侧只输出 match_action/分类结果
+        arm_controller 由队友集成；识别侧只输出 match_action/分类结果。
+        match_action=GRAB 表示允许队友机械臂模块执行固定 P_pick 抓取,
+        不输出实时抓取坐标。
 
   主循环伪代码:
 
@@ -319,11 +423,17 @@
             // ---- 融合决策 ----
             vision_result_t fused = fuse_results(
                 &filt_cam0.stable, &filt_cam1.stable, cfg);
+            // 2026-07-09 用户决策:
+            //   允许单路稳定时输出 GRAB, 但若目标含尺寸要求(size_sel!=00),
+            //   必须 Cam1(水平/侧面)稳定可用, 因为尺寸只看 Cam1 height_px。
+            //   仅 Cam0 稳定时只能处理尺寸通配目标。
+            //   UNKNOWN 在正式主线中输出 NONE; 调试模式可映射为 ERROR 便于 OSD 看问题。
 
             // ---- 目标输入 ----
             // 从 FPGA TARGET_SEL 寄存器读取：color_sel[1:0] + size_sel[1:0] + target_valid
             // shape 固定为 SHAPE_CUBE（识别侧只抓正方体）。
             // target_valid=0 时自动清空目标，evaluate() 返回 NONE。
+            // TARGET_SEL_AVAILABLE=0 时正式主线也清空目标; 手动目标仅限显式调试模式。
             task_matcher_read_target_from_fpga();
 
             // ---- 任务匹配 / 识别侧输出 ----
@@ -331,13 +441,14 @@
             uint8_t action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
             // 输出给队友/系统集成:
             //   fused.color_id, fused.shape_id, fused.size_cm_x10, action
+            //   action==GRAB 仅授权固定 P_pick 抓取序列, 不携带视觉抓取坐标。
             // 最终 match_action 首版推荐 Cam0/Cam1 两路都写同一个 action,
             // 这样 HDMI/OSD 切任一通道都能看到一致的抓取/跳过/报错状态。
-            // 抓取中心点暂不作为正式交付字段，后续需要时再打开:
+            // 抓取中心点只用于 OSD/日志/偏差检查, 默认不交付 arm_controller:
             //   uint16_t cx, cy;
             //   if (action == MATCH_ACTION_GRAB &&
             //       task_matcher_get_grab_coord(&cx, &cy) == 0) {
-            //       // pass cx/cy to arm_controller teammate interface
+            //       // log/debug only; do not use as real-time arm coordinate
             //   }
 
             // ---- 识别侧到队友接口边界 ----
@@ -349,8 +460,42 @@
   待定:
     - 两路相机是轮询还是等 VSYNC 中断? (当前方案: 独立轮询)
     - TARGET_SEL 寄存器地址/位定义由 FPGA 队友确认；0x06C 只是建议值
+    - main 单路抓取策略按 2026-07-09 用户决策:
+      允许单路稳定时抓取; 但目标含尺寸要求时必须 Cam1(水平/侧面)稳定可用。
+      TARGET_SEL 不可用或 target_valid=0 时正式主线清空目标, 不沿用旧目标。
+      UNKNOWN 正式主线按 NONE 处理; 只有显式调试模式才映射为 ERROR。
     - 具体占用哪些拨码/按键位由队友确认; CPU 只读寄存器
-    - 队友的 arm_controller 接口是否需要抓取中心点; 当前默认不交付 grab_center
+    - 队友的 arm_controller 接口按固定 P_pick 点位序列执行; 当前不交付 grab_center
+
+  2026-07-09 实现记录:
+    ✅ 主循环按 CPU_MODULE_PLAN §5 伪码完整实现:
+        1. board_io_validate() — APB 握手，失败时心跳保活
+        2. param_table_init() + mf_filter_reset × 2 + task_matcher_init()
+        3. init_camera_configs() — 两路 ROI + 颜色阈值 + commit
+        4. 主循环:
+           - heartbeat
+           - process_camera(0) → classify → filter → ack → write_results(action=0)
+           - process_camera(1) → 同上
+           - fuse_results + task_matcher_read_target + evaluate → action
+           - 两路 match_action 重写为融合后 action（OSD 一致性）
+           - write_global_state(ARM_STATE_IDLE, 0) + commit_global
+    ✅ 边界合规:
+        - grab_center 仅用于 UART 日志，不接 arm_controller
+        - ARM_STATE 识别侧始终输出 IDLE，不操控机械臂状态机
+        - match_action=GRAB 仅授权固定 P_pick 序列，不输出视觉坐标
+    ✅ UART 日志: 简化帧格式 [cam color shape size_mm] | fuse=shape act=GRAB cx=... cy=...
+    ✅ PC 编译: gcc -std=c99 -Wall -Wextra 0 error（仅预期 int-to-ptr warning +
+        APB placeholder warning）
+    ⬜ RISC-V 交叉编译 + 上板验证: 待执行
+
+  2026-07-09 Codex 审查修复 (本轮):
+    ✅ [P2] commit 失败处理 — init_camera_configs() 改为返回 int，
+           Cam0/Cam1 任一 commit 失败打印 FATAL 并进入心跳保活（不再假装配置成功）。
+           主循环所有 board_io_commit_results/commit_global() 返回值被检查，
+           失败时 err_code = ERR_COMMIT_TIMEOUT(2)，写入 FPGA ERROR_CODE 寄存器；
+           成功时 err_code 清零。commit 失败不会导致 seq 推进，下轮自动重试。
+    ✅ [P3] UART 日志尺寸单位修正 — size_cm_x10 是 0.1cm(=1mm) 单位，
+           移除错误的 *10 换算。20 → 直接打印 "20" mm，不再错印 "200"。只影响日志。
 
 ================================================================================
   模块依赖关系
@@ -393,8 +538,9 @@
         FPGA 负责物理开关同步/消抖/编码, CPU 只读稳定寄存器
         具体 SW 位需确认空闲资源; 当前 i_sw[0]/i_sw[1] 已被复位/HDMI 切换占用
     - 与机械臂队友确认识别输出字段: color/shape/size/match_action
+      match_action=GRAB 表示允许固定 P_pick 抓取, 不是视觉坐标闭环命令。
     - 最终 match_action 首版推荐 Cam0/Cam1 两路都写同一个融合后 action
-    - grab_center 是否启用；默认先注释保留，不作为当前正式接口
+    - grab_center 仅用于 OSD/日志/偏差检查；默认不作为当前正式接口
     - 是否有 VSYNC 中断可用 (优化轮询)
 
 ================================================================================

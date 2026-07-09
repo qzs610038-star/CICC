@@ -255,6 +255,19 @@ static void test_shape_cam1_unknown_low_fill(void)
     PASS();
 }
 
+static void test_shape_cam1_cone_threshold_configurable(void)
+{
+    TEST("shape Cam1: cone_fill_lo is configurable");
+    classifier_cfg_t cfg;
+    classifier_cfg_default(&cfg);
+    cfg.cone_fill_lo = 0.40f;
+
+    feature_snapshot_t s = make_snap(2000, 300, 300, 50,50, 150,150, 0, 1);
+    vision_result_t r = classify_frame(&s, 1, &cfg);
+    ASSERT_EQ(r.shape_id, SHAPE_UNKNOWN, "shape_id below raised cone_fill_lo");
+    PASS();
+}
+
 /*==========================================================================
  *  测试组 4: 尺寸分类
  *==========================================================================*/
@@ -618,6 +631,38 @@ static void test_config_window_bounds(void)
     PASS();
 }
 
+static void test_classifier_null_and_cam_guards(void)
+{
+    TEST("boundary: NULL inputs and invalid cam return UNKNOWN");
+    classifier_cfg_t cfg;
+    classifier_cfg_default(&cfg);
+    feature_snapshot_t s = make_snap(8000, 100, 50, 50,50, 150,150, 0, 1);
+    vision_result_t raw;
+    memset(&raw, 0, sizeof(raw));
+    raw.color_id = COLOR_RED;
+    raw.shape_id = SHAPE_CUBE;
+
+    vision_result_t r = classify_frame(0, 0, &cfg);
+    ASSERT_EQ(r.color_id, COLOR_UNKNOWN, "null snap");
+    r = classify_frame(&s, 0, 0);
+    ASSERT_EQ(r.shape_id, SHAPE_UNKNOWN, "null cfg");
+    r = classify_frame(&s, 2, &cfg);
+    ASSERT_EQ(r.color_id, COLOR_UNKNOWN, "invalid cam");
+
+    classifier_cfg_default(0);
+    mf_filter_reset(0);
+    r = mf_filter_update(0, &raw, &cfg);
+    ASSERT_EQ(r.color_id, COLOR_UNKNOWN, "null filter");
+
+    mf_filter_t f;
+    mf_filter_reset(&f);
+    r = mf_filter_update(&f, 0, &cfg);
+    ASSERT_EQ(r.color_id, COLOR_UNKNOWN, "null raw");
+    r = mf_filter_update(&f, &raw, 0);
+    ASSERT_EQ(r.color_id, COLOR_UNKNOWN, "null filter cfg");
+    PASS();
+}
+
 /*==========================================================================
  *  main
  *==========================================================================*/
@@ -643,6 +688,7 @@ int main(void)
     test_shape_cam1_cube();
     test_shape_cam1_cone();
     test_shape_cam1_unknown_low_fill();
+    test_shape_cam1_cone_threshold_configurable();
 
     printf("\n[4] Size classification\n");
     test_size_cam0_no_size();
@@ -667,6 +713,7 @@ int main(void)
     printf("\n[7] Boundary conditions\n");
     test_fill_ratio_clamped();
     test_config_window_bounds();
+    test_classifier_null_and_cam_guards();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            tests_pass, tests_run, tests_fail);

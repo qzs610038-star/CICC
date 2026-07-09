@@ -4,10 +4,13 @@
  *  接收 vision_classifier 的稳定分类结果，与任务目标比对，输出抓取/跳过/报错。
  *
  *  使用方式：
- *    1. task_matcher_set_target(&t) 设定本轮目标
+ *    1. task_matcher_set_target(&t) 或 task_matcher_read_target_from_fpga()
+ *       设定本轮目标
  *    2. 每帧调用 task_matcher_evaluate(&obs, cx, cy) 评估
- *    3. 若返回 MATCH_ACTION_GRAB → task_matcher_get_grab_coord(&cx, &cy)
- *       取得抓取坐标 → 送入 arm_controller
+ *    3. 若返回 MATCH_ACTION_GRAB → 表示授权固定 P_pick 抓取序列。
+ *       task_matcher_get_grab_coord() 可取出抓取中心坐标，
+ *       但该坐标仅用于 OSD/日志/偏差检查，不作为机械臂实时坐标接口。
+ *       （正式主线采用固定抓取点，不做视觉伺服闭环。）
  *==========================================================================*/
 
 #ifndef TASK_MATCHER_H
@@ -23,10 +26,20 @@ extern "C" {
 /*--------------------------------------------------------------------------
  *  动作码（回写到 FPGA OSD / match_action 寄存器）
  *--------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------
+ *  编译开关
+ *--------------------------------------------------------------------------*/
+#ifndef TASK_MATCHER_DEBUG_MODE
+#  define TASK_MATCHER_DEBUG_MODE  0   /* 正式主线默认 0；调试时设为 1 */
+#endif
+
+/*--------------------------------------------------------------------------
+ *  动作码（回写到 FPGA OSD / match_action 寄存器）
+ *--------------------------------------------------------------------------*/
 #define MATCH_ACTION_NONE    0   /* 空闲，无目标或未评估 */
 #define MATCH_ACTION_GRAB    1   /* 三属性全部匹配 → 抓取 */
 #define MATCH_ACTION_SKIP    2   /* 存在不匹配 → 跳过 */
-#define MATCH_ACTION_ERROR   3   /* 观测无效（UNKNOWN 颜色/形状）→ 报错 */
+#define MATCH_ACTION_ERROR   3   /* 观测无效（仅 DEBUG_MODE=1 时输出） */
 
 /*--------------------------------------------------------------------------
  *  任务目标
@@ -55,11 +68,18 @@ void task_matcher_set_target(const task_target_t *t);
  *
  * 决策规则（按优先级）：
  *   1. 未设定目标 → NONE
- *   2. color_id 或 shape_id 为 UNKNOWN → ERROR
+ *   2. color_id 或 shape_id 为 UNKNOWN：
+ *        DEBUG_MODE=1（调试）→ ERROR（便于 OSD 排查）
+ *        DEBUG_MODE=0（正式）→ NONE（不抓、不报错，等待下一帧有效观测）
  *   3. target_color != UNKNOWN 且 color 不匹配 → SKIP
  *   4. target_shape != UNKNOWN 且 shape 不匹配 → SKIP
- *   5. target_size != 0 且 size 不匹配 → SKIP
- *   6. 全部匹配 → GRAB */
+ *   5. target_size != 0 且 obs.size==0（Cam1 尺寸不可用）→ NONE
+ *      （必须等 Cam1 侧面稳定；不能仅靠 Cam0 判断尺寸）
+ *   6. target_size != 0 且 size 不匹配 → SKIP
+ *   7. 全部匹配 → GRAB
+ *
+ * 注意：正式主线中 UNKNOWN 只输出 NONE，不输出 ERROR。
+ * 这与 2026-07-09 用户决策一致：避免因偶然噪声帧触发误报错。 */
 uint8_t task_matcher_evaluate(const vision_result_t *obs,
                                uint16_t center_x, uint16_t center_y);
 
@@ -76,9 +96,14 @@ const task_target_t *task_matcher_get_target(void);
  * 返回 0=目标有效已设定, -1=target_valid=0 或 TARGET_SEL 未实现。
  *
  * 依赖 board_io.h 的 TARGET_SEL_AVAILABLE 编译开关：
- *   0（默认）→ 直接返回 -1，不读硬件；调试期手动 set_target()
+ *   0（默认）→ DEBUG_MODE=1 时保持当前目标不动（调试期手动 set_target）；
+ *              DEBUG_MODE=0 时强制清空目标（正式主线安全策略），返回 -1。
  *   1        → 真正读 TARGET_SEL 寄存器
  * FPGA 队友确认地址/位定义后改为 1。
+ *
+ * 正式主线行为（2026-07-09 用户决策）：
+ *   TARGET_SEL_AVAILABLE=0 或 target_valid=0 时，必须清空目标并返回 NONE，
+ *   不允许沿用旧目标继续抓取。手动设定目标仅限显式调试模式。
  *
  * TARGET_SEL 位定义（由 FPGA 队友提供，CPU 只读）：
  *   [1:0] color_sel   00=任意, 01=红, 10=蓝, 11=黄

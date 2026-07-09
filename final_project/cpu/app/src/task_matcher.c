@@ -56,13 +56,28 @@ uint8_t task_matcher_evaluate(const vision_result_t *obs,
     if (!g_target_set)
         return MATCH_ACTION_NONE;
 
-    /* 2. 空指针 → ERROR（防御裸机环境下调用方传错 NULL） */
-    if (obs == 0)
+    /* 2. 空指针 → 防御裸机环境下调用方传错 NULL。
+     *    正式主线 (DEBUG_MODE=0)：返回 NONE，不因软件 bug 触发误报错；
+     *    调试模式 (DEBUG_MODE=1)：返回 ERROR，提醒开发者修 bug。 */
+    if (obs == 0) {
+#if TASK_MATCHER_DEBUG_MODE
         return MATCH_ACTION_ERROR;
+#else
+        return MATCH_ACTION_NONE;
+#endif
+    }
 
-    /* 3. 观测无效 → ERROR */
-    if (obs->color_id == COLOR_UNKNOWN || obs->shape_id == SHAPE_UNKNOWN)
+    /* 3. 观测无效：
+     *    正式主线 (DEBUG_MODE=0) → NONE，不抓不报错，等待下一帧有效观测；
+     *    调试模式 (DEBUG_MODE=1) → ERROR，便于 OSD 排查分类器问题。
+     *    2026-07-09 用户决策：避免偶然噪声帧触发误报错。 */
+    if (obs->color_id == COLOR_UNKNOWN || obs->shape_id == SHAPE_UNKNOWN) {
+#if TASK_MATCHER_DEBUG_MODE
         return MATCH_ACTION_ERROR;
+#else
+        return MATCH_ACTION_NONE;
+#endif
+    }
 
     /* 4. 颜色不匹配 → SKIP（target_color=UNKNOWN 时跳过颜色检查） */
     if (g_target.target_color != COLOR_UNKNOWN &&
@@ -74,10 +89,17 @@ uint8_t task_matcher_evaluate(const vision_result_t *obs,
         obs->shape_id != g_target.target_shape)
         return MATCH_ACTION_SKIP;
 
-    /* 6. 尺寸不匹配 → SKIP（target_size=0 时跳过尺寸检查） */
-    if (g_target.target_size_cm_x10 != 0 &&
-        obs->size_cm_x10 != g_target.target_size_cm_x10)
-        return MATCH_ACTION_SKIP;
+    /* 6. 尺寸检查（CPU_MODULE_PLAN §4 决策逻辑）：
+     *    target_size=0        → 通配，跳过尺寸检查
+     *    obs->size_cm_x10=0   → Cam0-only，尺寸不可用。目标有尺寸要求时
+     *                           必须等 Cam1 侧面稳定，不能仅靠 Cam0 判断 → NONE
+     *    其他不匹配            → SKIP */
+    if (g_target.target_size_cm_x10 != 0) {
+        if (obs->size_cm_x10 == 0)
+            return MATCH_ACTION_NONE;   /* 等待 Cam1 尺寸稳定 */
+        if (obs->size_cm_x10 != g_target.target_size_cm_x10)
+            return MATCH_ACTION_SKIP;
+    }
 
     /* 7. 全部匹配 → GRAB，保存坐标 */
     g_grab_cx   = center_x;
@@ -138,9 +160,16 @@ int task_matcher_read_target_from_fpga(void)
     task_matcher_set_target(&t);
     return 0;
 #else
-    /* TARGET_SEL 寄存器未实现 → 不读硬件，保持当前目标不动。
-     * 调试期可通过 task_matcher_set_target() 手动设定目标。
-     * FPGA 队友确认地址/位定义后，把 board_io.h 的 TARGET_SEL_AVAILABLE 改为 1。 */
+    /* TARGET_SEL 寄存器未实现。
+     *   正式主线 (DEBUG_MODE=0) → 强制清空目标，evaluate() 将返回 NONE，
+     *     不允许沿用旧目标继续抓取（2026-07-09 用户决策）。
+     *   调试模式 (DEBUG_MODE=1) → 保持当前目标不动，
+     *     可通过 task_matcher_set_target() 手动设定目标进行测试。 */
+#if TASK_MATCHER_DEBUG_MODE
     return -1;
+#else
+    task_matcher_set_target(0);
+    return -1;
+#endif
 #endif
 }
