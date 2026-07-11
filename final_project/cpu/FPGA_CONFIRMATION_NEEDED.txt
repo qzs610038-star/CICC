@@ -1,0 +1,215 @@
+================================================================================
+  CPU 侧 → FPGA 队友：接口冻结待确认清单
+  日期: 2026-07-11
+  来源: cpu_fpga_preprocess_interface_freeze_20260711.md
+  状态: 等待 FPGA 队友逐条回复
+================================================================================
+
+本文件列出 CPU 侧代码已就绪但编译开关默认关闭、需 FPGA 队友确认后
+才能打开的项目。每项标注了对 CPU 侧的影响和期望答案。
+
+================================================================================
+  [A] 新增寄存器偏移确认 — 阻塞 SUM_RGB_AVAILABLE / STATUS_AVAILABLE 开关
+================================================================================
+
+CPU 侧已预留以下偏移（board_io.h），默认不读。FPGA 队友确认后可改
+SUM_RGB_AVAILABLE=1 / STATUS_AVAILABLE=1。
+
+  Cam0:
+    OFF_LIVE_ROI_PIXEL_COUNT0  = 0x08C   ROI 内参与统计的像素总数
+    OFF_LIVE_SUM_R0            = 0x090   ROI 内 R 通道累加和
+    OFF_LIVE_SUM_G0            = 0x094   ROI 内 G 通道累加和
+    OFF_LIVE_SUM_B0            = 0x098   ROI 内 B 通道累加和
+    OFF_LIVE_SUM_Y0            = 0x09C   ROI 内亮度累加和
+    OFF_LIVE_STATUS0           = 0x0B4   帧状态位
+
+  Cam1 (Cam0 + 0x100):
+    OFF_LIVE_ROI_PIXEL_COUNT1  = 0x18C
+    OFF_LIVE_SUM_R1            = 0x190
+    OFF_LIVE_SUM_G1            = 0x194
+    OFF_LIVE_SUM_B1            = 0x198
+    OFF_LIVE_SUM_Y1            = 0x19C
+    OFF_LIVE_STATUS1           = 0x1B4
+
+  ⚠ 注意: 0x08C-0x09F 在 handbook v2 中标记为 "WHITE/BLACK 面积寄存器预留区"。
+  如果 sum 寄存器占用此区域，WHITE/BLACK 面积寄存器需重新规划。
+  CPU 侧立场: sum/count 比 WHITE/BLACK 面积更优先——有了 sum_y/roi_pixel_count，
+  CPU 可以直接算亮度均值，不需要单独的 WHITE/BLACK 面积寄存器。
+  如果 FPGA 资源紧张，可省掉 WHITE/BLACK 面积寄存器。
+
+  FPGA 队友请回复:
+  □ 接受以上偏移，WHITE/BLACK 面积寄存器取消 → 请确认
+  □ 接受以上偏移，但 WHITE/BLACK 面积移到其他地址 → 请给出新地址
+  □ 不接受以上偏移 → 请给出 FPGA 侧分配的替代地址
+  □ 其他: ________
+
+================================================================================
+  [B] roi_pixel_count 的准确定义 — 阻塞 SUM_RGB_AVAILABLE 开关
+================================================================================
+
+CPU 侧理解: roi_pixel_count = ROI 内通过亮度门限(luma_th)的有效像素数。
+即 "参与 sum_r/g/b/y 累加的像素数"。
+
+CPU 用 sum_y / roi_pixel_count 直接得到 ROI 内有效区域的亮度均值，
+用于白/黑判定。这要求 roi_pixel_count 和 sum_y 统计的是同一组像素。
+
+如果 roi_pixel_count = ROI 内全部像素数（含过暗/过亮被排除的），
+则 sum_y / roi_pixel_count 会被暗像素拉低，白/黑判定不准。
+
+  FPGA 队友请回复:
+  □ roi_pixel_count = 通过亮度门限的有效像素数（和 sum 同一组像素）
+  □ roi_pixel_count = ROI 内全部像素（含被排除的）→ CPU 需额外处理
+  □ other: ________
+
+================================================================================
+  [C] status 位定义确认 — 阻塞 STATUS_AVAILABLE 开关
+================================================================================
+
+CPU 侧预设的 status 位定义（board_io.h feature_snapshot_t 注释）:
+
+  bit [0]  empty_foreground   ROI 内无通用前景像素 → CPU 跳过分类，返回 UNKNOWN
+  bit [1]  invalid_roi        ROI 配置非法（反向/越界/空）→ CPU 丢弃本帧
+  bit [2]  overflow           任一累加器溢出 → CPU 丢弃本帧 + 可上报 error
+  bit [3]  dropped_snapshot   新帧到达但旧快照未被 CPU ack → CPU 性能告警
+  bit [4]  roi_empty          ROI 内像素数为 0 → 同 empty_foreground，触发阻断
+  bit [7:5] reserved           置 0
+
+CPU 侧分类器入口逻辑 (vision_classifier.c classify_frame):
+  if (status & 0x17) → 直接返回 UNKNOWN，不走颜色/形状分类
+  阻断位: bits[4,2,1,0] = roi_empty | overflow | invalid_roi | empty_foreground
+  不阻断: bit3 (dropped_snapshot) — FPGA valid/ack 协议保证快照完整性，仅作性能告警
+
+  FPGA 队友请回复:
+  □ 接受以上位定义 → 请确认
+  □ 位定义需要调整 → 请给出 FPGA 侧规划
+  □ 首版不实现 status 寄存器 → STATUS_AVAILABLE 暂保持 0
+
+================================================================================
+  [D] LIVE_FG_AREA 寄存器确认 — 阻塞 FG_AREA_AVAILABLE 开关
+================================================================================
+
+CPU 侧已预留:
+  LIVE_FG_AREA0 = 0x0B0 (Cam0 俯视)
+  LIVE_FG_AREA1 = 0x1B0 (Cam1 侧面)
+
+语义: ROI 内通用前景像素数（基于 RGB 通道差 + 亮度门限通用前景掩码的像素计数）
+约束: fg_area ≠ red_area + blue_area + yellow_area（白/黑物块不会命中颜色掩码，
+      但会命中通用前景掩码）
+
+如果 fg_area = red|blue|yellow，则白色和黑色物块填充率恒为 0，形状分类全部失效。
+
+  FPGA 队友请回复:
+  □ fg_area 首版实现，偏移如上述，语义为通用前景（不等同颜色面积之和）
+  □ fg_area 首版不实现 → FG_AREA_AVAILABLE 暂保持 0，CPU 降级用颜色面积近似
+  □ fg_area 偏移需调整 → 请给出新地址
+
+================================================================================
+  [E] TARGET_SEL 寄存器确认 — 阻塞 TARGET_SEL_AVAILABLE 开关
+================================================================================
+
+CPU 侧已预留:
+  TARGET_SEL @ 0x06C
+
+位定义:
+  bits [1:0]  color_sel    00=通配, 01=红, 10=蓝, 11=黄
+  bits [3:2]  size_sel     00=通配, 01=小, 10=中, 11=大
+  bit  [4]    target_valid  0=不抓, 1=目标有效
+  bits [31:5] 保留，填 0
+
+需求:
+  - target_valid 首版用拨码位（不是瞬时按键），防止误触
+  - FPGA 负责物理开关同步/消抖/编码，CPU 只读稳定寄存器
+  - 00 颜色/00 尺寸表示通配，不是无效
+  - 形状不从拨码输入，CPU 固定 SHAPE_CUBE
+  - 具体占用哪些拨码位由 FPGA 确认；i_sw[0] (复位) 和 i_sw[1] (HDMI 切换) 不可占用
+
+  FPGA 队友请回复:
+  □ 首版实现 TARGET_SEL @ 0x06C，位定义如上 → 请确认占用的物理 SW 引脚
+  □ TARGET_SEL 地址需调整 → 请给出新地址
+  □ 首版不实现 TARGET_SEL → TARGET_SEL_AVAILABLE 暂保持 0
+  □ 拨码位不足 → 请给出可用位分配方案
+
+================================================================================
+  [F] 通道映射确认 — 阻塞 top.v 集成
+================================================================================
+
+当前未闭合的映射:
+  - stream_id ↔ 物理摄像头接口 ↔ RTL ch0/ch1 ↔ wb0/wb1 ↔ CPU Cam0/Cam1
+  - 哪个是俯视（形状+颜色）、哪个是侧面（形状+颜色+尺寸）
+  - 预处理取 Debayer 原始 RGB 还是白平衡后的 RGB
+
+  FPGA 队友请回复（填写下表）:
+  ┌───────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+  │ stream_id │ 物理接口 │ RTL 通道 │ 像素信号 │ CPU 块   │ 角色     │
+  ├───────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+  │           │          │          │ wb?_*    │ Cam?     │ 俯视/侧面│
+  ├───────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+  │           │          │          │ wb?_*    │ Cam?     │ 俯视/侧面│
+  └───────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+
+================================================================================
+  [G] 颜色面积的统计区域确认
+================================================================================
+
+当前 handbook v2 未明确: red_area / blue_area / yellow_area 统计的是
+  (a) ROI 内全区域
+  (b) bbox 内部（先找到前景 bbox，再在 bbox 内数颜色）
+
+CPU 侧立场: (a) ROI 内全区域就够用。如果 FPGA 选 (b)，需要做两遍扫描
+（第一遍找 bbox，第二遍颜色计数），会增加延迟和资源。建议首版用 (a)。
+
+  FPGA 队友请回复:
+  □ 首版用 (a) ROI 内全区域统计颜色面积
+  □ 用 (b) bbox 内统计 → 请说明 RTL 实现方案
+
+================================================================================
+  [H] bbox 区间语义确认 — 阻塞 top.v 集成
+================================================================================
+
+  2026-07-11 CPU 侧决定: bbox 采用半开区间 [x_min, x_max) × [y_min, y_max)。
+  即 x_max/y_max = 前景像素最大坐标 + 1 (exclusive upper bound)。
+  宽 = x_max - x_min，高 = y_max - y_min，无 ±1。
+  对应接口冻结文档 §2.1，CPU _bbox_area() 已按此实现。
+
+  与 FPGA 执行计划的不一致:
+    FPGA plan §5.3 (line 474) 写: "推荐...bbox 输出实际命中像素的闭区间 min/max"。
+    如果 FPGA 按闭区间实现，CPU 的 bbox_area、fill_ratio、中心点会系统性地
+    与硬件语义差 1 个像素（对 150px 量级 bbox，相对误差 ~0.7% 但不恒定）。
+
+  CPU 侧立场: 半开区间已写入接口冻结文档，CPU 全部测试以半开区间通过。
+  如果 FPGA 必须用闭区间（RTL 实现更简单），需在寄存器桥接层做 +1 转换，
+  或由 FPGA 提前告知并统一改为闭区间（此时 CPU 需要改 _bbox_area 加 +1）。
+
+  FPGA 队友请回复:
+  □ 接受半开区间，FPGA 输出 exclusive max (x_max = last_fg_pixel + 1)
+  □ 必须用闭区间（RTL 原因）→ CPU 改 _bbox_area 加 +1，需提前通知
+  □ 其他: ________
+
+================================================================================
+  [I] 文档合并确认
+================================================================================
+
+当前有三份接口文档:
+  1. register_map.md (v1 单路) — 已过期，与 handbook v2 矛盾
+  2. vision_register_handbook_draft_2026-07-03.md (v2 双路) — 当前基线
+  3. board_io.h — 跟随 v2
+
+CPU 侧建议: 在 register_map.md 顶部加过期声明，以 handbook v2 为唯一真相源。
+当 FPGA 队友确认 [A]-[G] 各项后，统一更新 handbook v2 为 v2.2，
+把 sum/count/status 从"保留区"升级为"已定义"。
+
+  FPGA 队友请回复:
+  □ 同意以 handbook v2 为单一真相源，register_map.md 加过期声明
+  □ 希望另建新文档合并 → 请指定文件名和路径
+
+================================================================================
+  详细讨论参考:
+    final_project/integration/cpu_fpga_preprocess_interface_freeze_20260711.md
+  寄存器基线:
+    final_project/docs/architecture/vision_register_handbook_draft_2026-07-03.md
+  CPU 侧代码:
+    final_project/cpu/app/include/board_io.h
+    final_project/cpu/app/src/board_io.c
+    final_project/cpu/app/include/vision_classifier.h
+    final_project/cpu/app/src/vision_classifier.c
+================================================================================
