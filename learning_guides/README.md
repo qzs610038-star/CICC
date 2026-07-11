@@ -10,6 +10,11 @@
     * [guide_fpga_vision_front.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
     * [guide_cpu_arm_control.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_cpu_arm_control.md)：嵌入式 CPU 控制与通信（面向角色 B）。
     * [guide_system_integration.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_system_integration.md)：机械臂控制调试与项目系统维护更新（面向角色 C）。
+  * [daily_sync/2026-07-10_merge_cpu_fpga_integration/](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-10_merge_cpu_fpga_integration/)：7 月 10 日合并 CPU-FPGA 双系统集成分支时生成的讲解指南。
+    * [guide_fpga_vision_front.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
+    * [guide_cpu_arm_control.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_cpu_arm_control.md)：嵌入式 CPU 控制与通信（面向角色 B）。
+    * [guide_system_integration.md](file:///d:/第十届集创赛-雄芯院材料/learning_guides/daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_system_integration.md)：机械臂控制调试与项目系统维护更新（面向角色 C）。
+
 
 ---
 
