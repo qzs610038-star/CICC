@@ -1,11 +1,11 @@
 {
-    "schema_version": 1,
-    "commit": "efd1bb7f011eeb856edecf50f7c2aee61a359e70",
-    "indexed_at": "2026-07-09T17:02:04Z",
+    "schema_version": 2,
+    "commit": "5dd59fc40584b1e00c66cc48da01e8ce5faf84d6",
+    "indexed_at": "2026-07-11T16:56:30Z",
     "project": "D-cicc_cbm_link",
-    "nodes": 2200,
-    "edges": 4613,
-    "original_size": 6488064,
-    "compressed_size": 936045,
-    "compression_level": 9
+    "nodes": 4376,
+    "edges": 10275,
+    "original_size": 8454144,
+    "compressed_size": 1067181,
+    "compression_level": 3
 }
