@@ -1,6 +1,6 @@
 # codebase-memory-mcp 图谱初始化与刷新指南
 
-> 更新日期: 2026-07-05
+> 更新日期: 2026-07-11
 > 适用项目: `D:\第十届集创赛-雄芯院材料`
 > 工具版本: `codebase-memory-mcp 0.8.1`
 > 本机程序: `D:\codebase-memory-mcp\codebase-memory-mcp.exe`
@@ -12,7 +12,7 @@
 
 ## 1. 当前状态
 
-2026-07-05 本机实测：
+当前已提交共享 artifact（2026-07-09 刷新记录）：
 
 - 仓库真实路径：`D:\第十届集创赛-雄芯院材料`
 - CBM 访问路径：`D:\cicc_cbm_link`
@@ -21,15 +21,17 @@
 - artifact 元数据：`.codebase-memory/artifact.json`
 - artifact 合并策略：`.codebase-memory/.gitattributes`
 - 当前图谱项目：`D-cicc_cbm_link`
-- 当前图谱规模：`967 nodes / 1356 edges`
+- artifact 记录：commit `efd1bb7f011eeb856edecf50f7c2aee61a359e70`、`2200 nodes / 4613 edges`
+- 新鲜度：该 artifact 早于 2026-07-11 合入的 FPGA 预处理结构，不能用于定位 `vision_preprocess_channel` 等新增符号；重要审查仍须回到真实源码。
 
 本轮初始化命令返回：
 
 ```text
 project: D-cicc_cbm_link
-status: indexed
+status: ready
 artifact_present: true
 artifact: .codebase-memory/graph.db.zst
+artifact_commit: efd1bb7
 ```
 
 已确认排除目录包括：
@@ -309,7 +311,7 @@ Agent 使用建议：
 
 - 真实中文路径 `D:/第十届集创赛-雄芯院材料` 直接索引会失败；当前使用 `D:/cicc_cbm_link` junction 作为稳定入口。
 - PowerShell CLI 的 `index_repository` 参数解析不可用；索引动作使用 MCP 工具调用。
-- 2026-07-05 入口文档维护后，MCP 运行态索引可更新到 `969 nodes / 1338 edges`，但本机未实际覆盖 `.codebase-memory/artifact.json` / `graph.db.zst`；共享 artifact 仍以已提交的 `967 nodes / 1356 edges` 为准。遇到这种情况不要声称 artifact 已刷新，应先核对 `artifact.json` 的 `indexed_at` 和节点数。
+- 2026-07-11 维护核查发现：对已存在项目调用 `index_repository(..., mode="fast"/"moderate", persistence=true)` 虽返回 `indexed`，但未更新 `.codebase-memory/artifact.json`、`graph.db.zst`，运行态检索也未出现 7 月 11 日新增预处理模块。遇到这类情况不得声称 artifact 已刷新；必须先核对 `artifact.json` 的 `commit`、`indexed_at`、节点数，以及对新增符号执行一次 `search_graph`。本次尝试删除旧项目以重建时 MCP 返回 `Permission denied`，因此 artifact 刷新仍为 WARN，待图谱服务权限恢复后重建。
 - 图谱主要是文件/目录级，不保证 Verilog module 级语义。
 - `final_project/docs`、`final_project/integration`、`final_project/tools` 当前被 CBM 自动排除；文档审查仍要回到真实 Markdown 和源码。
 
@@ -325,7 +327,8 @@ Agent 使用建议：
 - [x] `.codebase-memory/graph.db.zst` 已生成且非 0 字节。
 - [x] `.codebase-memory/.gitattributes` 已生成，声明 `graph.db.zst merge=ours binary`。
 - [x] Phase 2A 精选资料库图谱已生成到 `.codebase-memory/phase2/`。
-- [ ] 图谱初始化文件已提交并推送。
+- [x] 图谱初始化文件已提交并推送。
+- [ ] 2026-07-11 之后的结构性 RTL/CPU 变更已写入共享 artifact（当前受 MCP 项目删除权限阻塞）。
 
 ---
 

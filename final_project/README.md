@@ -23,6 +23,13 @@ MIPI 摄像头
 - FPGA ROI/统计特征预处理模块的范围、接口、实施阶段和队友交接约束：[fpga_vision_preprocess_execution_plan_20260711.md](docs/technical_plans/fpga_vision_preprocess_execution_plan_20260711.md)。
 - 其他已批准或待执行的技术方案统一从 [technical_plans/README.md](docs/technical_plans/README.md) 进入。
 
+## 当前系统集成状态
+
+- CPU 识别侧的 `board_io`、分类、参数表、任务匹配和主循环代码已落地；当前单测结果以 [CPU_MODULE_PLAN.txt](cpu/CPU_MODULE_PLAN.txt) 的“最新归档”统计为准，尚未完成 RISC-V/板级验证。
+- myCobot 的板上 CPU 协议与控制器已有代码和 mock 测试骨架；正式 UART、接线/电平和动作验证尚未开始，PC `pymycobot` 不进入比赛闭环。
+- CPU/APB/OSD 仍受生成 SoC 产物门禁：当前缺少正式 `soc.h`、APB slave、CDC RTL 和地址分配，见 [生成 SoC 摘要](docs/architecture/generated_soc_summary_2026-07-11.md)。
+- 全项目的当前路线、阻塞和待定决策以根目录 [CURRENT_STATE.md](../CURRENT_STATE.md) 为准。
+
 ## 目录边界
 
 - `fpga/`：Efinity 工程、RTL、IP、约束和仿真。

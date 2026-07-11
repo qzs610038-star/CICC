@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "project": "cicc-tj375-final-project",
+  "last_verified_commit": "218b012f23261991797c133341102692a25089b6",
+  "managed_documents": [
+    {
+      "file": "CURRENT_STATE.md",
+      "role": "mutable_route_and_status",
+      "refresh_on": [
+        "final_project/fpga/rtl/top/top.v",
+        "final_project/fpga/efinity/mem_test.xml",
+        "final_project/cpu/app/src/main.c",
+        "final_project/cpu/app/src/arm_controller.c",
+        "final_project/integration/"
+      ]
+    },
+    {
+      "file": "final_project/cpu/CPU_MODULE_PLAN.txt",
+      "role": "cpu_implementation_and_test_record",
+      "refresh_on": [
+        "final_project/cpu/app/",
+        "final_project/cpu/tests/"
+      ]
+    },
+    {
+      "file": "final_project/integration/register_map.md",
+      "role": "interface_contract_index",
+      "refresh_on": [
+        "final_project/integration/",
+        "final_project/cpu/app/include/board_io.h",
+        "final_project/fpga/rtl/"
+      ]
+    },
+    {
+      "file": "final_project/docs/architecture/current_code_architecture_2026-07-11.md",
+      "role": "current_architecture_snapshot",
+      "refresh_on": [
+        "final_project/fpga/rtl/",
+        "final_project/cpu/app/",
+        "final_project/integration/"
+      ]
+    },
+    {
+      "file": "CBM_CONFIG_GUIDE.md",
+      "role": "shared_graph_operation_guide",
+      "refresh_on": [
+        ".codebase-memory/graph.db.zst",
+        ".codebase-memory/artifact.json",
+        "final_project/fpga/rtl/",
+        "final_project/cpu/app/"
+      ]
+    },
+    {
+      "file": "方案评审/003_Agent协作与交接优化方案/README.md",
+      "role": "maintenance_entrypoint",
+      "refresh_on": [
+        "maintenance_manifest.json",
+        "tools/project_freshness_check.ps1",
+        "tools/agent_handoff_health_check.ps1"
+      ]
+    },
+    {
+      "file": "方案评审/003_Agent协作与交接优化方案/Agent协作与交接优化方案_v1.1_维护闭环.md",
+      "role": "maintenance_workflow_contract",
+      "refresh_on": [
+        "maintenance_manifest.json",
+        "tools/project_freshness_check.ps1",
+        "AGENTS.md",
+        "HANDOFF_TEMPLATE.md"
+      ]
+    }
+  ]
+}

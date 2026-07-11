@@ -1,5 +1,7 @@
 # final_project Current Code Architecture
 
+> 历史快照（2026-07-07）。本文中的“当前”仅表示当日工作树；CPU 代码、ch1 预处理旁路和当前视频故障边界已在 2026-07-09 至 2026-07-11 发生变化。请优先阅读 [current_code_architecture_2026-07-11.md](current_code_architecture_2026-07-11.md) 与根目录 `CURRENT_STATE.md`。
+
 Date: 2026-07-07
 
 Scope: this document describes the current code under `CICC/final_project` only. It is based on a read of the present working tree, mainly:

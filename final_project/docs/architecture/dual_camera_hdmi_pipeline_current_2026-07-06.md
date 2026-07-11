@@ -1,5 +1,7 @@
 # Dual-Camera CSI to HDMI Current Architecture
 
+> 历史调试快照（2026-07-06）。当前视频故障边界、ch1 I2C/CSI 诊断与下一步以 [video_link_current_state_20260711.md](../debug_sessions/video_link_current_state_20260711.md) 为准；不要将本文的 LED/链路结论当作最新上板状态。
+
 Date: 2026-07-06
 
 Scope: current `final_project/fpga` RTL, as read from the working tree. This is a debug-oriented summary of the existing dual-camera path to HDMI. It does not describe the older DSI display path except where it affects reset or tie-off behavior.

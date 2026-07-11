@@ -7,6 +7,12 @@
 - `params/`：阈值、标定、点位和任务配置。
 - `build_tools/`：Windows 批处理、部署脚本和旧工程迁移基线。
 
+## 当前实现与边界
+
+- `app/` 中已包含 `board_io`、`vision_classifier`、`param_table`、`task_matcher`、`mycobot_protocol`、`arm_controller` 与识别主循环；具体代码/测试记录见 [CPU_MODULE_PLAN.txt](CPU_MODULE_PLAN.txt)。
+- 当前完成度是“源码与 mock/host 测试层”。`soc.h`、正式 APB 基址、RISC-V 交叉构建、FPGA CDC/OSD 和板级验证仍未完成。
+- `TARGET_SEL`、`LIVE_FG_AREA`、参数持久化和机械臂 UART 接线均未定版；不得将草案地址或 PC 脚本用于正式控制闭环。
+
 ## 官方 RISC-V 例程吸收点
 
 参考目录：`赛方提供材料/例程/RISC-V例程`。
@@ -15,4 +21,4 @@
 - `03_SD_test/.../ip/gDMA/.../embedded_sw/soc_dma_exp_0/`：参考 `EfxAxi4Example`、`EfxApb3Example`、`dCacheFlushDemo`，用于 CPU 访问自定义 FPGA 逻辑和共享 DDR cache 风险验证。
 - eMMC/SD 操作说明只吸收流程：先下载 FPGA bitstream，再导入/构建 CPU makefile project，进入 debug，打开串口终端运行。
 
-当前 `app/include/bsp.h` 和 `app/linker/linker.ld` 是占位骨架。正式接入 SoC 后必须用最终工程生成物校正 UART、CLINT、PLIC、AXI/APB user window、DDR base/size 和工具链前缀。
+当前 `app/include/bsp.h` 和 `app/linker/linker.ld` 仍依赖占位 SoC 信息。正式接入 SoC 后必须用最终工程生成物校正 UART、CLINT、PLIC、AXI/APB user window、DDR base/size 和工具链前缀。

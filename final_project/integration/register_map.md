@@ -1,6 +1,8 @@
 # Register Map
 
-本表是决赛第一版 FPGA/CPU 寄存器窗口草案。实际基址必须来自最终 Efinity SoC 生成的 `soc.h`，例如官方示例中的 `SYSTEM_AXI_A_BMB` 或 `IO_APB_SLAVE_0_INPUT`，不要硬抄这里的占位地址。
+> 状态：接口草案，未冻结、未接入 RTL、未分配正式 SoC 地址。
+>
+> 实际基址必须来自最终 Efinity SoC 生成的 `soc.h`，例如官方示例中的 `SYSTEM_AXI_A_BMB` 或 `IO_APB_SLAVE_0_INPUT`，不要硬抄这里的占位地址。预处理快照、配置提交和 CPU-to-OSD 的最新语义见 [preprocess_apb_cdc_contract_draft_20260711.md](preprocess_apb_cdc_contract_draft_20260711.md)；该草案同样不分配地址。
 
 ## 地址窗口
 
@@ -40,3 +42,9 @@
 - CPU 完成分类后先写 `REG_RESULT_*`，最后写 `REG_FEATURE_ACK=REG_FRAME_ID`。
 - OSD 只显示 CPU 已写完的一组结果，避免半更新字段上屏。
 - 若后续启用共享 DDR ROI，寄存器中只放 ROI buffer 地址、长度和帧号；cache invalidate/flush 由 CPU 侧显式执行。
+
+## 未决项与冻结条件
+
+- `TARGET_SEL` 的建议偏移 `0x006C` 以及 `LIVE_FG_AREA` 的建议偏移（Cam0 `0x00B0`、Cam1 `0x01B0`）均为 CPU 侧建议占位，尚未写入本表，也不是硬件事实。
+- 必须在生成 `soc.h`、确认 APB 从机/时钟复位、完成 FPGA-CPU Review Packet 后，才能冻结偏移并同步到 CPU 头文件、RTL 常量和本文档。
+- 冻结前不得用本表直接驱动板级软件或机械臂动作。
