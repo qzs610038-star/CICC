@@ -1,4 +1,4 @@
-<efx:project xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="mem_test" description="" last_change="1783328385" sw_version="2025.2.288.4.15" last_run_state="pass" last_run_flow="syn" config_result_in_sync="sync" design_ood="sync" place_ood="sync" route_ood="sync" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
+<efx:project xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="mem_test" description="" last_change="1783758019" sw_version="2025.2.288.4.15" last_run_state="pass" last_run_flow="syn" config_result_in_sync="sync" design_ood="sync" place_ood="sync" route_ood="sync" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
     <efx:device_info>
         <efx:family name="Titanium" />
         <efx:device name="TJ375N529" />
@@ -39,6 +39,12 @@
         <efx:design_file name="../rtl/debayer/raw_to_rgb.v" version="default" library="default" />
         <efx:design_file name="../rtl/debayer/line_buffer.v" version="default" library="default" />
         <efx:design_file name="../rtl/debayer/rgb_gain.v" version="default" library="default" />
+        <efx:design_file name="../rtl/roi_crop/vision_stream_adapter_2ppc.v" version="default" library="default" />
+        <efx:design_file name="../rtl/roi_crop/roi_window_2ppc.v" version="default" library="default" />
+        <efx:design_file name="../rtl/feature_extract/pixel_mask_2ppc.v" version="default" library="default" />
+        <efx:design_file name="../rtl/feature_extract/feature_accumulator_2ppc.v" version="default" library="default" />
+        <efx:design_file name="../rtl/feature_extract/feature_snapshot.v" version="default" library="default" />
+        <efx:design_file name="../rtl/feature_extract/vision_preprocess_channel.v" version="default" library="default" />
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/timescale.v" version="default" library="default" />
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/i2c_master_defines.v" version="default" library="default" />
         <efx:design_file name="../rtl/framebuffer/elt_dcfifo_v10.v" version="default" library="default" />

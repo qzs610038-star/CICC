@@ -878,6 +878,10 @@ wire ch0_dbg_i2c_status_rxack_devaddr_seen;
 wire ch0_dbg_i2c_status_rxack_reg_high_seen;
 wire ch0_dbg_i2c_status_rxack_reg_low_seen;
 wire ch0_dbg_i2c_status_rxack_data_seen;
+wire ch0_dbg_stream_on_rxack_devaddr_seen;
+wire ch0_dbg_stream_on_rxack_reg_high_seen;
+wire ch0_dbg_stream_on_rxack_reg_low_seen;
+wire ch0_dbg_stream_on_rxack_data_seen;
 wire [7:0] ch0_dbg_i2c_last_status;
 wire ch1_dbg_reset_pixel_n;
 wire ch1_dbg_i2c_rst_n;
@@ -925,6 +929,7 @@ reg ch0_i2c_sda_edge_seen = 1'b0;
 reg ch0_i2c_scl_low_seen = 1'b0;
 reg ch0_i2c_sda_low_seen = 1'b0;
 reg ch0_i2c_sda_oe_seen = 1'b0;
+reg ch0_i2c_external_sda_low_seen = 1'b0;
 reg [1:0] ch1_i2c_scl_sync = 2'b11;
 reg [1:0] ch1_i2c_sda_sync = 2'b11;
 reg ch1_i2c_scl_edge_seen = 1'b0;
@@ -950,6 +955,13 @@ reg [31:0] ch0_mipi_hs_sample = 32'd0;
 reg ch0_mipi_hs_sample_valid = 1'b0;
 reg ch0_mipi_hs_data_seen = 1'b0;
 reg ch0_mipi_hs_term_seen = 1'b0;
+reg [1:0] ch0_stream_done_pixel_sync = 2'b00;
+reg ch0_clk_lp01_after_stream_seen = 1'b0;
+reg ch0_clk_lp00_after_stream_seen = 1'b0;
+reg ch0_data0_lp01_after_stream_seen = 1'b0;
+reg ch0_data0_lp00_after_stream_seen = 1'b0;
+reg ch0_hs_after_stream_seen = 1'b0;
+reg ch0_byte_fifo_after_stream_seen = 1'b0;
 reg ch0_i2c_wr_en_seen = 1'b0;
 reg ch0_i2c_wr_done_seen = 1'b0;
 reg ch0_i2c_init_done_seen = 1'b0;
@@ -971,8 +983,24 @@ reg ch0_i2c_stream_on_seen_mipi_latch = 1'b0;
 reg ch0_i2c_stream_on_done_mipi_latch = 1'b0;
 reg ch0_i2c_status_rxack_mipi_latch = 1'b0;
 reg ch0_i2c_status_al_mipi_latch = 1'b0;
+reg ch0_stream_on_rxack_devaddr_mipi_latch = 1'b0;
+reg ch0_stream_on_rxack_reg_high_mipi_latch = 1'b0;
+reg ch0_stream_on_rxack_reg_low_mipi_latch = 1'b0;
+reg ch0_stream_on_rxack_data_mipi_latch = 1'b0;
 reg [1:0] ch0_i2c_stream_on_clean_sync = 2'b00;
 reg [1:0] ch0_i2c_stream_on_error_sync = 2'b00;
+reg ch1_mipi_byteclk_alive = 1'b0;
+reg ch1_mipi_fifo_activity_byteclk_seen = 1'b0;
+reg [1:0] ch1_mipi_byteclk_alive_sync = 2'b00;
+reg [1:0] ch1_mipi_fifo_activity_sync = 2'b00;
+reg [1:0] ch1_stream_done_pixel_sync = 2'b00;
+reg [1:0] ch1_mipi_clk_lp_sample = 2'b11;
+reg [1:0] ch1_mipi_data0_lp_sample = 2'b11;
+reg ch1_mipi_lp_sample_valid = 1'b0;
+reg ch1_mipi_lp_transition_after_stream_seen = 1'b0;
+reg ch1_mipi_hs_after_stream_seen = 1'b0;
+reg ch1_mipi_byteclk_after_stream_seen = 1'b0;
+reg ch1_mipi_fifo_after_stream_seen = 1'b0;
 
 assign ch0_raw8_4pix = raw10_4pix_to_raw8_4pix(rx_out_data[39:0]);
 assign ch1_raw8_4pix = raw10_4pix_to_raw8_4pix(rx_out_data1[39:0]);
@@ -1024,6 +1052,7 @@ always @(posedge mipi_clk or negedge arst_n) begin
         ch0_i2c_scl_low_seen  <= 1'b0;
         ch0_i2c_sda_low_seen  <= 1'b0;
         ch0_i2c_sda_oe_seen   <= 1'b0;
+        ch0_i2c_external_sda_low_seen <= 1'b0;
         ch1_i2c_scl_sync      <= 2'b11;
         ch1_i2c_sda_sync      <= 2'b11;
         ch1_i2c_scl_edge_seen <= 1'b0;
@@ -1042,6 +1071,10 @@ always @(posedge mipi_clk or negedge arst_n) begin
         ch0_i2c_stream_on_done_mipi_latch <= 1'b0;
         ch0_i2c_status_rxack_mipi_latch <= 1'b0;
         ch0_i2c_status_al_mipi_latch <= 1'b0;
+        ch0_stream_on_rxack_devaddr_mipi_latch <= 1'b0;
+        ch0_stream_on_rxack_reg_high_mipi_latch <= 1'b0;
+        ch0_stream_on_rxack_reg_low_mipi_latch <= 1'b0;
+        ch0_stream_on_rxack_data_mipi_latch <= 1'b0;
     end else begin
         ch0_i2c_scl_sync <= {ch0_i2c_scl_sync[0], S0_io_cam_scl_IN};
         ch0_i2c_sda_sync <= {ch0_i2c_sda_sync[0], S0_io_cam_sda_IN};
@@ -1055,6 +1088,10 @@ always @(posedge mipi_clk or negedge arst_n) begin
             ch0_i2c_sda_low_seen <= 1'b1;
         if (S0_io_cam_sda_OE)
             ch0_i2c_sda_oe_seen <= 1'b1;
+        // With output disabled and SCL high, a low SDA is driven externally;
+        // during a write this is the closest passive indication of sensor ACK.
+        if (!S0_io_cam_sda_OE && S0_io_cam_scl_IN && !S0_io_cam_sda_IN)
+            ch0_i2c_external_sda_low_seen <= 1'b1;
         ch1_i2c_scl_sync <= {ch1_i2c_scl_sync[0], S1_io_cam_scl_IN};
         ch1_i2c_sda_sync <= {ch1_i2c_sda_sync[0], S1_io_cam_sda_IN};
         if (ch1_i2c_scl_sync[1] ^ ch1_i2c_scl_sync[0])
@@ -1089,6 +1126,14 @@ always @(posedge mipi_clk or negedge arst_n) begin
             ch0_i2c_status_rxack_mipi_latch <= 1'b1;
         if (ch0_dbg_i2c_status_al_seen)
             ch0_i2c_status_al_mipi_latch <= 1'b1;
+        if (ch0_dbg_stream_on_rxack_devaddr_seen)
+            ch0_stream_on_rxack_devaddr_mipi_latch <= 1'b1;
+        if (ch0_dbg_stream_on_rxack_reg_high_seen)
+            ch0_stream_on_rxack_reg_high_mipi_latch <= 1'b1;
+        if (ch0_dbg_stream_on_rxack_reg_low_seen)
+            ch0_stream_on_rxack_reg_low_mipi_latch <= 1'b1;
+        if (ch0_dbg_stream_on_rxack_data_seen)
+            ch0_stream_on_rxack_data_mipi_latch <= 1'b1;
     end
 end
 
@@ -1097,6 +1142,63 @@ always @(posedge mipi_rx_ck0_CLKOUT or negedge arst_n) begin
         ch0_mipi_byteclk_toggle <= 1'b0;
     else
         ch0_mipi_byteclk_toggle <= ~ch0_mipi_byteclk_toggle;
+end
+
+// Ch1 physical receive probes are passive and do not feed the video path.
+// A byte-clock-domain latch avoids losing a fast clock or FIFO pulse when the
+// event is observed later in the slower pixel clock domain.
+always @(posedge mipi_rx_ck1_CLKOUT or negedge arst_n) begin
+    if (!arst_n) begin
+        ch1_mipi_byteclk_alive <= 1'b0;
+        ch1_mipi_fifo_activity_byteclk_seen <= 1'b0;
+    end else begin
+        ch1_mipi_byteclk_alive <= 1'b1;
+        if (~mipi_rx_dp10_FIFO_EMPTY | ~mipi_rx_dp11_FIFO_EMPTY |
+            ~mipi_rx_dp12_FIFO_EMPTY | ~mipi_rx_dp13_FIFO_EMPTY |
+            mipi_rx_dp10_FIFO_RD | mipi_rx_dp11_FIFO_RD |
+            mipi_rx_dp12_FIFO_RD | mipi_rx_dp13_FIFO_RD)
+            ch1_mipi_fifo_activity_byteclk_seen <= 1'b1;
+    end
+end
+
+always @(posedge i_sysclk_div2 or negedge arst_n) begin
+    if (!arst_n) begin
+        ch1_mipi_byteclk_alive_sync <= 2'b00;
+        ch1_mipi_fifo_activity_sync <= 2'b00;
+        ch1_stream_done_pixel_sync <= 2'b00;
+        ch1_mipi_clk_lp_sample <= 2'b11;
+        ch1_mipi_data0_lp_sample <= 2'b11;
+        ch1_mipi_lp_sample_valid <= 1'b0;
+        ch1_mipi_lp_transition_after_stream_seen <= 1'b0;
+        ch1_mipi_hs_after_stream_seen <= 1'b0;
+        ch1_mipi_byteclk_after_stream_seen <= 1'b0;
+        ch1_mipi_fifo_after_stream_seen <= 1'b0;
+    end else begin
+        ch1_mipi_byteclk_alive_sync <= {ch1_mipi_byteclk_alive_sync[0], ch1_mipi_byteclk_alive};
+        ch1_mipi_fifo_activity_sync <= {ch1_mipi_fifo_activity_sync[0], ch1_mipi_fifo_activity_byteclk_seen};
+        ch1_stream_done_pixel_sync <= {ch1_stream_done_pixel_sync[0], ch1_dbg_i2c_stream_on_done};
+
+        if (ch1_stream_done_pixel_sync[1]) begin
+            if (ch1_mipi_lp_sample_valid &&
+                (({mipi_rx_ck1_LP_P_IN, mipi_rx_ck1_LP_N_IN} != ch1_mipi_clk_lp_sample) ||
+                 ({mipi_rx_dp10_LP_P_IN, mipi_rx_dp10_LP_N_IN} != ch1_mipi_data0_lp_sample)))
+                ch1_mipi_lp_transition_after_stream_seen <= 1'b1;
+            if (mipi_rx_ck1_HS_ENA | mipi_rx_ck1_HS_TERM |
+                mipi_rx_dp10_HS_ENA | mipi_rx_dp11_HS_ENA |
+                mipi_rx_dp12_HS_ENA | mipi_rx_dp13_HS_ENA |
+                mipi_rx_dp10_HS_TERM | mipi_rx_dp11_HS_TERM |
+                mipi_rx_dp12_HS_TERM | mipi_rx_dp13_HS_TERM)
+                ch1_mipi_hs_after_stream_seen <= 1'b1;
+            if (ch1_mipi_byteclk_alive_sync[1])
+                ch1_mipi_byteclk_after_stream_seen <= 1'b1;
+            if (ch1_mipi_fifo_activity_sync[1])
+                ch1_mipi_fifo_after_stream_seen <= 1'b1;
+        end
+
+        ch1_mipi_clk_lp_sample <= {mipi_rx_ck1_LP_P_IN, mipi_rx_ck1_LP_N_IN};
+        ch1_mipi_data0_lp_sample <= {mipi_rx_dp10_LP_P_IN, mipi_rx_dp10_LP_N_IN};
+        ch1_mipi_lp_sample_valid <= 1'b1;
+    end
 end
 
 always @(posedge i_sysclk_div2 or negedge arst_n) begin
@@ -1118,6 +1220,13 @@ always @(posedge i_sysclk_div2 or negedge arst_n) begin
         ch0_mipi_hs_sample_valid   <= 1'b0;
         ch0_mipi_hs_data_seen      <= 1'b0;
         ch0_mipi_hs_term_seen      <= 1'b0;
+        ch0_stream_done_pixel_sync <= 2'b00;
+        ch0_clk_lp01_after_stream_seen <= 1'b0;
+        ch0_clk_lp00_after_stream_seen <= 1'b0;
+        ch0_data0_lp01_after_stream_seen <= 1'b0;
+        ch0_data0_lp00_after_stream_seen <= 1'b0;
+        ch0_hs_after_stream_seen <= 1'b0;
+        ch0_byte_fifo_after_stream_seen <= 1'b0;
         ch0_i2c_stream_on_clean_sync <= 2'b00;
         ch0_i2c_stream_on_error_sync <= 2'b00;
         ch0_i2c_wr_en_seen         <= 1'b0;
@@ -1133,6 +1242,7 @@ always @(posedge i_sysclk_div2 or negedge arst_n) begin
     end else begin
         ch0_i2c_stream_on_clean_sync <= {ch0_i2c_stream_on_clean_sync[0], ch0_i2c_stream_on_clean_mipi_latch};
         ch0_i2c_stream_on_error_sync <= {ch0_i2c_stream_on_error_sync[0], ch0_i2c_stream_on_error_mipi_latch};
+        ch0_stream_done_pixel_sync <= {ch0_stream_done_pixel_sync[0], ch0_i2c_stream_on_done_mipi_latch};
         ch0_mipi_byteclk_toggle_sync <= {ch0_mipi_byteclk_toggle_sync[1:0], ch0_mipi_byteclk_toggle};
         if (ch0_mipi_byteclk_toggle_sync[2] ^ ch0_mipi_byteclk_toggle_sync[1])
             ch0_mipi_byteclk_seen <= 1'b1;
@@ -1170,6 +1280,29 @@ always @(posedge i_sysclk_div2 or negedge arst_n) begin
             ch0_mipi_fifo_nonempty_seen <= 1'b1;
         if (mipi_rx_dp00_FIFO_RD | mipi_rx_dp01_FIFO_RD | mipi_rx_dp02_FIFO_RD | mipi_rx_dp03_FIFO_RD)
             ch0_mipi_fifo_rd_seen <= 1'b1;
+        if (ch0_stream_done_pixel_sync[1]) begin
+            if ({mipi_rx_ck0_LP_P_IN, mipi_rx_ck0_LP_N_IN} == 2'b01)
+                ch0_clk_lp01_after_stream_seen <= 1'b1;
+            if ({mipi_rx_ck0_LP_P_IN, mipi_rx_ck0_LP_N_IN} == 2'b00)
+                ch0_clk_lp00_after_stream_seen <= 1'b1;
+            if ({mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN} == 2'b01)
+                ch0_data0_lp01_after_stream_seen <= 1'b1;
+            if ({mipi_rx_dp00_LP_P_IN, mipi_rx_dp00_LP_N_IN} == 2'b00)
+                ch0_data0_lp00_after_stream_seen <= 1'b1;
+            if (mipi_rx_ck0_HS_ENA |
+                mipi_rx_dp00_HS_ENA | mipi_rx_dp01_HS_ENA |
+                mipi_rx_dp02_HS_ENA | mipi_rx_dp03_HS_ENA |
+                mipi_rx_ck0_HS_TERM |
+                mipi_rx_dp00_HS_TERM | mipi_rx_dp01_HS_TERM |
+                mipi_rx_dp02_HS_TERM | mipi_rx_dp03_HS_TERM)
+                ch0_hs_after_stream_seen <= 1'b1;
+            if ((ch0_mipi_byteclk_toggle_sync[2] ^ ch0_mipi_byteclk_toggle_sync[1]) |
+                ~mipi_rx_dp00_FIFO_EMPTY | ~mipi_rx_dp01_FIFO_EMPTY |
+                ~mipi_rx_dp02_FIFO_EMPTY | ~mipi_rx_dp03_FIFO_EMPTY |
+                mipi_rx_dp00_FIFO_RD | mipi_rx_dp01_FIFO_RD |
+                mipi_rx_dp02_FIFO_RD | mipi_rx_dp03_FIFO_RD)
+                ch0_byte_fifo_after_stream_seen <= 1'b1;
+        end
         if (ch0_dbg_i2c_wr_en)
             ch0_i2c_wr_en_seen <= 1'b1;
         if (ch0_dbg_i2c_wr_done)
@@ -1275,6 +1408,10 @@ end
     .dbg_i2c_status_rxack_reg_high_seen(ch0_dbg_i2c_status_rxack_reg_high_seen),
     .dbg_i2c_status_rxack_reg_low_seen(ch0_dbg_i2c_status_rxack_reg_low_seen),
     .dbg_i2c_status_rxack_data_seen(ch0_dbg_i2c_status_rxack_data_seen),
+    .dbg_stream_on_rxack_devaddr_seen(ch0_dbg_stream_on_rxack_devaddr_seen),
+    .dbg_stream_on_rxack_reg_high_seen(ch0_dbg_stream_on_rxack_reg_high_seen),
+    .dbg_stream_on_rxack_reg_low_seen(ch0_dbg_stream_on_rxack_reg_low_seen),
+    .dbg_stream_on_rxack_data_seen(ch0_dbg_stream_on_rxack_data_seen),
     .dbg_i2c_last_status        (   ch0_dbg_i2c_last_status    )
   );
 
@@ -1610,8 +1747,8 @@ frame_buffer #(
 /*i*/.i_clk			(i_sysclk_div2      ),
 /*i*/.i_vs			(rx_out_vs1	),
 /*i*/.i_hs			(rx_out_hs1	),
-/*i*/.i_de			(1'b0               ),
-/*i*/.vin 			(32'd0              ),
+/*i*/.i_de			(rx_out_de1 	),
+/*i*/.vin 			(ch1_raw8_4pix	),
 
 /*i*/.o_clk       (i_sysclk_div2  ) ,
 /*i*/.o_hs    		(ch1_hs	    ),			
@@ -1947,6 +2084,65 @@ end
       .rgb_datax2_o   (rgb1_datax2     )//b,g,r,b,g,r
   );
 
+  // Ch1-only preprocessing tap. These retained snapshot wires are a
+  // non-intrusive pixel-domain debug anchor; they do not drive any board I/O.
+  (* mark_debug = "true" *) wire        preprocess_ch1_snapshot_valid;
+  (* mark_debug = "true" *) wire [15:0] preprocess_ch1_frame_id;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_roi_pixel_count;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_red_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_blue_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_yellow_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_fg_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_bbox_min;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_bbox_max;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_center;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_status;
+
+  (* keep_hierarchy = "TRUE" *) vision_preprocess_channel u_preprocess_ch1_tap (
+      .i_clk                 (i_sysclk_div2),
+      .i_rst_n               (pixel_data_en),
+      .i_vs                  (rgb1_vs),
+      .i_hs                  (rgb1_hs),
+      .i_de                  (rgb1_de),
+      .i_valid               (rgb1_valid),
+      .i_rgb_2ppc            (rgb1_datax2),
+      .i_cfg_enable          (1'b1),
+      .i_cfg_roi_x0          (16'd0),
+      .i_cfg_roi_y0          (16'd0),
+      .i_cfg_roi_x1          (16'hffff),
+      .i_cfg_roi_y1          (16'hffff),
+      .i_cfg_bg_r            (8'd0),
+      .i_cfg_bg_g            (8'd0),
+      .i_cfg_bg_b            (8'd0),
+      .i_cfg_fg_diff_min     (8'd1),
+      .i_cfg_luma_min        (10'd0),
+      .i_cfg_luma_max        (10'd1023),
+      .i_cfg_red_rg_min      (8'd32),
+      .i_cfg_red_rb_min      (8'd32),
+      .i_cfg_blue_bg_min     (8'd32),
+      .i_cfg_blue_br_min     (8'd32),
+      .i_cfg_yel_rb_min      (8'd32),
+      .i_cfg_yel_gb_min      (8'd32),
+      .i_cfg_yel_rg_delta_max(8'd32),
+      .i_snapshot_ack        (1'b1),
+      .o_snapshot_valid      (preprocess_ch1_snapshot_valid),
+      .o_frame_id            (preprocess_ch1_frame_id),
+      .o_roi_pixel_count     (preprocess_ch1_roi_pixel_count),
+      .o_sum_r               (),
+      .o_sum_g               (),
+      .o_sum_b               (),
+      .o_sum_y               (),
+      .o_red_area            (preprocess_ch1_red_area),
+      .o_blue_area           (preprocess_ch1_blue_area),
+      .o_yellow_area         (preprocess_ch1_yellow_area),
+      .o_fg_area             (preprocess_ch1_fg_area),
+      .o_bbox_min            (preprocess_ch1_bbox_min),
+      .o_bbox_max            (preprocess_ch1_bbox_max),
+      .o_center              (preprocess_ch1_center),
+      .o_status              (preprocess_ch1_status),
+      .o_dropped_frames      ()
+  );
+
 //============================================================================= 
 //mipi dsi
 //=============================================================================
@@ -1979,8 +2175,10 @@ wire            hdmi0_vs_out   = HDMI_RAW_GRAY_BYPASS ? ch0_vs :
                                  (HDMI_BYPASS_WHITE_BALANCE ? rgb_vs : wb0_vs_out);
 wire            hdmi0_de_out   = HDMI_RAW_GRAY_BYPASS ? ch0_de :
                                  (HDMI_BYPASS_WHITE_BALANCE ? rgb_de : wb0_de_out);
+// Match the vendor HDMI bypass path: send debayer's packed 2-pixel output
+// directly when white balance is bypassed.
 wire [47:0]     hdmi0_data_out = HDMI_RAW_GRAY_BYPASS ? ch0_gray_data_rgb :
-                                 (HDMI_BYPASS_WHITE_BALANCE ? rgb0_data_rgb : wb0_data_out);
+                                 (HDMI_BYPASS_WHITE_BALANCE ? rgb_datax2 : wb0_data_out);
 wire            hdmi1_hs_out   = HDMI_RAW_GRAY_BYPASS ? ch1_hs :
                                  (HDMI_BYPASS_WHITE_BALANCE ? rgb1_hs : wb1_hs_out);
 wire            hdmi1_vs_out   = HDMI_RAW_GRAY_BYPASS ? ch1_vs :
@@ -1988,7 +2186,7 @@ wire            hdmi1_vs_out   = HDMI_RAW_GRAY_BYPASS ? ch1_vs :
 wire            hdmi1_de_out   = HDMI_RAW_GRAY_BYPASS ? ch1_de :
                                  (HDMI_BYPASS_WHITE_BALANCE ? rgb1_de : wb1_de_out);
 wire [47:0]     hdmi1_data_out = HDMI_RAW_GRAY_BYPASS ? ch1_gray_data_rgb :
-                                 (HDMI_BYPASS_WHITE_BALANCE ? rgb1_data_rgb : wb1_data_out);
+                                 (HDMI_BYPASS_WHITE_BALANCE ? rgb1_datax2 : wb1_data_out);
 white_balance u0_white_balance (
     .clk            (i_sysclk_div2),
     .rst_n          (pixel_data_en      ),
@@ -2239,20 +2437,22 @@ assign mipi_tx_dp13_RST      = 1'b1;
           sw4_cnt      <= 20'd0;
           sw4_stable   <= 1'b1;
           sw4_stable_r <= 1'b1;
-          channel_sel  <= 1'b0;
+          channel_sel  <= 1'b1;
           channel_sel_toggle <= 1'b0;
       end else begin
           channel_sel_toggle <= 1'b0;
           sw4_sync <= {sw4_sync[0], i_sw[1]};
-          // ~7.5ms debounce @ 140MHz hdmi_tx_slow_clk
-          if (sw4_sync[1] != sw4_stable) begin
+          // Accept a new level only after ~7.5 ms stable at 140 MHz.
+          if (sw4_sync[1] == sw4_stable) begin
+              sw4_cnt <= 20'd0;
+          end else if (&sw4_cnt) begin
               sw4_cnt    <= 20'd0;
               sw4_stable <= sw4_sync[1];
-          end else if (!sw4_cnt[19]) begin
+          end else begin
               sw4_cnt <= sw4_cnt + 1'b1;
           end
-          // falling-edge toggle on stable low
           sw4_stable_r <= sw4_stable;
+          // SW4 is a momentary button: toggle channels on each stable press.
           if (sw4_stable_r && !sw4_stable) begin
               channel_sel <= ~channel_sel;
               channel_sel_toggle <= 1'b1;
@@ -2279,16 +2479,30 @@ assign mipi_tx_dp13_RST      = 1'b1;
           ch0_csi_format_ok_cdc <= {ch0_csi_format_ok_cdc[0], ch0_csi_format_ok};
           ch1_csi_format_ok_cdc <= {ch1_csi_format_ok_cdc[0], ch1_csi_format_ok};
 
-          hdmi_video_ready_sync <= channel_sel_toggle ? 2'b00 :
-              {hdmi_video_ready_sync[0], selected_frame_ok_hdmi & selected_bridge_active & ~selected_bridge_underflow};
+          if (channel_sel_toggle) begin
+              // Do not carry the previous channel's ready/data history across.
+              rgb_vs_r   <= 1'b0;
+              rgb_hs_r   <= 1'b0;
+              rgb_de_r   <= 1'b0;
+              rgb_datax1 <= 24'd0;
+              selected_hdmi_data_d <= 24'd0;
+              selected_bridge_data_change_seen <= 1'b0;
+              hdmi_video_ready_sync <= 2'b00;
+          end else begin
+              // Once selected-channel CDC traffic appears, keep HDMI on input.
+              // Do not let transient diagnostics force fallback bars.
+              if (selected_bridge_active &
+                  (selected_hdmi_de | selected_bridge_data_change_seen))
+                  hdmi_video_ready_sync <= 2'b11;
 
-          rgb_vs_r   <= selected_hdmi_vs;
-          rgb_hs_r   <= selected_hdmi_hs;
-          rgb_de_r   <= selected_hdmi_de;
-          rgb_datax1 <= selected_hdmi_de ? selected_hdmi_data : 24'd0;
-          selected_hdmi_data_d <= selected_hdmi_data;
-          if (selected_hdmi_de && (selected_hdmi_data != selected_hdmi_data_d))
-              selected_bridge_data_change_seen <= 1'b1;
+              rgb_vs_r   <= selected_hdmi_vs;
+              rgb_hs_r   <= selected_hdmi_hs;
+              rgb_de_r   <= selected_hdmi_de;
+              rgb_datax1 <= selected_hdmi_de ? selected_hdmi_data : 24'd0;
+              selected_hdmi_data_d <= selected_hdmi_data;
+              if (selected_hdmi_de && (selected_hdmi_data != selected_hdmi_data_d))
+                  selected_bridge_data_change_seen <= 1'b1;
+          end
       end
   end
 
@@ -2307,23 +2521,21 @@ assign selected_csi_format_ok = channel_sel ? ch1_csi_format_ok_cdc[1] : ch0_csi
 assign selected_frame_ok_hdmi = selected_frame_ready_cdc[2] & ~selected_fifo_underflow_cdc[1];
 assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   //===================================================================
-  // HDMI stripe debug LED map, 2026-07-09 direct I2C stream-on split:
+  // Ch1 stream-to-MIPI segmented recovery map.
   //   LED18 led[0] (B2)  = DDR configured
-  //   LED19 led[1] (E3)  = ch0 selected (~channel_sel)
+  //   LED19 led[1] (E3)  = ch1 selected (channel_sel)
   //   LED20 led[2] (F3)  = global reset released (arst_n)
-  //   LED21 led[3] (F2)  = ch0 reset_pixel_n released
-  //   LED22 dbg_ddr_ok (G2)        = ch0 i2c_rst_n released
-  //   LED23 dbg_fb0_ready (K6)     = ch0 I2C init_done seen
-  //   LED24 dbg_fb0_underflow (J3) = ch0 any I2C wr_en seen
-  //   LED25 dbg_csi_fmt_ok (L6)    = ch0 any I2C wr_done seen
-  //   LED26 dbg_bridge_active (K4) = ch0 I2C cfg_done reached
-  //   LED27 dbg_bridge_under (K3)  = ch0 stream-on index reached
-  //   LED28 dbg_video_ready (M5)   = ch0 stream-on write launched (0100=01)
-  //   LED29 dbg_input_stable (M6)  = ch0 stream-on write done
-  //   LED30 dbg_led30 (N7)         = ch0 stream-on completed cleanly
-  //   LED31 dbg_led31 (P7)         = BAD: ch0 stream-on write completed with error
-  //   LED32 dbg_led32 (P6)         = BAD: ch0 aggregate I2C RXACK seen
-  //   LED33 dbg_led33 (R6)         = BAD: ch0 aggregate I2C arbitration lost seen
+  //   LED21 led[3] (F2)            = ch1 I2C post-reset delay complete
+  //   LED22 dbg_ddr_ok (G2)        = ch1 stream-on transaction completed
+  //   LED23 dbg_fb0_ready (K6)     = ch1 0x0100 read completed
+  //   LED24 dbg_fb0_underflow (J3) = ch1 0x0100 readback bit 0 is set
+  //   LED25/26                     = ch1 current clock-lane LP_P / LP_N
+  //   LED27/28                     = ch1 current data0-lane LP_P / LP_N
+  //   LED29                        = ch1 LP transition observed after stream-on
+  //   LED30                        = ch1 HS enable/termination observed after stream-on
+  //   LED31                        = ch1 byte clock observed after stream-on
+  //   LED32                        = ch1 receive FIFO activity observed after stream-on
+  //   LED33                        = ch1 parsed CSI DE observed
   //===================================================================
 
   // Bring ch0 signals into hdmi_tx_slow_clk domain with 2-stage sync.
@@ -2540,25 +2752,25 @@ assign ch0_dbg_any_write_start = ch0_dbg_wr_start_seen | ch0_dbg_awvalid_seen;
   end
 
   assign led[0]             = ddr_cfg_ok_sync[1];             // LED18
-  assign led[1]             = ~channel_sel;                   // LED19
+  assign led[1]             = channel_sel;                    // LED19
   assign led[2]             = arst_n;                         // LED20
-  assign led[3]             = ch0_dbg_reset_pixel_n;          // LED21
-  assign dbg_ddr_ok         = ch0_dbg_i2c_rst_n;              // LED22
-  assign dbg_fb0_ready      = ch0_i2c_init_done_mipi_latch;   // LED23
-  assign dbg_fb0_underflow  = ch0_i2c_wr_en_mipi_latch;       // LED24
-  assign dbg_csi_fmt_ok     = ch0_i2c_wr_done_mipi_latch;     // LED25
-  assign dbg_bridge_active  = ch0_i2c_cfg_done_mipi_latch;    // LED26
-  assign dbg_bridge_under   = ch0_i2c_stream_on_index_reached_mipi_latch; // LED27
-  assign dbg_video_ready    = ch0_i2c_stream_on_seen_mipi_latch; // LED28
-  assign dbg_input_stable   = ch0_i2c_stream_on_done_mipi_latch; // LED29
-  assign dbg_led30          = ch0_i2c_stream_on_clean_mipi_latch; // LED30
-  assign dbg_led31          = ch0_i2c_stream_on_error_mipi_latch; // LED31, BAD
-  assign dbg_led32          = ch0_i2c_status_rxack_mipi_latch; // LED32, BAD
-  assign dbg_led33          = ch0_i2c_status_al_mipi_latch;   // LED33, BAD
+  assign led[3]             = ch1_dbg_i2c_rst_n;              // LED21
+  assign dbg_ddr_ok         = ch1_dbg_i2c_stream_on_done;     // LED22
+  assign dbg_fb0_ready      = ch1_dbg_i2c_status_sample_seen; // LED23
+  assign dbg_fb0_underflow  = ch1_dbg_i2c_last_status[0];     // LED24
+  assign dbg_csi_fmt_ok     = mipi_rx_ck1_LP_P_IN;            // LED25
+  assign dbg_bridge_active  = mipi_rx_ck1_LP_N_IN;            // LED26
+  assign dbg_bridge_under   = mipi_rx_dp10_LP_P_IN;           // LED27
+  assign dbg_video_ready    = mipi_rx_dp10_LP_N_IN;           // LED28
+  assign dbg_input_stable   = ch1_mipi_lp_transition_after_stream_seen; // LED29
+  assign dbg_led30          = ch1_mipi_hs_after_stream_seen;  // LED30
+  assign dbg_led31          = ch1_mipi_byteclk_after_stream_seen; // LED31
+  assign dbg_led32          = ch1_mipi_fifo_after_stream_seen; // LED32
+  assign dbg_led33          = ch1_de_seen;                    // LED33
   //=== end debug LED bank drive ===
 
   hdmi_top #(
-    .USE_INPUT_STABLE_GATE(1'b1)
+    .USE_INPUT_STABLE_GATE(1'b0)
   ) hdmi_top_inst (
     .hdmi_tx_locked(1'b1),
     .i_video_ready(hdmi_video_ready),

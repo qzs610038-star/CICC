@@ -88,9 +88,13 @@ module soft_mipi_rx_top #(
    output      dbg_i2c_status_rxack_prebyte_seen,
    output      dbg_i2c_status_rxack_devaddr_seen,
    output      dbg_i2c_status_rxack_reg_high_seen,
-   output      dbg_i2c_status_rxack_reg_low_seen,
-   output      dbg_i2c_status_rxack_data_seen,
-   output      [7:0] dbg_i2c_last_status
+	   output      dbg_i2c_status_rxack_reg_low_seen,
+	   output      dbg_i2c_status_rxack_data_seen,
+	   output      dbg_stream_on_rxack_devaddr_seen,
+	   output      dbg_stream_on_rxack_reg_high_seen,
+	   output      dbg_stream_on_rxack_reg_low_seen,
+	   output      dbg_stream_on_rxack_data_seen,
+	   output      [7:0] dbg_i2c_last_status
 
 
 
@@ -269,6 +273,10 @@ wire dbg_i2c_status_rxack_devaddr_seen_w;
 wire dbg_i2c_status_rxack_reg_high_seen_w;
 wire dbg_i2c_status_rxack_reg_low_seen_w;
 wire dbg_i2c_status_rxack_data_seen_w;
+wire dbg_stream_on_rxack_devaddr_seen_w;
+wire dbg_stream_on_rxack_reg_high_seen_w;
+wire dbg_stream_on_rxack_reg_low_seen_w;
+wire dbg_stream_on_rxack_data_seen_w;
 wire [7:0] dbg_i2c_last_status_w;
 assign dbg_i2c_init_done = dbg_i2c_init_done_w;
 assign dbg_i2c_wr_en = dbg_i2c_wr_en_w;
@@ -290,6 +298,10 @@ assign dbg_i2c_status_rxack_devaddr_seen = dbg_i2c_status_rxack_devaddr_seen_w;
 assign dbg_i2c_status_rxack_reg_high_seen = dbg_i2c_status_rxack_reg_high_seen_w;
 assign dbg_i2c_status_rxack_reg_low_seen = dbg_i2c_status_rxack_reg_low_seen_w;
 assign dbg_i2c_status_rxack_data_seen = dbg_i2c_status_rxack_data_seen_w;
+assign dbg_stream_on_rxack_devaddr_seen = dbg_stream_on_rxack_devaddr_seen_w;
+assign dbg_stream_on_rxack_reg_high_seen = dbg_stream_on_rxack_reg_high_seen_w;
+assign dbg_stream_on_rxack_reg_low_seen = dbg_stream_on_rxack_reg_low_seen_w;
+assign dbg_stream_on_rxack_data_seen = dbg_stream_on_rxack_data_seen_w;
 assign dbg_i2c_last_status = dbg_i2c_last_status_w;
 
 i2c_master_ctrl_top #(
@@ -323,10 +335,13 @@ i2c_master_ctrl_top #(
   /*o*/.dbg_i2c_status_rxack_reg_high_seen(dbg_i2c_status_rxack_reg_high_seen_w),
   /*o*/.dbg_i2c_status_rxack_reg_low_seen(dbg_i2c_status_rxack_reg_low_seen_w),
   /*o*/.dbg_i2c_status_rxack_data_seen(dbg_i2c_status_rxack_data_seen_w),
+	  /*o*/.dbg_stream_on_rxack_devaddr_seen(dbg_stream_on_rxack_devaddr_seen_w),
+	  /*o*/.dbg_stream_on_rxack_reg_high_seen(dbg_stream_on_rxack_reg_high_seen_w),
+	  /*o*/.dbg_stream_on_rxack_reg_low_seen(dbg_stream_on_rxack_reg_low_seen_w),
+	  /*o*/.dbg_stream_on_rxack_data_seen(dbg_stream_on_rxack_data_seen_w),
   /*o*/.dbg_i2c_last_status(dbg_i2c_last_status_w)
   
   );
-// Match the vendor demo reset polarity for this controlled I2C ACK test.
 assign o_cam_rst_p = ~arst_n;
 assign io_cam_scl_OE = ~scl_padoen_o;
 assign io_cam_sda_OE = ~sda_padoen_o;
