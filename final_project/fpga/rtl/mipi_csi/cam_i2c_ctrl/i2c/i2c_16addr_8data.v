@@ -21,19 +21,10 @@ module i2c_16addr_8data #(
 	output		reg					wr_done,
 	output		reg					rd_done,
 	output		wire				dout_valid,
-	output		reg					dbg_wr_done_clean,
-	output		reg					dbg_wr_done_error,
-	output		reg					dbg_status_sample_seen,
-	output		reg					dbg_status_rxack_seen,
-	output		reg					dbg_status_busy_seen,
-	output		reg					dbg_status_al_seen,
-	output		reg					dbg_status_tip_seen,
-	output		reg					dbg_status_rxack_prebyte_seen,
-	output		reg					dbg_status_rxack_devaddr_seen,
-	output		reg					dbg_status_rxack_reg_high_seen,
-	output		reg					dbg_status_rxack_reg_low_seen,
-	output		reg					dbg_status_rxack_data_seen,
-	output		reg		[7:0]		dbg_last_status,
+	output		reg					dbg_rd_nack_devaddr,
+	output		reg					dbg_rd_nack_reg_high,
+	output		reg					dbg_rd_nack_reg_low,
+	output		reg					dbg_rd_nack_read_addr,
 	
 	output		wire	[2:0]		i2c_address,
   	output		wire				i2c_write   ,
@@ -130,7 +121,6 @@ reg		  wr_wr = 1'b0;
 reg	[7:0] wr_wrdata = 0;
 reg	[2:0] wr_cnt = 0;
 reg	[2:0] wait_cnt = 0;
-reg       wr_error_seen = 1'b0;
 always @( posedge clk or negedge rst_n )
 begin
 		if( ~rst_n ) begin
@@ -141,7 +131,6 @@ begin
 				wr_state <= S_WR_IDLE;
 				wr_cnt <= 'd0;
 				wait_cnt <= 'd0;
-				wr_error_seen <= 1'b0;
 		end else begin
 				case( wr_state ) 
 				S_WR_IDLE : begin //S_WR_IDLE 	= 3'b000;
@@ -151,7 +140,6 @@ begin
 						wr_wrdata <= 0;
 						wait_cnt <= 'd0;
 						if( init_done & (wr_en || wr_cnt != 0)) begin
-							wr_error_seen <= 1'b0;
 							wr_state <= S_WR_RD_TIP;
 						end
 				end
@@ -173,8 +161,6 @@ begin
 				end
 				S_WR_TIP_CHK: begin //S_WR_TIP_CHK 	= 3'b011;
 						wr_cs <= 1'b0;
-						if( i2c_readdata[7] || i2c_readdata[5] )
-								wr_error_seen <= 1'b1;
 						if( i2c_readdata[1] == 1'b0 ) begin
 								wr_state <= wr_cnt == 4 ? S_WR_WR_OVER : S_WR_WR_DATA;
 						end 
@@ -244,19 +230,12 @@ end
 
 always @( posedge clk or negedge rst_n )
 begin
-		if( ~rst_n ) begin
+		if( ~rst_n )
 				wr_done <= 1'b0;
-				dbg_wr_done_clean <= 1'b0;
-				dbg_wr_done_error <= 1'b0;
-		end else if(wr_state == S_WR_SET_WAIT ) begin
+		else if(wr_state == S_WR_SET_WAIT )
 				wr_done <= 1'b1;
-				dbg_wr_done_clean <= ~wr_error_seen;
-				dbg_wr_done_error <= wr_error_seen;
-		end else begin
+		else
 				wr_done <= 1'b0;
-				dbg_wr_done_clean <= 1'b0;
-				dbg_wr_done_error <= 1'b0;
-		end
 end
 
 //================================================================
@@ -272,6 +251,7 @@ localparam S_RD_SET_WAIT = 4'b0110;
 localparam S_RD_WR_OVER 	= 4'b0111;
 localparam	S_RD_CFG_SET  = 4'b1000;
 localparam	S_RD_RD_DATA	= 4'b1001;
+localparam S_RD_DATA_WAIT = 4'b1010;
 reg	[2:0] rd_addr;
 reg				rd_cs;
 reg				rd_wr;
@@ -279,6 +259,7 @@ reg[7:0]	rd_wrdata;
 reg [3:0] rd_state = S_RD_IDLE;
 reg	[2:0]	rd_cnt = 0;   
 reg	[2:0] rd_wait_cnt = 0;
+reg [DATA_BYTES*8-1:0] dout_r = {DATA_BYTES*8{1'b0}};
 always @( posedge clk or negedge rst_n )
 begin
 		if( ~rst_n ) begin
@@ -288,6 +269,11 @@ begin
 				rd_wrdata <= 0;
 				rd_state <= S_RD_IDLE;    
 				rd_cnt <= 'd0;
+				dout_r <= {DATA_BYTES*8{1'b0}};
+				dbg_rd_nack_devaddr <= 1'b0;
+				dbg_rd_nack_reg_high <= 1'b0;
+				dbg_rd_nack_reg_low <= 1'b0;
+				dbg_rd_nack_read_addr <= 1'b0;
 		end else begin
 				case( rd_state ) 
 				S_RD_IDLE : begin
@@ -296,6 +282,12 @@ begin
 						rd_wr <= 1'b0;
 						rd_wrdata <= 0;
 						if( init_done & (rd_en || rd_cnt != 0)) begin
+							if (rd_en) begin
+								dbg_rd_nack_devaddr <= 1'b0;
+								dbg_rd_nack_reg_high <= 1'b0;
+								dbg_rd_nack_reg_low <= 1'b0;
+								dbg_rd_nack_read_addr <= 1'b0;
+							end
 							rd_state <= S_RD_RD_TIP;
 						end
 				end
@@ -316,6 +308,15 @@ begin
 				end
 				S_RD_TIP_CHK: begin     //3 
 						rd_cs <= 1'b0;
+						if (i2c_readdata[7]) begin
+							case (rd_cnt)
+								3'd1: dbg_rd_nack_devaddr <= 1'b1;
+								3'd2: dbg_rd_nack_reg_high <= 1'b1;
+								3'd3: dbg_rd_nack_reg_low <= 1'b1;
+								3'd4: dbg_rd_nack_read_addr <= 1'b1;
+								default:;
+							endcase
+						end
 						if( i2c_readdata[1] == 1'b0 ) begin
 								if( rd_cnt == 5 ) begin
 										rd_state <= S_RD_WR_OVER;
@@ -374,11 +375,18 @@ begin
 				end
 				
 				S_RD_RD_DATA : begin
-						rd_state <= S_RD_CFG_SET ;
+						rd_state <= S_RD_DATA_WAIT;
+						rd_addr <= 3;
+						rd_cs <= 1'b1;
+				end
+				S_RD_DATA_WAIT: begin
+						// wb_dat_o is registered; hold RXR address for one full clock.
+						rd_state <= S_RD_CFG_SET;
 						rd_addr <= 3;
 						rd_cs <= 1'b1;
 				end
 				S_RD_CFG_SET: begin
+						dout_r <= i2c_readdata;
 						rd_cs <= 1'b0;
 						rd_wr <= 1'b0;
 						rd_wrdata <= 8'h00;
@@ -400,48 +408,8 @@ begin
 		else
 				rd_done <= 1'b0;
 end
-
-always @( posedge clk or negedge rst_n )
-begin
-		if( ~rst_n ) begin
-				dbg_status_sample_seen <= 1'b0;
-				dbg_status_rxack_seen  <= 1'b0;
-				dbg_status_busy_seen   <= 1'b0;
-				dbg_status_al_seen     <= 1'b0;
-				dbg_status_tip_seen    <= 1'b0;
-				dbg_status_rxack_prebyte_seen <= 1'b0;
-				dbg_status_rxack_devaddr_seen <= 1'b0;
-				dbg_status_rxack_reg_high_seen <= 1'b0;
-				dbg_status_rxack_reg_low_seen <= 1'b0;
-				dbg_status_rxack_data_seen <= 1'b0;
-				dbg_last_status        <= 8'd0;
-		end else if( (wr_state == S_WR_TIP_CHK) || (rd_state == S_RD_TIP_CHK) ) begin
-				dbg_status_sample_seen <= 1'b1;
-				dbg_last_status        <= i2c_readdata;
-				if( i2c_readdata[7] ) begin
-						if( !dbg_status_rxack_seen && (wr_state == S_WR_TIP_CHK) ) begin
-								if( wr_cnt == 3'd0 )
-										dbg_status_rxack_prebyte_seen <= 1'b1;
-								else if( wr_cnt == 3'd1 )
-										dbg_status_rxack_devaddr_seen <= 1'b1;
-								else if( wr_cnt == 3'd2 )
-										dbg_status_rxack_reg_high_seen <= 1'b1;
-								else if( wr_cnt == 3'd3 )
-										dbg_status_rxack_reg_low_seen <= 1'b1;
-								else if( wr_cnt == 3'd4 )
-										dbg_status_rxack_data_seen <= 1'b1;
-						end
-						dbg_status_rxack_seen <= 1'b1;
-				end
-				if( i2c_readdata[6] )
-						dbg_status_busy_seen <= 1'b1;
-				if( i2c_readdata[5] )
-						dbg_status_al_seen <= 1'b1;
-				if( i2c_readdata[1] )
-						dbg_status_tip_seen <= 1'b1;
-		end
-end
 assign dout_valid = rd_done;
+assign dout = dout_r;
 
 assign 	i2c_address 		= init_addr | wr_addr |rd_addr;
 assign	i2c_chipselect 	= 1'b1;//init_cs | wr_cs |rd_cs;

@@ -224,7 +224,7 @@ ROM[8'h8c] = {16'h57ac,8'h00,1'b0};
 ROM[8'h8d] = {16'h57ad,8'h00,1'b0};
 ROM[8'h8e] = {16'h36e9,8'h53,1'b0};
 ROM[8'h8f] = {16'h37f9,8'h53,1'b0};
-ROM[8'h90] = {16'h0100,8'h00,1'b0}; // keep standby until final window registers are written
+ROM[8'h90] = {16'h0100,8'h01,1'b0};
 ROM[8'h91] = {16'h3200,8'h00,1'b0};
 ROM[8'h92] = {16'h3201,8'h00,1'b0};
 ROM[8'h93] = {16'h3202,8'h00,1'b0};
@@ -241,8 +241,7 @@ ROM[8'h9d] = {16'h3210,8'h01,1'b0};
 ROM[8'h9e] = {16'h3211,8'h44,1'b0};
 ROM[8'h9f] = {16'h3212,8'h00,1'b0};
 ROM[8'ha0] = {16'h3213,8'h05,1'b0};
-ROM[8'ha1] = {16'h0100,8'h01,1'b0}; // repeat stream-on after final window registers
-
+ROM[8'ha1] = {16'h0100,8'h00,1'b1}; // read back streaming state
 end 
 // write is unused
 wire [ADDR_WIDTH-1:0] ADDRA = {ADDR_WIDTH{1'b0}}; 
