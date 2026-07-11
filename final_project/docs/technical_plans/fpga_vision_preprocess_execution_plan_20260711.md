@@ -1,10 +1,10 @@
 # FPGA 视觉预处理模块执行与协作交接方案
 
-> 状态：方案已获用户批准，RTL 尚未开始  
+> 状态：第一阶段独立 RTL 与自检 testbench 已完成；ch1 旁路已接入 `top.v`、已加入 Efinity 工程 XML，并通过带 `mark_debug` 探针的正式 map；尚未接入 APB、OSD 或 CPU
 > 日期：2026-07-11  
 > 适用工程：`final_project/`  
 > 第一阶段目标：完成可脱离摄像头独立验证的双像素流 ROI 与统计特征模块  
-> 当前阶段不修改：`top.v`、MIPI/I2C、`mem_test.xml`、`.peri.xml`、`constrain.sdc`
+> 独立 RTL 阶段不修改：MIPI/I2C、`.peri.xml`、`constrain.sdc`；`top.v` 与 `mem_test.xml` 的后续旁路集成已另附 Review Packet 并完成 map 核验。
 
 ## 1. 目的
 
@@ -533,3 +533,52 @@ Review Packet 至少包含：
 5. 建立并签认通道映射表。
 
 上述内容确认后，直接进入独立 RTL 和自检 testbench，不等待摄像头恢复。
+
+## 15. 实施记录
+
+### 2026-07-11 第一阶段独立实现
+
+已新增：
+
+```text
+fpga/rtl/roi_crop/vision_stream_adapter_2ppc.v
+fpga/rtl/roi_crop/roi_window_2ppc.v
+fpga/rtl/feature_extract/pixel_mask_2ppc.v
+fpga/rtl/feature_extract/feature_accumulator_2ppc.v
+fpga/rtl/feature_extract/feature_snapshot.v
+fpga/rtl/feature_extract/vision_preprocess_channel.v
+tests/fpga_sim/feature_extract/tb_vision_preprocess_channel.v
+tests/fpga_sim/feature_extract/run_vision_preprocess_iverilog.ps1
+```
+
+完成内容：
+
+- `{B1,G1,R1,B0,G0,R0}` 到双 RGB888 像素的唯一适配点。
+- `de && valid` 行有效区驱动的双像素坐标器。
+- ROI 半开区间、可配置色彩/前景掩码、统计、bbox 和中心点。
+- 帧级快照、直接 ack 语义和未确认快照的 dropped frame 计数。
+- ROI 无像素时仍发布 `empty_foreground` 快照。
+
+验证记录：
+
+- 使用 Efinity 2025.2 `efx_map.exe` 对新增六个 RTL 文件做独立综合，结果通过。
+- 独立映射资源：`EFX_LUT4=1291`、`EFX_FF=1042`、`EFX_ADD=775`。
+- 映射仅保留 `pixel_mask_2ppc.v` 中 `abs_diff8` 函数临时信号的 Efinity 冗余删除提示；无语法、展开、组合环、未连接端口或 CDC warning。该提示在后续正式工程综合时仍需复核，不作为时序结论。
+- 未改 `top.v`、`mem_test.xml`、`.peri.xml`、`constrain.sdc` 或 MIPI/I2C 文件。
+- 当前机器未发现 Icarus、Verilator 或 ModelSim 命令，因此 testbench 已保存但尚未在本机执行；脚本见 `tests/fpga_sim/feature_extract/run_vision_preprocess_iverilog.ps1`。
+
+已知限制和下一步：
+
+- 坐标器以 `de && valid` 的上升沿为主分行，同时接受 HS 上升沿；顶层接入前必须核对真实 Debayer 的 HS 极性和时序。
+- 通道映射、APB 基址/CDC、OSD 和双路实例化仍受本文件前述 Gate 约束，不能直接进入 `top.v`。
+
+### 2026-07-11 ch1 正式工程旁路集成
+
+- 新建 Review Packet：`docs/review_packets/preprocess_ch1_tap_review_packet_20260711.md`。
+- `top.v` 已从 `debayer_top1` 的 `rgb1_vs/hs/de/valid` 和 `rgb1_datax2` 分叉实例化单个 `vision_preprocess_channel`。
+- 本次实例 `i_cfg_enable=1`、`i_snapshot_ack=1`；11 组快照输出通过顶层 `mark_debug` 导线保留。HDMI、Framebuffer、MIPI/I2C、AXI、CPU、OSD 和 LED 均未改变。
+- `mem_test.xml` 已加入全部 6 个预处理源文件。
+- 在 `D:\cicc_cbm_link\final_project\fpga\efinity` 对正式工程运行 `efx_run.bat mem_test.xml --prj -f map`，结果 `map : PASS`；资源为 `EFX_ADD=2081`、`EFX_LUT4=11945`、`EFX_FF=10484`。
+- map 包含既有工程/IP 的 586 条 warning；未发现新增模块的语法、缺模块、组合环、未连接端口或 CDC warning。`abs_diff8` 冗余临时信号提示仍需在后续全量工程中复核。
+- map 生成的 `debug_profile.mark_debug.json` 已列出 11 组 ch1 快照探针，说明 map 已识别该观察锚点；此次通过不代表 Debugger flow、PNR、bitstream 或真实特征已验证。
+- `D:\final_project` 的 `top.v`/`mem_test.xml` 与 C 盘当前版本哈希不同；未同步、未 PNR、未烧录。

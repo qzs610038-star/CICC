@@ -26,6 +26,30 @@
 
 ## 路线覆盖项
 
+- 日期：2026-07-11，来源 Agent：Codex
+  - 适用范围：`final_project` FPGA 视觉预处理第一阶段
+  - 最新结论：可复用的 RGB888 2ppc ROI/统计特征 RTL 已完成。ch1 Debayer 输出已以只读旁路接入 `top.v`，6 个源文件已纳入 `mem_test.xml`；正式 map 通过，资源为 `EFX_ADD=2081`、`EFX_LUT4=11945`、`EFX_FF=10484`。顶层 `mark_debug` 已识别 11 组 `i_sysclk_div2` 域快照探针。FPGA 只提供 ROI 与统计特征，颜色/形状/尺寸决策、参数管理和 myCobot 控制仍归板上 CPU。
+  - 替代旧结论：`fpga_vision_preprocess_execution_plan_20260711.md` 开头“尚未接入 `top.v` 或 Efinity 工程 XML”的第一阶段规划状态。
+  - 证据路径：`final_project/fpga/rtl/top/top.v`、`final_project/fpga/efinity/mem_test.xml`、`final_project/docs/review_packets/preprocess_ch1_tap_review_packet_20260711.md`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`。
+  - 失效条件：真实 Debayer 波形证明当前 `vs/hs/de/valid` 或 48-bit RGB 字节序假设错误，或 D 盘 build/flash 树合并时发生必须调整的顶层冲突。
+  - 未完成边界：未完成 Efinity Debugger capture、PNR、bitstream、烧录、真实帧验证、APB/CPU CDC、OSD 或第二通道；`D:\final_project` 与 C 盘的 `top.v`/`mem_test.xml` 仍有差异，未经审查不得覆盖同步。
+
+- 日期：2026-07-11，来源 Agent：Codex
+  - 适用范围：`final_project` FPGA 视觉预处理的 PNR/Debugger 验证路径
+  - 最新结论：C 盘 ASCII junction 上的正式 map 再次通过。项目 `mem_test.xml` 的 Debugger 自动实例化处于开启状态，命令行 PNR 自动带 `--enable_dbg`，要求 Debug Wizard 先生成 `mem_test.dbg.vdb`；现有 map 仅生成普通 `mem_test.vdb`，因此该路径不能直接完成 PNR。用普通 VDB 继续的 PNR 已越过打包和 SDC 解析，最终因 2,288 个未约束 I/O 在 Efinity 内部 `outpad` 断言失败，未产生时序签核结果。
+  - 替代旧结论：将 `mark_debug` profile 视为可直接进行命令行 Debugger/PNR capture 的假设。
+  - 证据路径：`final_project/fpga/efinity/mem_test.xml` 的 `debugger.auto_instantiation=on`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`、`final_project/docs/review_packets/preprocess_ch1_tap_review_packet_20260711.md`。
+  - 失效条件：在受控 Efinity GUI Debug Wizard 中生成含 ch1 预处理探针的 `.dbg.vdb` 并成功完成对应 PNR，或工程接口/约束完整性修复后普通 PNR 不再出现未约束 I/O 的 `outpad` 断言。
+  - 未完成边界：不得伪造、手工复制或修改 `.dbg.vdb`；不得把 PNR 失败归咎于新增预处理 RTL。未生成 bitstream、未烧录、未进行板级或机械臂动作。
+
+- 日期：2026-07-11，来源 Agent：用户批准 / Codex
+  - 适用范围：FPGA 视觉预处理的系统交接阶段
+  - 最新结论：用户批准暂缓四项证据门槛：独立 testbench 实跑、真实 Debayer 波形确认、PNR/时序与 bitstream 闭环、板级特征采集。暂缓期间只允许推进不改变数据路径的接口审计与契约文档，不接入 CPU/APB、OSD 或 ch0 正式 RTL。
+  - 替代旧结论：将第 1-4 项视为立即执行的前置任务顺序。
+  - 证据路径：`final_project/docs/architecture/generated_soc_summary_2026-07-11.md`、`final_project/integration/preprocess_apb_cdc_contract_draft_20260711.md`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`。
+  - 失效条件：用户要求恢复验证，或生成 `soc.h`、SoC 端口与 APB 时钟/复位信息后提交新的 CPU/APB Review Packet。
+  - 未完成边界：当前仓库不存在生成的 `soc.h`、`generated_soc_summary`、APB slave 或 `results_cdc` RTL；`board_io.h` 及寄存器偏移为草案，CPU 测试构建的 `0xF0000000` 是占位值，不能用于正式硬件。
+
 - 日期：2026-07-08，来源 Agent：Codex 复核 + Claude 据实测日志交叉核查
   - 适用范围：PC端防假熔断降级重试与故障诊断 (`mycobot_pc_tests/` V2.12)
   - 最新结论：Codex 只读复核裁定 V2.12 改动链：(A) V2.11 EOF→release 修复 Safe；(B) confirm=2 遇 `get_angles_once` 持续 None/瞬态跳变 Safe（V2.12 加 `none_count` 诊断不改 confirm 行为）；(C) 缺陷B sync res==0 直接熔断 Insufficient→已补 post-failure 复读+有界重试三段式判定。run-25(N=5)全流程软到位收敛、0 兜底、0 人工扶正、Happy Path 零副作用（V2.12 诊断/retry 仅挂 res!=1 退路）。**如实风险**：V2.12 retry 分支因 run-25 全程零兜底**未被运行时触发**，代码层面经 Codex 复核闭环，运行时正确性无独立背书；Priority-3 文档须标注"代码审查通过、运行时未触发"。

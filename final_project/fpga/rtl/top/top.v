@@ -2084,6 +2084,65 @@ end
       .rgb_datax2_o   (rgb1_datax2     )//b,g,r,b,g,r
   );
 
+  // Ch1-only preprocessing tap. These retained snapshot wires are a
+  // non-intrusive pixel-domain debug anchor; they do not drive any board I/O.
+  (* mark_debug = "true" *) wire        preprocess_ch1_snapshot_valid;
+  (* mark_debug = "true" *) wire [15:0] preprocess_ch1_frame_id;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_roi_pixel_count;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_red_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_blue_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_yellow_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_fg_area;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_bbox_min;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_bbox_max;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_center;
+  (* mark_debug = "true" *) wire [31:0] preprocess_ch1_status;
+
+  (* keep_hierarchy = "TRUE" *) vision_preprocess_channel u_preprocess_ch1_tap (
+      .i_clk                 (i_sysclk_div2),
+      .i_rst_n               (pixel_data_en),
+      .i_vs                  (rgb1_vs),
+      .i_hs                  (rgb1_hs),
+      .i_de                  (rgb1_de),
+      .i_valid               (rgb1_valid),
+      .i_rgb_2ppc            (rgb1_datax2),
+      .i_cfg_enable          (1'b1),
+      .i_cfg_roi_x0          (16'd0),
+      .i_cfg_roi_y0          (16'd0),
+      .i_cfg_roi_x1          (16'hffff),
+      .i_cfg_roi_y1          (16'hffff),
+      .i_cfg_bg_r            (8'd0),
+      .i_cfg_bg_g            (8'd0),
+      .i_cfg_bg_b            (8'd0),
+      .i_cfg_fg_diff_min     (8'd1),
+      .i_cfg_luma_min        (10'd0),
+      .i_cfg_luma_max        (10'd1023),
+      .i_cfg_red_rg_min      (8'd32),
+      .i_cfg_red_rb_min      (8'd32),
+      .i_cfg_blue_bg_min     (8'd32),
+      .i_cfg_blue_br_min     (8'd32),
+      .i_cfg_yel_rb_min      (8'd32),
+      .i_cfg_yel_gb_min      (8'd32),
+      .i_cfg_yel_rg_delta_max(8'd32),
+      .i_snapshot_ack        (1'b1),
+      .o_snapshot_valid      (preprocess_ch1_snapshot_valid),
+      .o_frame_id            (preprocess_ch1_frame_id),
+      .o_roi_pixel_count     (preprocess_ch1_roi_pixel_count),
+      .o_sum_r               (),
+      .o_sum_g               (),
+      .o_sum_b               (),
+      .o_sum_y               (),
+      .o_red_area            (preprocess_ch1_red_area),
+      .o_blue_area           (preprocess_ch1_blue_area),
+      .o_yellow_area         (preprocess_ch1_yellow_area),
+      .o_fg_area             (preprocess_ch1_fg_area),
+      .o_bbox_min            (preprocess_ch1_bbox_min),
+      .o_bbox_max            (preprocess_ch1_bbox_max),
+      .o_center              (preprocess_ch1_center),
+      .o_status              (preprocess_ch1_status),
+      .o_dropped_frames      ()
+  );
+
 //============================================================================= 
 //mipi dsi
 //=============================================================================
