@@ -57,6 +57,19 @@ static float _fill_rate(const feature_snapshot_t *snap)
     return (float)total / (float)area;
 }
 
+/* A12 provides sum_y over the complete ROI. A nonzero ROI count makes this
+ * a direct average RGB-channel brightness in [0, 255], independent of bbox
+ * shape. It is only used by the CPU classifier, never by FPGA decision RTL. */
+static int _mean_channel_luma(const feature_snapshot_t *snap, float *mean)
+{
+    if (snap->roi_pixel_count == 0u || snap->sum_y == 0u)
+        return 0;
+
+    *mean = (float)snap->sum_y /
+            (3.0f * (float)snap->roi_pixel_count);
+    return 1;
+}
+
 /*==========================================================================
  *  内部 helper — 颜色分类
  *
@@ -115,12 +128,26 @@ static uint8_t _classify_color(const feature_snapshot_t *snap,
         return max_c;
     }
 
-    /* ---- 全部低于阈值 → 白/黑排除法 ---- */
-    /* 复用 _fill_rate()：当 FG_AREA_AVAILABLE=1 时优先用硬件前景计数
-     * （fg_area/bbox_area，含 clamp），否则降级为 R+G+B 近似。
-     * 白色物块：R/G/B 各自低但 fg_area 高 → ratio 高 → WHITE
-     * 黑色物块：R/G/B 各自低且 fg_area 低 → ratio 低 → BLACK
-     * FG_AREA_AVAILABLE=0 时白色检测不可靠（见文件头注释）。*/
+    /* A12 frame statistics distinguish neutral white and black directly.
+     * The legacy fill-rate path remains as a compatibility fallback until
+     * final APB snapshot offsets are specified. */
+    {
+        float mean_luma;
+        if (_mean_channel_luma(snap, &mean_luma)) {
+            if (mean_luma >= cfg->white_mean_luma_min) {
+                *conf = 200;
+                return COLOR_WHITE;
+            }
+            if (mean_luma <= cfg->black_mean_luma_max) {
+                *conf = 200;
+                return COLOR_BLACK;
+            }
+            *conf = 30;
+            return COLOR_UNKNOWN;
+        }
+    }
+
+    /* No RGB/luma frame statistics: retain the old fill-rate fallback. */
     float ratio = _fill_rate(snap);
 
     if (ratio > cfg->white_luma_ratio) {
@@ -239,9 +266,15 @@ void classifier_cfg_default(classifier_cfg_t *cfg)
     cfg->min_blue_area = 500;
     cfg->min_yel_area  = 500;
 
-    /* 白/黑排除法比率 */
+    /* Legacy fill-rate fallback. */
     cfg->white_luma_ratio = 0.55f;
     cfg->black_luma_ratio = 0.10f;
+
+    /* A12's 960x1080 synthetic ROI includes a 128-gray background:
+       white=140.37 and black=115.36 average channel brightness. Keep a
+       deliberate UNKNOWN band between these provisional replay thresholds. */
+    cfg->white_mean_luma_min = 130.0f;
+    cfg->black_mean_luma_max = 125.0f;
 
     /* 宽高比范围（定点 x1000）— 暂未启用，保留给现场标定 */
     cfg->cube_ratio_lo = 850;

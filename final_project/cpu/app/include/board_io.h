@@ -278,6 +278,14 @@ typedef struct {
     uint32_t red_area;
     uint32_t blue_area;
     uint32_t yel_area;
+    /* Frame-statistic fields are populated by the Host replay path today.
+       Their final APB offsets remain intentionally undefined until the SoC
+       integration gate closes. */
+    uint32_t roi_pixel_count;
+    uint32_t sum_r;
+    uint32_t sum_g;
+    uint32_t sum_b;
+    uint32_t sum_y;
     uint32_t bbox_min;          /* [31:16]Y_MIN, [15:0]X_MIN */
     uint32_t bbox_max;          /* [31:16]Y_MAX, [15:0]X_MAX */
     uint32_t center;            /* [31:16]Y_CEN, [15:0]X_CEN */

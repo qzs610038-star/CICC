@@ -59,9 +59,13 @@ typedef struct {
     uint32_t min_blue_area;
     uint32_t min_yel_area;
 
-    /* 排除法判定白/黑的门限 */
-    float    white_luma_ratio;   /* (sum_rgb / bbox_area) 高于此视为白 */
-    float    black_luma_ratio;   /* (sum_rgb / bbox_area) 低于此视为黑 */
+    /* Legacy fill-rate fallback thresholds when no RGB/luma sums exist. */
+    float    white_luma_ratio;
+    float    black_luma_ratio;
+
+    /* A12 frame-statistic thresholds: sum_y / (3 * roi_pixel_count), 0..255. */
+    float    white_mean_luma_min;
+    float    black_mean_luma_max;
 
     /* 形状：宽高比范围（x1000 定点） */
     uint16_t cube_ratio_lo;      /* 典型 850 */

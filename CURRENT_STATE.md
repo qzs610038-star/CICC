@@ -27,6 +27,98 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-12，来源 Agent：Codex（A11 合成五色预处理隔离 Map）
+  - 适用范围：摄像头无稳定数据流期间的 FPGA ROI/颜色面积/bbox/中心快照候选工程；不适用于 D 盘 HDMI 基线或正式比赛构建。
+  - 最新结论：已创建 `C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga`。该副本以 D 盘五色 HDMI 基线为源，仅增加 6 个预处理 RTL 和 ch1 合成 tap；HDMI 仍用 RGB 合成流，预处理支路单独转换为 Debayer BGR 合同，避免黄/红蓝通道误读。Efinity map PASS，预处理模块已展开，最终 v2 资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`。
+  - 证据路径：`final_project/docs/debug_sessions/a11_synthetic_preprocess_isolated_map_20260712.md`、`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\outflow_a11_v2\mem_test.map.out`。
+  - 下一步门禁：A11 已生成 USER2 Debugger 配置、PNR 通过且已有专用 `.dbg.vdb/.bit/.hex`。下一步仅允许手动 JTAG SRAM 下载 A11 `.bit`，再采集 11 个快照探针；不得使用旧 D 盘 bitstream，且不得接入 SoC/APB/CPU/OSD。
+  - 验证：A11 已经 JTAG SRAM 下载并分别采集黄色、红色、蓝色合成帧；三帧的对应颜色面积均为 `102400`，其他两种彩色面积为 0。白色帧由 HDMI 同时观察确认，快照显示三种彩色面积为 0、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态为 0。该结论仅覆盖 A11 隔离 bitstream 和已采集的合成帧；当前探针不能独立区分白/黑。
+  - 验证增量（20:37）：操作者在 `Run Immediate` 时同步确认 HDMI 为黑色；`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\la0_waveform.vcd`（最后写入 `2026-07-12 20:37:45`）显示红/蓝/黄面积均为 `0`、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态 `0`。黑色身份来自 HDMI 观察，当前 11 个探针不能独立区分黑/白；五种合成色的前景/几何快照验证至此完成。
+  - NOT VERIFIED：白黑独立区分统计、A11 HDMI 回归和所有真实摄像头/CPU/OSD/机械臂路径均未验证。
+
+- 日期：2026-07-12，来源 Agent：Codex（A12 白黑统计快照探针）
+  - 适用范围：A11 隔离合成视频的白/黑基础统计可观测性；不适用于 D 盘 HDMI 基线或正式比赛工程。
+  - 最新结论：A12 在 `C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga` 的既有 `vision_preprocess_channel` 快照输出上，仅将 `sum_r/sum_g/sum_b/sum_y` 接至四根顶层 `mark_debug` 网络；无新分类 RTL、无像素路径改变。`efx_run --prj -f map` 输出 `outflow_a12`，map PASS，资源 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`，与 A11 v2 相同，map warning 数同为 134。
+  - 证据路径：`final_project/docs/debug_sessions/a12_white_black_snapshot_probe_execution_20260712.md`、`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\outflow_a12\mem_test.map.out`。
+  - 下一步门禁：必须在 Efinity Debug Wizard 以 `USER2` 保留原 11 根探针并新增 4 根统计网，生成新的 A12 `.dbg.vdb` 后才允许 PNR、bitstream、JTAG SRAM 下载和白黑 VCD 采集；禁止手工编辑或伪造 `.dbg.vdb`。
+  - NOT VERIFIED：A12 Debugger、PNR/时序/bitstream/JTAG 下载、白黑独立板级快照，以及真实摄像头/CPU/APB/OSD/尺寸/机械臂路径均未验证。
+  - 验证增量（A12 板级）：15 探针 `USER2` Debugger、PNR/时序/bitstream/JTAG SRAM 下载已由操作者完成。`20:59:26` VCD 黑色快照为 RGB 三通道各 `119603200`、`sum_y=358809600`；`21:03:42` VCD 白色快照为 RGB 三通道各 `145715200`、`sum_y=437145600`。两帧均有彩色面积全 `0`、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态 `0`。白黑已由 FPGA 统计独立区分，不再依赖 HDMI 人工颜色确认。
+  - 注意：HDMI 支路经过 2ppc-to-1ppc CDC/FIFO，瞬时屏幕颜色与源时钟预处理快照可能存在相位差；A12 颜色身份以 VCD 中 `sum_r/sum_g/sum_b/sum_y` 为准。
+  - NOT VERIFIED：A12 完整 HDMI 回归，以及所有真实摄像头/CPU/APB/OSD/尺寸/机械臂路径均未验证。
+
+- 日期：2026-07-12，来源 Agent：Codex（A13 FPGA 快照到 CPU Host 回放）
+  - 适用范围：A11/A12 隔离合成五色特征到 CPU 分类器和逐轮契约的 Host 回放；不适用于板上固件或正式 APB ABI。
+  - 最新结论：`feature_snapshot_t` 已为 Host 回放增加 `roi_pixel_count`、`sum_r/g/b/y`。CPU 对有 A12 帧统计的快照使用 `sum_y / (3 * roi_pixel_count)` 区分白黑；无统计字段时保留旧填充率路径。实测五色回放后，A13 完整 20 轮 Host 流程 `169/169` 通过：任务一、二输出唯一 `EXECUTE/SKIP + COLOR_MISMATCH`，任务三、四在尺寸未标定时固定 `WAIT + SIZE_UNAVAILABLE` 后放弃。
+  - 证据路径：`final_project/docs/debug_sessions/a13_fpga_snapshot_cpu_host_replay_20260712.md`、`final_project/cpu/tests/test_a13_fpga_snapshot_replay.c`、`final_project/cpu/tests/run_a13_fpga_snapshot_replay.ps1`。
+  - 下一步门禁：恢复 SoC/视频资源审查，先确认 PLL 重规划与正式 snapshot/APB 地址/CDC 契约；不得把 A13 接入 `main.c`、MMIO、OSD 或机械臂。
+  - NOT VERIFIED：RISC-V、正式 SoC/APB/CDC、真实相机、OSD、尺寸标定、板级 20 轮和机械臂均未验证。A13 的 APB 占位宏和 `FG_AREA_AVAILABLE=1` 只表达 Host 测试输入，不构成正式硬件接口。
+
+- 日期：2026-07-12，来源 Agent：Codex（A14 SoC/视频 PLL 重规划决策门）
+  - 适用范围：从 A13 Host 回放恢复正式 SoC/APB 路线前的时钟资源决策；不适用于 D 盘基线或即时烧录。
+  - 最新结论：只读复核确认硬 SoC 系统 PLL 只能使用已被视频占用的 `PLL_BL0/BL1/BL2`；`PLL_TR1` 的 I/O bank 存在不能证明它可替代 `PLL_BL1`。禁止猜测性改 PLL、手改 `.peri.xml` 或直接合并 SoC。唯一下一步是在 A8 隔离工程的 Interface Designer 中检查 GUI 是否提供 `pll_inst1` 的合法 Titanium 迁移候选；无候选即继续阻塞，有候选也只能生成新的隔离工程重审。
+  - 证据路径：`final_project/docs/review_packets/a14_soc_pll_replanning_decision_gate_20260712.md`、`final_project/docs/debug_sessions/a4_soc_video_resource_audit_20260712.md`、`final_project/docs/debug_sessions/a9_gui_pll_jtag_resource_audit_20260712.md`。
+  - 下一步门禁：取得 GUI 候选项或“不支持”证据前，不得接入 SoC/APB/MMIO/`main.c`/OSD/机械臂。
+
+- 日期：2026-07-12，来源 Agent：Codex（A8 Efinity GUI PLL 审查隔离基线）
+  - 适用范围：SoC/视频工程 PLL 资源可行性审查前的隔离工作目录。
+  - 最新结论：已从 `D:\final_project\fpga` 单向创建 `C:\fpga_soc_isolated\tj375_video_soc_gui_a8\fpga`，排除 `outflow` 和 `work_*` 构建目录。`top.v`、`mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc` 的 SHA-256 与 D 盘源逐项一致；未写入 D 盘或仓库工程，尚未打开 GUI、修改 PLL/SoC 资源、PNR 或烧录。
+  - 证据路径：`final_project/docs/debug_sessions/a8_gui_isolation_baseline_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_gui_a8\A8_GUI_ISOLATION_BASELINE_20260712.md`。
+  - 下一步门禁：仅在该副本中以 Efinity GUI 读取并记录现有 PLL/JTAG 的真实用途与下游连接；禁止手改 `.peri.xml`、删除 LPDDR4 PLL、运行 PNR 或烧录。任何资源重规划结论必须以 GUI 实际生成物和新的审查记录为准。
+  - NOT VERIFIED：GUI 可行性、PLL 重规划、SoC 集成、工程级 map/PNR、bitstream 与板级行为均未验证。
+
+- 日期：2026-07-12，来源 Agent：Codex（A7 CPU Host 端到端 20 轮流程）
+  - 适用范围：CPU 纯 Host 适配层的配置、事件、观察、结果和 ACK 调用顺序验证；不适用于板上正式固件。
+  - 最新结论：新增 `competition_host_adapter` 和完整 20 轮 Mock。任务一、二各 5 轮可输出 `EXECUTE/SKIP` 与理由；尺寸标定仍暂缓，任务三、四各 5 轮固定 `WAIT + SIZE_UNAVAILABLE` 后通过 `ABANDON` 结束。每轮验证同序号 `PLACE` 幂等、错误 ACK 拒绝、正确 ACK 完成、`REMOVE` 后转入下一轮。Host 端到端测试 `164/164` 通过。
+  - 替代旧结论：替代“仅单模块测试，未验证配置到结果完整调用顺序”的状态；不替代正式 `main.c`、SoC、APB、OSD、摄像头或机械臂未接入的事实。
+  - 证据路径：`final_project/docs/debug_sessions/a7_cpu_host_end_to_end_flow_20260712.md`、`final_project/docs/review_packets/a7_cpu_host_end_to_end_flow_review_packet_20260712.md`、`final_project/cpu/tests/test_competition_host_flow.c`、`final_project/cpu/tests/run_competition_host_flow.ps1`。
+  - 验证：端到端 `164/164`、契约 `35/35`、四任务/逐轮 `135/135`、原 matcher `82/82` Host 测试通过；均使用测试专用 APB 占位宏，且 Host 适配层不访问 MMIO。
+  - 下一步门禁：不得将 Host 适配接入板上 `main.c`，直至 SoC/APB 资源门关闭；恢复时先审查目标/事件/结果字段的硬件快照、CDC、commit/ACK 与 OSD 映射。
+  - NOT VERIFIED：正式 `main.c`、RISC-V、SoC/APB、FPGA 输入、OSD、摄像头、尺寸标定、板级 20 轮和机械臂均未验证。
+
+- 日期：2026-07-12，来源 Agent：Codex（A6 CPU 接口契约与尺寸标定暂缓）
+  - 适用范围：CPU 目标配置、操作事件和结果语义的寄存器无关冻结；用户已明确尺寸标定暂缓。
+  - 最新结论：新增 `competition_contract`，冻结 `target_config` 的 staging/apply/轮内锁存、`operator_event` 的 `PLACE/REMOVE/ABANDON/RESET + event_seq`，以及 `result_status` 的识别、判断、决策、理由、状态和序号语义。尺寸状态为 `SIZE_UNAVAILABLE` 时，任务一、二仍可判断；任务三、四固定输出 `WAIT + SIZE_UNAVAILABLE`，不得执行、跳过或发布未标定尺寸。重复同序号事件幂等，旧序号拒绝，匹配 ACK 才结束一轮。
+  - 替代旧结论：替代“尺寸字段必须在当前阶段参与四任务演示”的隐含假设；Mock 尺寸仍仅用于规则测试，不构成现场标定或任务三/四完成。
+  - 证据路径：`final_project/docs/debug_sessions/a6_cpu_contract_size_deferred_20260712.md`、`final_project/docs/review_packets/a6_cpu_contract_size_deferred_review_packet_20260712.md`、`final_project/cpu/tests/test_competition_contract.c`、`final_project/cpu/tests/run_competition_contract_host.ps1`。
+  - 验证：新契约 `35/35`、四任务/20轮 `135/135`、原 matcher `82/82` Host 测试通过；均使用测试专用 APB 占位宏，不代表 `soc.h`、APB 或板级运行。
+  - 下一步门禁：在 SoC/FPGA 接口恢复前，保持本契约地址无关且不接入 `main.c`；恢复时先审查目标/事件/结果字段的快照、CDC、commit 和 ACK 映射。尺寸标定验收前，`SIZE_STATE` 必须保持 `UNAVAILABLE`。
+  - NOT VERIFIED：APB 地址/位宽、FPGA 去抖/CDC、OSD、RISC-V、真实特征、板级轮次、尺寸标定和机械臂均未验证。
+
+- 日期：2026-07-12，来源 Agent：Codex（A5 CPU 四任务与逐轮事务 Host 验证）
+  - 适用范围：不依赖摄像头、SoC、APB、OSD 或机械臂的 CPU 纯软件前置闭环。
+  - 最新结论：新增 `competition_tasks` 固化四任务规则和理由码，新增 `round_controller` 固化一轮一事务、最终结论锁存、`event_seq/ACK`、超时、放弃和软复位。任务三只接受 2cm/3cm 参考且目标差为 1cm，任务四只接受 2cm/3cm 目标且差不超过 0.5cm。Host 新测试 `135/135` 通过，原 `task_matcher` 回归 `82/82` 通过。
+  - 替代旧结论：替代“CPU 端仅有旧精确颜色/形状/尺寸匹配且无逐轮状态机”的完成度描述；不替代当前视频工程未集成 SoC/APB/CDC/OSD 的事实。
+  - 证据路径：`final_project/docs/debug_sessions/a5_cpu_competition_rounds_host_20260712.md`、`final_project/docs/review_packets/a5_cpu_competition_rounds_review_packet_20260712.md`、`final_project/cpu/tests/test_competition_rounds.c`、`final_project/cpu/tests/run_competition_rounds_host.ps1`。
+  - 下一步门禁：先冻结 `target_config`、`operator_event`、`result_status` 的寄存器无关语义和事件序号/ACK 契约；实际 APB 地址、FPGA 输入、CPU 到 OSD、`main.c` 集成及任何 `round_controller -> arm_controller` 映射须等待 SoC/接口安全门。
+  - NOT VERIFIED：RISC-V 交叉构建、SoC/APB、CDC/OSD、真实特征快照、板级 20 轮和机械臂均未验证。测试使用既有 APB 占位宏仅为通过 `board_io.h` 的测试安全门，不代表正式 `soc.h` 已生成。
+
+- 日期：2026-07-12，来源 Agent：Codex（A4 SoC/视频物理资源核查）
+  - 适用范围：A 队员 CPU/APB 最小闭环从隔离 A3 副本进入正式视频工程前的 Interface Designer 资源门禁。
+  - 最新结论：**A2 最小硬核 SoC 不可直接合并到当前视频工程。**视频 `mem_test.peri.xml` 已占用 `PLL_BL0`、`PLL_BL1`、`PLL_BL2`、`PLL_TR0`、`JTAG_USER1`；A2 请求 `PLL_BL0`、`PLL_TR0`、`JTAG_USER1`。官方硬 SoC IP 的 `PLL_SOC_SYS_RESOURCE` 仅允许 `PLL_BL0/PLL_BL1/PLL_BL2`，且三者均已占用；虽可把 JTAG 改为 `JTAG_USER2`、把外设 PLL 改至其它合法资源，但系统 PLL 无未占用候选。A2 还会创建与视频 `clk_25m`/`ddr_clk_ref` 重叠的 `GPIOT_P_50`/`GPIOL_25` 时钟输入 GPIO。不得直接拼接 `.peri.xml`、手改生成 RTL 或重复声明同一 pad。
+  - 替代旧结论：替代“A3 完成资源审查后即可将 `REG_MAGIC` 接入视频顶层”的下一步假设；A3 隔离 map 仍有效，但工程级接入被本条门禁阻塞。
+  - 证据路径：`final_project/docs/debug_sessions/a4_soc_video_resource_audit_20260712.md`、`final_project/docs/review_packets/a4_soc_video_resource_audit_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\A4_SOC_VIDEO_RESOURCE_AUDIT_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\fpga\efinity\mem_test.peri.xml`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\a2_soc_generated.peri.xml`、`D:\Efinity\2025.2\ipm\ip\efx_hard_soc\ipm\ip_component.xml`。
+  - 下一步门禁：须由 Efinity GUI / Interface Designer 以视频工程为基准，先审查是否允许重新规划视频 `PLL_BL*` 与 DDR/MIPI/视频时钟依赖；仅在该架构决定获批准后，才可用官方 IP Manager 重新生成 SoC（JTAG 应使用 `JTAG_USER2`）并对实际产物做资源交集检查。
+  - NOT VERIFIED：GUI 重规划可行性、时钟/复位、UART0/JTAG 引脚、工程级 map/PNR、bitstream、RISC-V 固件、CPU Hello 与 APB 实读均未验证；未修改 RTL/约束/工程 XML，未烧录或上板。
+
+- 日期：2026-07-12，来源 Agent：Codex（A3 隔离 APB REG_MAGIC 前置实施）
+  - 适用范围：A 队员 CPU/APB 最小闭环的隔离工程验证；不适用于 C/D 主工程或烧录基线。
+  - 最新结论：A3 已从 `D:\final_project\fpga` 建立独立副本，创建时 `top.v` 与 `mem_test.xml` 哈希一致。APB0 语义裁定为生成 BSP `IO_APB_SLAVE_0_INPUT=0xe8100000` 的 4 KiB 窗口，RTL 从机使用 `PADDR[11:0]`；隔离 `REG_MAGIC` 于偏移 `0x000` 返回 `0x375A0001`。生成 SoC 到 APB 从机的 Efinity map 退出码为 0，隔离 CPU `board_io.c` 在生成 `soc.h` 下预处理通过。
+  - 替代旧结论：替代“APB0 32/12 位宽不一致而没有可执行地址处理方案”的阻塞描述；32 位主包装端口不再作为寄存器从机地址总线，窗口内偏移固定为低 12 位。
+  - 证据路径：`final_project/docs/debug_sessions/a3_apb_magic_isolated_20260712.md`、`final_project/docs/review_packets/a3_apb_magic_isolated_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\A3_APB_MAGIC_IMPLEMENTATION_RECORD_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\map_check\efx_map.log`。
+  - 未完成边界：未合并 SoC `.peri.xml` 到视频工程、未改视频 `top.v`/`mem_test.xml`/约束、未完成行为仿真或 RISC-V 交叉构建、未 PNR/烧录/板测/CPU Hello/APB 实读；未进入 `LIVE_FG_AREA`、CDC、OSD、UART2 或机械臂。
+  - 下一步门禁：先审查 A3 SoC `.peri.xml` 与视频 Interface Designer 配置的资源、时钟、复位、JTAG 和 UART0 引脚兼容性；通过后才能在 A3 顶层接入 `REG_MAGIC` 并进行工程级 map。
+  - 失效条件：Interface Designer 合并显示 PLL/JTAG/SoC 资源冲突、真实视频时钟复位不兼容，或板级 CPU/APB 证据改变候选地址/接口。
+
+- 日期：2026-07-12，来源 Agent：Codex（A2 隔离硬核 SoC 重新生成与最小 map）
+  - 适用范围：A 队员 CPU/APB 前置生成验证；不适用于当前 C/D 视频工程构建树。
+  - 最新结论：已在 `C:\fpga_soc_isolated\tj375_soc_a2_20260712` 生成 `TJ375N529` 最小硬核 SoC 配置、BSP 和外围 RTL。IP Manager 参数校验通过；官方后处理补齐后，Efinity `efx_map` 对隔离 wrapper/外围 RTL 退出码为 0。该隔离 BSP 的候选地址为 UART0 `0xe8010000`、APB0 `0xe8100000`，APB0 窗口为 4 KiB、频率为 200 MHz；尚未成为正式工程 ABI。
+  - 替代旧结论：仅替代“完全没有可供审查的生成 SoC/soc.h 候选物”的前置缺口，不替代 `final_project` 当前“尚未集成 SoC、APB slave 或 results CDC”的事实。
+  - 关键风险：生成 wrapper 出现 APB0 `PADDR` 的 `32 -> 12 -> 32` 位宽 warning，且默认仅 `PREADY=1`、`PRDATA=0`、`PSLVERROR` 未驱动；因此不能用于 `REG_MAGIC`、`LIVE_FG_AREA` 或任何正式寄存器访问。
+  - 证据路径：`final_project/docs/debug_sessions/a2_isolated_soc_generation_20260712.md`、`final_project/docs/review_packets/a2_isolated_soc_generation_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\A2_SOC_GENERATION_RECORD_20260712.md`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\map_check\efx_map.log`。
+  - 未完成边界：未创建视频工程隔离副本，未修改 C/D 的 `top.v`/`mem_test.xml`/`.peri.xml`/约束，未实现 APB 从机或 CDC，未构建 CPU 程序、未验证 CPU 启动/UART、未 PNR/烧录/上板，也未涉及 UART2 或机械臂。
+  - 下一步门禁：审查包必须先裁定 APB 地址位宽和正式 SoC 接入方法；通过后才可在视频工程隔离副本实施 CPU Hello + APB `REG_MAGIC` 最小闭环。
+  - 失效条件：重新生成的参数/工具版本改变端口或 BSP 地址，或者受控视频副本产生了新的 SoC/APB 实测证据。
+
 - 日期：2026-07-12，来源：用户逐项进度访谈 + Codex共享仓库核查
   - 适用范围：7月17日保底冻结前的真实进度、人力、阻塞、最低保底和立即工作队列
   - 最新结论：决赛主方案已更新为`v1.2-main`。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。

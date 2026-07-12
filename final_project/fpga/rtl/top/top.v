@@ -2084,6 +2084,58 @@ end
       .rgb_datax2_o   (rgb1_datax2     )//b,g,r,b,g,r
   );
 
+  // Set to 1 only for the camera-independent preprocessing verification path.
+  // This source feeds u_preprocess_ch1_tap only; HDMI and the CSI/DDR path
+  // remain connected to their live signals. Set back to 0 before any live
+  // camera validation or competition build.
+  localparam PREPROCESS_CH1_USE_SYNTHETIC_SOURCE = 1'b1;
+  // Set to 1 only for an HDMI-visible synthetic-source board test. It uses a
+  // dedicated CDC instance and does not alter the live camera CDC instances.
+  localparam HDMI_USE_SYNTHETIC_VERIFY = 1'b1;
+  wire        synthetic_preprocess_vs;
+  wire        synthetic_preprocess_hs;
+  wire        synthetic_preprocess_de;
+  wire        synthetic_preprocess_valid;
+  wire [47:0] synthetic_preprocess_rgb_2ppc;
+
+  synthetic_2ppc_source #(
+      // The HDMI input path expects 960 single pixels after its 2ppc-to-1ppc
+      // CDC. The same source feeds preprocessing during this verification.
+      .FRAME_WIDTH(960),
+      .FRAME_HEIGHT(1080),
+      .FRAMES_PER_COLOR(60)
+  ) u_synthetic_preprocess_source (
+      .i_clk       (i_sysclk_div2),
+      .i_rst_n     (pixel_data_en),
+      .o_vs        (synthetic_preprocess_vs),
+      .o_hs        (synthetic_preprocess_hs),
+      .o_de        (synthetic_preprocess_de),
+      .o_valid     (synthetic_preprocess_valid),
+      .o_rgb_2ppc  (synthetic_preprocess_rgb_2ppc)
+  );
+
+  wire        preprocess_ch1_vs = PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ?
+                                 synthetic_preprocess_vs : rgb1_vs;
+  wire        preprocess_ch1_hs = PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ?
+                                 synthetic_preprocess_hs : rgb1_hs;
+  wire        preprocess_ch1_de = PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ?
+                                 synthetic_preprocess_de : rgb1_de;
+  wire        preprocess_ch1_valid = PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ?
+                                    synthetic_preprocess_valid : rgb1_valid;
+  // The live Debayer stream is {B1,G1,R1,B0,G0,R0}, while the HDMI-correct
+  // synthetic source is {R1,G1,B1,R0,G0,B0}. Convert only the synthetic tap
+  // so vision_stream_adapter_2ppc sees one stable BGR-format contract.
+  wire [47:0] preprocess_ch1_synthetic_bgr_2ppc = {
+      synthetic_preprocess_rgb_2ppc[31:24],
+      synthetic_preprocess_rgb_2ppc[39:32],
+      synthetic_preprocess_rgb_2ppc[47:40],
+      synthetic_preprocess_rgb_2ppc[7:0],
+      synthetic_preprocess_rgb_2ppc[15:8],
+      synthetic_preprocess_rgb_2ppc[23:16]
+  };
+  wire [47:0] preprocess_ch1_rgb_2ppc = PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ?
+                                      preprocess_ch1_synthetic_bgr_2ppc : rgb1_datax2;
+
   // Ch1-only preprocessing tap. These retained snapshot wires are a
   // non-intrusive pixel-domain debug anchor; they do not drive any board I/O.
   (* mark_debug = "true" *) wire        preprocess_ch1_snapshot_valid;
@@ -2101,19 +2153,21 @@ end
   (* keep_hierarchy = "TRUE" *) vision_preprocess_channel u_preprocess_ch1_tap (
       .i_clk                 (i_sysclk_div2),
       .i_rst_n               (pixel_data_en),
-      .i_vs                  (rgb1_vs),
-      .i_hs                  (rgb1_hs),
-      .i_de                  (rgb1_de),
-      .i_valid               (rgb1_valid),
-      .i_rgb_2ppc            (rgb1_datax2),
+      .i_vs                  (preprocess_ch1_vs),
+      .i_hs                  (preprocess_ch1_hs),
+      .i_de                  (preprocess_ch1_de),
+      .i_valid               (preprocess_ch1_valid),
+      .i_rgb_2ppc            (preprocess_ch1_rgb_2ppc),
       .i_cfg_enable          (1'b1),
       .i_cfg_roi_x0          (16'd0),
       .i_cfg_roi_y0          (16'd0),
       .i_cfg_roi_x1          (16'hffff),
       .i_cfg_roi_y1          (16'hffff),
-      .i_cfg_bg_r            (8'd0),
-      .i_cfg_bg_g            (8'd0),
-      .i_cfg_bg_b            (8'd0),
+      // The synthetic source uses neutral gray background. Keep the prior
+      // black reference when the live Debayer input is selected.
+      .i_cfg_bg_r            (PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ? 8'd128 : 8'd0),
+      .i_cfg_bg_g            (PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ? 8'd128 : 8'd0),
+      .i_cfg_bg_b            (PREPROCESS_CH1_USE_SYNTHETIC_SOURCE ? 8'd128 : 8'd0),
       .i_cfg_fg_diff_min     (8'd1),
       .i_cfg_luma_min        (10'd0),
       .i_cfg_luma_max        (10'd1023),
@@ -2313,7 +2367,7 @@ assign mipi_tx_dp13_RST      = 1'b1;
   reg [23:0] selected_hdmi_data_d;
   reg selected_bridge_data_change_seen;
   reg [1:0] hdmi_video_ready_sync;
-  wire hdmi_video_ready = hdmi_video_ready_sync[1];
+  wire hdmi_video_ready = HDMI_USE_SYNTHETIC_VERIFY ? 1'b1 : hdmi_video_ready_sync[1];
   wire selected_frame_ready;
   wire selected_fifo_underflow;
   reg [2:0] selected_frame_ready_cdc;
@@ -2379,6 +2433,14 @@ assign mipi_tx_dp13_RST      = 1'b1;
   wire       hdmi1_bridge_underflow;
   wire       hdmi1_bridge_level_ready;
   wire       hdmi1_bridge_level_low;
+  wire       synthetic_hdmi_bridge_vs;
+  wire       synthetic_hdmi_bridge_hs;
+  wire       synthetic_hdmi_bridge_de;
+  wire [23:0] synthetic_hdmi_bridge_data;
+  wire       synthetic_hdmi_bridge_active;
+  wire       synthetic_hdmi_bridge_underflow;
+  wire       synthetic_hdmi_bridge_level_ready;
+  wire       synthetic_hdmi_bridge_level_low;
 
   video_2pix_to_1pix_cdc #(
       .FIFO_DEPTH(4096),
@@ -2422,14 +2484,45 @@ assign mipi_tx_dp13_RST      = 1'b1;
       .o_level_low(hdmi1_bridge_level_low)
   );
 
-  assign selected_hdmi_vs   = channel_sel ? hdmi1_bridge_vs   : hdmi0_bridge_vs;
-  assign selected_hdmi_hs   = channel_sel ? hdmi1_bridge_hs   : hdmi0_bridge_hs;
-  assign selected_hdmi_de   = channel_sel ? hdmi1_bridge_de   : hdmi0_bridge_de;
-  assign selected_hdmi_data = channel_sel ? hdmi1_bridge_data : hdmi0_bridge_data;
-  assign selected_bridge_active = channel_sel ? hdmi1_bridge_active : hdmi0_bridge_active;
-  assign selected_bridge_underflow = channel_sel ? hdmi1_bridge_underflow : hdmi0_bridge_underflow;
-  assign selected_bridge_level_ready = channel_sel ? hdmi1_bridge_level_ready : hdmi0_bridge_level_ready;
-  assign selected_bridge_level_low = channel_sel ? hdmi1_bridge_level_low : hdmi0_bridge_level_low;
+  // Dedicated verification bridge. It is the only HDMI path fed by the
+  // synthetic source; u_hdmi0_video_cdc and u_hdmi1_video_cdc remain live.
+  video_2pix_to_1pix_cdc #(
+      .FIFO_DEPTH(4096),
+      .START_LEVEL(256)
+  ) u_synthetic_hdmi_video_cdc (
+      .wr_clk(i_sysclk_div2),
+      .rd_clk(hdmi_tx_slow_clk),
+      .rst_n(pixel_data_en),
+      .i_vs(synthetic_preprocess_vs),
+      .i_hs(synthetic_preprocess_hs),
+      .i_de(synthetic_preprocess_de),
+      .i_data(synthetic_preprocess_rgb_2ppc),
+      .o_vs(synthetic_hdmi_bridge_vs),
+      .o_hs(synthetic_hdmi_bridge_hs),
+      .o_de(synthetic_hdmi_bridge_de),
+      .o_data(synthetic_hdmi_bridge_data),
+      .o_active(synthetic_hdmi_bridge_active),
+      .o_underflow(synthetic_hdmi_bridge_underflow),
+      .o_level_ready(synthetic_hdmi_bridge_level_ready),
+      .o_level_low(synthetic_hdmi_bridge_level_low)
+  );
+
+  assign selected_hdmi_vs   = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_vs :
+                              (channel_sel ? hdmi1_bridge_vs : hdmi0_bridge_vs);
+  assign selected_hdmi_hs   = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_hs :
+                              (channel_sel ? hdmi1_bridge_hs : hdmi0_bridge_hs);
+  assign selected_hdmi_de   = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_de :
+                              (channel_sel ? hdmi1_bridge_de : hdmi0_bridge_de);
+  assign selected_hdmi_data = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_data :
+                              (channel_sel ? hdmi1_bridge_data : hdmi0_bridge_data);
+  assign selected_bridge_active = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_active :
+                                  (channel_sel ? hdmi1_bridge_active : hdmi0_bridge_active);
+  assign selected_bridge_underflow = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_underflow :
+                                     (channel_sel ? hdmi1_bridge_underflow : hdmi0_bridge_underflow);
+  assign selected_bridge_level_ready = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_level_ready :
+                                        (channel_sel ? hdmi1_bridge_level_ready : hdmi0_bridge_level_ready);
+  assign selected_bridge_level_low = HDMI_USE_SYNTHETIC_VERIFY ? synthetic_hdmi_bridge_level_low :
+                                    (channel_sel ? hdmi1_bridge_level_low : hdmi0_bridge_level_low);
 
   always @(posedge hdmi_tx_slow_clk or negedge sys_rst_n) begin
       if (!sys_rst_n) begin
