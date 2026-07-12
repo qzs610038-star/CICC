@@ -16,13 +16,17 @@
     - 白/黑依赖填充率；FG_AREA_AVAILABLE 默认仍为 0，白色现场可靠性不足。
     - board_io / classifier / param_table / matcher / main 有 C 代码和历史 Host 测试。
     - myCobot 协议、控制器和点位表已有部分纯 C 迁移骨架。
+    - 2026-07-12 B线 Host checkpoint:
+      task_matcher 已新增决赛四任务契约、五色目标、任务三/四相对尺寸关系和理由码；
+      round_controller 已新增独立纯 C 状态机，覆盖事件序号/ACK、超时、放弃/软复位、
+      ARM_DISABLED、单 tick 动作请求和 20 轮 SKIP Mock 回归。
 
   现在不能确认的:
     - 当前视频 Efinity 工程没有 QCRV32 SoC IP、生成的 soc.h、正式 APB 从机或
       CPU->OSD CDC；赛方 CPU 例程和视频工程仍是两个独立 bitstream。
     - CPU 代码没有在 final_project 板级闭环中运行过。
-    - task_matcher 仍只做旧版颜色/形状/精确尺寸匹配，没有任务三“差=10mm”、
-      任务四“差<=5mm”、task_mode、理由码和一轮一事务。
+    - task_matcher/round_controller 目前只通过 Host/Mock，不等于板上逐轮闭环；
+      main 仍未接入 round_controller，正式 TARGET_CFG/OPERATOR_EVENT/RESULT_STATUS 未由硬件定版。
     - TARGET_SEL / LIVE_FG_AREA 均未在 FPGA 硬件定版；当前偏移和基址不能上板。
     - main 没有调用 arm_controller，开发板到 myCobot 的 UART/电平/接线未确定。
 
@@ -47,8 +51,8 @@
   [1] board_io          ✅ 代码完成 / 硬件接入待 SoC 生成
   [2] vision_classifier ✅ 代码完成（最新归档 host 单测 31/31, 2026-07-09）
   [3] param_table       ✅ 代码完成（最新归档 host 单测 81/81, 2026-07-09）
-  [4] task_matcher      ⚠️ 旧精确匹配代码完成 / 决赛四任务升级未实现
-  [5] round_controller ❌ 尚未实现
+  [4] task_matcher      ✅ Host四任务契约通过 / 板上目标输入待 SoC/APB 定版
+  [5] round_controller ✅ Host/Mock状态机通过 / main和板上事件接入待实现
   [6] main              ⚠️ 识别循环存在 / 未接逐轮事务和 arm_controller / 未上板
 
   注：本文件中的“代码完成”只表示当前 C 源码与已归档测试记录；不表示已生成

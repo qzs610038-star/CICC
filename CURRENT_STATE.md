@@ -27,6 +27,16 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-12，来源 Agent：Codex（B/CPU得分引擎）
+  - 适用范围：`final_project/cpu/app` 四任务匹配契约与纯 C 逐轮事务 Host/Mock 基线
+  - 最新结论：B 线首个 Host checkpoint 已落地。`task_matcher` 新增 `competition_target_t`、`task_mode_t`、`reason_code_t` 和 `task_matcher_evaluate_competition()`，覆盖五色目标、任务一/二颜色正方体、任务三 `delta == 10mm`、任务四 `delta <= 5mm` 与稳定理由码；新增独立 `round_controller`，覆盖 `event_seq + ACK`、PLACE/REMOVE/APPLY、识别锁存、非目标 SKIP、`ARM_DISABLED -> ARM_NOT_READY`、单 tick 动作请求、识别超时、软复位和 20 轮 SKIP Mock 回归。
+  - 替代旧结论：替代“task_matcher 仍只做旧版颜色/形状/精确尺寸匹配、round_controller 尚未实现”的 CPU 源码状态；不替代 SoC/APB/OSD/真实摄像头/板到臂 UART 的未完成状态。
+  - 证据路径：`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/tests/test_task_matcher.c`、`final_project/cpu/tests/test_round_controller.c`。
+  - 验证命令与结果：使用本机 `tools/mingw64/bin/gcc.exe` 和 `-DAPB_VISION_BASE_PLACEHOLDER=0xF0000000u` 编译 Host 测试；`test_task_matcher_codex.exe` 结果 `119/119 passed`，`test_round_controller_codex.exe` 结果 `115/115 passed`。编译期仅出现预期 `soc.h` 缺失占位基址 warning。
+  - 未完成边界：未做 RISC-V 交叉构建，未接入 `main.c`，未使用正式 `soc.h`，未验证 APB、CDC、OSD、真实特征快照、20轮板级计时或机械臂动作；Host/Mock 通过不得描述成真实摄像头或板级闭环通过。
+  - 下一步最小闭环：等待 A 提供正式 `soc.h`/寄存器语义后，把 `TARGET_CFG_STATUS`、`OPERATOR_EVENT`、`RESULT_STATUS` 与 `LIVE_FG_AREA` 接入 `board_io`/`main.c`，先保持 `ARM_DISABLED` 跑 20 轮 F1 Mock/板上流程。
+  - 失效条件：A 侧正式寄存器语义与当前 `competition_target_t`/事件模型不兼容，后续 RISC-V 构建失败，或 Host/Mock 回归失败。
+
 - 日期：2026-07-12，来源：用户逐项进度访谈 + Codex共享仓库核查
   - 适用范围：7月17日保底冻结前的真实进度、人力、阻塞、最低保底和立即工作队列
   - 最新结论：决赛主方案已更新为`v1.2-main`。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。
