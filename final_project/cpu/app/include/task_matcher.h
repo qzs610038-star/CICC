@@ -4,13 +4,20 @@
  *  接收 vision_classifier 的稳定分类结果，与任务目标比对，输出抓取/跳过/报错。
  *
  *  使用方式：
- *    1. task_matcher_set_target(&t) 或 task_matcher_read_target_from_fpga()
- *       设定本轮目标
+ *    1. task_matcher_set_target_ex(&t) 设定本轮目标（含 task_mode）
  *    2. 每帧调用 task_matcher_evaluate(&obs, cx, cy) 评估
  *    3. 若返回 MATCH_ACTION_GRAB → 表示授权固定 P_pick 抓取序列。
- *       task_matcher_get_grab_coord() 可取出抓取中心坐标，
- *       但该坐标仅用于 OSD/日志/偏差检查，不作为机械臂实时坐标接口。
- *       （正式主线采用固定抓取点，不做视觉伺服闭环。）
+ *       随后自动进入 GRAB_REQUESTED 锁定状态，同轮不再重复 GRAB。
+ *    4. 本轮结束后调用 task_matcher_next_round() 释放锁定，进入下一轮。
+ *
+ *  grab_center 仅用于 OSD/日志/偏差检查，不作为机械臂实时坐标接口。
+ *  （正式主线采用固定抓取点，不做视觉伺服闭环。）
+ *
+ *  四任务决赛规则（2026-07-12）：
+ *    TASK_MODE_1 — 颜色+形状精确匹配（无视尺寸）
+ *    TASK_MODE_2 — 颜色+形状+尺寸精确匹配
+ *    TASK_MODE_3 — 颜色+形状匹配，尺寸与 reference_size 差 = 10mm(1cm)
+ *    TASK_MODE_4 — 颜色+形状匹配，尺寸与 target_size 差 ≤ 5mm(0.5cm)
  *==========================================================================*/
 
 #ifndef TASK_MATCHER_H
@@ -24,9 +31,6 @@ extern "C" {
 #endif
 
 /*--------------------------------------------------------------------------
- *  动作码（回写到 FPGA OSD / match_action 寄存器）
- *--------------------------------------------------------------------------*/
-/*--------------------------------------------------------------------------
  *  编译开关
  *--------------------------------------------------------------------------*/
 #ifndef TASK_MATCHER_DEBUG_MODE
@@ -37,17 +41,47 @@ extern "C" {
  *  动作码（回写到 FPGA OSD / match_action 寄存器）
  *--------------------------------------------------------------------------*/
 #define MATCH_ACTION_NONE    0   /* 空闲，无目标或未评估 */
-#define MATCH_ACTION_GRAB    1   /* 三属性全部匹配 → 抓取 */
+#define MATCH_ACTION_GRAB    1   /* 全部匹配 → 抓取 */
 #define MATCH_ACTION_SKIP    2   /* 存在不匹配 → 跳过 */
 #define MATCH_ACTION_ERROR   3   /* 观测无效（仅 DEBUG_MODE=1 时输出） */
 
 /*--------------------------------------------------------------------------
- *  任务目标
+ *  任务模式（四任务决赛）
+ *--------------------------------------------------------------------------*/
+typedef enum {
+    TASK_MODE_NONE = 0,
+    TASK_MODE_1    = 1,   /* 颜色+形状精确匹配，尺寸通配 */
+    TASK_MODE_2    = 2,   /* 颜色+形状+尺寸精确匹配 */
+    TASK_MODE_3    = 3,   /* 颜色+形状匹配，尺寸=|obs-ref|=10mm */
+    TASK_MODE_4    = 4    /* 颜色+形状匹配，尺寸=|obs-target|≤5mm */
+} task_mode_t;
+
+/*--------------------------------------------------------------------------
+ *  一轮一事务状态机
+ *--------------------------------------------------------------------------*/
+typedef enum {
+    ROUND_IDLE          = 0,   /* 未设定目标，等待新轮 */
+    ROUND_TARGET_LOCKED = 1,   /* 目标已设定，等待匹配 */
+    ROUND_GRAB_REQUESTED = 2,  /* 本轮已发出 GRAB，锁定防重复 */
+    ROUND_DONE          = 3    /* 本轮完成，等待 next_round 复位 */
+} round_state_t;
+
+/*--------------------------------------------------------------------------
+ *  尺寸差值常量（cm_x10 单位，即 0.1cm = 1mm）
+ *--------------------------------------------------------------------------*/
+#define TASK3_SIZE_DELTA_CM_X10      10   /* 任务三：边长差 = 10mm (1cm) */
+#define TASK4_SIZE_DELTA_MAX_CM_X10   5   /* 任务四：边长差 ≤ 5mm (0.5cm) */
+
+/*--------------------------------------------------------------------------
+ *  任务目标（扩展版，支持四任务决赛）
  *--------------------------------------------------------------------------*/
 typedef struct {
-    uint8_t target_color;       /* COLOR_* — COLOR_UNKNOWN 时匹配任意颜色 */
-    uint8_t target_shape;       /* SHAPE_* — SHAPE_UNKNOWN 时匹配任意形状 */
-    uint8_t target_size_cm_x10; /* 0=wildcard 匹配任意尺寸，非零则精确匹配 */
+    uint8_t target_color;            /* COLOR_WHITE/BLACK/RED/BLUE/YELLOW/UNKNOWN */
+    uint8_t target_shape;            /* SHAPE_* — SHAPE_UNKNOWN 时匹配任意形状 */
+    uint8_t target_size_cm_x10;      /* 20/25/30; 0=通配 — 用于 MODE_2/4 */
+    uint8_t reference_size_cm_x10;   /* 任务三参照物尺寸; 0=未锁定 */
+    uint8_t task_mode;               /* TASK_MODE_1..4 */
+    uint8_t round_state;             /* ROUND_* — 防重复触发的事务锁状态 */
 } task_target_t;
 
 /*--------------------------------------------------------------------------
@@ -57,29 +91,41 @@ typedef struct {
 /* 初始化：清空目标和内部状态 */
 void task_matcher_init(void);
 
-/* 设定当前要寻找的物块目标。传入 NULL 则清空目标。 */
+/* 设定当前要寻找的物块目标（旧接口，兼容历史测试）。
+ * 等价于 task_matcher_set_target_ex() 且 task_mode=TASK_MODE_2、其余字段为 0。
+ * 传入 NULL 则清空目标。 */
 void task_matcher_set_target(const task_target_t *t);
+
+/* 设定当前目标（扩展版，支持 task_mode / reference_size / round_state）。
+ * 传入 NULL 则清空目标并重置为 ROUND_IDLE。
+ * 调用此函数自动推进到 ROUND_TARGET_LOCKED（若目标有效）。 */
+void task_matcher_set_target_ex(const task_target_t *t);
 
 /* 将一帧观测结果与当前目标比对。
  *
  * center_x / center_y: bbox 中心的像素坐标（来自 feature_snapshot_t.center）。
  * 若本次返回 MATCH_ACTION_GRAB，该坐标被内部保存，
- * 后续 task_matcher_get_grab_coord() 可取出。
+ * 后续 task_matcher_get_grab_coord() 可取出，且 round_state 自动推进到
+ * ROUND_GRAB_REQUESTED（锁定，防止同轮重复 GRAB）。
  *
  * 决策规则（按优先级）：
- *   1. 未设定目标 → NONE
+ *   1. round_state != ROUND_TARGET_LOCKED → NONE
+ *      （未设定目标 / 已抓过 / 本轮已完成 → 不抓）
  *   2. color_id 或 shape_id 为 UNKNOWN：
- *        DEBUG_MODE=1（调试）→ ERROR（便于 OSD 排查）
- *        DEBUG_MODE=0（正式）→ NONE（不抓、不报错，等待下一帧有效观测）
+ *        DEBUG_MODE=1（调试）→ ERROR
+ *        DEBUG_MODE=0（正式）→ NONE
  *   3. target_color != UNKNOWN 且 color 不匹配 → SKIP
  *   4. target_shape != UNKNOWN 且 shape 不匹配 → SKIP
- *   5. target_size != 0 且 obs.size==0（Cam1 尺寸不可用）→ NONE
- *      （必须等 Cam1 侧面稳定；不能仅靠 Cam0 判断尺寸）
- *   6. target_size != 0 且 size 不匹配 → SKIP
- *   7. 全部匹配 → GRAB
+ *   5. 尺寸判定（按 task_mode 分派）：
+ *        MODE_1: 跳过尺寸检查（通配）
+ *        MODE_2: obs.size==0 → NONE（等 Cam1）；obs.size != target_size → SKIP
+ *        MODE_3: obs.size==0 → NONE；
+ *                |obs.size - reference_size| != 10 → SKIP
+ *        MODE_4: obs.size==0 → NONE；
+ *                |obs.size - target_size| > 5 → SKIP
+ *   6. 全部匹配 → GRAB（自动推进到 ROUND_GRAB_REQUESTED）
  *
- * 注意：正式主线中 UNKNOWN 只输出 NONE，不输出 ERROR。
- * 这与 2026-07-09 用户决策一致：避免因偶然噪声帧触发误报错。 */
+ * 注意：正式主线中 UNKNOWN 只输出 NONE，不输出 ERROR。 */
 uint8_t task_matcher_evaluate(const vision_result_t *obs,
                                uint16_t center_x, uint16_t center_y);
 
@@ -89,6 +135,18 @@ int task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy);
 
 /* 获取当前目标（NULL=无目标），用于调试 / OSD 显示 */
 const task_target_t *task_matcher_get_target(void);
+
+/* 推进到下一轮：重置事务锁，允许新的 GRAB。
+ * 调用后 round_state 从 ROUND_GRAB_REQUESTED/ROUND_DONE → ROUND_IDLE。
+ * 调用方必须在下一轮开始前重新 set_target。 */
+void task_matcher_next_round(void);
+
+/* 完全重置：清空目标 + round_state → ROUND_IDLE。
+ * 等价于 set_target_ex(NULL)。 */
+void task_matcher_round_reset(void);
+
+/* 获取当前 round_state，供 main 循环 / 调试使用 */
+uint8_t task_matcher_get_round_state(void);
 
 /* 从 FPGA TARGET_SEL 寄存器读取并构建 cube 目标。
  * target_shape 固定为 SHAPE_CUBE（识别侧只抓正方体）。
@@ -101,14 +159,9 @@ const task_target_t *task_matcher_get_target(void);
  *   1        → 真正读 TARGET_SEL 寄存器
  * FPGA 队友确认地址/位定义后改为 1。
  *
- * 正式主线行为（2026-07-09 用户决策）：
- *   TARGET_SEL_AVAILABLE=0 或 target_valid=0 时，必须清空目标并返回 NONE，
- *   不允许沿用旧目标继续抓取。手动设定目标仅限显式调试模式。
- *
- * TARGET_SEL 位定义（由 FPGA 队友提供，CPU 只读）：
- *   [1:0] color_sel   00=任意, 01=红, 10=蓝, 11=黄
- *   [3:2] size_sel    00=任意, 01=小(20mm), 10=中(25mm), 11=大(30mm)
- *   [4]   target_valid  0=无效, 1=有效 */
+ * 注意：旧 2-bit color_sel 不支持白/黑五色；四任务正式接入前
+ * 必须使用 set_target_ex() + Host/mock API 注入五色目标，
+ * 不得依赖 TARGET_SEL_AVAILABLE=1 读取旧字段。 */
 int task_matcher_read_target_from_fpga(void);
 
 #ifdef __cplusplus
