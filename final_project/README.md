@@ -22,6 +22,7 @@ MIPI 摄像头
 
 ## 当前实施方案
 
+- 摄像头尚未产生稳定 CSI 流期间，下游采用 host 特征回放和合成像素仿真推进，且不替代真实摄像头验收：[camera_independent_downstream_execution_plan_20260712.md](docs/technical_plans/camera_independent_downstream_execution_plan_20260712.md)。
 - FPGA ROI/统计特征预处理模块的范围、接口、实施阶段和队友交接约束：[fpga_vision_preprocess_execution_plan_20260711.md](docs/technical_plans/fpga_vision_preprocess_execution_plan_20260711.md)。
 - 其他已批准或待执行的技术方案统一从 [technical_plans/README.md](docs/technical_plans/README.md) 进入。
 

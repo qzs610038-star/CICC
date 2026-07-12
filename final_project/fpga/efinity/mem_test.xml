@@ -45,6 +45,7 @@
         <efx:design_file name="../rtl/feature_extract/feature_accumulator_2ppc.v" version="default" library="default" />
         <efx:design_file name="../rtl/feature_extract/feature_snapshot.v" version="default" library="default" />
         <efx:design_file name="../rtl/feature_extract/vision_preprocess_channel.v" version="default" library="default" />
+        <efx:design_file name="../rtl/feature_extract/synthetic_2ppc_source.v" version="default" library="default" />
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/timescale.v" version="default" library="default" />
         <efx:design_file name="../rtl/mipi_csi/cam_i2c_ctrl/i2c_master/i2c_master_defines.v" version="default" library="default" />
         <efx:design_file name="../rtl/framebuffer/elt_dcfifo_v10.v" version="default" library="default" />
