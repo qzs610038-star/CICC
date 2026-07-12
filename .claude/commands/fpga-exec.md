@@ -5,13 +5,14 @@
 ## 执行规则
 - 先确认本轮只解决一个明确问题。
 - 修改前先用 codebase-memory-mcp 的 `D-cicc_cbm_link` 图谱定位相关文件/函数/模块，再回到真实文件核查。
-- 先核对本轮修改是否符合 `分赛区决赛实施开发路线.md`：FPGA 做视频前端/ROI/统计特征/OSD，板上 CPU 做视觉分类、参数管理和 myCobot 控制。
+- 先核对最新官方细则、`AGENTS.md`「分赛区决赛系统架构硬边界」和 `CURRENT_STATE.md`；旧路线文件只能提供历史经验，不能覆盖当前任务或状态。
 - 修改前列出影响范围和计划改动。
 - 优先改问题所属子系统，只有系统连线变化时才改 `src/top.v`。
 - 不做无关格式化或生成文件重排。
 - 不直接改 `ipm/`、赛方补丁、原始压缩包、波形、`outflow/` 等生成产物。
 - 不直接迁移初赛 demo 的识别 RTL、`DEMO_MODE`、临时脚本或硬编码路径。
 - 不把颜色/形状/尺寸分类和 myCobot 动作状态机写回纯 RTL；如确需硬件加速，只能作为 FPGA 特征统计或串口/FIFO/寄存器通道。
+- 若修改影响任务输入、四任务关系判定、逐轮事务、OSD 结果语义或机械臂响应，必须同时更新对应接口契约、host/mock 测试和 `CURRENT_STATE.md`；未完成板级验证时不得写成已闭环。
 - 涉及双通道、时钟、复位、AXI、framebuffer、约束或工程文件时，执行后必须生成 Codex Review Packet。
 - 涉及 QCRV32、BSCAN/JTAG、CPU DDR/AXI、`axi_reg_file`、`results_cdc`、CPU/OSD 回写、机械臂动作或串口接线时，执行后必须生成 Codex Review Packet。
 - 同一问题连续两轮失败时，停止继续试补丁，转为请求 Codex 审查。
@@ -24,6 +25,8 @@
 
 ## 修改前判断
 - CBM 定位结果：
+- 官方细则约束：
+- CURRENT_STATE 当前事实：
 - 影响范围：
 - 计划修改：
 - 需要保护的文件：

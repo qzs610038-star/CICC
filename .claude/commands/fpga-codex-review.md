@@ -41,7 +41,10 @@
 - FPGA：
 - 板上 CPU：
 - PC/外部 MCU：
-- 是否偏离 `分赛区决赛实施开发路线.md`：
+- 是否符合最新官方细则：
+- 是否符合 `AGENTS.md`「分赛区决赛系统架构硬边界」：
+- 是否与 `CURRENT_STATE.md` 当前事实一致：
+- 是否误用旧路线或历史 handoff：
 
 ## 时钟、复位、AXI、framebuffer、双通道影响
 

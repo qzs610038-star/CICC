@@ -15,6 +15,6 @@
 - `debug_sessions/`：当前调试状态和逐轮上板记录。
 - `review_packets/`：跨子系统、顶层、时钟/CDC、工程配置等 Codex 审查材料。
 - `bringup/`：板级 bring-up 操作说明。
-- `competition_manual/`：比赛现场操作手册。
+- `competition_manual/`：官方比赛细则与现场操作手册。核心约束入口见 [0710 最新官方细则](competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md)，项目差距与优化顺序见 [细则对照优化建议](competition_manual/细则对照项目优化建议_20260712.md)。
 - `evidence/`：测试和验收证据。
 - `source_materials_digest/`：赛方资料摘要入口。

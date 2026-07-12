@@ -2,7 +2,7 @@
 
 > 本文件记录对历史规划文件的最新覆盖项与当前阶段状态。优先级见 `AGENTS.md`「文档优先级与交接规则」。
 > 真实源码、工程 XML、构建日志和上板现象始终是最终事实来源；本文件只记录对它们的最新结论和证据位置。
-> 安全红线（机械臂动作、Codex 审查门、决赛主线边界、Git 规范）不可被本文件覆盖。
+> 安全红线（机械臂动作、Codex 审查门、系统架构硬边界、Git 规范）不可被本文件覆盖。
 > 活跃条目只保留当前路线、阻塞和下一步；PC 端历史实测归入“历史参考”，未定硬件选择归入“待定决策”。
 
 ## 状态条目格式
@@ -22,10 +22,27 @@
 - 适用范围：分赛区决赛主线阶段识别
 - 最新结论：`HDMI 双摄透传 bring-up / 分赛区决赛保底方案` 已降级为历史基础链路或旧结论，不再作为默认当前核心攻关任务。后续当前目标必须由用户最新指令或最新 handoff 明确声明，例如 ROI/统计特征与 OSD、CPU 分类参数、CPU 与 myCobot UART 控制协议联调等；Agent 不得从旧保底方案自动推断当前阶段。
 - 替代旧结论：`分赛区决赛实施开发路线.md` 中以 HDMI 双摄透传保底为当前核心目标的阶段性表述，以及 `debug_records/camera_hdmi_handoff_2026-07-06.md` 中的阶段性 bring-up 状态。
-- 证据路径：`AGENTS.md`「分赛区决赛主线」、`分赛区决赛实施开发路线.md`、`debug_records/camera_hdmi_handoff_2026-07-06.md`、用户 2026-07-07 批注。
+- 证据路径：`AGENTS.md`「分赛区决赛系统架构硬边界」（原「分赛区决赛主线」）、`分赛区决赛实施开发路线.md`、`debug_records/camera_hdmi_handoff_2026-07-06.md`、用户 2026-07-07 批注。
 - 失效条件：用户明确恢复 HDMI 双摄透传为当前攻关目标，或新的 `CURRENT_STATE.md` 状态条目给出更高优先级结论。
 
 ## 活跃状态与路线覆盖项
+
+- 日期：2026-07-12，来源 Agent：Codex（Agent 入口一致性维护）
+  - 适用范围：`AGENTS.md`、`CLAUDE.md`、`.claude/commands/*`、`.agents/skills/*` 与活跃实施文档的权威层级
+  - 最新结论：活跃入口已统一为四层职责：最新官方细则定义比赛任务/评分/时限，`AGENTS.md` 定义稳定系统架构与安全硬边界，`CURRENT_STATE.md` 定义可变完成度/阻塞，`分赛区决赛实施开发路线.md` 只作历史路线图和经验库。FPGA/CPU 总体分工未改变，但已显式补入四任务关系判定、逐轮事务、OSD 结果语义、唯一机械臂响应和“目标不等于完成状态”规则。
+  - 替代旧结论：`AGENTS.md`“当前最高层路线文件是分赛区决赛实施开发路线”、`.claude/commands/fpga-plan.md`“旧路线是当前高层路线源”、两项 Skill 以旧路线作为共同权威的表述。
+  - 同步范围：`AGENTS.md`、`CLAUDE.md`、`.claude/commands/fpga-plan.md`、`fpga-exec.md`、`fpga-codex-review.md`、`fpga-handoff.md`、`.agents/skills/fpga_vision/SKILL.md`、`.agents/skills/cpu_mycobot/SKILL.md`、`final_project/README.md`、`final_project/docs/source_materials_digest/05_agent_quickstart.md`、`final_project/docs/mycobot_migration_plan.md` 及两份活跃技术计划。
+  - 当前状态不变：此次只维护文档和 Agent 指令，未修改 RTL/CPU 源码，未补齐四任务输入/关系判定、CPU/APB/OSD、正式 UART 或机械臂实机闭环。
+  - 失效条件：官方细则更新、架构边界经用户明确改变，或活跃入口再次出现把旧路线当作当前唯一权威的表述。
+
+- 日期：2026-07-12，来源 Agent：Codex（依据 0710 最新官方 PDF）
+  - 适用范围：分赛区决赛任务定义、评分语义、现场流程与全项目验收优先级
+  - 最新结论：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md` 已注册为核心目标与约束。完整演示必须覆盖四任务×5轮并在 10 分钟内完成；每轮按识别25%、判断25%、执行50%串行计分，且必须明确输出识别、判断和执行/不执行理由。任务三是相对参考物边长差等于1cm，任务四是相对目标物边长差≤0.5cm，不能按“精确目标尺寸匹配”代替。目标颜色必须覆盖白、黑、红、蓝、黄。
+  - 替代旧结论：`分赛区决赛实施开发路线.md` 中“横向搬运距离大于10cm”“三类分赛区任务”“现场每项通常放置5次”等旧/模糊口径；正式目标位置改以官方细则的“相对起点旋转180°（±10°）且最大臂展处”为准。
+  - 证据路径：`赛方提供材料/第十届集创赛分赛区决赛“雄芯院”企业命题比赛细则-0710新.pdf`、`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`、`final_project/docs/competition_manual/细则对照项目优化建议_20260712.md`。
+  - 当前阻塞：`task_matcher_read_target_from_fpga()` 的目标输入缺白/黑色；`task_matcher_evaluate()` 仅支持精确尺寸匹配，未实现任务三/四的相对差值关系；`main.c` 尚未把匹配结果接入 `arm_controller`，仍写 `ARM_STATE_IDLE`；OSD/APB/CDC 与 20 轮端到端时限均无板级证据。
+  - 下一步最小闭环：先在 host 层定版 `task_mode + target_color + reference_size + apply/lock` 契约并补齐四任务规则单测，再做“一轮一事务”状态机和 mock 机械臂集成；不得因新细则扩大未验证的 FPGA 数据路径。
+  - 失效条件：组委会/企业专家发布更新版本，或现场给出不同书面确认；发生时必须保留版本历史并新增覆盖条目，不得静默改写 0710 转写。
 
 - 日期：2026-07-11，来源 Agent：Codex
   - 适用范围：`final_project` FPGA 视觉预处理第一阶段

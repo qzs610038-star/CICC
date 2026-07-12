@@ -2,12 +2,14 @@
 
 本目录是分赛区决赛正式开发工程。赛方原始资料与初赛 demo 只作为只读来源，不在原目录内直接修改。
 
+比赛任务、评分和现场流程从 [0710 最新官方细则](docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md) 进入；系统架构硬边界见根目录 [AGENTS.md](../AGENTS.md)，当前完成度和阻塞见 [CURRENT_STATE.md](../CURRENT_STATE.md)。根目录 `分赛区决赛实施开发路线.md` 只作为历史路线图和经验库。
+
 ## 主线
 
 ```text
 MIPI 摄像头
 -> FPGA: video_in / raw_unpack / debayer / wb_gamma / roi_crop / feature_extract
--> CPU: vision_classifier / task_matcher / arm_controller / mycobot_protocol
+-> CPU: vision_classifier / four-task matcher / per-round state / arm_controller / mycobot_protocol
 -> FPGA: osd / dvi_tx
 -> HDMI 显示与 myCobot 控制
 ```

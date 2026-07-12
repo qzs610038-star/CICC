@@ -2,7 +2,7 @@
 
 > 从 PC 端 Python / `pymycobot` 迁移到板上 SoC C 固件
 > 补充版：2026-07-07，Codex 审查与 Gemini 查表核查后修订
-> 当前定性：方向可行，但必须先完成真源确认；本文是实施蓝图，不是已验证完成清单。
+> 当前定性：纯 C 协议、传输、控制器与 mock/host 骨架已落地；正式 SoC/UART、主循环和实机闭环仍受真源与安全门阻塞。本文是实施蓝图与状态索引，不是板级完成证明。
 
 ## 0. 结论与边界
 
@@ -16,21 +16,21 @@
 - 未确认电平、接线、管脚约束、UART IP、`soc.h` 地址和急停/断电方式前，不允许把 FPGA 输出直接接入机械臂控制线。
 - 涉及实机动作、夹爪、快速移动、FPGA-to-机械臂接线、`constrain.sdc`、`mem_test.xml`、`.peri.xml` 或 PLIC/CDC/AXI 的修改，必须进入 Codex Gate。
 
-本文引用的主线边界来自 `AGENTS.md`「分赛区决赛主线」和 `分赛区决赛实施开发路线.md`；若后续 `CURRENT_STATE.md` 给出更高优先级增量，以新状态为准，但不得覆盖机械臂安全红线。
+本文的比赛动作要求来自最新官方细则，系统职责来自 `AGENTS.md`「分赛区决赛系统架构硬边界」，当前完成度与阻塞来自 `CURRENT_STATE.md`。`分赛区决赛实施开发路线.md` 只提供历史实施经验，不得覆盖前三者或机械臂安全红线。
 
 ## 1. 当前工程事实
 
-当前仓库中已有 CPU 软件骨架，但机械臂离线控制尚未真正落地：
+当前仓库中的纯 C 软件层已经明显超过早期 skeleton，但正式硬件闭环仍未落地：
 
-- `final_project/cpu/app/src/mycobot_protocol.c`：仅有最小帧头拼装骨架，还没有完整命令 payload、返回帧解析、校验和超时策略。
-- `final_project/cpu/app/src/arm_controller.c`：仅有 `arm_id/state` 初始化骨架，还没有动作状态机、点位表和安全门。
-- `final_project/cpu/app/include/board_io.h`：已定义 FPGA/CPU APB3 视觉寄存器接口、feature snapshot、result writeback、heartbeat 等 API。
-- `final_project/cpu/app/src/board_io.c`：当前仍是 stub，尚未实现 `board_io.h` 声明的 APB3 API。
-- `final_project/cpu/app/include/bsp.h`：地址、CLINT/PLIC、UART、DDR 等仍是占位值，文件自身要求最终以 Efinity 生成的 `soc.h` 为真源。
-- `final_project/integration/io_pin_map.md`：目前只有说明文字，尚未记录 F12/C14/U19/V19 的正式证据表。
-- `final_project/integration/fpga_cpu_interface.md`：已明确第一版先验证 `REG_MAGIC -> CPU read -> CPU writeback -> OSD visible`，后续再接 PLIC 中断。
+- `final_project/cpu/app/src/mycobot_protocol.c`：已实现有界帧构造、完整帧解析，以及角度、夹爪等 typed payload helper；当前命令证据主要来自本机 `pymycobot 4.0.5`，实机前仍需官方资料或逻辑分析仪确认。
+- `final_project/cpu/app/src/mycobot_transport.c`：已实现纯 C RX ring、帧提取、TX queue/cursor 和错误计数；尚未连接真实 UART/MMIO/PLIC。
+- `final_project/cpu/app/src/arm_controller.c`：已实现配置、点位校验、一次抓取请求、协作式 `tick()`、软到位、失败复读、一次有限重试和 fault 路径；仍通过注入 callback 运行，不等于板上动作闭环。
+- `final_project/cpu/params/arm_positions.c`：已有默认点位计划及纯 C 校验入口，但尚未依据最新官方“旋转 180°（±10°）且最大臂展处”完成赛场目标点验收。
+- `final_project/cpu/app/src/board_io.c`：已实现配置、特征快照、结果回写、全局状态和 heartbeat API；寄存器地址及硬件语义仍受正式 `soc.h`、APB slave 和 CDC 实现约束。
+- `final_project/cpu/app/src/main.c`：识别主循环已调用任务匹配器，但抓取坐标只记录日志，尚未调用 `arm_controller`，`ARM_STATE` 仍固定写为 `IDLE`。
+- 当前仓库仍缺正式生成的 `soc.h`、myCobot UART 实例/地址/FIFO 语义、板级电平与接线确认、CPU/APB/OSD 闭环，以及任何机械臂实机动作证据。
 
-因此，后续执行顺序必须先补真源，再写动作逻辑。
+因此，下一步不是重写已经存在的协议或控制器，而是先补四任务逐轮事务与 `main`/controller 的 mock 集成，再在 SoC/UART 真源齐备后实施只读板级适配和受控动作验证。
 
 ## 2. 实施前真源确认清单
 
@@ -389,7 +389,7 @@ if strict arrival fails:
 
 | 项目 | 判定 | 说明 |
 |---|---|---|
-| 架构方向 | GO | 符合 `AGENTS.md`「分赛区决赛主线」：板上 CPU 控制 myCobot，RTL 只给硬件通道 |
+| 架构方向 | GO | 符合 `AGENTS.md`「分赛区决赛系统架构硬边界」：板上 CPU 控制 myCobot，RTL 只给硬件通道 |
 | 作为执行蓝图 | GO with conditions | 需先完成 T0 真源确认，并按阶段推进 |
 | 直接实机动作 | NO-GO | 管脚、UART2、`soc.h`、协议命令和安全点位尚未完成工程级闭环 |
 | 直接改 `board_io.c` 做 UART ISR | NO-GO | `board_io` 已承担 FPGA/CPU APB3 视觉寄存器接口，应新建 `mycobot_uart` |

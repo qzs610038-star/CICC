@@ -282,7 +282,7 @@ CDC 规则：
 
 ## 11. 参考事实源
 
-- `AGENTS.md`「分赛区决赛主线」与「Codex 审查门」
+- `AGENTS.md`「分赛区决赛系统架构硬边界」与「Codex 审查门」
 - `CURRENT_STATE.md`
 - `final_project/fpga/efinity/mem_test.xml`
 - `final_project/fpga/efinity/mem_test.peri.xml`

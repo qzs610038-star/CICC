@@ -6,10 +6,11 @@
 
 ## 1. Decision Basis
 
-The migration must follow the current final-route boundary:
+The migration must follow the current authority hierarchy:
 
-- `AGENTS.md` section "分赛区决赛主线": FPGA handles video front-end, ROI/statistics, OSD and necessary acceleration; board CPU handles recognition decision, parameter management and myCobot control.
-- `分赛区决赛实施开发路线.md` section 5.5: PC plus `pymycobot` is only for early point calibration and safety verification; final control returns to board CPU.
+- Latest official competition rules define the four tasks, unique arm response, gentle placement, 180-degree target geometry and timing requirements.
+- `AGENTS.md` section "分赛区决赛系统架构硬边界": FPGA handles video front-end, ROI/statistics, OSD rendering and hardware channels; board CPU handles classification, four-task relations, per-round state, parameter management and myCobot control.
+- `CURRENT_STATE.md` defines current implementation status and blockers. `分赛区决赛实施开发路线.md` is historical implementation guidance only.
 - `CURRENT_STATE.md` route overrides dated 2026-07-08: V2.10 to V2.12 PC findings are now governed by Codex review plus Claude log cross-check.
 - `mycobot_pc_tests/audit_logs/v2_codex_review_migrated_findings.md` section 5: Priority-3 migration rules are the authoritative precondition for this design.
 

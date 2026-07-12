@@ -6,11 +6,12 @@ This file provides Claude Code specific guidance for this repository. Shared pro
 
 Claude 开始任何任务前按以下顺序读取：
 
-1. `AGENTS.md`：仓库结构、决赛主线硬边界、机械臂安全、Codex Gate、Review Packet、交接规则。
-2. `CURRENT_STATE.md`：最新路线增量、当前阶段、已降级或废弃的旧结论。
-3. 本文件：Claude 专属执行方式、常用命令和交接命令。
+1. `AGENTS.md`：仓库结构、系统架构硬边界、机械臂安全、Codex Gate、Review Packet、交接规则。
+2. `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`：最新官方任务、评分、时间和现场流程硬约束。
+3. `CURRENT_STATE.md`：最新路线增量、当前阶段、已降级或废弃的旧结论。
+4. 本文件：Claude 专属执行方式、常用命令和交接命令。
 
-若三者冲突，以 `AGENTS.md`「文档优先级与交接规则」为准。不要在本文件重复维护主线边界、机械臂安全三阶段或 Codex Gate 清单。
+若这些入口冲突，以 `AGENTS.md`「文档优先级与交接规则」为准。不要在本文件重复维护官方细则、主线边界、机械臂安全三阶段或 Codex Gate 清单。
 
 ## 仓库性质
 
@@ -64,11 +65,18 @@ list_projects / index_status
 
 图谱只负责定位和上下文压缩。涉及 RTL 连线、时钟复位、AXI/framebuffer、QCRV32、myCobot 实机安全或 warning 取舍时，必须以真实文件和验证日志为准。
 
-## 决赛主线与协作规则
+## 权威层级与执行定位
 
-见 `AGENTS.md`「分赛区决赛主线」「机械臂与外设联调提示」「文档优先级与交接规则」「Claude/Codex 协同分工」。本文件不重复条款，只补充 Claude 专属上下文。
+Claude 必须按以下职责使用文档，不得把它们混成同一个“路线源”：
 
-当前阶段、旧方案降级、当前宏开关、当前烧录树等易变内容见 `CURRENT_STATE.md`。不要从旧 handoff 或旧保底方案自动推断当前核心目标。
+- 最新官方细则：定义四项任务、评分、10 分钟实操、现场操作与结果确认要求。
+- `AGENTS.md`「分赛区决赛系统架构硬边界」：定义 FPGA、板上 CPU、PC/外部 MCU 的长期职责和安全红线。
+- `CURRENT_STATE.md`：定义当前已完成项、阻塞、占位事实、暂缓验证项和下一步最小闭环。
+- `分赛区决赛实施开发路线.md`：仅作历史实施路线与经验库；被官方细则或 `CURRENT_STATE.md` 覆盖的内容不得恢复为当前目标。
+
+开始任务时，先把请求归类为“官方要求、稳定架构边界、当前状态或历史经验”中的一种或多种，再回到真实源码、工程 XML、日志和上板现象核查。不要从旧 handoff、旧保底方案、架构目标或 host 单测推断板级闭环。
+
+与正式比赛闭环有关的方案或实现，必须显式说明是否覆盖：五色/三形状/三尺寸、四任务关系判定、逐轮识别—判断—执行事务、明确结果输出、唯一机械臂响应和 20 轮时限。具体缺口以 `CURRENT_STATE.md` 最新条目为准，不在本文件复制易过期的完成度清单。
 
 ## 常用命令
 
@@ -131,6 +139,7 @@ powershell -ExecutionPolicy Bypass -File "tools\agent_handoff_health_check.ps1" 
 - 建议使用高能力模型，例如 Opus 系列。
 - 默认只读探索，不直接修改 RTL、约束或工程文件。
 - 必须先定位真实工程入口：`mem_test.xml`、`top.v`、相关 RTL 子目录和对应 IP `settings.json`。
+- 必须分别列出：官方细则约束、`AGENTS.md` 架构边界、`CURRENT_STATE.md` 当前事实；不得把 `分赛区决赛实施开发路线.md` 单独当作当前权威来源。
 - 输出必须包含：目标、涉及文件、信号链路、时钟/复位假设、双通道影响、备选方案、主要风险、验证计划。
 - 方案结束时生成 Codex Review Packet，等待 Codex 复核后再进入执行。
 
@@ -140,6 +149,7 @@ powershell -ExecutionPolicy Bypass -File "tools\agent_handoff_health_check.ps1" 
 
 - 建议使用廉价执行模型。
 - 每轮只处理一个明确问题，优先小 diff，不做无关重排。
+- 修改前必须核对 `CURRENT_STATE.md` 的当前阻塞和暂缓边界，并说明本轮是否改变四任务、逐轮事务、OSD 结果语义或机械臂唯一响应链路。
 - 修改前说明影响范围；修改后列出文件、命令、结果、仍存在的 warning 和未验证项。
 - 不直接重写 `ipm/`、赛方补丁、原始压缩包、波形和 `outflow/` 等生成产物。
 - 若连续两轮未解决同一问题，应停止继续试补丁，改为生成 Codex Review Packet。

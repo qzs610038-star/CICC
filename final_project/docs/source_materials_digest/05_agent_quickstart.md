@@ -8,14 +8,15 @@
 
 ## 推荐读取顺序
 
-1. `final_project/README.md`
-2. `分赛区决赛实施开发路线.md`
-3. `final_project/docs/source_materials_digest/README.md`
-4. `final_project/docs/source_materials_digest/03_main_video_demo.md`
-5. `final_project/integration/video_pipeline.md`
-6. `final_project/docs/architecture/riscv_official_examples_integration.md`
-7. `final_project/integration/fpga_cpu_interface.md`
-8. `final_project/integration/register_map.md`
+1. `AGENTS.md`：架构、安全、审查和协作硬边界。
+2. `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`：最新官方任务、评分与现场流程。
+3. `CURRENT_STATE.md`：当前完成度、阻塞、暂缓项和下一步。
+4. `CLAUDE.md`：Claude 专属执行方式；其他 Agent 可据此理解入口分工。
+5. `final_project/README.md`：正式工程入口。
+6. `final_project/docs/source_materials_digest/README.md` 与 `03_main_video_demo.md`：来源摘要与经验库。
+7. `final_project/integration/video_pipeline.md`、`fpga_cpu_interface.md`、`register_map.md`：接口契约；其中占位地址不得当作硬件事实。
+8. `final_project/docs/architecture/riscv_official_examples_integration.md`：RISC-V 例程吸收结论。
+9. `分赛区决赛实施开发路线.md`：仅在需要历史实施路线或经验时阅读。
 
 ## 视觉队友任务入口
 
@@ -32,7 +33,7 @@
 
 ## 不要做
 
-- 不直接复制官方 PDF/DOCX 大段原文。
+- 不再从官方 PDF/DOCX 另建重复转写；比赛规则统一引用 `competition_manual/` 下的规范 Markdown。
 - 不复制官方 RTL/C 源码到摘要。
 - 不建议把纯 FPGA 视觉识别或纯 RTL 机械臂控制作为决赛主线。
 - 不修改约束、IP settings、工程 XML、RTL 顶层或机械臂动作脚本，除非另有明确任务和审查。

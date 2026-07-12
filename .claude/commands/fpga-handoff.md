@@ -33,9 +33,15 @@
     "checked": false,
     "queries": []
   },
+  "authority_sources": {
+    "competition_rules": "final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md",
+    "architecture_boundary": "AGENTS.md#分赛区决赛系统架构硬边界",
+    "mutable_state": "CURRENT_STATE.md",
+    "historical_route_only": "分赛区决赛实施开发路线.md"
+  },
   "completed_tasks": [],
   "key_decisions": [],
-  "architecture_boundary": "FPGA video front-end/ROI/statistics/OSD; board CPU vision decision/parameters/myCobot control; no pure-FPGA vision or pure-FPGA arm control as main route",
+  "architecture_boundary": "FPGA video front-end/ROI/statistics/OSD rendering/hardware channels; board CPU five-color/three-shape/three-size classification, four-task relations, per-round transaction, parameters and myCobot control; no pure-FPGA vision or pure-FPGA arm control",
   "modified_files": [],
   "verification": [
     {
@@ -99,6 +105,7 @@
 - 生成 handoff 时由脚本动态写入当前工作区根路径；仓库内部证据路径必须统一写成相对项目根的路径，例如 `final_project/...`。
 - 绝对路径只用于来源追溯，不能作为接力 Agent 的执行目标。
 - `verified_facts` 每条必须带 `evidence` 和 `timestamp`；缺失则触发 `contradiction_report`。
+- `authority_sources` 必须保持四层职责分离：官方细则定义比赛，`AGENTS.md` 定义架构硬边界，`CURRENT_STATE.md` 定义当前状态，旧路线文件只作历史经验。
 - 机械臂相关事实不得包含任何未确认安全条件下的动作建议；交接恢复时只允许先做只读状态检查。
 
 ## 摘要格式
