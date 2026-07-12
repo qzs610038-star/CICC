@@ -124,7 +124,7 @@
   - 最新结论：保留 `origin/dev/wsc6090-CPU` 的正式 `round_controller`，覆盖 APPLY/PLACE/REMOVE 事件、识别与判断锁存、执行或跳过、机械臂等待/故障、软复位和 20 轮 Mock；同时将 `origin/dev/libaoxun688` 的轻量观察事务控制器改名为 `competition_round_transaction`，供 `competition_contract` 保留目标评估、event_seq、ACK、超时与放弃语义，避免同名覆盖丢失任一实现。
   - 本次验证：MSVC C11 `/W4 /WX`（A13 仅关闭编译器特有 `C4132`）实际运行 `task_matcher 146/146`、`vision_classifier 31/31`、`competition_round_transaction 135/135`、`competition_contract 35/35`、`competition_host_flow 164/164`、`A13 snapshot replay 169/169`、`round_controller 115/115`，合计 `795/795`；Efinity `riscv-none-embed-gcc 8.3.0` 对 matcher、classifier、两层 controller、contract、adapter、tasks 与 `main.c` 共 8 个源文件以 `-Wall -Wextra -Werror` compile-only PASS。
   - 当前边界：两层代码尚未接入 `main.c`、正式 `soc.h`、APB/CDC/OSD 或板上 UART；本地整合后的 Host/Mock 与交叉编译结果必须以本次验证记录为准，分支历史测试不能外推为板级通过。
-  - 证据路径：`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/competition_round_transaction.h`、`final_project/cpu/app/src/competition_round_transaction.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_competition_rounds.c`。
+  - 证据路径：`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/competition_round_transaction.h`、`final_project/cpu/app/src/competition_round_transaction.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_competition_rounds.c`、`final_project/docs/review_packets/team_integration_merge_review_20260713.md`。
   - 失效条件：整合回归失败、正式寄存器/事件契约改变接口，或后续主循环集成形成新的可复现实测证据。
 - 日期：2026-07-12，来源：用户现场反馈 + 当日 PC 原始日志 / Codex 复核
   - 适用范围：myCobot 280 的 180° PC 点位诊断、机械固定边界与板上 F2 放行顺序

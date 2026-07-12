@@ -18,6 +18,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_fpga_vision_front.md)：FPGA 目标寄存器与事件接口约束（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_cpu_arm_control.md)：四任务真源、幂等锁与错误锁存（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_system_integration.md)：机械臂七阶段安全门（面向角色 C）。
+  * [daily_sync/2026-07-13_merge_team-integration/](daily_sync/2026-07-13_merge_team-integration/)：7 月 13 日整合两位队友分支、个人机械臂证据与双层 CPU 控制器时生成的讲解指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-13_merge_team-integration/guide_fpga_vision_front.md)：合成源、生产构建开关与真实摄像头验收边界（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-13_merge_team-integration/guide_cpu_arm_control.md)：逐轮状态机与观察事务层的职责拆分（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-13_merge_team-integration/guide_system_integration.md)：J4/底座风险、板上安全门与低冲突 Git 维护（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 
