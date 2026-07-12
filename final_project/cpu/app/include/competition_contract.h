@@ -3,7 +3,7 @@
 #define COMPETITION_CONTRACT_H
 
 #include <stdint.h>
-#include "round_controller.h"
+#include "competition_round_transaction.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,7 +33,7 @@ typedef struct {
 
 typedef struct {
     uint16_t event_seq;
-    round_state_t round_state;
+    competition_round_txn_state_t round_state;
     uint8_t color_id;
     uint8_t shape_id;
     uint8_t size_cm_x10;
@@ -47,7 +47,7 @@ typedef struct {
     target_config_t active;
     uint16_t last_event_seq;
     size_state_t size_state;
-    round_controller_t round;
+    competition_round_txn_t transaction;
     result_status_t result;
 } competition_contract_t;
 

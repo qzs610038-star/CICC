@@ -1,48 +1,89 @@
-/* One-round transaction controller. It never drives the arm directly. */
 #ifndef ROUND_CONTROLLER_H
 #define ROUND_CONTROLLER_H
 
 #include <stdint.h>
-#include "competition_tasks.h"
+#include "task_matcher.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef enum {
-    ROUND_STATE_IDLE = 0,
-    ROUND_STATE_WAIT_OBSERVATION = 1,
-    ROUND_STATE_WAIT_ACK = 2,
-    ROUND_STATE_COMPLETE = 3,
-    ROUND_STATE_TIMEOUT = 4,
-    ROUND_STATE_ABANDONED = 5
-} round_state_t;
+    ROUND_STATE_CONFIG = 0,
+    ROUND_STATE_WAIT_PLACE_CONFIRM,
+    ROUND_STATE_ACQUIRE_STABLE,
+    ROUND_STATE_LATCH_RECOGNITION,
+    ROUND_STATE_LATCH_DECISION,
+    ROUND_STATE_EXECUTE_OR_SKIP,
+    ROUND_STATE_WAIT_ARM_DONE,
+    ROUND_STATE_ROUND_DONE,
+    ROUND_STATE_WAIT_REMOVE_CONFIRM,
+    ROUND_STATE_ARM_FAULT
+} round_controller_state_t;
+
+typedef enum {
+    ROUND_EVENT_NONE = 0,
+    ROUND_EVENT_APPLY_CONFIG,
+    ROUND_EVENT_PLACE_CONFIRM,
+    ROUND_EVENT_REMOVE_CONFIRM,
+    ROUND_EVENT_ABANDON_ROUND,
+    ROUND_EVENT_SOFT_RESET_ROUND,
+    ROUND_EVENT_SESSION_RESET
+} round_event_t;
 
 typedef struct {
-    uint16_t event_seq;
-    uint32_t timeout_ms;
-} round_controller_cfg_t;
+    uint32_t acquire_timeout_ms;
+    uint32_t arm_timeout_ms;
+} round_controller_config_t;
 
 typedef struct {
-    round_state_t state;
-    uint16_t event_seq;
-    uint32_t deadline_ms;
-    competition_target_t target;
-    competition_evaluation_t evaluation;
+    uint32_t now_ms;
+    uint8_t event_valid;
+    uint8_t event_seq;
+    round_event_t event;
+    uint8_t observation_valid;
+    task_match_result_t match;
+    uint8_t arm_enabled;
+    uint8_t arm_busy;
+    uint8_t arm_done;
+    uint8_t arm_fault;
+} round_controller_input_t;
+
+typedef struct {
+    round_controller_state_t state;
+    uint16_t round_seq;
+    uint8_t event_ack_valid;
+    uint8_t event_ack_seq;
+    uint8_t request_arm_grab;
+    uint8_t result_valid;
+    uint8_t decision_action;
+    uint8_t is_target;
+    reason_code_t reason;
+} round_controller_output_t;
+
+typedef struct {
+    round_controller_state_t state;
+    round_controller_config_t cfg;
+    uint16_t round_seq;
+    uint8_t have_event_seq;
+    uint8_t last_event_seq;
+    uint8_t result_valid;
+    uint8_t decision_action;
+    uint8_t is_target;
+    reason_code_t reason;
+    uint8_t arm_request_sent;
+    uint32_t state_enter_ms;
+    uint32_t acquire_deadline_ms;
+    uint32_t arm_deadline_ms;
 } round_controller_t;
 
-void round_controller_init(round_controller_t *controller);
-int round_controller_start(round_controller_t *controller,
-                           const competition_target_t *target,
-                           uint16_t event_seq, uint32_t now_ms,
-                           uint32_t timeout_ms);
-competition_evaluation_t round_controller_observe(round_controller_t *controller,
-                                                   const vision_result_t *observation,
-                                                   uint32_t now_ms);
-int round_controller_ack(round_controller_t *controller, uint16_t event_seq);
-int round_controller_abandon(round_controller_t *controller);
-int round_controller_tick(round_controller_t *controller, uint32_t now_ms);
-void round_controller_soft_reset(round_controller_t *controller);
+void round_controller_init(round_controller_t *rc,
+                           const round_controller_config_t *cfg,
+                           uint32_t now_ms);
+void round_controller_tick(round_controller_t *rc,
+                           const round_controller_input_t *in,
+                           round_controller_output_t *out);
+round_controller_state_t round_controller_get_state(const round_controller_t *rc);
 
 #ifdef __cplusplus
 }

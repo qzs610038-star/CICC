@@ -46,16 +46,17 @@ static void test_apply_lock_ack_remove(void)
     CHECK(contract.active.target.target_color == COLOR_RED);
     CHECK(competition_contract_handle_event(&contract, &place, 0u, 50u) == 0);
     CHECK(competition_contract_handle_event(&contract, &place, 1u, 50u) == 0);
-    CHECK(contract.round.event_seq == 1u && contract.round.state == ROUND_STATE_WAIT_OBSERVATION);
+    CHECK(contract.transaction.event_seq == 1u &&
+          contract.transaction.state == COMP_ROUND_TXN_STATE_WAIT_OBSERVATION);
     CHECK(competition_contract_observe(&contract, &red_cube, 2u) == 0);
     CHECK(contract.result.decision == COMP_DECISION_EXECUTE);
     CHECK(contract.result.reason == COMP_REASON_TARGET_MATCH);
     CHECK(contract.result.size_state == SIZE_STATE_UNAVAILABLE && contract.result.size_cm_x10 == 0u);
     CHECK(competition_contract_ack_result(&contract, 2u) == -1);
     CHECK(competition_contract_ack_result(&contract, 1u) == 0);
-    CHECK(contract.round.state == ROUND_STATE_COMPLETE);
+    CHECK(contract.transaction.state == COMP_ROUND_TXN_STATE_COMPLETE);
     CHECK(competition_contract_handle_event(&contract, &remove, 3u, 50u) == 0);
-    CHECK(contract.round.state == ROUND_STATE_IDLE);
+    CHECK(contract.transaction.state == COMP_ROUND_TXN_STATE_IDLE);
 }
 
 static void test_size_unavailable_and_events(void)
@@ -74,12 +75,13 @@ static void test_size_unavailable_and_events(void)
     CHECK(competition_contract_observe(&contract, &cube, 1u) == 0);
     CHECK(contract.result.decision == COMP_DECISION_WAIT);
     CHECK(contract.result.reason == COMP_REASON_SIZE_UNAVAILABLE);
-    CHECK(contract.round.state == ROUND_STATE_WAIT_OBSERVATION);
+    CHECK(contract.transaction.state == COMP_ROUND_TXN_STATE_WAIT_OBSERVATION);
     CHECK(competition_contract_handle_event(&contract, &abandon, 2u, 20u) == 0);
     CHECK(contract.result.decision == COMP_DECISION_SKIP);
     CHECK(contract.result.reason == COMP_REASON_OPERATOR_ABANDONED);
     CHECK(competition_contract_handle_event(&contract, &reset, 3u, 20u) == 0);
-    CHECK(!contract.active.valid && contract.round.state == ROUND_STATE_IDLE);
+    CHECK(!contract.active.valid &&
+          contract.transaction.state == COMP_ROUND_TXN_STATE_IDLE);
 }
 
 static void test_timeout_and_stale_sequence(void)
@@ -96,7 +98,7 @@ static void test_timeout_and_stale_sequence(void)
     CHECK(competition_contract_handle_event(&contract, &stale, 101u, 10u) == -1);
     CHECK(competition_contract_tick(&contract, 110u) == 1);
     CHECK(contract.result.reason == COMP_REASON_ROUND_TIMEOUT);
-    CHECK(contract.round.state == ROUND_STATE_TIMEOUT);
+    CHECK(contract.transaction.state == COMP_ROUND_TXN_STATE_TIMEOUT);
 }
 
 int main(void)

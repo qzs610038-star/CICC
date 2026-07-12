@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "competition_tasks.h"
-#include "round_controller.h"
+#include "competition_round_transaction.h"
 
 static int failures;
 static int checks;
@@ -67,7 +67,7 @@ static void test_task_rules(void)
 
 static void test_twenty_round_mock(void)
 {
-    round_controller_t controller;
+    competition_round_txn_t controller;
     uint16_t seq;
     unsigned int i;
     const competition_target_t targets[4] = {
@@ -83,7 +83,7 @@ static void test_twenty_round_mock(void)
         { COLOR_BLACK, SHAPE_CUBE, 25, 200 }
     };
 
-    round_controller_init(&controller);
+    competition_round_txn_init(&controller);
     for (i = 0; i < 20u; ++i) {
         competition_evaluation_t first;
         competition_evaluation_t repeated;
@@ -92,43 +92,48 @@ static void test_twenty_round_mock(void)
         int should_execute = (i % 5u) == 0u;
 
         seq = (uint16_t)(i + 1u);
-        CHECK(round_controller_start(&controller, &targets[task_index], seq,
-                                     now_ms, 50u) == 0);
+        CHECK(competition_round_txn_start(&controller, &targets[task_index],
+                                         seq, now_ms, 50u) == 0);
         if (should_execute) {
-            first = round_controller_observe(&controller, &target_obs[task_index], now_ms + 1u);
+            first = competition_round_txn_observe(
+                &controller, &target_obs[task_index], now_ms + 1u);
             CHECK(first.decision == COMP_DECISION_EXECUTE);
         } else {
             vision_result_t non_target = target_obs[task_index];
             if (task_index < 2u) non_target.color_id = COLOR_YELLOW;
             else non_target.size_cm_x10 = (task_index == 3u) ? 20u : 25u;
-            first = round_controller_observe(&controller, &non_target, now_ms + 1u);
+            first = competition_round_txn_observe(&controller, &non_target,
+                                                  now_ms + 1u);
             CHECK(first.decision == COMP_DECISION_SKIP);
         }
         {
             vision_result_t later_observation = obs(COLOR_WHITE, SHAPE_CUBE, 20);
-            repeated = round_controller_observe(&controller, &later_observation, now_ms + 2u);
+            repeated = competition_round_txn_observe(
+                &controller, &later_observation, now_ms + 2u);
         }
         CHECK(repeated.decision == COMP_DECISION_WAIT);
-        CHECK(round_controller_ack(&controller, (uint16_t)(seq + 1u)) == -1);
-        CHECK(round_controller_ack(&controller, seq) == 0);
-        CHECK(controller.state == ROUND_STATE_COMPLETE);
+        CHECK(competition_round_txn_ack(&controller,
+                                        (uint16_t)(seq + 1u)) == -1);
+        CHECK(competition_round_txn_ack(&controller, seq) == 0);
+        CHECK(controller.state == COMP_ROUND_TXN_STATE_COMPLETE);
     }
 }
 
 static void test_timeout_abandon_and_reset(void)
 {
-    round_controller_t controller;
+    competition_round_txn_t controller;
     competition_target_t t = target(COMP_TASK_COLOR_CUBE, COLOR_RED, 0);
 
-    round_controller_init(&controller);
-    CHECK(round_controller_start(&controller, &t, 7u, 100u, 10u) == 0);
-    CHECK(round_controller_tick(&controller, 110u) == 1);
-    CHECK(controller.state == ROUND_STATE_TIMEOUT);
-    CHECK(round_controller_start(&controller, &t, 8u, 200u, 10u) == 0);
-    CHECK(round_controller_abandon(&controller) == 0);
-    CHECK(controller.state == ROUND_STATE_ABANDONED);
-    round_controller_soft_reset(&controller);
-    CHECK(controller.state == ROUND_STATE_IDLE && controller.event_seq == 0u);
+    competition_round_txn_init(&controller);
+    CHECK(competition_round_txn_start(&controller, &t, 7u, 100u, 10u) == 0);
+    CHECK(competition_round_txn_tick(&controller, 110u) == 1);
+    CHECK(controller.state == COMP_ROUND_TXN_STATE_TIMEOUT);
+    CHECK(competition_round_txn_start(&controller, &t, 8u, 200u, 10u) == 0);
+    CHECK(competition_round_txn_abandon(&controller) == 0);
+    CHECK(controller.state == COMP_ROUND_TXN_STATE_ABANDONED);
+    competition_round_txn_soft_reset(&controller);
+    CHECK(controller.state == COMP_ROUND_TXN_STATE_IDLE &&
+          controller.event_seq == 0u);
 }
 
 int main(void)

@@ -1,8 +1,8 @@
 ﻿================================================================================
-  CPU 端 5 大模块开发计划（识别侧 + 固定点抓取授权）
+  CPU 端 6 大模块开发计划（识别侧 + 固定点抓取授权）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
-  更新: 2026-07-12（决赛主方案 + CPU 四任务 Host 契约合并；板级闭环仍待验证）
+  更新: 2026-07-13（合并四任务 Host 契约、逐轮状态机与观察事务层；板级闭环仍待验证）
 ================================================================================
 
 先看这里：2026-07-12 决赛真实状态（不是代码完成度）
@@ -21,15 +21,16 @@
     - 当前视频 Efinity 工程没有 QCRV32 SoC IP、生成的 soc.h、正式 APB 从机或
       CPU->OSD CDC；赛方 CPU 例程和视频工程仍是两个独立 bitstream。
     - CPU 代码没有在 final_project 板级闭环中运行过。
-    - task_matcher 已加入五色目标、四任务尺寸关系与同轮防重复 GRAB 的 Host 代码；
-      但尚无 20 轮真源回放、round_controller、理由码和板级运行证据。
+    - task_matcher 已加入五色目标、四任务尺寸关系、理由码与同轮防重复 GRAB 的 Host 代码；
+      round_controller 已合入操作员事件/识别锁存/执行或跳过/机械臂等待状态机，
+      competition_round_transaction 保留观察—判定—ACK 事务；二者均无板级运行证据。
     - TARGET_SEL / LIVE_FG_AREA 均未在 FPGA 硬件定版；当前偏移和基址不能上板。
     - main 没有调用 arm_controller，开发板到 myCobot 的 UART/电平/接线未确定。
 
   CPU 线按这个顺序做，不能倒序:
     1. 冻结 task_mode + target_color + reference_size + apply/lock 契约和20轮真值表。
     2. 重跑 task_matcher Host 测试，并补 20 轮真源回放与理由码。
-    3. 新增独立 round_controller：事件序号/ACK、超时、放弃、软复位、唯一动作。
+    3. ✅ 合入独立 round_controller 与 competition_round_transaction；先跑 Host/Mock 回归。
     4. 与 FPGA 锁定 TARGET_CFG / OPERATOR_EVENT / LIVE_FG_AREA / RESULT_STATUS 语义。
     5. 视频工程内 CPU Hello -> APB MAGIC -> 固定结果 OSD -> 真实特征快照。
     6. 最后才接 round_controller -> arm_controller；板到臂 UART 未过安全门时，
@@ -48,7 +49,7 @@
   [2] vision_classifier ✅ 代码完成（历史归档 host 单测 31/31, 2026-07-09；修改前须重跑）
   [3] param_table       ✅ 代码完成（历史归档 host 单测 81/81, 2026-07-09；修改前须重跑）
   [4] task_matcher      ✅ 四任务 Host 契约已实现 / 20轮真源与板级验证未完成
-  [5] round_controller ❌ 尚未实现
+  [5] round_controller ✅ Host 115/115；两层 CPU 整合回归合计 795/795 / main 与板级事件未接入
   [6] main              ⚠️ 已有 matcher 锁定/错误锁存占位 / 未接 round_controller、arm_controller / 未上板
 
   注：本文件中的“代码完成”只表示当前 C 源码与已归档测试记录；不表示已生成
@@ -62,7 +63,7 @@
     当前 CPU 侧不是“完全没写”；四任务 Host 契约已补齐，硬件目标输入与逐轮控制仍未闭环。
     识别分类、参数表、基础匹配和主循环已有 C 代码与历史 host/mock 测试记录；
     `TARGET_SEL` 仍只覆盖 任意/红/蓝/黄 + 小/中/大 + valid，缺黑/白和任务模式；
-    matcher 已有关系判断与防重复锁，但 round_controller、APB/OSD/板上 UART/myCobot 仍无板级证据。
+    matcher、round_controller 与观察事务层已有 Host 代码，但 APB/OSD/板上 UART/myCobot 仍无板级证据。
 
   Claude 本轮目标:
     在不依赖 FPGA 新 RTL、不触发机械臂动作的前提下，先把四任务决赛规则在 CPU Host
@@ -596,7 +597,7 @@
     - `app/src/arm_controller.c`、`app/src/mycobot_protocol.c`、`app/src/mycobot_transport.c`
       已在本 CPU 目录中存在，说明“机械臂控制代码骨架”已经由本团队落地。
     - 但它们尚未接入 `main.c`，`arm_controller_tick()` 当前不会被识别主循环调用。
-    - 当前 [5] main 仍写 `ARM_STATE_IDLE`，这不是闭环设计完成，而是“机械臂集成未完成”。
+    - 当前 [6] main 仍写 `ARM_STATE_IDLE`，这不是闭环设计完成，而是“机械臂集成未完成”。
     - 后续接入前必须等待:
         1) 四任务一轮一事务状态机先定版，防止连续帧重复触发抓取。
         2) 板上 UART 驱动定版；当前只有协议/transport 逻辑，没有正式 SoC UART
@@ -616,7 +617,7 @@
     - 不做视觉坐标实时映射, 不做复杂视觉伺服。
 
 ================================================================================
-  [5] main  —  识别主循环集成 + 固定点抓取授权
+  [6] main  —  识别主循环集成 + 固定点抓取授权
 ================================================================================
   状态: ✅ 识别主循环与 error latch 修复完成；⬜ round_controller / arm_controller 集成待定版。
         RISC-V 交叉构建、SoC/APB 和板级验证待执行。
@@ -780,7 +781,7 @@
        ↑
     main  ←── 识别侧依赖 [1]~[4]；arm_controller 代码存在但尚未集成
 
-  开发顺序: [1] → [2] → [3] → [4四任务 Host 契约已完成] → [round_controller] → [arm_controller 接入]
+  开发顺序: [1] → [2] → [3] → [4四任务 Host 契约已完成] → [5逐轮控制 Host/Mock] → [arm_controller 接入]
             机械臂控制代码骨架已存在，正式接入必须等 UART/电平/事务锁确认
   (param_table 可在 vision_classifier 完成后并行开发)
 

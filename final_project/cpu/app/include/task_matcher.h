@@ -74,6 +74,35 @@ typedef enum {
 #define TASK_MODE_LEGACY_EXACT       255u /* 旧 API 专用：颜色+形状+尺寸精确匹配 */
 
 /*--------------------------------------------------------------------------
+ *  决策理由码（供 round_controller / OSD 语义输出使用）
+ *--------------------------------------------------------------------------*/
+typedef enum {
+    REASON_TARGET_MATCH = 0,
+    REASON_COLOR_MISMATCH,
+    REASON_SHAPE_MISMATCH,
+    REASON_SIZE_NOT_EQ_10MM,
+    REASON_SIZE_OUTSIDE_5MM,
+    REASON_OBSERVATION_UNKNOWN,
+    REASON_TARGET_INVALID,
+    REASON_STABILITY_TIMEOUT,
+    REASON_OPERATOR_ABANDON,
+    REASON_ARM_NOT_READY,
+    REASON_ARM_FAULT
+} reason_code_t;
+
+typedef struct {
+    uint8_t action;             /* MATCH_ACTION_* */
+    uint8_t is_target;          /* 1=目标, 0=非目标或不可判定 */
+    reason_code_t reason;
+    task_mode_t mode;
+} task_match_result_t;
+
+#define TASK_MODE_COLOR_CUBE          TASK_MODE_1
+#define TASK_MODE_SHAPE_COLOR_CUBE    TASK_MODE_2
+#define TASK_MODE_SIZE_DELTA_EQ_10MM  TASK_MODE_3
+#define TASK_MODE_SIZE_DELTA_LE_5MM   TASK_MODE_4
+
+/*--------------------------------------------------------------------------
  *  任务目标（扩展版，支持四任务决赛）
  *--------------------------------------------------------------------------*/
 typedef struct {

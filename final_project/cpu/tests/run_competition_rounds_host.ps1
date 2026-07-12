@@ -5,7 +5,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $include = Join-Path $root 'final_project\cpu\app\include'
 $test = Join-Path $root 'final_project\cpu\tests\test_competition_rounds.c'
 $tasks = Join-Path $root 'final_project\cpu\app\src\competition_tasks.c'
-$rounds = Join-Path $root 'final_project\cpu\app\src\round_controller.c'
+$rounds = Join-Path $root 'final_project\cpu\app\src\competition_round_transaction.c'
 $build = Join-Path $root 'final_project\cpu\build\competition_rounds_host'
 $exe = Join-Path $build 'test_competition_rounds.exe'
 

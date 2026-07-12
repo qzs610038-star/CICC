@@ -119,11 +119,19 @@
   - 下一步门禁：审查包必须先裁定 APB 地址位宽和正式 SoC 接入方法；通过后才可在视频工程隔离副本实施 CPU Hello + APB `REG_MAGIC` 最小闭环。
   - 失效条件：重新生成的参数/工具版本改变端口或 BSP 地址，或者受控视频副本产生了新的 SoC/APB 实测证据。
 
+- 日期：2026-07-13，来源 Agent：Codex（两位队友分支本地整合）
+  - 适用范围：CPU 四任务匹配、逐轮控制与观察—判定—ACK 事务层的 Host/Mock 基线；不适用于板级闭环或真实机械臂动作放行。
+  - 最新结论：保留 `origin/dev/wsc6090-CPU` 的正式 `round_controller`，覆盖 APPLY/PLACE/REMOVE 事件、识别与判断锁存、执行或跳过、机械臂等待/故障、软复位和 20 轮 Mock；同时将 `origin/dev/libaoxun688` 的轻量观察事务控制器改名为 `competition_round_transaction`，供 `competition_contract` 保留目标评估、event_seq、ACK、超时与放弃语义，避免同名覆盖丢失任一实现。
+  - 本次验证：MSVC C11 `/W4 /WX`（A13 仅关闭编译器特有 `C4132`）实际运行 `task_matcher 146/146`、`vision_classifier 31/31`、`competition_round_transaction 135/135`、`competition_contract 35/35`、`competition_host_flow 164/164`、`A13 snapshot replay 169/169`、`round_controller 115/115`，合计 `795/795`；Efinity `riscv-none-embed-gcc 8.3.0` 对 matcher、classifier、两层 controller、contract、adapter、tasks 与 `main.c` 共 8 个源文件以 `-Wall -Wextra -Werror` compile-only PASS。
+  - 当前边界：两层代码尚未接入 `main.c`、正式 `soc.h`、APB/CDC/OSD 或板上 UART；本地整合后的 Host/Mock 与交叉编译结果必须以本次验证记录为准，分支历史测试不能外推为板级通过。
+  - 证据路径：`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/competition_round_transaction.h`、`final_project/cpu/app/src/competition_round_transaction.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_competition_rounds.c`。
+  - 失效条件：整合回归失败、正式寄存器/事件契约改变接口，或后续主循环集成形成新的可复现实测证据。
+
 - 日期：2026-07-12，来源：用户逐项进度访谈 + Codex共享仓库核查
   - 适用范围：7月17日保底冻结前的真实进度、人力、阻塞、最低保底和立即工作队列
   - 最新结论：决赛主方案已更新为`v1.2-main`。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。
   - 实时事实：两只旧摄像头交叉任一接口均花屏，新摄像头预计7月13日到货；官方fallback纯色轮切稳定，ch1 I2C地址阶段ACK且`0x0100` bit0读高，但未见CSI DE。赛方独立CPU例程历史上板成功，但当前视频工程无SoC IP、生成`soc.h`、APB从机或结果CDC。目标输入和决赛OSD未实现。PC机械臂多轮动作稳定但旧路径约10cm，开发板UART/电平/接线未定；7月12日可重新示教180°点位并低速带载。五色/三形状/三尺寸物体齐全，底板/相机/机械臂/摆放区仍待固定，背景/补光未定。
-  - CPU特别风险：`vision_classifier.c`已有白/黑排除法，但`FG_AREA_AVAILABLE=0`时白色不可靠；`LIVE_FG_AREA`提升为P0接口。`task_matcher`仍缺白/黑目标输入、task_mode和任务三/四关系判定；无`round_controller`，`main`未接`arm_controller`。
+  - CPU特别风险（历史盘点，已由上方 2026-07-13 CPU 整合条目部分替代）：`vision_classifier.c` 的白/黑仍依赖 `LIVE_FG_AREA` 真源；四任务 matcher 与 round_controller 已有 Host 代码，但 `main`、正式 APB/OSD 和 arm_controller 仍未闭环。
   - 并行工作：FPGA/SoC成员A主责CPU与视频工程合并；CPU成员每天1—2h负责契约/审查，其他成员接纯C实现；机械臂成员C每天6—8h。队友另有尚未合入的FPGA合成数据源方案，预计7月12日实现；禁止并发覆盖其`top.v`等文件，合成源不作为真实摄像头验收。
   - 截止线：7月14日晚必须出现视频工程内CPU Hello+APB MAGIC，否则人力集中救SoC/APB；7月15中午双摄未稳则降单摄；7月15晚无LIVE_FG_AREA则白色列高风险；7月16中午板到臂安全链未过则冻结F1无机械臂；7月16晚F1必须完成20轮计时，7月17冻结。
   - 替代旧结论：替代“方案仍待访谈定版”、把Host旧测试视为决赛CPU完成、把花屏简单归因于摄像头硬件、以及机械臂必须先完成才有保底的表述。
