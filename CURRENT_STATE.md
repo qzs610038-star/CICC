@@ -60,8 +60,8 @@
   - 最新结论：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md` 已注册为核心目标与约束。完整演示必须覆盖四任务×5轮并在 10 分钟内完成；每轮按识别25%、判断25%、执行50%串行计分，且必须明确输出识别、判断和执行/不执行理由。任务三是相对参考物边长差等于1cm，任务四是相对目标物边长差≤0.5cm，不能按“精确目标尺寸匹配”代替。目标颜色必须覆盖白、黑、红、蓝、黄。
   - 替代旧结论：`分赛区决赛实施开发路线.md` 中“横向搬运距离大于10cm”“三类分赛区任务”“现场每项通常放置5次”等旧/模糊口径；正式目标位置改以官方细则的“相对起点旋转180°（±10°）且最大臂展处”为准。
   - 证据路径：`赛方提供材料/第十届集创赛分赛区决赛“雄芯院”企业命题比赛细则-0710新.pdf`、`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`、`final_project/docs/competition_manual/细则对照项目优化建议_20260712.md`。
-  - 当前阻塞：`task_matcher_read_target_from_fpga()` 的目标输入缺白/黑色；`task_matcher_evaluate()` 仅支持精确尺寸匹配，未实现任务三/四的相对差值关系；`main.c` 尚未把匹配结果接入 `arm_controller`，仍写 `ARM_STATE_IDLE`；OSD/APB/CDC 与 20 轮端到端时限均无板级证据。
-  - 下一步最小闭环：先在 host 层定版 `task_mode + target_color + reference_size + apply/lock` 契约并补齐四任务规则单测，再做“一轮一事务”状态机和 mock 机械臂集成；不得因新细则扩大未验证的 FPGA 数据路径。
+  - 当前阻塞：`task_matcher_read_target_from_fpga()` 的目标输入仍只有旧 2-bit 红/蓝/黄，缺少白/黑色硬件输入路径（Host 层 matcher 已支持五色，见 2026-07-12 CPU 条目）；`main.c` 尚未把匹配结果接入 `arm_controller`，仍写 `ARM_STATE_IDLE`；OSD/APB/CDC 与 20 轮端到端时限均无板级证据。
+  - 下一步最小闭环：Host 层 matcher 四任务规则 + 一轮一事务锁已完成（Codex 合并后重跑 258/258）。剩余：板上五色目标注入路径（3-bit TARGET_SEL 或 UART 命令）、arm_controller 主循环集成、round 推进逻辑接入。
   - 失效条件：组委会/企业专家发布更新版本，或现场给出不同书面确认；发生时必须保留版本历史并新增覆盖条目，不得静默改写 0710 转写。
 
 - 日期：2026-07-11，来源 Agent：Codex
@@ -88,13 +88,25 @@
   - 失效条件：用户要求恢复验证，或生成 `soc.h`、SoC 端口与 APB 时钟/复位信息后提交新的 CPU/APB Review Packet。
   - 未完成边界：`generated_soc_summary_2026-07-11.md` 是已存在的缺口报告；当前仓库不存在由 Efinity SoC 生成的 `soc.h`、APB slave 或 `results_cdc` RTL。`final_project/cpu/app/include/board_io.h` 及寄存器偏移仍为草案，CPU 测试构建的 `0xF0000000` 是占位值，不能用于正式硬件。
 
-- 日期：2026-07-11，来源 Agent：维护核查（基于 2026-07-09 CPU 合入记录）
-  - 适用范围：板上 CPU 识别决策软件
-  - 最新结论：`board_io`、`vision_classifier`、`param_table`、`task_matcher` 与识别主循环已在 `final_project/cpu/app/` 落地。计划文件记录的最新 host 单测统计为分类 31/31、参数表 81/81、任务匹配 82/82；本次维护未重跑测试。代码完成不等于 SoC 或板级闭环完成。
-  - 替代旧结论：将 CPU 分类、匹配和主循环仅描述为 skeleton/interface draft 的旧架构表述。
-  - 证据路径：`final_project/cpu/CPU_MODULE_PLAN.txt`、`final_project/cpu/app/src/main.c`、`final_project/cpu/tests/test_classifier.c`、`final_project/cpu/tests/test_param_table.c`、`final_project/cpu/tests/test_task_matcher.c`。
-  - 失效条件：后续测试重跑失败、生成 SoC 的寄存器语义与当前草案不兼容，或 CPU/APB Review Packet 改写接口边界。
-  - 未完成边界：未生成正式 `soc.h`，未完成 RISC-V 交叉构建、APB/CDC、OSD、bitstream 或板级验证；`TARGET_SEL`、`LIVE_FG_AREA` 及其地址均未定版。
+- 日期：2026-07-12，来源 Agent：Claude（四任务 Host 层实现 + Codex 审查）
+  - 适用范围：板上 CPU 识别决策软件 — task_matcher 四任务契约 + main.c error_code 修复
+  - 最新结论：
+    - CPU 分支原始实现报告 254/254；Codex 按官方细则修正任务二尺寸语义并补同目标重复写入锁测试后，当前源码通过 **258/258** host 单测（classifier 31 + param_table 81 + task_matcher 146，MSVC 19.42 `/std:c11`，全部从当前源码重建）。
+    - `task_matcher` 四任务契约已在 Host 层定版：
+      - `task_mode_t`（MODE_1 指定颜色正方体 / MODE_2 混合形状池中的指定颜色正方体且尺寸通配 / MODE_3 相对参照物差值 10mm / MODE_4 相对目标物差值 ≤5mm）。
+      - `round_state_t` 一轮一事务锁（IDLE → TARGET_LOCKED → GRAB_REQUESTED → next_round → IDLE）。GRAB 后自动锁定，防止连续帧重复触发。
+      - 五色目标（WHITE/BLACK/RED/BLUE/YELLOW）在 matcher 内部正确区分，不与 COLOR_UNKNOWN 混淆。
+      - `set_target_ex()` 自动锁定到 ROUND_TARGET_LOCKED，不依赖调用方填写内部事务状态。
+    - `main.c` 的 error_code 清零 bug 已修复：新增 `latched_err` 跨迭代锁存，`commit_global` 失败后下轮重试提交，成功才清零。commit_results 失败在 commit_global 成功后不会被吞掉。
+    - `main.c` 中五色目标注入点和 round 推进条件已用注释显式标注占位。
+    - **未完成（不是"已闭环"）**：
+      - 五色目标在 Host 层 matcher 可测，但板上入口仍只有旧 `task_matcher_read_target_from_fpga()`（2-bit color_sel，仅红/蓝/黄）。正式目标注入路径（3-bit TARGET_SEL 或 UART 命令）阻塞于 FPGA 硬件确认。
+      - 一轮一事务锁在 matcher 层完成，但 `task_matcher_next_round()` 当前仅在测试中调用。主循环的 round 推进（arm_controller 完成信号 / 物理按键 / 超时）阻塞于 arm_controller 集成和板上 UART 驱动。
+      - 以上两项不得在 CURRENT_STATE 或 Review Packet 中被描述为"已完成"或"已闭环"。
+  - 替代旧结论：2026-07-11 CPU 条目中"维护未重跑测试""仅支持精确尺寸匹配""缺白/黑色"等旧口径；2026-07-12 比赛规则条目中"下一步最小闭环"的 matcher 部分已执行。
+  - 证据路径：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md` §二.3.1、`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/src/main.c`、`final_project/cpu/tests/test_task_matcher.c`（146/146）、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 失效条件：后续测试重跑失败、生成 SoC 的寄存器语义与当前草案不兼容，或 Codex 下一轮审查发现 Host 层逻辑缺陷。
+  - 未完成边界：未生成正式 `soc.h`，未完成 RISC-V 交叉构建、APB/CDC、OSD、bitstream 或板级验证；五色目标硬件输入路径（3-bit TARGET_SEL / UART cmd）未定版；`TARGET_SEL`、`LIVE_FG_AREA` 及其地址均未定版；arm_controller 未接入主循环。
 
 - 日期：2026-07-11，来源 Agent：维护核查（基于 2026-07-09 myCobot CPU 迁移记录）
   - 适用范围：板上 CPU myCobot 协议与控制器

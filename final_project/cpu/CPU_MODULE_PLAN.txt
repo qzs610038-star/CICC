@@ -2,7 +2,7 @@
   CPU 端 5 大模块开发计划（识别侧 + 固定点抓取授权）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
-  更新: 2026-07-12（决赛主方案增量：四任务/逐轮事务/板上闭环缺口已登记）
+  更新: 2026-07-12（决赛主方案 + CPU 四任务 Host 契约合并；板级闭环仍待验证）
 ================================================================================
 
 先看这里：2026-07-12 决赛真实状态（不是代码完成度）
@@ -21,14 +21,14 @@
     - 当前视频 Efinity 工程没有 QCRV32 SoC IP、生成的 soc.h、正式 APB 从机或
       CPU->OSD CDC；赛方 CPU 例程和视频工程仍是两个独立 bitstream。
     - CPU 代码没有在 final_project 板级闭环中运行过。
-    - task_matcher 仍只做旧版颜色/形状/精确尺寸匹配，没有任务三“差=10mm”、
-      任务四“差<=5mm”、task_mode、理由码和一轮一事务。
+    - task_matcher 已加入五色目标、四任务尺寸关系与同轮防重复 GRAB 的 Host 代码；
+      但尚无 20 轮真源回放、round_controller、理由码和板级运行证据。
     - TARGET_SEL / LIVE_FG_AREA 均未在 FPGA 硬件定版；当前偏移和基址不能上板。
     - main 没有调用 arm_controller，开发板到 myCobot 的 UART/电平/接线未确定。
 
   CPU 线按这个顺序做，不能倒序:
-    1. task_mode + target_color + reference_size + apply/lock 契约和20轮真值表。
-    2. task_matcher 五色目标与任务三/四关系判定 Host 测试。
+    1. 冻结 task_mode + target_color + reference_size + apply/lock 契约和20轮真值表。
+    2. 重跑 task_matcher Host 测试，并补 20 轮真源回放与理由码。
     3. 新增独立 round_controller：事件序号/ACK、超时、放弃、软复位、唯一动作。
     4. 与 FPGA 锁定 TARGET_CFG / OPERATOR_EVENT / LIVE_FG_AREA / RESULT_STATUS 语义。
     5. 视频工程内 CPU Hello -> APB MAGIC -> 固定结果 OSD -> 真实特征快照。
@@ -45,14 +45,190 @@
 模块一览
 --------
   [1] board_io          ✅ 代码完成 / 硬件接入待 SoC 生成
-  [2] vision_classifier ✅ 代码完成（最新归档 host 单测 31/31, 2026-07-09）
-  [3] param_table       ✅ 代码完成（最新归档 host 单测 81/81, 2026-07-09）
-  [4] task_matcher      ⚠️ 旧精确匹配代码完成 / 决赛四任务升级未实现
+  [2] vision_classifier ✅ 代码完成（历史归档 host 单测 31/31, 2026-07-09；修改前须重跑）
+  [3] param_table       ✅ 代码完成（历史归档 host 单测 81/81, 2026-07-09；修改前须重跑）
+  [4] task_matcher      ✅ 四任务 Host 契约已实现 / 20轮真源与板级验证未完成
   [5] round_controller ❌ 尚未实现
-  [6] main              ⚠️ 识别循环存在 / 未接逐轮事务和 arm_controller / 未上板
+  [6] main              ⚠️ 已有 matcher 锁定/错误锁存占位 / 未接 round_controller、arm_controller / 未上板
 
   注：本文件中的“代码完成”只表示当前 C 源码与已归档测试记录；不表示已生成
       `soc.h`、已锁定 APB 地址、已完成 FPGA CDC/OSD、已生成 bitstream 或已上板。
+
+================================================================================
+  2026-07-12 Claude 下一步执行包（先做 Host 层，不碰硬件）
+================================================================================
+
+  背景判断:
+    当前 CPU 侧不是“完全没写”；四任务 Host 契约已补齐，硬件目标输入与逐轮控制仍未闭环。
+    识别分类、参数表、基础匹配和主循环已有 C 代码与历史 host/mock 测试记录；
+    `TARGET_SEL` 仍只覆盖 任意/红/蓝/黄 + 小/中/大 + valid，缺黑/白和任务模式；
+    matcher 已有关系判断与防重复锁，但 round_controller、APB/OSD/板上 UART/myCobot 仍无板级证据。
+
+  Claude 本轮目标:
+    在不依赖 FPGA 新 RTL、不触发机械臂动作的前提下，先把四任务决赛规则在 CPU Host
+    层定版并测通。完成后交给 Codex 复核，再决定是否接入 APB/OSD 或 arm_controller。
+
+  P0 阻塞修正（先修或至少先写 failing test/Review Packet）:
+
+    A. `main.c` error_code 吞错 bug
+       - 当前风险: 本轮 Cam0/Cam1 的 `board_io_commit_results()` 失败会设置
+         `err_code = ERR_COMMIT_TIMEOUT`，但随后 `board_io_commit_global()` 若成功，
+         当前代码会把 `err_code` 清为 0，导致本轮错误被静默吞掉。
+       - 需要 Claude 在实现前给出最小修复方案，建议二选一:
+         1) 本轮局部错误码:
+            `uint16_t loop_err = 0;`
+            每次 commit_results 失败只设置 `loop_err`；
+            在 `board_io_write_global_state(ARM_STATE_IDLE, loop_err)` 之前完成所有错误收集；
+            `commit_global` 失败只能影响下一轮或单独 latch，不能倒写吞掉本轮错误。
+         2) latch 型错误码:
+            有新错误时置位，只有明确 reset/ack/健康检查通过后清零；
+            不能因为一次 `commit_global` 成功自动清除历史错误。
+       - 完成标准: 增加 mock/host 层测试或可审查伪测试，覆盖
+         `commit_results fail + commit_global success` 时 ERROR_CODE 仍非 0。
+
+    B. 四任务判定接口必须定签名，不能自由发挥
+       - `task_target_t` 建议扩展为:
+
+         typedef enum {
+             TASK_MODE_NONE = 0,
+             TASK_MODE_1    = 1,
+             TASK_MODE_2    = 2,
+             TASK_MODE_3    = 3,
+             TASK_MODE_4    = 4
+         } task_mode_t;
+
+         typedef enum {
+             ROUND_IDLE = 0,
+             ROUND_TARGET_LOCKED,
+             ROUND_GRAB_REQUESTED,
+             ROUND_DONE
+         } round_state_t;
+
+         typedef struct {
+             uint8_t target_color;          /* COLOR_WHITE/BLACK/RED/BLUE/YELLOW/UNKNOWN */
+             uint8_t target_shape;          /* 首版固定 SHAPE_CUBE */
+             uint8_t target_size_cm_x10;    /* 20/25/30; 0=通配或本任务不用 */
+             uint8_t reference_size_cm_x10; /* 任务三参照尺寸; 0=未锁定 */
+             uint8_t task_mode;             /* TASK_MODE_1..4 */
+             uint8_t round_state;           /* ROUND_* 防重复触发 */
+         } task_target_t;
+
+       - `task_matcher_evaluate()` 内部必须按 task_mode 分派:
+
+         MODE_1   -> match_color_cube()（同尺寸正方体池，目标输入为颜色）
+         MODE_2   -> match_color_shape()（混合形状池，尺寸通配）
+         MODE_3   -> match_relative_delta_10mm()
+         MODE_4   -> match_relative_delta_5mm()
+
+       - 任务三临时规则（待官方/用户确认前不得写死到散落常量）:
+         `abs(obs.size_cm_x10 - reference_size_cm_x10) == TASK3_SIZE_DELTA_CM_X10`
+         其中 `TASK3_SIZE_DELTA_CM_X10 = 10`，因为 `cm_x10` 单位中 10 等于 10mm/1cm。
+         当前分类输出已经是 20/25/30 的离散尺寸，首版按“精确等于 10mm 差值”处理；
+         若后续改成“约等于”，必须只改统一 tolerance 常量和测试。
+       - 任务四临时规则:
+         `abs(obs.size_cm_x10 - target_size_cm_x10) <= TASK4_SIZE_DELTA_MAX_CM_X10`
+         其中 `TASK4_SIZE_DELTA_MAX_CM_X10 = 5`，即边长差不超过 5mm/0.5cm。
+       - reference_size 来源（首版 Host-only）:
+         先由测试或显式 API 写入 `reference_size_cm_x10`，模拟“第一轮/参照物已测得”；
+         在 FPGA `TARGET_SEL` 未扩展前，不从拨码读取 reference_size，不伪造硬件字段。
+
+    C. 五色目标与 2-bit `color_sel` 冲突
+       - 旧 `TARGET_SEL.color_sel[1:0]` 只有 4 个编码，且已经定义为:
+           00=通配, 01=红, 10=蓝, 11=黄
+         它无法同时表示 WHITE/BLACK/RED/BLUE/YELLOW 五色。
+       - 四任务 Host 层必须先支持五色目标；但正式硬件输入不能继续沿用旧
+         2-bit `color_sel` 作为五色来源。
+       - 默认建议的下一版硬件/寄存器契约:
+
+         bit [2:0] target_color_sel:
+             000 = ANY
+             001 = WHITE
+             010 = BLACK
+             011 = RED
+             100 = BLUE
+             101 = YELLOW
+             110/111 = RESERVED
+         bit [4:3] target_size_sel:
+             00 = ANY
+             01 = 20mm
+             10 = 25mm
+             11 = 30mm
+         bit [7:5] task_mode:
+             000 = NONE
+             001..100 = TASK_MODE_1..4
+         bit [8] target_valid
+         bit [9] apply_or_lock      /* 上升沿或电平语义由 FPGA/CPU 契约确认 */
+         bit [10] next_round_reset  /* 清事务锁/进入下一轮 */
+
+       - reference_size 首版不从拨码读取，先由 Host/mock 显式 API 注入；
+         若现场确需硬件输入 reference_size，必须新增寄存器字段或 UART 调试命令，
+         不得复用旧 2-bit color_sel。
+       - `TARGET_SEL_AVAILABLE` 仍保持 0，直到 FPGA 侧确认新字段和地址。
+
+  必做修改（建议分 4 个小提交/小补丁）:
+
+    1. 目标/任务契约升级（Host-only）
+       - 修改 `app/include/task_matcher.h` 与 `app/src/task_matcher.c`。
+       - 新增 `task_mode` 字段，至少支持四种任务模式；如果官方细则命名未统一，
+         先用中性枚举名，例如 TASK_MODE_1/2/3/4，并在注释写清判定语义。
+       - `target_color` 必须支持五色：WHITE / BLACK / RED / BLUE / YELLOW；
+         保留 COLOR_UNKNOWN 作为通配或未设置，不要把 UNKNOWN 当成白/黑。
+       - 先增加一个 Host/mock 设置接口，例如:
+         `task_matcher_set_target_ex(const task_target_t *t)` 或等价 API。
+         四任务测试必须通过该 API 注入五色目标，不依赖旧 `TARGET_SEL`。
+       - 增加参考尺寸/关系字段，例如 `reference_size_cm_x10` 或等价字段，
+         用于任务三/四的相对尺寸关系判断。
+       - 保留旧的 `task_matcher_set_target()` 或提供兼容包装，避免一次性打碎旧测试。
+
+    2. 四任务规则单测先行
+       - 扩展 `tests/test_task_matcher.c`，先覆盖规则，再改实现。
+       - 修改前先重跑全部历史 host 测试，建立新基线；当前历史归档合计为
+         classifier 31 + param_table 81 + task_matcher 82 = 194 条，不能继续只写
+         “维护时未重跑”。
+       - 必测场景:
+         * 红/蓝/黄/白/黑五色均可作为目标参与匹配。
+         * 黑白目标不是 `TARGET_SEL_COLOR_ANY`，也不是 `COLOR_UNKNOWN`。
+         * 任务一验证指定颜色正方体；任务二验证混合形状池中的指定颜色正方体，
+           两者尺寸均不参与目标判断（官方细则 §二.3.1 ①/②）。
+         * 任务三尺寸差值阈值按当前用户记忆/讨论：差值约 10mm 的关系规则。
+         * 任务四尺寸差值阈值按当前用户记忆/讨论：差值约 5mm 的关系规则。
+         * Cam1 尺寸不可用 (`obs.size_cm_x10 == 0`) 且任务需要尺寸关系时，必须返回 NONE，
+           不能 SKIP，更不能 GRAB。
+         * 同一目标已经 GRAB 后，未显式开启下一轮/清锁前不能连续帧重复 GRAB。
+       - 若阈值最终需要官方细则确认，先把常量名写清楚，例如
+         `TASK3_SIZE_DELTA_MM` / `TASK4_SIZE_DELTA_MM`，不要散落魔法数字。
+
+    3. 一轮一事务/防重复触发（Host-only）
+       - 在 task_matcher 或新模块中实现最小事务锁:
+         `IDLE -> TARGET_LOCKED -> GRAB_REQUESTED -> ROUND_DONE/WAIT_NEXT`。
+       - 同一轮同一目标只能产生一次 GRAB。
+       - 新目标、用户确认下一轮、或显式 reset 才能重新允许 GRAB。
+       - 先用 mock/单测验证，不要直接接机械臂，不要发送 UART。
+
+  暂不做 / 禁止项:
+    - 不修改 FPGA RTL、`mem_test.xml`、`constrain.sdc`、`.peri.xml` 或 IP settings。
+    - 不打开 `TARGET_SEL_AVAILABLE=1`，除非 FPGA 侧已经给出支持五色和 task_mode
+      的正式寄存器地址和位定义；旧 2-bit `color_sel` 不满足此条件。
+    - 不把 `0x06C`、`0x0B0/0x1B0` 当成硬件事实；它们仍是建议占位。
+    - 不接入真实 myCobot 动作，不运行 `pymycobot` 动作脚本。
+    - 不把 `grab_center` 当成机械臂实时坐标；它仍只用于 OSD/日志/偏差检查。
+    - 不声称“板上 CPU 已闭环”，除非有 UART/APB/OSD/bitstream/上板日志证据。
+
+  完成标准:
+    - `tests/test_task_matcher.c` 新增四任务测试，全部通过。
+    - 修改前和修改后均重跑全部已有 host 测试；至少覆盖历史 194 条基线，
+      并在 Review Packet 中写明实际通过数。若因接口升级导致旧断言迁移，
+      必须列出迁移原因，不能只写“未重跑”。
+    - `main.c` error_code 处理方案已修正或至少有明确 failing test 与补丁计划；
+      不能继续把“commit 失败处理已完成”作为无条件事实。
+    - 五色目标输入路径已明确: Host/mock API 可用；硬件侧若未定版，必须继续
+      禁用旧 `TARGET_SEL_AVAILABLE`，不得声称拨码已支持白/黑。
+    - 代码中所有新增任务字段都有注释说明单位和语义，尺寸统一用 `cm_x10`，
+      即 20=20mm, 25=25mm, 30=30mm。
+    - `CURRENT_STATE.md` 增加一条 2026-07-12 状态：说明 Host 层四任务契约是否完成、
+      哪些板级验证仍未完成。
+    - 交给 Codex 的 Review Packet 至少包含：修改文件、四任务规则表、测试命令与结果、
+      未确认的官方/FPGA 接口问题。
 
 ================================================================================
   [1] board_io  —  FPGA↔CPU 寄存器读写层
@@ -133,10 +309,10 @@
 ================================================================================
   [2] vision_classifier  —  颜色/形状/尺寸分类
 ================================================================================
-  状态: ✅ 代码完成；最新归档 host 单测 31/31（2026-07-09）。
+  状态: ✅ 代码完成；历史归档 host 单测 31/31（2026-07-09），四任务修改前必须重跑。
          历史基线：2026-07-07 为 29/29，后续测试扩充后以顶部统计为准。
   文件: app/include/vision_classifier.h, app/src/vision_classifier.c
-  测试: tests/test_classifier.c（历史基线 29 条；最新归档统计 31 条，维护时未重跑）
+  测试: tests/test_classifier.c（历史基线 29 条；历史归档统计 31 条；下一轮修改前必须重跑）
   依赖: board_io (feature_snapshot_t 输入)
 
   Codex R1 审查修复 (已合入):
@@ -219,13 +395,26 @@
     - 是否需要 LIVE_FG_AREA 寄存器? (建议加, 对填充率计算至关重要)
     - 形状判别的填充率阈值具体数值 (需现场标定)
 
+  融合组合表（2026-07-12 审查补充）:
+    - Cam0=CUBE     + Cam1=CUBE     → CUBE
+    - Cam0=CYLINDER + Cam1=CUBE     → CYLINDER
+    - Cam0=CYLINDER + Cam1=CONE     → CONE
+    - Cam0=CUBE     + Cam1=CONE     → UNKNOWN
+      物理上不符合三类物块正常视角，视为一侧分类错误或遮挡/噪声。
+    - Cam0=CONE 或 Cam1=CYLINDER 的双路组合 → UNKNOWN
+      当前单摄角色中 Cam0 不应稳定输出 CONE，Cam1 不应稳定输出 CYLINDER。
+    - 任一侧 UNKNOWN 且另一侧存在时:
+      当前 `fuse_results()` 的 NULL 输入支持单路退化；但非 NULL 的 UNKNOWN
+      会参与双路组合并落到 UNKNOWN。调用方若要单路退化，必须显式传 NULL
+      或在主循环中定义“该路未稳定”的判定，不要把 UNKNOWN 当作有效侧。
+
 ================================================================================
   [3] param_table  —  参数表管理
 ================================================================================
-  状态: ✅ 代码完成；最新归档 host 单测 81/81（2026-07-09）。
+  状态: ✅ 代码完成；历史归档 host 单测 81/81（2026-07-09），四任务修改前必须重跑。
          历史基线：2026-07-07 为 68/68。
   计划文件: app/include/param_table.h, app/src/param_table.c
-  测试: tests/test_param_table.c（历史基线 68 条；最新归档统计 81 条，维护时未重跑）
+  测试: tests/test_param_table.c（历史基线 68 条；历史归档统计 81 条；下一轮修改前必须重跑）
   依赖: vision_classifier (classifier_cfg_t)
 
   实现:
@@ -241,6 +430,18 @@
   待定:
     - NVM 读写函数具体实现（依赖硬件 SPI Flash / EEPROM 驱动）
 
+  现场标定流程草案（2026-07-12 审查补充）:
+    1. 进入标定模式：首版可用 UART 命令、调试宏或拨码触发；未定版前只写 Host/mock 流程。
+    2. 放置已知物块，例如红色正方体 25mm，保持 Cam0/Cam1 与物块位置固定。
+    3. CPU 打印或回传当前帧关键量：red_area/blue_area/yel_area、bbox、fill_rate、
+       fg_area（若可用）、height_px、raw/stable color/shape/size。
+    4. 人工调整 classifier_cfg_t 阈值：颜色面积阈值、white/black ratio、fill 阈值、
+       height_px_20mm/25mm/30mm。
+    5. 调用 `param_table_set(PARAM_SLOT_CALIBRATED, &cfg)` 写入 RAM 标定槽并立即验证。
+    6. 若 NVM 可用，再调用 `param_table_save_calibrated()`；当前 NVM 默认不可用，
+       不得声称掉电保存已完成。
+    7. 对五色、三形状、三尺寸重复采样，记录最终阈值和失败样本。
+
   2026-07-09 代码修正 (本轮):
     ✅ [P2] PARAM_ERR_SLOT 专用错误码 — param_table_set() slot 越界原返回
            PARAM_ERR_WINDOW(滤波窗口错误)，语义不匹配。新增 PARAM_ERR_SLOT=8，
@@ -255,10 +456,10 @@
 ================================================================================
   [4] task_matcher  —  目标匹配与动作决策
 ================================================================================
-  状态: ✅ 代码完成；最新归档 host 单测 82/82（2026-07-09）。
-         历史基线：2026-07-08 为 73/73。
+  状态: ✅ 四任务 Host 契约完成；Codex 合并后 host 单测 146/146（2026-07-12）。
+         历史基线：2026-07-09 为 82/82；板级目标输入与 round 推进仍未完成。
   计划文件: app/include/task_matcher.h, app/src/task_matcher.c
-  测试: tests/test_task_matcher.c（历史基线 73 条；最新归档统计 82 条，维护时未重跑）
+  测试: tests/test_task_matcher.c（当前 146/146；覆盖任务二尺寸通配与同目标重复写入不解锁）
   依赖: vision_classifier (vision_result_t 输入)
 
   实现:
@@ -267,7 +468,11 @@
     - 决策动作: 抓取 / 跳过 / 报错
     - 输出 match_action (回写到 FPGA OSD 显示)
 
-  任务输入 (本轮讨论结论, 2026-07-08):
+  任务输入 (旧契约记录, 2026-07-08；四任务开发不得继续采用):
+    - 2026-07-12 更新: 以下 TARGET_SEL 方案是旧契约，只能覆盖红/蓝/黄和精确尺寸匹配。
+      决赛四任务需要新增 task_mode、白/黑目标、reference_size 和 round_state；
+      详见文件顶部 “Claude 下一步执行包”。Claude 不得继续只按本旧契约实现四任务。
+      旧 `color_sel[1:0]` 不能表示五色，是 P0 阻塞，不是待优化项。
     - 比赛目标顺序未知, 不采用固定顺序任务表作为首选方案。
     - 由于本人识别侧只抓正方体, target_shape 首版固定为 SHAPE_CUBE。
     - 目标输入只需要颜色 + 尺寸 + 有效位:
@@ -307,8 +512,9 @@
       uint8_t target_size_cm_x10;
     } task_target_t;
 
-    /* FPGA→CPU 目标选择寄存器草案: TARGET_SEL
-       地址: 0x06C 为建议值, 未经 FPGA 确认前不得当作硬件事实 */
+    /* FPGA→CPU 目标选择寄存器旧草案: TARGET_SEL
+       地址: 0x06C 为建议值, 未经 FPGA 确认前不得当作硬件事实。
+       该 5-bit 草案无法支持白/黑/task_mode/reference, 四任务不得沿用。 */
     bits [1:0] color_sel;
     bits [3:2] size_sel;
     bit  [4]   target_valid;
@@ -357,7 +563,7 @@
 ================================================================================
   识别侧协作边界 — 给队友 / 从队友获取
 ================================================================================
-  本人负责范围:
+  识别侧负责范围:
     - Cam0/Cam1 特征读取、颜色/形状/尺寸分类、参数表、目标匹配
     - 根据识别结果输出“是否允许抓取”的 match_action。
       match_action=GRAB 只表示允许机械臂执行预设固定 P_pick 抓取序列,
@@ -380,15 +586,25 @@
     - FPGA 视频前端需把两路视频转成 CPU 可读的 LIVE_* 特征寄存器:
         red/blue/yel area, bbox_min/max, center, fg_area, height_px, frame_id
     - 目标输入寄存器:
-        FPGA 队友从剩余拨码/按键中分配 4~5 位, 生成 TARGET_SEL:
-          color_sel[1:0] + size_sel[1:0] + target_valid
-        CPU 根据 TARGET_SEL 设置 task_target_t, 且 target_shape 固定为 SHAPE_CUBE。
-        target_valid 使用拨码位; 00 颜色/尺寸编码表示通配, 不是无效。
-        实际占用哪些 SW 位必须和队友确认, 避免占用复位、HDMI 通道切换、
-        调试和机械臂控制用途。
+        旧方案为 4~5 位 `color_sel[1:0] + size_sel[1:0] + target_valid`，
+        只能覆盖通配/红/蓝/黄，不能覆盖白/黑和四任务模式。
+        四任务新方案必须至少提供 3-bit target_color_sel、task_mode、valid、
+        apply/lock 或 next_round_reset；具体位宽和地址需 FPGA 队友确认。
+        在硬件契约未确认前，CPU Host 层用显式 API/mock 注入目标，不读旧 TARGET_SEL。
 
-  不在本人范围:
-    - myCobot 串口协议、动作状态机、夹爪控制、机械臂安全互锁
+  myCobot/arm_controller 当前归属（2026-07-12 审查补充）:
+    - `app/src/arm_controller.c`、`app/src/mycobot_protocol.c`、`app/src/mycobot_transport.c`
+      已在本 CPU 目录中存在，说明“机械臂控制代码骨架”已经由本团队落地。
+    - 但它们尚未接入 `main.c`，`arm_controller_tick()` 当前不会被识别主循环调用。
+    - 当前 [5] main 仍写 `ARM_STATE_IDLE`，这不是闭环设计完成，而是“机械臂集成未完成”。
+    - 后续接入前必须等待:
+        1) 四任务一轮一事务状态机先定版，防止连续帧重复触发抓取。
+        2) 板上 UART 驱动定版；当前只有协议/transport 逻辑，没有正式 SoC UART
+           发送中断或轮询发送接入。
+        3) FPGA-to-myCobot 接线、电平、UART 通道和 1000000 波特率经安全确认。
+        4) 用户明确允许进入机械臂动作测试阶段。
+
+  当前仍不做:
     - 视觉中心点到机械臂坐标的实时映射/视觉伺服闭环
     - FPGA-to-机械臂接线、电平确认、真实动作测试
 
@@ -402,10 +618,11 @@
 ================================================================================
   [5] main  —  识别主循环集成 + 固定点抓取授权
 ================================================================================
-  状态: ✅ 代码完成（2026-07-09）；RISC-V 交叉构建、SoC/APB 和板级验证待执行
-  计划文件: app/src/main.c（当前 361 行；历史归档 host gcc 0 error，本次维护未重跑）
+  状态: ✅ 识别主循环与 error latch 修复完成；⬜ round_controller / arm_controller 集成待定版。
+        RISC-V 交叉构建、SoC/APB 和板级验证待执行。
+  计划文件: app/src/main.c（当前 361 行；历史归档 host gcc 0 error；下一轮修改前必须重跑）
   依赖: board_io + vision_classifier + param_table + task_matcher
-        arm_controller 由队友集成；识别侧只输出 match_action/分类结果。
+        arm_controller 已有本地 C 代码骨架，但尚未接入 main；当前 main 只输出 match_action/分类结果。
         match_action=GRAB 表示允许队友机械臂模块执行固定 P_pick 抓取,
         不输出实时抓取坐标。
 
@@ -495,15 +712,21 @@
             //       // log/debug only; do not use as real-time arm coordinate
             //   }
 
-            // ---- 识别侧到队友接口边界 ----
-            // 本人侧到此结束；机械臂状态/错误码/动作执行由队友 arm_controller 负责。
-            // 若后续联调需要，可在这里调用队友提供的非阻塞接口。
+            // ---- 机械臂集成边界 ----
+            // 当前 main.c 尚未调用 arm_controller_request_grab()/arm_controller_tick()。
+            // action==GRAB 只写 OSD/日志/授权状态，不会直接驱动机械臂。
+            // 后续必须先完成四任务事务锁和板上 UART 驱动，再接入非阻塞 arm_controller。
         }
     }
 
   待定:
     - 两路相机是轮询还是等 VSYNC 中断? (当前方案: 独立轮询)
-    - TARGET_SEL 寄存器地址/位定义由 FPGA 队友确认；0x06C 只是建议值
+    - 首版不使用中断；startup_qcrv32.S 的 trap/interrupt handler 仍是 halt 占位。
+      当前延时/轮询依赖 mtime 读取，timer/UART 中断服务留作后续性能优化，
+      不得假设当前固件已有中断驱动的 UART 或周期调度。
+    - TARGET_SEL 寄存器地址/位定义由 FPGA 队友确认；0x06C 只是旧建议值
+    - 旧 2-bit color_sel 不能表示五色；正式接入前必须扩展为 3-bit color 或改用
+      UART/API 注入目标。未定版前 `TARGET_SEL_AVAILABLE` 必须保持 0。
     - main 单路抓取策略按 2026-07-09 用户决策:
       允许单路稳定时抓取; 但目标含尺寸要求时必须 Cam1(水平/侧面)稳定可用。
       TARGET_SEL 不可用或 target_valid=0 时正式主线清空目标, 不沿用旧目标。
@@ -523,6 +746,10 @@
            - fuse_results + task_matcher_read_target + evaluate → action
            - 两路 match_action 重写为融合后 action（OSD 一致性）
            - write_global_state(ARM_STATE_IDLE, 0) + commit_global
+    ⚠️ 2026-07-12 审查更新:
+        - 上述 `ARM_STATE_IDLE` 表示机械臂主循环尚未接入，不是完整状态机闭环。
+        - 当前 err_code 处理存在 P0 风险：commit_results 失败后，若 commit_global 成功，
+          可能清零并吞掉本轮错误。四任务开发前必须按顶部 P0 修正。
     ✅ 边界合规:
         - grab_center 仅用于 UART 日志，不接 arm_controller
         - ARM_STATE 识别侧始终输出 IDLE，不操控机械臂状态机
@@ -533,11 +760,9 @@
     ⬜ RISC-V 交叉编译 + 上板验证: 待执行
 
   2026-07-09 Codex 审查修复 (本轮):
-    ✅ [P2] commit 失败处理 — init_camera_configs() 改为返回 int，
+    ✅ [P0 已修] commit 失败处理 — init_camera_configs() 改为返回 int，
            Cam0/Cam1 任一 commit 失败打印 FATAL 并进入心跳保活（不再假装配置成功）。
-           主循环所有 board_io_commit_results/commit_global() 返回值被检查，
-           失败时 err_code = ERR_COMMIT_TIMEOUT(2)，写入 FPGA ERROR_CODE 寄存器；
-           成功时 err_code 清零。commit 失败不会导致 seq 推进，下轮自动重试。
+           主循环使用 latched_err 跨迭代保留提交失败；commit_global 成功后才清零。
     ✅ [P3] UART 日志尺寸单位修正 — size_cm_x10 是 0.1cm(=1mm) 单位，
            移除错误的 *10 换算。20 → 直接打印 "20" mm，不再错印 "200"。只影响日志。
 
@@ -553,10 +778,10 @@
        ↑
     task_matcher  ←── 依赖 vision_classifier (vision_result_t)
        ↑
-    main  ←── 识别侧依赖 [1]~[4]，与 arm_controller 仅通过接口对接
+    main  ←── 识别侧依赖 [1]~[4]；arm_controller 代码存在但尚未集成
 
-  开发顺序: [1] → [2] → [3] → [4] → [5识别侧集成]
-            机械臂控制由队友并行开发，后续做接口联调
+  开发顺序: [1] → [2] → [3] → [4四任务 Host 契约已完成] → [round_controller] → [arm_controller 接入]
+            机械臂控制代码骨架已存在，正式接入必须等 UART/电平/事务锁确认
   (param_table 可在 vision_classifier 完成后并行开发)
 
 ================================================================================
@@ -571,18 +796,40 @@
     - 队友提供 Cam0/Cam1 两路摄像头视频信号及稳定视频前端
     - [UNRESOLVED] LIVE_FG_AREA 建议 Cam0 0x0B0、Cam1 0x1B0 (bbox 内前景像素总数)
     - 颜色面积是否限定 bbox 内部 (当前为全帧)
-    - TARGET_SEL 目标输入寄存器:
-        建议 bit[1:0]=color_sel, bit[3:2]=size_sel, bit[4]=target_valid
-        [UNRESOLVED] 建议地址 0x06C 未定版; 若 FPGA 不接受该地址, 需回到用户确认新地址
-        target_valid 用拨码位, 不用瞬时按键
-        color_sel=00 / size_sel=00 表示该维度通配; 两者都为 00 且 valid=1 时“看到正方体就抓”
-        形状不从拨码输入, CPU 固定为 SHAPE_CUBE
-        FPGA 负责物理开关同步/消抖/编码, CPU 只读稳定寄存器
-        具体 SW 位需确认空闲资源; 当前 i_sw[0]/i_sw[1] 已被复位/HDMI 切换占用
+    - TARGET_SEL / TASK_SEL 目标输入寄存器:
+        2026-07-12 注意: 原 5-bit TARGET_SEL 是旧草案，只够旧版精确匹配；
+        2-bit color_sel 无法表示 WHITE/BLACK/RED/BLUE/YELLOW 五色。
+        四任务决赛建议新增或重定义为更宽寄存器，例如:
+          bit [2:0] target_color_sel: ANY/WHITE/BLACK/RED/BLUE/YELLOW/RESERVED
+          bit [4:3] target_size_sel:  ANY/20mm/25mm/30mm
+          bit [7:5] task_mode:        NONE/TASK_MODE_1..4
+          bit [8]   target_valid
+          bit [9]   apply_or_lock
+          bit [10]  next_round_reset
+        reference_size 首版不从拨码读取；Host/mock API 注入。若硬件必须输入，
+        需另增 reference_size 字段或 UART 调试命令。
+        [UNRESOLVED] 新寄存器地址和位定义未定版；旧 0x06C 不能直接当作五色硬件事实。
+        FPGA 负责物理开关同步/消抖/编码，CPU 只读稳定寄存器。
+        具体 SW 位需确认空闲资源; 当前 i_sw[0]/i_sw[1] 已被复位/HDMI 切换占用。
     - 与机械臂队友确认识别输出字段: color/shape/size/match_action
       match_action=GRAB 表示允许固定 P_pick 抓取, 不是视觉坐标闭环命令。
     - 最终 match_action 首版推荐 Cam0/Cam1 两路都写同一个融合后 action
     - grab_center 仅用于 OSD/日志/偏差检查；默认不作为当前正式接口
     - 是否有 VSYNC 中断可用 (优化轮询)
+
+================================================================================
+  其他源码状态
+================================================================================
+
+  conveyor_control.c:
+    - 当前为 7 行空桩，未被 main.c 调用。
+    - 若比赛最终不需要传送带控制，应标记为废弃或从构建中移除；
+      若需要保留占位，必须在文件头注释说明“未接入、无行为、不得作为完成项”。
+    - Claude 本轮四任务工作不要扩展 conveyor_control，避免扩大范围。
+
+  startup_qcrv32.S:
+    - trap/interrupt handler 当前仍是 halt 占位。
+    - 首版固件按全轮询模型设计；timer/UART 中断服务不是当前能力。
+    - 若后续为了机械臂 UART 或周期调度启用中断，必须单独提交 Review Packet。
 
 ================================================================================

@@ -271,8 +271,11 @@ int main(void)
     uart_puts("[LOOP] Entering main recognition loop...\r\n\r\n");
 
     /* ---- 4. 主循环 ---- */
-    uint16_t err_code = 0;
+    uint16_t latched_err = 0;    /* persists across iterations until commit_global succeeds */
     for (;;) {
+        /* Carry forward any error that couldn't be committed to FPGA last iteration */
+        uint16_t loop_err = latched_err;
+
         board_io_heartbeat();
 
         feature_snapshot_t snap0, snap1;
@@ -297,7 +300,7 @@ int main(void)
                                       s0.size_cm_x10, 0, &snap0, &wb0);
             board_io_write_results(0, &wb0);
             if (board_io_commit_results(0, &seq_cam0) != 0)
-                err_code = ERR_COMMIT_TIMEOUT;
+                loop_err = ERR_COMMIT_TIMEOUT;
         }
 
         /* ---- 处理 Cam1 ---- */
@@ -310,14 +313,30 @@ int main(void)
                                       s1.size_cm_x10, 0, &snap1, &wb1);
             board_io_write_results(1, &wb1);
             if (board_io_commit_results(1, &seq_cam1) != 0)
-                err_code = ERR_COMMIT_TIMEOUT;
+                loop_err = ERR_COMMIT_TIMEOUT;
         }
 
         /* ---- 融合决策 ---- */
         vision_result_t fused = fuse_results(&filt_cam0.stable,
                                               &filt_cam1.stable, cfg);
 
-        /* ---- 目标输入 ---- */
+        /* ---- 目标输入 ----
+         * 当前路径：task_matcher_read_target_from_fpga() 只解红/蓝/黄
+         * （旧 2-bit color_sel），不支持白/黑和 task_mode。
+         *
+         * 四任务正式接入点（待 FPGA 确认 3-bit color_sel 后启用）：
+         *   task_target_t t;
+         *   memset(&t, 0, sizeof(t));
+         *   t.target_color  = <read from 3-bit TARGET_SEL or UART cmd>;
+         *   t.target_shape  = SHAPE_CUBE;
+         *   t.target_size_cm_x10 = <size_sel>;
+         *   t.reference_size_cm_x10 = <ref_size, UART or fixed>;
+         *   t.task_mode     = <task_mode from TARGET_SEL or UART>;
+         *   task_matcher_set_target_ex(&t);
+         *
+         * 在硬件就绪前，可临时用 UART 调试命令注入五色目标：
+         *   if (uart_cmd_target_ready) { task_matcher_set_target_ex(&uart_target); }
+         */
         task_matcher_read_target_from_fpga();
 
         /* ---- 任务匹配 ---- */
@@ -332,7 +351,7 @@ int main(void)
                                       s0.size_cm_x10, action, &snap0, &wb);
             board_io_write_results(0, &wb);
             if (board_io_commit_results(0, &seq_cam0) != 0)
-                err_code = ERR_COMMIT_TIMEOUT;
+                loop_err = ERR_COMMIT_TIMEOUT;
         }
         if (cam1_ok) {
             result_writeback_t wb;
@@ -340,21 +359,42 @@ int main(void)
                                       s1.size_cm_x10, action, &snap1, &wb);
             board_io_write_results(1, &wb);
             if (board_io_commit_results(1, &seq_cam1) != 0)
-                err_code = ERR_COMMIT_TIMEOUT;
+                loop_err = ERR_COMMIT_TIMEOUT;
         }
 
         /* ---- 日志：融合结果 + 动作 ---- */
         log_action_fused(action, &fused, obj_cx, obj_cy);
 
+        /* ---- 一轮一事务：round 推进占位 ----
+         * action==GRAB 后 task_matcher 已自动进入 ROUND_GRAB_REQUESTED 锁定。
+         * 释放锁的条件（待 arm_controller 集成后实现）：
+         *   1. arm_controller 报告本轮抓取-放置序列完成 → next_round()
+         *   2. 或 FPGA 物理按键 / UART 命令显式触发下一轮
+         *   3. 或超时（如 30s 无 GRAB → 自动推进）
+         *
+         * 当前占位逻辑（不做任何事，等 arm_controller 接入）：
+         *   if (arm_round_done_flag) {
+         *       task_matcher_next_round();
+         *       arm_round_done_flag = 0;
+         *   }
+         */
+
         /* ---- 全局状态提交 ----
          * ARM_STATE: 识别侧始终输出 IDLE。队友 arm_controller 负责
          * 在抓取/分拣时更新为 GRABBING 等实际状态。
-         * ERROR_CODE: 反映最近一次 commit 失败（若成功则为 0）。 */
-        board_io_write_global_state(ARM_STATE_IDLE, err_code);
-        if (board_io_commit_global(&seq_cam0) != 0)
-            err_code = ERR_COMMIT_TIMEOUT;
-        else
-            err_code = 0;
+         * ERROR_CODE: 本轮 + 历史未提交错误的累积。
+         * commit_global 失败 → latched_err 锁存，下轮重试提交。
+         * commit_global 成功 → latched_err 清零，错误已送达 FPGA。 */
+        board_io_write_global_state(ARM_STATE_IDLE, loop_err);
+        if (board_io_commit_global(&seq_cam0) != 0) {
+            /* commit_global 失败：当前 loop_err（含可能的历史锁存 + 本轮新错误）
+             * 未能写入 FPGA 寄存器。锁存到下一轮重试。
+             * 若 loop_err==0 但 commit_global 本身是唯一的失败，
+             * 用 ERR_COMMIT_TIMEOUT 标记。 */
+            latched_err = (loop_err != 0) ? loop_err : ERR_COMMIT_TIMEOUT;
+        } else {
+            latched_err = 0;   /* 成功提交 → 错误已送达 FPGA，清除锁存 */
+        }
     }
 
     return 0;

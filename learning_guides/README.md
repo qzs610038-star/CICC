@@ -14,6 +14,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_cpu_arm_control.md)：嵌入式 CPU 控制与通信（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-10_merge_cpu_fpga_integration/guide_system_integration.md)：机械臂控制调试与项目系统维护更新（面向角色 C）。
+  * [daily_sync/2026-07-12_merge_dev_wsc6090-CPU/](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/)：7 月 12 日合并 CPU 四任务 matcher 与事务锁分支时生成的讲解指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_fpga_vision_front.md)：FPGA 目标寄存器与事件接口约束（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_cpu_arm_control.md)：四任务真源、幂等锁与错误锁存（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_system_integration.md)：机械臂七阶段安全门（面向角色 C）。
 
 
 ---
