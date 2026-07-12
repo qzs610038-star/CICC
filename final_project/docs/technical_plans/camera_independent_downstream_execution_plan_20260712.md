@@ -1,11 +1,13 @@
 # 摄像头不可用期间的下游并行推进方案
 
 > 日期：2026-07-12  
-> 状态：待审核，尚未实施  
+> 状态：**部分实施**；L1 Host 回放、L2 合成像素源和 WP-1/WP-2 主要契约已完成，正式 SoC/APB/CDC/OSD 与板级闭环未完成
 > 适用范围：`final_project/`  视觉链路当前未产生稳定 CSI 数据流时的下游开发与验证  
 > 前提：不把测试输入、PC 脚本或 mock 结果描述为真实摄像头、板上 SoC 或机械臂正式闭环
 
 > 实施更新（2026-07-12）：已按用户指令实现 `synthetic_2ppc_source.v`，并只接入 `u_preprocess_ch1_tap` 的输入选择。默认 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1`；HDMI、CSI、DDR 和机械臂路径不变。独立 map 和正式工程 map 已通过；RTL 仿真、PNR、bitstream 和板级采集仍为 `NOT VERIFIED`。
+
+> 整合更新（2026-07-13）：合成源、竞赛契约、完整 `round_controller`、轻量 `competition_round_transaction`、20 轮 Host flow 与 A13 snapshot replay 已进入本地整合分支，Host 合计 795/795；正式工程 map PASS，但 PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言 FAIL。当前应推进 WP-4 的 `ARM_DISABLED` 主循环集成和 WP-6 的正式 SoC/APB 门，不得重复把 L1/WP-2 记为未开始。
 
 ## 1. 决策与目标
 

@@ -28,10 +28,13 @@ MIPI 摄像头
 
 ## 当前系统集成状态
 
-- CPU 识别侧的 `board_io`、分类、参数表、任务匹配和主循环代码已落地；当前单测结果以 [CPU_MODULE_PLAN.txt](cpu/CPU_MODULE_PLAN.txt) 的“最新归档”统计为准，尚未完成 RISC-V/板级验证。
-- myCobot 的板上 CPU 协议与控制器已有代码和 mock 测试骨架；正式 UART、接线/电平和动作验证尚未开始，PC `pymycobot` 不进入比赛闭环。
+- 两位队友分支与个人工作区已在本地整合：Host CPU/competition 回归 795/795 PASS，8 个关键 C 源完成 Efinity RISC-V strict compile-only；正式链接、烧录和板级运行尚未验证。详见 [团队整合 Review Packet](docs/review_packets/team_integration_merge_review_20260713.md)。
+- CPU 侧已有五色/四任务 matcher、完整 `round_controller` 和轻量 `competition_round_transaction`；`main.c` 尚未接入两层逐轮控制器、正式 APB/OSD 或 arm done/ACK。
+- FPGA 合成像素源已接入当前验证路径，整合工程 map PASS；PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言 FAIL，没有可验收 bitstream。合成源不替代真实摄像头。
+- myCobot 的板上 CPU 协议与控制器已有代码和 mock 测试骨架；正式 UART、接线/电平和动作验证尚未开始，PC `pymycobot` 不进入比赛闭环，真实动作维持 NO-GO。
 - CPU/APB/OSD 仍受生成 SoC 产物门禁：当前缺少正式 `soc.h`、APB slave、CDC RTL 和地址分配，见 [生成 SoC 摘要](docs/architecture/generated_soc_summary_2026-07-11.md)。
 - 全项目的当前路线、阻塞和待定决策以根目录 [CURRENT_STATE.md](../CURRENT_STATE.md) 为准。
+- 当前代码分层与门禁见 [2026-07-13 综合架构快照](docs/architecture/current_code_architecture_2026-07-13.md)。
 
 ## 目录边界
 

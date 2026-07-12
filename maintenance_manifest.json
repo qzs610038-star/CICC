@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "cicc-tj375-final-project",
-  "last_verified_commit": "218b012f23261991797c133341102692a25089b6",
+  "last_verified_commit": "510caca79ce439da143916fa4c91854f79e3db7a",
   "managed_documents": [
     {
       "file": "CURRENT_STATE.md",
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "file": "final_project/docs/architecture/current_code_architecture_2026-07-11.md",
+      "file": "final_project/docs/architecture/current_code_architecture_2026-07-13.md",
       "role": "current_architecture_snapshot",
       "refresh_on": [
         "final_project/fpga/rtl/",

@@ -27,6 +27,14 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-13，来源 Agent：Codex（团队整合后的文档新鲜度与 Codebase Memory 刷新）
+  - 适用范围：`codex/team-integration-20260713@510caca` 的当前状态、接口候选契约、近期执行方案、架构入口和默认协作图谱；不改变官方细则、系统职责边界或任何板级/机械臂 Gate。
+  - 最新结论：已把决赛主方案更新为 `v1.3-main`，将 Host/合成源任务标记为已形成证据，并把当前队列转向 `register_map/board_io` 契约收口、`ARM_DISABLED` 主循环集成、production/debug 构建拆分与 periphery/PNR。`register_map.md` 已和 `board_io.h` 当前候选偏移对齐，但正式基址/扩展字段仍等待同一次 SoC 生成的 `soc.h` 与 Review Packet；新增 `current_code_architecture_2026-07-13.md` 作为当前架构入口。
+  - 图谱结果：使用 `codebase-memory-mcp 0.9.0` 对 `D:/cicc_cbm_link` 执行 `fast + persistence` 重建，运行时与 artifact 均为 `4514 nodes / 10958 edges`，artifact commit 为 `510caca79ce439da143916fa4c91854f79e3db7a`；`round_controller`、`competition_round_transaction`、`synthetic_2ppc_source` 查询回归通过。新会话/新机器仅依靠 artifact 的冷启动导入尚未验证。
+  - 新鲜度结果：`tools/project_freshness_check.ps1` 在图谱重建前已达到 `FAIL=0`；保留的绝对路径 WARN 是隔离工程/工具安装位置的真实外部证据，不代表板级通过。图谱 artifact 与本轮文档的提交/推送状态必须以当前 `git status` 和 `origin/main` 为准，不从本条历史文字推断。
+  - 证据路径：`maintenance_manifest.json`、`final_project/integration/register_map.md`、`final_project/docs/architecture/current_code_architecture_2026-07-13.md`、`final_project/docs/review_packets/team_integration_merge_review_20260713.md`、`CBM_CONFIG_GUIDE.md`、`.codebase-memory/artifact.json`、`.codebase-memory/graph.db.zst`。
+  - 失效条件：代码结构再次变化、正式 `soc.h`/APB/CDC/OSD 接口定版、production/debug 构建结构改变，或冷启动验证发现 artifact 无法恢复同等查询结果。
+
 - 日期：2026-07-13，来源 Agent：Codex（两位队友分支整合后的正式 FPGA 工程构建）
   - 适用范围：`codex/team-integration-20260713` 中 `final_project/fpga/efinity/mem_test.xml` 与合并后 `top.v` 的 Efinity 2025.2 map/PNR；不表示真实摄像头、HDMI 或 bitstream 上板通过。
   - 最新结论：中文仓库路径直接运行 map 会因 Efinity `filesystem error: Illegal byte sequence / EFX-0002` 在 HDL 前失败；改用仓库 ASCII junction `D:\cicc_cbm_link` 后 map PASS。资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`；`mem_test.warn.log` 有 132 条 warning 记录，综合摘要报告 post-synthesis netlist 共 1098 warnings，不能标记为可忽略。
@@ -138,15 +146,15 @@
   - 最新结论：PC 端已定位到 `pick_hover` 姿态下 J4 约 `1.84°–2.20°` 的指令—读回末段静差；正向 J4 偏置可将内部正运动学残差降至约 `3.7–3.8 mm`，但 `sync_send_angles` 仍返回 `0`，故不得视为严格到位或下探许可。用户新确认机械臂本体与乐高底座的连接会在运动中微倾；该位移不被 `get_coords()` 的底座坐标系测量，因而成为真实抓放稳定性的首要未解风险。乐高多点加固可缓解但不等同刚性固定。
   - 当前放行：PC 端 180°真实抓放和任何板上真实动作维持 NO-GO；D1（CPU/APB）和 D2（UART2 本地回环/监听）可立即并行，均不得连接真实机械臂控制线或发送动作帧。D3 真实臂只读仍以 T0 的 `soc.h`/UART2 真源、电平、线序、共地、急停及机械结构复核为前置；D5 动作须完成 D0–D4 和 Codex Review Packet。
   - 替代旧结论：替代“PC 端多轮动作稳定即可作为 180°点位或板上动作放行依据”的隐含判断；不否定 PC 端对协议与点位顺序的开发期参考价值。
-  - 证据路径：`mycobot_pc_tests/audit_logs/20260712_180deg_j4_mount_debug_record.md`、`mycobot_pc_tests/audit_logs/auto_run_20260712_164639.log`、`auto_run_20260712_173543.log`、`auto_run_20260712_191421.log`、`auto_run_20260712_191657.log`、`mycobot_pc_tests/test_j4_bias.py`、`final_project/docs/technical_plans/mycobot_board_debug_execution_plan_20260712.md`。
+  - 证据路径：`mycobot_pc_tests/audit_logs/20260712_180deg_j4_mount_debug_record.md`、`mycobot_pc_tests/audit_logs/auto_run_20260712_164639.log`、`mycobot_pc_tests/audit_logs/auto_run_20260712_173543.log`、`mycobot_pc_tests/audit_logs/auto_run_20260712_191421.log`、`mycobot_pc_tests/audit_logs/auto_run_20260712_191657.log`、`mycobot_pc_tests/test_j4_bias.py`、`final_project/docs/technical_plans/mycobot_board_debug_execution_plan_20260712.md`。
   - 失效条件：完成外部基准下的乐高连接位移验收并获得新的两次以上悬停复测证据，或新的 SoC/UART/电平/实机日志改变 D1–D5 的事实边界。
 
 - 日期：2026-07-12，来源：用户逐项进度访谈 + Codex共享仓库核查
   - 适用范围：7月17日保底冻结前的真实进度、人力、阻塞、最低保底和立即工作队列
-  - 最新结论：决赛主方案已更新为`v1.2-main`。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。
+  - 最新结论（2026-07-13 版本号更新）：决赛主方案已从 `v1.2-main` 更新为 `v1.3-main`，拿分顺序和 F1/F2 边界不变；新增团队整合进度与下一 Gate。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。
   - 实时事实：两只旧摄像头交叉任一接口均花屏，新摄像头预计7月13日到货；官方fallback纯色轮切稳定，ch1 I2C地址阶段ACK且`0x0100` bit0读高，但未见CSI DE。赛方独立CPU例程历史上板成功，但当前视频工程无SoC IP、生成`soc.h`、APB从机或结果CDC。目标输入和决赛OSD未实现。PC机械臂多轮动作稳定但旧路径约10cm，开发板UART/电平/接线未定；7月12日可重新示教180°点位并低速带载。五色/三形状/三尺寸物体齐全，底板/相机/机械臂/摆放区仍待固定，背景/补光未定。
   - CPU特别风险（历史盘点，已由上方 2026-07-13 CPU 整合条目部分替代）：`vision_classifier.c` 的白/黑仍依赖 `LIVE_FG_AREA` 真源；四任务 matcher 与 round_controller 已有 Host 代码，但 `main`、正式 APB/OSD 和 arm_controller 仍未闭环。
-  - 并行工作：FPGA/SoC成员A主责CPU与视频工程合并；CPU成员每天1—2h负责契约/审查，其他成员接纯C实现；机械臂成员C每天6—8h。队友另有尚未合入的FPGA合成数据源方案，预计7月12日实现；禁止并发覆盖其`top.v`等文件，合成源不作为真实摄像头验收。
+  - 并行工作（已由 2026-07-13 整合条目覆盖）：FPGA 合成数据源、CPU 竞赛契约与两层逐轮控制器已合入 `codex/team-integration-20260713`；后续 A 线转入生产/调试构建拆分与 periphery/PNR，B 线转入 `main`/APB/OSD 的 `ARM_DISABLED` 最小集成，C 线继续执行 T0、D1/D2 安全门。合成源仍不作为真实摄像头验收。
   - 截止线：7月14日晚必须出现视频工程内CPU Hello+APB MAGIC，否则人力集中救SoC/APB；7月15中午双摄未稳则降单摄；7月15晚无LIVE_FG_AREA则白色列高风险；7月16中午板到臂安全链未过则冻结F1无机械臂；7月16晚F1必须完成20轮计时，7月17冻结。
   - 替代旧结论：替代“方案仍待访谈定版”、把Host旧测试视为决赛CPU完成、把花屏简单归因于摄像头硬件、以及机械臂必须先完成才有保底的表述。
   - 证据路径：`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`、`final_project/docs/debug_sessions/video_link_current_state_20260711.md`、`final_project/cpu/app/src/vision_classifier.c`、`final_project/cpu/app/include/board_io.h`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
@@ -154,11 +162,11 @@
 
 - 日期：2026-07-12，来源 Agent：Codex（Gemini方案复核后的总控计划落地）
   - 适用范围：分赛区决赛最大化得分攻关顺序与跨CPU/FPGA/SoC/OSD/myCobot验收门
-  - 最新结论：`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md` 已升级为 `v1.2-main` 并由用户标定为“决赛主方案”。方案采用“CPU得分引擎 + FPGA生产构建”双P0并行，先闭合识别/判断/OSD/正确SKIP，再用一条固定正方体抓放路径补齐7个目标轮执行分；逐轮控制器新增事件锁存/序号/ACK、有界超时、人工放弃、分级复位和机械臂运动态安全恢复，且已补充访谈盘点、F1/F2保底层级与7月12—17日工作队列。
+  - 最新结论（2026-07-13 版本号更新）：`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md` 当前为 `v1.3-main` 并继续作为用户标定的“决赛主方案”。方案采用“CPU得分引擎 + FPGA生产构建”双P0并行，先闭合识别/判断/OSD/正确SKIP，再用一条固定正方体抓放路径补齐7个目标轮执行分；逐轮控制器新增事件锁存/序号/ACK、有界超时、人工放弃、分级复位和机械臂运动态安全恢复，且已补充团队整合盘点、F1/F2保底层级与7月12—17日工作队列。
   - 替代旧结论：Gemini方案中四任务均按1目标+4非目标估分、统一按25%/25%/50%解释任务三、直接通过约束/隔离2288个I/O修PNR、把逐轮状态机直接写入`main.c`、把新点位写入`arm_controller.c`等不严谨表述；同时纠正“把5位APB总线升级为16/32位”的说法，当前只是软件假设的32位MMIO寄存器中的5位载荷草案。
   - 证据路径：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`、`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/src/main.c`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`。
-  - 当前状态不变：主方案已批准不等于实现完成；本次仍未修改RTL/CPU源码/工程配置，未解除此前暂缓的testbench、真实Debayer、PNR/bitstream、板级特征采集，也未授权机械臂动作。
-  - 下一步最小闭环：先通过逐项访谈刷新团队今天的真实进展和卡点，再定版“最低保底方案 + 立即工作队列”；在新证据到来前，默认候选 checkpoint 仍是四任务20轮真值表、纯软件目标/理由/可恢复round-controller接口与测试清单、只读PNR复现Review Packet。
+  - 当前状态（已由 2026-07-13 整合条目覆盖）：主方案已批准不等于板级实现完成。RTL/CPU 源码和工程配置已有整合改动，Host 侧四任务、竞赛契约与两层逐轮控制器以及 RISC-V compile-only 已形成证据；真实 Debayer、正式 APB/CDC/OSD、PNR/bitstream、板级特征采集与机械臂动作仍未放行。
+  - 下一步最小闭环（2026-07-13 更新）：统一 `register_map.md`、`board_io.h` 与竞赛契约；在 `ARM_DISABLED` 下把正式 `round_controller` 最小接入 `main.c`；拆分 production/debug 合成源入口并审查 periphery/IO 导出后重跑 PNR。不得重复把已完成的 Host 真值表和纯 C 控制器作为未开始任务。
   - 失效条件：用户否决该总控顺序、官方细则更新、任务三评分获得不同现场确认，或新的真实板级证据改变PNR/视频/SoC阻塞判断。
 
 - 日期：2026-07-12，来源 Agent：Codex（Agent 入口一致性维护）
@@ -188,7 +196,7 @@
 
 - 日期：2026-07-11，来源 Agent：Codex
   - 适用范围：`final_project` FPGA 视觉预处理的 PNR/Debugger 验证路径
-  - 最新结论：C 盘 ASCII junction 上的正式 map 再次通过。项目 `mem_test.xml` 的 Debugger 自动实例化处于开启状态，命令行 PNR 自动带 `--enable_dbg`，要求 Debug Wizard 先生成 `mem_test.dbg.vdb`；现有 map 仅生成普通 `mem_test.vdb`，因此该路径不能直接完成 PNR。用普通 VDB 继续的 PNR 已越过打包和 SDC 解析，最终因 2,288 个未约束 I/O 在 Efinity 内部 `outpad` 断言失败，未产生时序签核结果。
+  - 最新结论（历史构建，已由 2026-07-13 正式整合构建覆盖）：C 盘 ASCII junction 上的正式 map 再次通过。项目 `mem_test.xml` 的 Debugger 自动实例化处于开启状态，命令行 PNR 自动带 `--enable_dbg`，要求 Debug Wizard 先生成 `mem_test.dbg.vdb`；当时普通 VDB 路径因 2,288 个未约束 I/O 在 Efinity 内部 `outpad` 断言失败。当前整合分支的最新计数为 1,776，仍未产生时序签核结果；两次结果共同指向 periphery/顶层 IO 导出边界问题，不得混作同一次构建统计。
   - 替代旧结论：将 `mark_debug` profile 视为可直接进行命令行 Debugger/PNR capture 的假设。
   - 证据路径：`final_project/fpga/efinity/mem_test.xml` 的 `debugger.auto_instantiation=on`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`、`final_project/docs/review_packets/preprocess_ch1_tap_review_packet_20260711.md`。
   - 失效条件：在受控 Efinity GUI Debug Wizard 中生成含 ch1 预处理探针的 `.dbg.vdb` 并成功完成对应 PNR，或工程接口/约束完整性修复后普通 PNR 不再出现未约束 I/O 的 `outpad` 断言。
@@ -220,7 +228,7 @@
   - 替代旧结论：2026-07-11 CPU 条目中"维护未重跑测试""仅支持精确尺寸匹配""缺白/黑色"等旧口径；2026-07-12 比赛规则条目中"下一步最小闭环"的 matcher 部分已执行。
   - 证据路径：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md` §二.3.1、`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/src/main.c`、`final_project/cpu/tests/test_task_matcher.c`（146/146）、`final_project/cpu/CPU_MODULE_PLAN.txt`。
   - 失效条件：后续测试重跑失败、生成 SoC 的寄存器语义与当前草案不兼容，或 Codex 下一轮审查发现 Host 层逻辑缺陷。
-  - 未完成边界：未生成正式 `soc.h`，未完成 RISC-V 交叉构建、APB/CDC、OSD、bitstream 或板级验证；五色目标硬件输入路径（3-bit TARGET_SEL / UART cmd）未定版；`TARGET_SEL`、`LIVE_FG_AREA` 及其地址均未定版；arm_controller 未接入主循环。
+  - 未完成边界（已由 2026-07-13 CPU 整合条目部分覆盖）：8 个关键源文件的 RISC-V strict compile-only 已通过，但仍未生成正式 `soc.h`，未完成正式链接/烧录、APB/CDC、OSD、bitstream 或板级验证；五色目标硬件输入路径（3-bit TARGET_SEL / UART cmd）未定版；`TARGET_SEL`、`LIVE_FG_AREA` 及其地址均未定版；arm_controller 未接入主循环。
 
 - 日期：2026-07-11，来源 Agent：维护核查（基于 2026-07-09 myCobot CPU 迁移记录）
   - 适用范围：板上 CPU myCobot 协议与控制器

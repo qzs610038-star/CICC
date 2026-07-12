@@ -168,11 +168,11 @@ T0 的唯一产物为 `final_project/integration/io_pin_map.md` 的证据表和�
 - **真实动作：当前 NO-GO。** 需先完成 D0–D4，并由现场安全确认和 Codex Review Packet 放行。
 - **7 月 16 日 12:00 后：硬冻结。** 未达 F2 安全链即切回 F1，不用机械臂链路影响 20 轮、10 分钟的保底演示。
 
-### 8.2 2026-07-12 CPU 分支合并后的执行增量（Codex）
+### 8.2 2026-07-13 团队整合后的执行增量（Codex）
 
-- 本地 `main` 已合并 `origin/dev/wsc6090-CPU@af82e52`，合并提交为 `af6d32d`；未推送 `origin/main`。
-- 四任务 matcher、同轮防重复锁与错误锁存已完成 Host 层修正，当前三组测试为 258/258；这不改变 APB/UART/机械臂板级未验证结论。
+- 当前统一筛选分支为 `codex/team-integration-20260713@510caca`；两位队友分支与个人学习指南、180°点位诊断和原始日志均已保留，`origin/main` 未被本次整合改写。
+- 四任务 matcher、完整 `round_controller`、轻量 `competition_round_transaction`、竞赛契约和 Host snapshot flow 已整合，Host 合计 795/795；8 个关键源完成 RISC-V strict compile-only。这不改变 APB/UART/机械臂板级未验证结论。
 - `mycobot_transport.c/.h` 的纯内存 RX Ring Buffer、坏帧重同步和 TX 队列已经存在，不应另起一套 transport；D2/D4 只新增硬件适配层 `mycobot_uart.c/.h`，负责 UART2 MMIO、超时、轮询/ISR 和 PLIC claim/complete。
-- `task_matcher_set_target_ex()` 已保证同一轮反复写入相同目标不会重新解除 `GRAB_REQUESTED`；下一轮必须显式调用 `task_matcher_next_round()`。
+- `task_matcher_set_target_ex()` 已保证同一轮反复写入相同目标不会重新解除 `GRAB_REQUESTED`；下一轮必须由正式 `round_controller` 的事件/ACK 流显式推进，当前尚未接入 `main.c`。
 - `final_project/cpu/params/arm_positions.c` 仍是旧 PC 点位迁移表，文件头明确“未接 main/UART/真实 transport”，且不包含当日新示教的 180°放置点。D5/D6 禁止使用该默认表冒充新点位。
 - 当前操作版见 `mycobot_board_bringup_operator_sop_20260712.md`。在 `io_pin_map.md` 真源表、结构加固复核、UART2 硬件适配和 180°板上点位迁移完成前，只允许 Host/QEMU、APB 和无臂 UART 监听。

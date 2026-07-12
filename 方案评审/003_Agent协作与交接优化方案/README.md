@@ -11,6 +11,8 @@
 | 高置信 handoff 与只读健康检查 | 已落地 | `HANDOFF_TEMPLATE.md`、`tools/agent_handoff_health_check.ps1` |
 | FPGA / CPU-myCobot 模块规则 | 已落地 | `.agents/skills/fpga_vision/`、`.agents/skills/cpu_mycobot/` |
 | 文档、证据、CBM 新鲜度检查 | 已落地 | `tools/project_freshness_check.ps1`、`maintenance_manifest.json` |
+
+> 2026-07-13 维护更新：团队整合后已把受管架构快照切换到 `current_code_architecture_2026-07-13.md`，维护基线更新为整合提交 `510caca`；新鲜度检查必须在图谱刷新后再次运行，不能只看 `index_status` 的 HEAD。
 | 寄存器单一数据源与自动生成 | 待 SoC/APB 定版后实施 | 不得在草案阶段分配正式地址 |
 
 ## 文件索引

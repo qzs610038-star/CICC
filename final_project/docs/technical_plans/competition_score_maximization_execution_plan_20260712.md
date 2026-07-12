@@ -1,7 +1,7 @@
 # 分赛区决赛主方案：最大化得分总控执行方案
 
-> 版本：v1.2-main
-> 日期：2026-07-12
+> 版本：v1.3-main
+> 日期：2026-07-13（在 2026-07-12 主方案上追加整合进度）
 > 状态：**决赛主方案（已由用户标定）**；作为当前最高执行方案，不代表任何硬件或机械臂闭环已经完成
 > 目标：在 0710 官方细则下，以最小风险获得尽可能高的现场有效分
 > 适用工程：`final_project/`
@@ -108,17 +108,17 @@
 
 ### 3.2 当前 P0 缺口
 
-- `task_matcher_read_target_from_fpga()` 只支持红、蓝、黄目标；缺白、黑。
-- `task_matcher_evaluate()` 只支持精确尺寸匹配；缺任务三/四关系判定。
+- Host 层 `task_matcher_evaluate()` 已覆盖五色和四任务关系判定；板上 `task_matcher_read_target_from_fpga()` 仍只有旧红/蓝/黄输入，缺白/黑和完整任务配置。
+- 完整 `round_controller` 与轻量 `competition_round_transaction` 已分别保留并通过 Host 回归，但尚未接入 `main.c`、正式 APB/OSD 或 arm done/ACK。
 - 现有 `TARGET_SEL` 是软件假设的 32 位 MMIO/APB 寄存器中的 5 位有效载荷草案，无法完整表达五色、四任务、参考尺寸和配置提交语义；它不是已经落地的“5 位 APB 总线”。
-- `main.c` 连续轮询并重写动作，没有“一轮一事务”；抓取坐标仍只写日志，未接 `arm_controller`。
+- `main.c` 仍直接调用 matcher；两层逐轮控制器尚未进入主循环，抓取坐标仍只写日志，未接 `arm_controller`。
 - OSD/APB/CDC、正式 `soc.h`、正式 UART 和地址均未闭环。
-- PNR 失败同时涉及 Debugger 专用 `.dbg.vdb` 缺失和普通 VDB 路径的 2,288 个未约束 I/O；根因尚未定版。
+- 2026-07-13 整合工程 map PASS；普通 VDB 路径报告 1,776 个 IO 无 placement 后触发 `outpad` 断言。旧构建曾报告 2,288 个未约束 I/O，两者不得混为同一次统计；根因仍需从 periphery/Interface Designer 与顶层导出边界定位。
 - 未完成真实 Debayer 波形、板级特征采集、bitstream、烧录和 20 轮时限验证。
 
 ### 3.3 工具链事实
 
-当前 PATH 未发现 `gcc`、`clang`、MSVC、MinGW、`riscv-none-elf-gcc` 或 `qemu-system-riscv32`。实施时不得假设“直接用 MinGW”。应优先复用已有测试脚本能够定位的 Efinity/QEMU 工具链，或先创建固定、可复现的工具链入口。
+当前 Host 脚本已能调用 MSVC；Efinity 随附的 RISC-V GCC 已对 8 个关键源文件完成 `-Wall -Wextra -Werror` compile-only。该结果不等于正式固件链接、烧录或板上运行；后续仍应复用固定脚本和同一次 SoC 生成物，不得改用来源不明的全局工具链。
 
 ## 4. 目标软件契约
 
@@ -624,14 +624,14 @@ round_seq + recognition + decision + reason + action + arm_state
 
 ## 18. 当前建议的首个可验证 checkpoint
 
-访谈后定版的首个并行 checkpoint 是：
+2026-07-13 整合后，原 Host/合成源 checkpoint 已完成，下一并行 checkpoint 调整为：
 
-1. FPGA/SoC线：在不覆盖队友合成源工作的前提下，形成“赛方独立SoC例程 → 当前视频工程”的最小合并清单，目标只到CPU Hello/heartbeat和单个APB MAGIC。
-2. CPU线：形成四任务20轮真值表，补齐五色目标、任务三/四关系判定、理由码和可恢复 `round_controller` 的Host/Mock测试。
-3. 机械臂线：保留旧10cm点位不动，新增符合180°±10°和最大臂展要求的决赛点位表，完成空载与低速带载验证。
-4. 物理线：完成可重复安装的临时底板/相机/机械臂/摆放区设计，为新摄像头到货后的单变量测试准备条件。
+1. FPGA/SoC 线：把合成验证入口拆成明确的 debug/production 配置，审查 periphery/Interface Designer 与顶层 IO 导出，先关闭 1,776 IO 的 PNR 阻塞。
+2. CPU 线：统一 `register_map.md`、`board_io.h` 与竞赛契约，在 `ARM_DISABLED` 下把正式 `round_controller` 最小接入 `main.c`，保持轻量 transaction 层负责 event_seq/ACK。
+3. SoC/APB 线：继续在隔离副本完成 CPU Hello、heartbeat 和单个 APB MAGIC；正式 `soc.h` 到位前不冻结地址。
+4. 机械臂/物理线：只推进 T0、D1/D2、结构加固和外部基准复核；真实臂只读及动作继续按独立安全门放行。
 
-本方案已经获批为决赛主方案，但首个实施 checkpoint 将在完成“最新进展与卡点”逐项访谈后定版。访谈期间不得把文档中的历史状态当作团队今天的真实进度；若用户提供了新的构建、上板或机械臂证据，应先更新 `CURRENT_STATE.md`，再调整立即工作队列。
+新的构建、上板或机械臂证据必须先写入 `CURRENT_STATE.md`，再调整立即工作队列。Host 795/795 和 compile-only 不得外推为板级闭环。
 
 ## 19. v1.1-main 修订记录
 
@@ -640,6 +640,13 @@ round_seq + recognition + decision + reason + action + arm_state
 - 纠正“5 位 APB 扩成 16/32 位”的错误表述：当前只是 32 位 MMIO 寄存器内的 5 位载荷草案。
 - 将持久目标配置与 `PLACE/REMOVE/ABANDON/RESET` 操作事件拆分。
 - 增加 APB/CDC 增量集成门，禁止新增宽物理引脚和多位语义裸跨 CDC。
+
+### 19.1 v1.3-main（2026-07-13）整合进度
+
+- 合入 `synthetic_2ppc_source`、竞赛契约、Host replay、完整 `round_controller` 和轻量 `competition_round_transaction`，保留两位队友原始提交历史。
+- Host 合计 795/795 PASS，8 个关键 C 源完成 RISC-V strict compile-only；正式链接、烧录和板上运行仍未验证。
+- 正式整合工程 map PASS，PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言失败；无可验收 bitstream。
+- 将下一工作重心从“实现 Host 控制器”转为“接口契约收口、主循环无动作集成、production/debug 构建拆分和 periphery/PNR 修复”。
 
 ## 20. 2026-07-12 逐项访谈后的实时盘点
 
@@ -651,11 +658,11 @@ round_seq + recognition + decision + reason + action + arm_state
 | 人力 | FPGA/SoC成员每天6—8h；CPU成员1—2h且其他成员可接管纯C；机械臂成员6—8h | 必须三线并行，CPU设计审查与编码执行拆开 |
 | 摄像头 | 两只旧摄像头交叉任一接口均花屏；官方fallback纯色轮切稳定；ch1 I2C地址阶段ACK且`0x0100` bit0读高，但未见CSI DE | 显示后端可用，故障在ch1控制后、CSI有效帧前；“摄像头损坏”未定案 |
 | 新摄像头 | 预计7月13日到货 | 只做单变量替换；失败后当天借万用表/示波器测电源、复位、MCLK |
-| 合成源 | 队友正在策划FPGA合成数据源替代CSI输入，预计7月12日实现，尚未合入 | 可解锁下游调试；不得作为真实识别验收或与其并发修改同一顶层 |
-| 视频工程 | 当前可生成/烧录调试bitstream并出现彩屏/花屏；无有效真实画面 | 不得描述为视频基线通过 |
+| 合成源 | `synthetic_2ppc_source.v` 已合入，并被当前 `top.v` 的预处理与 HDMI 验证常量选中 | 已解锁下游 map/Host 回放；必须拆分 production/debug 配置，且不得作为真实识别验收 |
+| 视频工程 | 整合工程 map PASS；PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言 FAIL，无本次可验收 bitstream | 不得描述为生产构建或视频基线通过 |
 | CPU启动 | 赛方独立RISC-V例程历史上板成功，源码仍在赛方材料；团队选择暂不重复独立复现 | 有历史基线，但当前工具/步骤未新鲜复验 |
 | SoC/APB | 成功CPU例程与视频工程是两个独立bitstream；正式视频工程无SoC IP、生成`soc.h`、APB从机和结果CDC | 当前为A档，系统集成第一硬阻塞 |
-| CPU算法 | classifier已有白/黑排除法；`FG_AREA_AVAILABLE=0`时白色不可靠。matcher仍是红/蓝/黄目标输入和精确尺寸匹配；无`round_controller` | Host旧功能不等于决赛四任务完成 |
+| CPU算法 | Host matcher 已覆盖五色/四任务；完整 round controller、轻量 transaction、契约与 20 轮回放已合入，Host 合计 795/795。`FG_AREA_AVAILABLE=0`时白色仍不可靠，板上目标入口仍只有旧红/蓝/黄 | Host 完成不等于 `main`/APB/OSD/板级完成 |
 | 目标输入 | 尚未实现；有8个按键和32个拨码，1个按键保留双摄显示切换 | 物理资源充足，缺消抖/锁存/APB契约 |
 | OSD | 初赛纯FPGA OSD曾成功；决赛工程尚未推进动态结果OSD | 可复用经验，不计作当前能力；可在合成/纯色背景上先调 |
 | 机械臂 | PC端多轮抓放稳定，旧释放路径约横移10cm；具备四点示教与中间回零点；部分C迁移存在但未接板 | 动作基础较强，官方180°目标和板上UART是两项独立缺口 |
@@ -716,6 +723,8 @@ round_seq + recognition + decision + reason + action + arm_state
 ## 22. 7月12—17日立即工作队列
 
 三成员可直接执行的文件级任务卡见 `three_member_execution_board_20260712_17.md`；本节保留总控级里程碑和截止线。
+
+> 2026-07-13 覆盖：7/12 的合成源、Host 契约/控制器和 PC 调试资料已整合；7/13 起按“PNR/periphery、主循环无动作集成、SoC/APB MAGIC、T0/D1/D2”执行。下表早期任务保留为计划历史，完成状态以三成员执行板和 `CURRENT_STATE.md` 为准。
 
 | 日期 | FPGA/SoC主责（A，6—8h） | CPU主责（B审查1—2h + 其他成员执行） | 机械臂/现场主责（C，6—8h） | 当日硬交付 |
 |---|---|---|---|---|

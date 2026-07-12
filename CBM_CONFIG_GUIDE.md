@@ -1,8 +1,8 @@
 # codebase-memory-mcp 图谱初始化与刷新指南
 
-> 更新日期: 2026-07-11
+> 更新日期: 2026-07-13
 > 适用项目: `D:\第十届集创赛-雄芯院材料`
-> 工具版本: `codebase-memory-mcp 0.8.1`
+> 工具版本: `codebase-memory-mcp 0.9.0`
 > 本机程序: `D:\codebase-memory-mcp\codebase-memory-mcp.exe`
 > 当前共享图谱项目: `D-cicc_cbm_link`
 
@@ -12,26 +12,28 @@
 
 ## 1. 当前状态
 
-当前已提交共享 artifact（2026-07-09 刷新记录）：
+当前工作区已刷新共享 artifact（2026-07-13 团队整合后）：
 
 - 仓库真实路径：`D:\第十届集创赛-雄芯院材料`
 - CBM 访问路径：`D:\cicc_cbm_link`
-- `D:\cicc_cbm_link` 是指向真实仓库的 Windows junction，用于绕过 CBM 0.8.1 对中文根路径的索引/持久化问题。
+- `D:\cicc_cbm_link` 是指向真实仓库的 Windows junction，用于保持工具链和 Efinity/CBM 的 ASCII 稳定入口。
 - 共享 artifact 已生成：`.codebase-memory/graph.db.zst`
 - artifact 元数据：`.codebase-memory/artifact.json`
 - artifact 合并策略：`.codebase-memory/.gitattributes`
 - 当前图谱项目：`D-cicc_cbm_link`
-- artifact 记录：commit `efd1bb7f011eeb856edecf50f7c2aee61a359e70`、`2200 nodes / 4613 edges`
-- 新鲜度：该 artifact 早于 2026-07-11 合入的 FPGA 预处理结构，不能用于定位 `vision_preprocess_channel` 等新增符号；重要审查仍须回到真实源码。
+- artifact 记录：commit `510caca79ce439da143916fa4c91854f79e3db7a`、`4514 nodes / 10958 edges`、压缩文件 `1,144,300 bytes`。
+- 运行时回归：可检索 `round_controller_init/tick`、`competition_round_txn_init` 和 Verilog module `synthetic_2ppc_source`。
+- 重要审查仍须回到真实源码；图谱命中不等于 RTL 连线、时序、APB 地址或机械臂安全已验证。
 
 本轮初始化命令返回：
 
 ```text
 project: D-cicc_cbm_link
 status: ready
+nodes/edges: 4514 / 10958
 artifact_present: true
 artifact: .codebase-memory/graph.db.zst
-artifact_commit: efd1bb7
+artifact_commit: 510caca79ce439da143916fa4c91854f79e3db7a
 ```
 
 已确认排除目录包括：
@@ -54,8 +56,8 @@ final_project/tools
 说明：
 
 - 第一版共享图谱只覆盖 Git 协作工程主干，不纳入 `赛方提供材料/`、`初赛demo/`、`myblockly/` 等本地资料库或软件包。
-- CBM 0.8.1 的 `fast` 索引会自动过滤部分文档/工具目录，例如 `final_project/docs`、`final_project/integration`、`final_project/tools`；这些仍要用真实文件检索。
-- 图谱主要是 File/Folder 级导航，不应当作 Verilog module 级调用链事实源。
+- CBM 0.9.0 的 `fast` 索引仍自动过滤 `final_project/docs`、`final_project/integration`、`final_project/tools` 等目录；这些仍要用真实文件检索。
+- 当前图谱能提取 C Function 和 Verilog module/class，但不应当作 RTL 实例连线、时钟/复位或 CDC 正确性的事实源。
 
 ---
 
@@ -159,7 +161,7 @@ codebase-memory-mcp install
 
 注意：
 
-- 当前验证版本是 `codebase-memory-mcp 0.8.1`。
+- 当前验证版本是 `codebase-memory-mcp 0.9.0`。
 - 注册后重启 Codex、Claude 或其他 Agent。
 - 如果安装提示删除旧索引，先确认项目路径和 artifact 状态，不要盲删。
 
@@ -199,6 +201,7 @@ cmd /c mklink /J "D:\cicc_cbm_link" "E:\CICC"
   "tool": "index_repository",
   "arguments": {
     "repo_path": "D:/cicc_cbm_link",
+    "name": "D-cicc_cbm_link",
     "mode": "fast",
     "persistence": true
   }
@@ -309,17 +312,18 @@ Agent 使用建议：
 
 ## 11. 已知限制
 
-- 真实中文路径 `D:/第十届集创赛-雄芯院材料` 直接索引会失败；当前使用 `D:/cicc_cbm_link` junction 作为稳定入口。
-- PowerShell CLI 的 `index_repository` 参数解析不可用；索引动作使用 MCP 工具调用。
-- 2026-07-11 维护核查发现：对已存在项目调用 `index_repository(..., mode="fast"/"moderate", persistence=true)` 虽返回 `indexed`，但未更新 `.codebase-memory/artifact.json`、`graph.db.zst`，运行态检索也未出现 7 月 11 日新增预处理模块。遇到这类情况不得声称 artifact 已刷新；必须先核对 `artifact.json` 的 `commit`、`indexed_at`、节点数，以及对新增符号执行一次 `search_graph`。本次尝试删除旧项目以重建时 MCP 返回 `Permission denied`，因此 artifact 刷新仍为 WARN，待图谱服务权限恢复后重建。
-- 图谱主要是文件/目录级，不保证 Verilog module 级语义。
+- 真实中文路径可能使 Efinity 或部分外围工具产生编码问题；CBM 当前继续使用 `D:/cicc_cbm_link` junction 作为稳定入口。
+- 索引动作优先使用 MCP `index_repository`；CLI 适合 `list_projects`、`index_status` 等只读检查，raw JSON 形式已提示未来弃用。
+- `index_status` 的 Git HEAD 可能随工作区自动更新，但不证明图内容已重建。每次结构性合并后必须同时核对 `artifact.json` 的 commit/节点数，并查询本次新增的 2—3 个结构符号。
+- 2026-07-11 的 0.8.1 持久化不更新问题在本次 0.9.0 重建中未复现：运行时、artifact 元数据和新增符号查询均已更新。冷启动导入未在本轮删除现有运行时项目验证，仍应由新会话/队友首次拉取时复核。
+- 图谱能发现 Verilog module，但不保证实例连线、时钟/复位、CDC 或时序语义正确。
 - `final_project/docs`、`final_project/integration`、`final_project/tools` 当前被 CBM 自动排除；文档审查仍要回到真实 Markdown 和源码。
 
 ---
 
 ## 12. 初始化验收清单
 
-- [x] `codebase-memory-mcp --version` 输出 `0.8.1`。
+- [x] `codebase-memory-mcp --version` 输出 `0.9.0`。
 - [x] 仓库根目录已创建 `.cbmignore`。
 - [x] 已创建 ASCII junction：`D:\cicc_cbm_link`。
 - [x] `index_repository(repo_path="D:/cicc_cbm_link", mode="fast", persistence=true)` 成功。
@@ -328,7 +332,9 @@ Agent 使用建议：
 - [x] `.codebase-memory/.gitattributes` 已生成，声明 `graph.db.zst merge=ours binary`。
 - [x] Phase 2A 精选资料库图谱已生成到 `.codebase-memory/phase2/`。
 - [x] 图谱初始化文件已提交并推送。
-- [ ] 2026-07-11 之后的结构性 RTL/CPU 变更已写入共享 artifact（当前受 MCP 项目删除权限阻塞）。
+- [x] 2026-07-13 团队整合后的结构性 RTL/CPU 变更已写入共享 artifact。
+- [x] `round_controller`、`competition_round_transaction`、`synthetic_2ppc_source` 查询回归通过。
+- [ ] 从全新本机/新会话仅依靠 artifact 的冷启动导入由下一次首次拉取验证。
 
 ---
 

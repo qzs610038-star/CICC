@@ -1,9 +1,9 @@
 # A 队员 FPGA/SoC 执行方案
 
 > 日期：2026-07-12  
-> 状态：**待审核，未经审核不得进入 A2 及之后的 RTL/SoC 改动**  
+> 状态：**部分实施，继续受 Codex Gate 约束**；A2–A4 已有隔离工程/Review Packet 证据，正式协作工程仍未形成 SoC/APB/CDC/OSD 闭环
 > 负责人：A（FPGA/SoC）  
-> 关联上位方案：`competition_score_maximization_execution_plan_20260712.md`（v1.2-main）  
+> 关联上位方案：`competition_score_maximization_execution_plan_20260712.md`（v1.3-main）
 > 关联分工：`three_member_execution_board_20260712_17.md`
 
 ## 1. 目标与完成定义
@@ -45,6 +45,7 @@
 - 不恢复纯 RTL 分类或纯 RTL myCobot 控制。
 - 不执行机械臂动作，不改变机械臂接线、电平或串口控制。
 - 不伪造、复制或手改 `.dbg.vdb`，不通过批量补 2,288 个 I/O 约束绕过 PNR 问题。
+- 2026-07-13 正式整合构建的最新 PNR 计数为 1,776 个 IO 无 placement；2,288 仅保留为旧构建历史。两者均不得通过盲绑管脚绕过。
 - 每次修改 `top.v`、`mem_test.xml`、`.peri.xml`、`constrain.sdc`、时钟、复位、CDC 或 SoC/IP 设置前，先建立该次改动的 Review Packet 并经 Codex Gate 复核。
 - 真实摄像头/比赛构建前必须使：
 
@@ -259,4 +260,3 @@ PASS/FAIL：
 2. 是否确认 A3 的最小寄存器仅为 `REG_MAGIC`、`REG_VERSION`、`REG_HEARTBEAT`？
 3. 是否确认 A4 前不接 OSD、真实摄像头分类、UART2 或机械臂？
 4. 是否确认 C/D 不做整树同步，后续每次 D 盘合并均先提交差异清单？
-

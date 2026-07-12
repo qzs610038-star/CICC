@@ -67,7 +67,7 @@ OSD 插入必须另行提交顶层时序/fanout Review Packet，不能仅依据�
 
 ## 寄存器布局状态
 
-`integration/register_map.md` 和 `cpu/app/include/board_io.h` 中现有偏移属于旧草案。必须在生成 `soc.h` 给出真实 APB 窗口后，再与本文字段对齐。本文刻意不定义基址，也不预留 APB 槽位。
+`integration/register_map.md` 已在 2026-07-13 与 `cpu/app/include/board_io.h` 的当前候选偏移对齐，但二者仍不是硬件事实。必须在生成 `soc.h` 给出真实 APB 窗口，并完成 APB/CDC Review Packet 后，才能为本文字段冻结槽位。本文刻意不定义基址；`roi_pixel_count`、`sum_r/g/b/y`、任务模式、五色目标和理由码仍未分配正式偏移。
 
 ## 明确暂缓项
 
@@ -75,4 +75,3 @@ OSD 插入必须另行提交顶层时序/fanout Review Packet，不能仅依据�
 - 不授权修改 `board_io.h` 偏移或 `FG_AREA_AVAILABLE`。
 - 仿真、真实摄像头时序验证、Debugger 采集、PNR、bitstream 和板级测试继续暂缓。
 - 在这些门禁关闭前，特征数据不得用于分类或 myCobot 控制。
-

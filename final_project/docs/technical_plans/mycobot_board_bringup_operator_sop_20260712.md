@@ -1,6 +1,6 @@
-# myCobot 板上操作员 SOP（基于 CPU 合并 `af6d32d`）
+# myCobot 板上操作员 SOP（基于团队整合 `510caca`）
 
-> 日期：2026-07-12
+> 日期：2026-07-13（基于 2026-07-12 SOP 更新基线）
 > 适用对象：A（FPGA/SoC）、B（CPU）、C（机械臂现场安全员）
 > 总原则：每一门只增加一个新变量；前门未 PASS，禁止进入后门。真实动作当前为 **NO-GO**。
 
@@ -8,8 +8,8 @@
 
 | 项目 | 当前事实 | 操作判定 |
 |---|---|---|
-| CPU 分支 | 本地 `main=af6d32d`，含 CPU 队友 `af82e52`；未推送云端 main | 可继续本地开发 |
-| 四任务 matcher | Host 258/258；任务二已按官方细则改为颜色+形状、尺寸通配 | 仅 Host GO |
+| CPU 分支 | 本地统一筛选分支 `codex/team-integration-20260713@510caca`，保留两位队友提交历史；`origin/main` 未改写 | 可继续本地筛选/开发 |
+| 四任务与逐轮控制 | matcher、完整 round controller、轻量 transaction、契约与 snapshot flow 已整合；Host 合计 795/795 | 仅 Host GO；`main`/APB/OSD 未闭环 |
 | myCobot 协议/transport | `mycobot_protocol`、内存 Ring Buffer、TX 队列已有；QEMU asserts PASS | 纯 C/QEMU GO |
 | UART2 硬件层 | `mycobot_uart.c/.h` 不存在；UART2 基址/IRQ/分频/引脚无真源 | NO-GO |
 | APB/SoC | 视频工程内 SoC、正式 `soc.h`、APB 从机/OSD 证据未闭环 | NO-GO |
@@ -28,7 +28,7 @@ git status --short --branch
 
 通过判据：
 
-- 第一条显示 `main` 位于 `af6d32d`；`origin/main` 仍为 `e2b3902` 属于预期，本 SOP 不要求推送。
+- 第一条应显示当前受审分支与 Review Packet 一致；本版基线为 `codex/team-integration-20260713@510caca`。若切换分支，必须重新核对 `CURRENT_STATE.md` 和整合 Review Packet，不能继续照抄本基线。
 - 工作区原有 myCobot 调试改动必须仍在，不得为了“干净”而丢弃。
 - 测试最后必须显示 `RESULT: PASS`。本机当前走 Efinity RISC-V QEMU shim，已实际执行 asserts。
 
@@ -150,7 +150,7 @@ home_ready -> pick_hover -> pick -> close_gripper
 -> pick_hover -> drop_hover -> drop -> open_gripper -> home_ready
 ```
 
-先空载路径，再单个已验证正方体，最后才接 matcher。`SKIP` 必须零动作并输出原因；`GRAB` 在同一轮只能锁存一次，动作完成后由 round_controller 显式调用 `task_matcher_next_round()`。若 round_controller、OSD 理由码或 arm done/ACK 尚未实现，不得接自动识别触发。
+先空载路径，再单个已验证正方体，最后才接 matcher。`SKIP` 必须零动作并输出原因；`GRAB` 在同一轮只能锁存一次。完整 `round_controller` 和轻量 transaction 已在 Host 层存在，但 `main.c`、OSD 理由码、arm done/ACK 与正式 UART 尚未闭环；完成这些板级连接前不得接自动识别触发。
 
 ## 10. 每次实机记录模板
 

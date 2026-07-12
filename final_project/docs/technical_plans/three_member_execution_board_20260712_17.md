@@ -1,6 +1,6 @@
 # 三成员决赛保底冲刺执行板（7月12—17日）
 
-> 上位方案：`competition_score_maximization_execution_plan_20260712.md`（v1.2-main）
+> 上位方案：`competition_score_maximization_execution_plan_20260712.md`（v1.3-main）
 >
 > 目标：7月17日冻结F1最低保底；条件满足时升级F2机械臂执行
 >
@@ -11,7 +11,7 @@
 | 成员 | 每日投入 | 唯一主责 | 不得被其他任务挤占的交付 |
 |---|---:|---|---|
 | A：FPGA/SoC | 6—8h | 合成源收口、摄像头恢复、QCRV32并入视频工程、APB/CDC/OSD硬件通道 | 7月14日晚前：视频工程内CPU Hello + APB MAGIC |
-| B：CPU负责人 | 1—2h，其他成员协助编码 | 决赛契约定版、CPU代码审查、四任务/状态机验收；将纯C实现拆给支援成员 | 7月14日晚前：四任务与round_controller Host/Mock全通过 |
+| B：CPU负责人 | 1—2h，其他成员协助编码 | 决赛契约审查、双层逐轮控制职责收口、`main`/APB/OSD 无动作集成 | 下一 Gate：`ARM_DISABLED` 下 20 轮主循环路径，正式地址仍等待 `soc.h` |
 | C：机械臂/现场 | 6—8h | 180°点位、低速带载、治具/现场、板到臂UART物理安全验证 | 7月12日：新点位与5轮记录；7月16日前决定能否开启F2 |
 
 ## 2. 文件所有权与冲突红线
@@ -74,10 +74,10 @@ final_project/cpu/app/src/arm_positions.c（进入板控移植阶段后）
 
 今日验收：
 
-- [ ] 合成源有独立文件和明确Mux，不破坏真实CSI路径。
-- [ ] 合成源map通过，或形成包含原始错误的Review Packet。
+- [x] 合成源有独立文件和明确 Mux，真实 CSI 结构仍保留；当前仍需拆分 production/debug 构建开关。
+- [x] 合成源合入后的正式工程 map PASS，证据见 `../review_packets/team_integration_merge_review_20260713.md`；PNR 仍 FAIL。
 - [ ] SoC合并清单完整，能指出UART、APB、时钟、复位和生成`soc.h`的方法。
-- [ ] 没有批量给2,288个所谓I/O分配管脚，没有伪造`.dbg.vdb`。
+- [x] 没有批量给历史 2,288/当前 1,776 个 IO 分配管脚，没有伪造 `.dbg.vdb`。
 
 ### 7月13日：新摄像头 + CPU Hello
 
@@ -155,10 +155,10 @@ T4:    CUBE && abs(size-reference) <= 5mm
 
 当日验收：
 
-- [ ] 黑/白目标可配置，不只是在classifier中可识别。
+- [ ] 黑/白目标在 Host 契约可配置；板上 `TARGET_SEL` 入口仍未覆盖五色，不能勾选硬件完成。
 - [ ] `LIVE_FG_AREA`被写成P0输入，`FG_AREA_AVAILABLE=0`明确是降级状态。
-- [ ] `round_reset`不在目标配置中，PLACE/REMOVE/ABANDON/RESET是独立事件。
-- [ ] 每个状态有超时和人工出口，机械臂运动中禁止盲复位。
+- [x] `round_reset` 不在持久目标配置中，PLACE/REMOVE/ABANDON/RESET 已作为独立事件进入 Host 契约。
+- [x] 完整 `round_controller` 已覆盖超时和人工出口，机械臂运动中禁止盲复位；板级事件源仍未接入。
 
 ### 7月13—14日：Host/Mock闭环
 
@@ -173,15 +173,16 @@ T4:    CUBE && abs(size-reference) <= 5mm
 
 7月14日验收：
 
-- [ ] 旧测试继续通过。
-- [ ] 新四任务真值表全部通过。
-- [ ] 无死锁、无重复动作。
-- [ ] 失败输出精确到用例和状态，不接受只写“测试失败”。
+- [x] 旧测试与整合回归继续通过。
+- [x] 新四任务真值表和 20 轮 Host 回放通过。
+- [x] Host 层无死锁、无重复动作；尚无板级结论。
+- [x] 脚本按用例/状态输出失败，整合结果为 795/795 PASS。
 
-### 7月15—17日：板上适配
+### 7月13—17日：板上适配（整合后当前队列）
 
-- 7月15日：根据A提供的正式`soc.h`和寄存器语义适配`board_io`；先读固定/合成快照。
-- 7月16日：把`round_controller`最小接入`main.c`，先保持`ARM_DISABLED`，跑20轮≤10分钟。
+- 7月13日：统一 `register_map.md`、`board_io.h` 和竞赛契约，明确完整 `round_controller` 负责逐轮编排、轻量 transaction 负责 event_seq/ACK。
+- 正式 `soc.h` 到位后适配 `board_io`；先读 MAGIC/heartbeat，再读固定/合成快照。
+- 把 `round_controller` 最小接入 `main.c`，先保持 `ARM_DISABLED`，跑 20 轮且不产生真实动作。
 - 仅当C和A完成UART安全门，才接`round_controller → arm_controller`唯一请求。
 - 7月17日冻结固件、参数版本、按键表、理由码和构建方法。
 
