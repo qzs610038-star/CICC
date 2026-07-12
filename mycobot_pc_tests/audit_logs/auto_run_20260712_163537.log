@@ -1,0 +1,6 @@
+[V2.8 日志] 终端输出同步写入: D:\第十届集创赛-雄芯院材料\mycobot_pc_tests\audit_logs\auto_run_20260712_163537.log
+尝试连接机械臂 (COMx @ 1000000)...
+Note: This class is no longer maintained since v3.6.0, please refer to the project documentation: https://github.com/elephantrobotics/pymycobot/blob/main/README.md
+
+🚨 [异常] 运行中发生错误或运动超时: could not open port 'COMx': FileNotFoundError(2, '系统找不到指定的文件。', None, 2)
+-> 请用手扶稳机械臂/物块防止下沉/掉落，扶稳后按 Enter 释放舵机...

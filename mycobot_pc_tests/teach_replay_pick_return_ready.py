@@ -818,12 +818,48 @@ def record_return_ready_point(mc):
 # ============================================================
 # 带返回值检查的动作封装
 # ============================================================
-def checked_sync_angles(mc, angles, speed, timeout, label):
-    """关节角同步回放。失败抛异常，不静默继续。"""
+def checked_sync_angles(mc, angles, speed, timeout, label, expected_coords=None, ignore_error_exit=False):
+    """关节角同步回放。失败时记录诊断证据，若不忽略错误则抛异常退出。"""
     print(f"  -> 关节回放到 {label}: {angles}")
     res = mc.sync_send_angles(angles, speed, timeout=timeout)
     if res != 1:
-        raise RuntimeError(f"关节回放超时或未到位: {label} (返回 {res})")
+        print(f"  ⚠️ [警告] {label} 运动同步返回 {res} (未收敛或超时)")
+        # 实时抓取实际状态，若读数为 None/非列表 进行一次短时重试
+        actual_angles = mc.get_angles()
+        if not isinstance(actual_angles, list):
+            time.sleep(0.2)
+            actual_angles = mc.get_angles()
+
+        actual_coords = mc.get_coords()
+        if not isinstance(actual_coords, list):
+            time.sleep(0.2)
+            actual_coords = mc.get_coords()
+
+        # 校验列表类型和长度，防范返回 -1 时 zip 崩溃
+        has_angles = isinstance(actual_angles, list) and len(actual_angles) == len(angles)
+        has_coords = isinstance(actual_coords, list) and len(actual_coords) >= 3
+
+        print(f"  -> [诊断实际角度] {label}: {actual_angles if has_angles else '读取失败(返回 ' + str(actual_angles) + ')'}")
+        print(f"  -> [诊断实际坐标] {label}: {actual_coords if has_coords else '读取失败(返回 ' + str(actual_coords) + ')'}")
+
+        if has_angles:
+            diffs = [abs(a - t) for a, t in zip(actual_angles, angles)]
+            max_diff = max(diffs)
+            print(f"  -> [诊断各轴绝对误差]: {['%.2f' % d for d in diffs]}")
+            print(f"  -> [诊断最大轴误差]: {max_diff:.2f}°")
+        else:
+            print("  -> [诊断错误]: 无法读取当前实际关节角，跳过角度差计算。")
+
+        if has_coords and expected_coords is not None and isinstance(expected_coords, list) and len(expected_coords) >= 3:
+            dist = math.sqrt(sum((actual_coords[i] - expected_coords[i]) ** 2 for i in range(3)))
+            print(f"  -> [诊断空间物理残差] delta_xyz={dist:.2f} mm (目标: {expected_coords[:3]}, 实际: {actual_coords[:3]})")
+        elif expected_coords is not None:
+            print("  -> [诊断错误]: 无法读取当前实际空间坐标或预期坐标格式错误，跳过物理残差计算。")
+
+        if not ignore_error_exit:
+            raise RuntimeError(f"关节回放超时或未到位: {label} (返回 {res})")
+        else:
+            print("  -> [诊断模式] ignore_error_exit=True，不抛出异常。")
     return True
 
 
@@ -1381,7 +1417,7 @@ def checked_gripper_action(mc, state, speed, timeout=GRIPPER_TIMEOUT):
         return False
 
     if not hasattr(mc, "get_gripper_value"):
-        print("  -> 【信息】当前库无 get_gripper_value 反馈接口，使用开环定时等待。")
+        print("  -> [GRIP_UNVERIFIED] 当前库无 get_gripper_value 反馈接口，使用开环定时等待。")
         time.sleep(timeout)
         return True
 
@@ -1898,11 +1934,16 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
 
     print("\n3. 短距离关节下探到 pick...")
     checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick")
+    # 额外记录实际坐标作为诊断证据，跳过 SKIP_COORD_VERIFY_ON_STRICT_PASS 限制
+    actual_coords_pick = get_filtered_coords(mc)
+    print(f"  -> [诊断证据] Step 3 (下探到位) 实际坐标: {actual_coords_pick}")
     if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
         verify_coords_near(mc, pick["coords"], "pick")
 
     print("\n4. 闭合夹爪抓取目标...")
     gripper_action_with_retry(mc, 1, "step4 闭合")
+    actual_coords_grip = get_filtered_coords(mc)
+    print(f"  -> [诊断证据] Step 4 (闭合夹爪后) 实际坐标: {actual_coords_grip}")
 
     print("\n5. 短距离关节抬起回 pick_hover...")
     _t = time.time()
@@ -1924,6 +1965,8 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
             expected_coords=pick_hover["coords"],
             allow_soft_success=True,
         )
+    actual_coords_lift = get_filtered_coords(mc)
+    print(f"  -> [诊断证据] Step 5 (抬起回 hover 后) 实际坐标: {actual_coords_lift}")
     verify_coords_near(mc, pick_hover["coords"], "pick_hover")
     print(f"  -> [V2.2 耗时] step 5: {time.time() - _t:.1f}s")
 
@@ -2177,6 +2220,12 @@ def main():
                         help="保存预设时记录的物块尺寸(cm)")
     parser.add_argument("--save-preset-notes", dest="save_preset_notes", default="",
                         help="保存预设时的备注")
+    parser.add_argument("--teach-only", dest="teach_only", action="store_true",
+                        help="仅进行五点示教并保存预设（不进行后续通电、回零及回放动作）")
+    parser.add_argument("--probe-pick-hover", dest="probe_pick_hover", action="store_true",
+                        help="诊断模式：仅执行 HOME -> pick_hover，记录对比目标/实际状态并安全回零后退出")
+    parser.add_argument("--probe-pick", dest="probe_pick", action="store_true",
+                        help="受控探针模式：仅到 pick 下探点，夹爪保持张开，记录实际坐标并安全回零后退出")
     parser.add_argument("--no-log", dest="no_log", action="store_true",
                         help="V2.8 点3：禁用自动终端日志导出（默认启用，写到 "
                              "audit_logs/auto_run_<时间戳>.log）")
@@ -2184,7 +2233,7 @@ def main():
 
     # V2.8 点3：安装 Tee 双写 stdout，自动导出终端日志到 UTF-8 文件。
     # --no-log 可禁用。装在 try 之前，确保后续 get_port/连接/示教/运动全过程都被记录。
-    # try/finally 确保异常/Ctrl+C/正常退出时文件关闭落盘。
+    # try/finally 确保异常/Ctrl+C/正常退出时文件关闭落盘.
     tee = None
     original_stdout = sys.stdout
     if not args.no_log:
@@ -2202,6 +2251,101 @@ def main():
         time.sleep(0.5)
 
         pick_hover, pick, drop_hover, drop, home_ready = acquire_points(mc, args)
+
+        if args.teach_only:
+            print("\n✅ [--teach-only] 示教点采集并校验完成，已成功保存预设。")
+            print("根据指令，程序将在保存后安全结束，不执行后续通电、回零及自动抓取回放。")
+            return
+
+        if args.probe_pick_hover:
+            print("\n====================================")
+            print("【诊断模式：--probe-pick-hover 仅执行 HOME -> pick_hover】")
+            print("====================================")
+            if not prepare_phase(mc):
+                return
+
+            # 从 HOME 移动到 pick_hover，在 --probe-pick-hover 模式下 ignore_error_exit 传入 True
+            checked_sync_angles(mc, pick_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "pick_hover", expected_coords=pick_hover["coords"], ignore_error_exit=True)
+
+            # 记录并输出最后的对比
+            actual_angles = mc.get_angles()
+            actual_coords = mc.get_coords()
+            has_angles = isinstance(actual_angles, list) and len(actual_angles) == len(pick_hover["angles"])
+            has_coords = isinstance(actual_coords, list) and len(actual_coords) >= 3
+
+            print(f"\n[诊断模式最终状态]")
+            print(f"  目标角度: {pick_hover['angles']}")
+            print(f"  实际角度: {actual_angles if has_angles else '读取失败'}")
+            print(f"  目标坐标: {pick_hover['coords']}")
+            print(f"  实际坐标: {actual_coords if has_coords else '读取失败'}")
+
+            if has_angles:
+                diffs = [abs(a - t) for a, t in zip(actual_angles, pick_hover['angles'])]
+                print(f"  各轴最终绝对差: {['%.2f' % d for d in diffs]}，最大差: {max(diffs):.2f}°")
+            if has_coords:
+                dist = math.sqrt(sum((actual_coords[i] - pick_hover["coords"][i]) ** 2 for i in range(3)))
+                print(f"  最终空间物理残差: {dist:.2f} mm")
+
+            # 安全回零（HOME）
+            print("\n  -> 诊断结束，正在安全回零...")
+            safe_return_home(mc)
+            print("  -> 机械臂已回到安全直立终态。")
+            print("\n✅ [--probe-pick-hover] 诊断运行完成。")
+            return
+
+        if args.probe_pick:
+            print("\n====================================")
+            print("【受控探针模式：--probe-pick 仅执行 HOME -> pick_hover -> pick】")
+            print("====================================")
+            if not prepare_phase(mc):
+                return
+
+            print("\n1. 关节角回放到 pick_hover...")
+            checked_sync_angles(mc, pick_hover["angles"], ANG_REPLAY_SPEED, ANG_REPLAY_TIMEOUT, "pick_hover", expected_coords=pick_hover["coords"], ignore_error_exit=True)
+
+            print("\n2. 短距离关节下探到 pick...")
+            try:
+                checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick", expected_coords=pick["coords"])
+                print("  -> pick 严格到位。")
+            except RuntimeError as e:
+                print(f"  ⚠️ [警告] 下探到 pick 时发生超时或未到位: {e}")
+
+            # 无论是否到位，在 pick 测量并输出当前的对比数据
+            print("\n[受控探针 pick 状态数据]")
+            actual_angles = mc.get_angles()
+            actual_coords = mc.get_coords()
+
+            has_angles = isinstance(actual_angles, list) and len(actual_angles) == len(pick["angles"])
+            has_coords = isinstance(actual_coords, list) and len(actual_coords) >= 3
+
+            print(f"  目标角度: {pick['angles']}")
+            print(f"  实际角度: {actual_angles if has_angles else '读取失败'}")
+            print(f"  目标坐标: {pick['coords']}")
+            print(f"  实际坐标: {actual_coords if has_coords else '读取失败'}")
+
+            if has_angles:
+                diffs = [abs(a - t) for a, t in zip(actual_angles, pick['angles'])]
+                print(f"  各轴最终绝对差: {['%.2f' % d for d in diffs]}，最大差: {max(diffs):.2f}°")
+            if has_coords:
+                dist = math.sqrt(sum((actual_coords[i] - pick["coords"][i]) ** 2 for i in range(3)))
+                print(f"  最终空间物理残差: {dist:.2f} mm")
+
+            # 夹爪保持张开，不下发闭爪，原路抬起回 pick_hover
+            print("\n3. 短距离关节抬起回 pick_hover...")
+            try:
+                if ASYNC_SHORT_STEP5_ENABLE:
+                    checked_short_angles_async(mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover", expected_coords=pick_hover["coords"])
+                else:
+                    checked_short_angles(mc, pick_hover["angles"], SHORT_UP_SPEED, SHORT_UP_TIMEOUT, "pick_hover", expected_coords=pick_hover["coords"], allow_soft_success=True)
+            except RuntimeError as e:
+                print(f"  ⚠️ [警告] 抬起回 pick_hover 时发生错误: {e}")
+
+            # 安全回零（HOME）
+            print("\n  -> 探测结束，正在安全回零...")
+            safe_return_home(mc)
+            print("  -> 机械臂已回到安全直立终态。")
+            print("\n✅ [--probe-pick] 受控探针运行完成。")
+            return
 
         if not prepare_phase(mc):
             return
