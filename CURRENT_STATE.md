@@ -27,6 +27,26 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-12，来源：用户逐项进度访谈 + Codex共享仓库核查
+  - 适用范围：7月17日保底冻结前的真实进度、人力、阻塞、最低保底和立即工作队列
+  - 最新结论：决赛主方案已更新为`v1.2-main`。最低保底定义为F1“至少单路真实摄像头 + FPGA同帧统计/LIVE_FG_AREA + 板上CPU四任务判断 + 拨码/按键目标锁存 + 可恢复逐轮状态机 + OSD明确结果 + 非目标正确SKIP + 20轮≤10分钟”；机械臂板控作为F2条件升级，不再拖死F1。
+  - 实时事实：两只旧摄像头交叉任一接口均花屏，新摄像头预计7月13日到货；官方fallback纯色轮切稳定，ch1 I2C地址阶段ACK且`0x0100` bit0读高，但未见CSI DE。赛方独立CPU例程历史上板成功，但当前视频工程无SoC IP、生成`soc.h`、APB从机或结果CDC。目标输入和决赛OSD未实现。PC机械臂多轮动作稳定但旧路径约10cm，开发板UART/电平/接线未定；7月12日可重新示教180°点位并低速带载。五色/三形状/三尺寸物体齐全，底板/相机/机械臂/摆放区仍待固定，背景/补光未定。
+  - CPU特别风险：`vision_classifier.c`已有白/黑排除法，但`FG_AREA_AVAILABLE=0`时白色不可靠；`LIVE_FG_AREA`提升为P0接口。`task_matcher`仍缺白/黑目标输入、task_mode和任务三/四关系判定；无`round_controller`，`main`未接`arm_controller`。
+  - 并行工作：FPGA/SoC成员A主责CPU与视频工程合并；CPU成员每天1—2h负责契约/审查，其他成员接纯C实现；机械臂成员C每天6—8h。队友另有尚未合入的FPGA合成数据源方案，预计7月12日实现；禁止并发覆盖其`top.v`等文件，合成源不作为真实摄像头验收。
+  - 截止线：7月14日晚必须出现视频工程内CPU Hello+APB MAGIC，否则人力集中救SoC/APB；7月15中午双摄未稳则降单摄；7月15晚无LIVE_FG_AREA则白色列高风险；7月16中午板到臂安全链未过则冻结F1无机械臂；7月16晚F1必须完成20轮计时，7月17冻结。
+  - 替代旧结论：替代“方案仍待访谈定版”、把Host旧测试视为决赛CPU完成、把花屏简单归因于摄像头硬件、以及机械臂必须先完成才有保底的表述。
+  - 证据路径：`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`、`final_project/docs/debug_sessions/video_link_current_state_20260711.md`、`final_project/cpu/app/src/vision_classifier.c`、`final_project/cpu/app/include/board_io.h`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 失效条件：新摄像头/仪器测量改变视频故障边界、合成源或SoC/APB代码合入并产生新上板证据、任务三评分获官方确认，或用户改变7月17冻结目标。
+
+- 日期：2026-07-12，来源 Agent：Codex（Gemini方案复核后的总控计划落地）
+  - 适用范围：分赛区决赛最大化得分攻关顺序与跨CPU/FPGA/SoC/OSD/myCobot验收门
+  - 最新结论：`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md` 已升级为 `v1.2-main` 并由用户标定为“决赛主方案”。方案采用“CPU得分引擎 + FPGA生产构建”双P0并行，先闭合识别/判断/OSD/正确SKIP，再用一条固定正方体抓放路径补齐7个目标轮执行分；逐轮控制器新增事件锁存/序号/ACK、有界超时、人工放弃、分级复位和机械臂运动态安全恢复，且已补充访谈盘点、F1/F2保底层级与7月12—17日工作队列。
+  - 替代旧结论：Gemini方案中四任务均按1目标+4非目标估分、统一按25%/25%/50%解释任务三、直接通过约束/隔离2288个I/O修PNR、把逐轮状态机直接写入`main.c`、把新点位写入`arm_controller.c`等不严谨表述；同时纠正“把5位APB总线升级为16/32位”的说法，当前只是软件假设的32位MMIO寄存器中的5位载荷草案。
+  - 证据路径：`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`、`final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/src/main.c`、`final_project/docs/technical_plans/fpga_vision_preprocess_implementation_handoff_20260711.md`。
+  - 当前状态不变：主方案已批准不等于实现完成；本次仍未修改RTL/CPU源码/工程配置，未解除此前暂缓的testbench、真实Debayer、PNR/bitstream、板级特征采集，也未授权机械臂动作。
+  - 下一步最小闭环：先通过逐项访谈刷新团队今天的真实进展和卡点，再定版“最低保底方案 + 立即工作队列”；在新证据到来前，默认候选 checkpoint 仍是四任务20轮真值表、纯软件目标/理由/可恢复round-controller接口与测试清单、只读PNR复现Review Packet。
+  - 失效条件：用户否决该总控顺序、官方细则更新、任务三评分获得不同现场确认，或新的真实板级证据改变PNR/视频/SoC阻塞判断。
+
 - 日期：2026-07-12，来源 Agent：Codex（Agent 入口一致性维护）
   - 适用范围：`AGENTS.md`、`CLAUDE.md`、`.claude/commands/*`、`.agents/skills/*` 与活跃实施文档的权威层级
   - 最新结论：活跃入口已统一为四层职责：最新官方细则定义比赛任务/评分/时限，`AGENTS.md` 定义稳定系统架构与安全硬边界，`CURRENT_STATE.md` 定义可变完成度/阻塞，`分赛区决赛实施开发路线.md` 只作历史路线图和经验库。FPGA/CPU 总体分工未改变，但已显式补入四任务关系判定、逐轮事务、OSD 结果语义、唯一机械臂响应和“目标不等于完成状态”规则。

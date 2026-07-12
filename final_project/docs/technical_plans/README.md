@@ -4,6 +4,8 @@
 
 ## 当前方案
 
+- **[决赛主方案：最大化得分总控执行方案](competition_score_maximization_execution_plan_20260712.md)**：当前最高执行方案。以官方评分表为依据，组织 CPU 得分引擎与 FPGA 生产构建双 P0 主线，定义四任务契约、可恢复逐轮状态机、OSD/SKIP闭环、机械臂安全恢复、APB/CDC增量门、回退模式和比赛化验收。状态：`v1.2-main`，已纳入7月12日逐项进度访谈、F1最低保底、F2机械臂升级、7月12—17日工作队列和强制降级截止线；不自动解除硬件或机械臂安全门槛。
+- [三成员决赛保底冲刺执行板](three_member_execution_board_20260712_17.md)：把主方案拆成A（FPGA/SoC）、B（CPU负责人）、C（机械臂/现场）三张逐日任务卡，包含文件所有权、当日验收、交接格式和失败降级规则。
 - [FPGA 视觉预处理模块执行与协作交接方案](fpga_vision_preprocess_execution_plan_20260711.md)：双像素 RGB888 输入、ROI、颜色/前景掩码、统计特征、帧级快照、自检仿真，以及 CPU/APB、CDC、OSD 和双通道交接约束。状态：独立 RTL/testbench 已完成，ch1 旁路已接入顶层并通过带 `mark_debug` 探针的正式 map；尚未接入 APB/CPU、OSD 或第二通道。
 - [FPGA 视觉预处理模块实现交接](fpga_vision_preprocess_implementation_handoff_20260711.md)：当前 RTL 做了什么、特征和快照语义、独立综合结果、未完成项与接手者最小步骤。
 - [预处理 APB/CDC 生成物门禁](../architecture/generated_soc_summary_2026-07-11.md)：确认当前缺失生成的 `soc.h`、APB 从机与 CDC RTL，并列出恢复 CPU/APB 集成所需输入。

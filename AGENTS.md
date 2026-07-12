@@ -28,6 +28,8 @@
 
 比赛任务、评分、时间限制和现场流程以 `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md` 为最高比赛约束；当前完成度、阻塞和下一步以 `CURRENT_STATE.md` 为准。`分赛区决赛实施开发路线.md` 仅作为实施路线图和历史经验库，不再作为当前状态或最新赛题口径的唯一来源。
 
+当前最高执行方案是 `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`（“决赛主方案”）。所有 Agent 的局部计划、实现顺序、阶段门和降级策略必须与其一致；它不覆盖官方细则、本文件的架构/安全硬边界，也不能把 `CURRENT_STATE.md` 中尚未完成的能力推断为已经闭环。
+
 所有 Agent 在规划、修改和验收时必须遵守以下架构边界：
 
 - 正式系统主线是 `FPGA 视频采集/视频前端/ROI/统计特征/OSD 渲染/硬件通道 + 板上 CPU 分类决策/四任务匹配/逐轮状态机/参数管理/myCobot 控制`。
@@ -111,9 +113,10 @@ Verilog/SystemVerilog 代码应沿用现有风格：文件名使用 snake_case�
 1. 用户当前对话中的明确指令。
 2. 最新官方比赛细则（`final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`）与本文件中的安全红线：机械臂动作限制、Codex 审查门、系统架构硬边界、Git 提交规范。两者均为硬约束：官方细则定义比赛目标、任务语义、评分和现场流程；安全红线约束实现与验证方式。若两者疑似冲突，停止扩展修改并请求用户或现场专家确认，不得自行弱化任一方。
 3. `CURRENT_STATE.md`：最新路线增量与当前状态索引，可覆盖旧规划中的路线选择、任务优先级和已废弃方案，但不可覆盖第 2 级硬约束。
-4. `SESSION_HANDOFF.md` 或 `debug_records/*handoff*.md`：高置信接力事实，需先跑 `tools/agent_handoff_health_check.ps1`。
-5. `分赛区决赛实施开发路线.md` 等历史规划文件。
-6. 初赛 demo 文档与旧日志：仅作经验库，不作事实来源。
+4. `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`：当前“决赛主方案”，定义拿分顺序、阶段门和回退策略；不得覆盖前三级的硬约束与真实状态。
+5. `SESSION_HANDOFF.md` 或 `debug_records/*handoff*.md`：高置信接力事实，需先跑 `tools/agent_handoff_health_check.ps1`。
+6. `分赛区决赛实施开发路线.md` 等历史规划文件。
+7. 初赛 demo 文档与旧日志：仅作经验库，不作事实来源。
 
 真实源码、工程 XML、构建日志和上板现象始终是最终事实来源；上述文件只记录对它们的最新结论和证据位置。
 

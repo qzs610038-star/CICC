@@ -9,7 +9,8 @@ Claude 开始任何任务前按以下顺序读取：
 1. `AGENTS.md`：仓库结构、系统架构硬边界、机械臂安全、Codex Gate、Review Packet、交接规则。
 2. `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`：最新官方任务、评分、时间和现场流程硬约束。
 3. `CURRENT_STATE.md`：最新路线增量、当前阶段、已降级或废弃的旧结论。
-4. 本文件：Claude 专属执行方式、常用命令和交接命令。
+4. `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`：当前“决赛主方案”，定义拿分顺序、阶段门和回退策略。
+5. 本文件：Claude 专属执行方式、常用命令和交接命令。
 
 若这些入口冲突，以 `AGENTS.md`「文档优先级与交接规则」为准。不要在本文件重复维护官方细则、主线边界、机械臂安全三阶段或 Codex Gate 清单。
 
@@ -72,6 +73,7 @@ Claude 必须按以下职责使用文档，不得把它们混成同一个“路�
 - 最新官方细则：定义四项任务、评分、10 分钟实操、现场操作与结果确认要求。
 - `AGENTS.md`「分赛区决赛系统架构硬边界」：定义 FPGA、板上 CPU、PC/外部 MCU 的长期职责和安全红线。
 - `CURRENT_STATE.md`：定义当前已完成项、阻塞、占位事实、暂缓验证项和下一步最小闭环。
+- `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`：当前最高执行方案；局部方案、实现顺序和降级选择不得与其冲突，但不能覆盖官方细则、架构安全边界或真实进度。
 - `分赛区决赛实施开发路线.md`：仅作历史实施路线与经验库；被官方细则或 `CURRENT_STATE.md` 覆盖的内容不得恢复为当前目标。
 
 开始任务时，先把请求归类为“官方要求、稳定架构边界、当前状态或历史经验”中的一种或多种，再回到真实源码、工程 XML、日志和上板现象核查。不要从旧 handoff、旧保底方案、架构目标或 host 单测推断板级闭环。
