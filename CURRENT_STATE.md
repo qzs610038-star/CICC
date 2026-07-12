@@ -27,6 +27,13 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-13，来源 Agent：Codex（两位队友分支整合后的正式 FPGA 工程构建）
+  - 适用范围：`codex/team-integration-20260713` 中 `final_project/fpga/efinity/mem_test.xml` 与合并后 `top.v` 的 Efinity 2025.2 map/PNR；不表示真实摄像头、HDMI 或 bitstream 上板通过。
+  - 最新结论：中文仓库路径直接运行 map 会因 Efinity `filesystem error: Illegal byte sequence / EFX-0002` 在 HDL 前失败；改用仓库 ASCII junction `D:\cicc_cbm_link` 后 map PASS。资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`；`mem_test.warn.log` 有 132 条 warning 记录，综合摘要报告 post-synthesis netlist 共 1098 warnings，不能标记为可忽略。
+  - PNR 结果：FAIL。工具报告 1776 个 IO 无 placement、将被随机放置，随后触发内部断言 `!available_io_sites.empty(): outpad`；未生成可验收 bitstream。该失败再次证明不能给所有顶层端口盲补约束，须先审查 Interface Designer/periphery 导出边界、普通 VDB 与 debug VDB、正式顶层端口和 `.peri.xml`。
+  - 证据路径：`final_project/docs/review_packets/team_integration_merge_review_20260713.md`。原始 Efinity 输出位于本次临时构建目录，关键命令、资源、warning 计数和首个 PNR 错误已摘录到 Review Packet；生成型 VDB/netlist/outflow 不提交仓库。
+  - 下一步门禁：先解决生产构建模式与 periphery/IO 绑定方法，再重跑 PNR/时序；当前 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1` 也必须在生产构建中显式回到真实输入。禁止把 map PASS 描述成 PNR、bitstream 或上板 PASS。
+
 - 日期：2026-07-12，来源 Agent：Codex（A11 合成五色预处理隔离 Map）
   - 适用范围：摄像头无稳定数据流期间的 FPGA ROI/颜色面积/bbox/中心快照候选工程；不适用于 D 盘 HDMI 基线或正式比赛构建。
   - 最新结论：已创建 `C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga`。该副本以 D 盘五色 HDMI 基线为源，仅增加 6 个预处理 RTL 和 ch1 合成 tap；HDMI 仍用 RGB 合成流，预处理支路单独转换为 Debayer BGR 合同，避免黄/红蓝通道误读。Efinity map PASS，预处理模块已展开，最终 v2 资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`。

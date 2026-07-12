@@ -36,8 +36,38 @@
 | 个人机械臂 Python | `py_compile` PASS |
 | 180° preset JSON | 解析 PASS，五点齐全 |
 | Git whitespace | 个人备份提交与 CPU 冲突整合均 PASS |
+| `mem_test.xml` 解析 | PASS |
+| Icarus 预处理仿真 | WARN：本机无 `iverilog/vvp`，未启动 |
+| Efinity 2025.2 map | PASS（必须通过 `D:\cicc_cbm_link` ASCII junction） |
+| map 资源 | ADD 1827 / LUT4 10339 / FF 7991 / RAM10 154 |
+| map warnings | `mem_test.warn.log` 132 条记录；综合摘要报告 1098 条，未标记可忽略 |
+| Efinity PNR | FAIL：1776 个 IO 无 placement，随机放置后触发 `!available_io_sites.empty(): outpad` |
 
 本轮未发送机械臂动作命令。
+
+### 3.1 Efinity 复现命令与输出保留边界
+
+中文仓库路径直接运行 map 会在 HDL 解析前失败：
+
+```text
+filesystem error: Cannot convert character sequence: Illegal byte sequence
+ERROR: Illegal command line. [EFX-0002]
+```
+
+改用仓库 ASCII junction 后，以下命令 map PASS：
+
+```powershell
+cmd /c "call D:\Efinity\2025.2\bin\setup.bat && cd /d D:\cicc_cbm_link\final_project\fpga\efinity && efx_run.bat mem_test --prj -f map --work_dir work_syn_codex_team_integration_ascii_20260713 --output_dir outflow_codex_team_integration_ascii_20260713 --timeout 600"
+```
+
+分阶段 PNR wrapper 要求 VDB 位于 work 目录；将 map 生成的同 SHA-256 `mem_test.vdb` 复制到该构建 work 目录后，PNR 进入真实布局并输出：
+
+```text
+INFO: 1776 IO cells will have random placement
+ERROR: [Internal] Assertion: '!available_io_sites.empty()' failed: outpad
+```
+
+Efinity 生成型 VDB、map netlist、work/outflow 不纳入 Git；本节保存复现命令、资源统计、warning 计数和首个阻塞错误。
 
 ## 4. Codex 结论
 
@@ -50,13 +80,13 @@
 ### 合入远端 main：WARN / 暂不放行
 
 1. `final_project/fpga/rtl/top/top.v` 当前 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1` 且 `HDMI_USE_SYNTHETIC_VERIFY=1'b1`，会选择合成验证链；不能直接作为真实摄像头比赛构建。
-2. `top.v` 与 `mem_test.xml` 属于 Codex 系统级审查门。本轮未对合并后的正式 `final_project` 运行完整 Efinity map/PNR/bitstream/上板回归。
+2. 合并后的正式工程 map 已 PASS，但 PNR 因 1776 个未绑定 IO 和 outpad 断言 FAIL；没有 bitstream/时序/上板通过证据。不得把 map PASS 外推为完整构建通过。
 3. CPU 双层控制器尚未接入 `main.c`、正式 `soc.h`、APB/CDC/OSD、UART2 或机械臂动作链。
 4. myCobot 真实动作继续 NO-GO；底座连接位移、T0 真源、电平/线序/急停与 D0-D4 均未闭环。
 
 ## 5. 下一步最小动作
 
 1. 将合成源/HDMI 验证选择改成明确的构建配置，生产默认必须回到真实输入；形成差异可审查的 debug/production 两套入口。
-2. 对正式工程执行 Efinity project parse、map、PNR、时序与视频回归；保留工具版本、warning 和产物路径。
+2. 审查 periphery/Interface Designer 与正式顶层 IO 导出边界，修复 1776 个未绑定 IO 的工程模式问题后重跑 PNR、时序与视频回归；不得批量盲绑管脚。
 3. 在 `ARM_DISABLED` 下把正式 `round_controller` 接到板上事件/结果寄存器，先跑 20 轮无动作流程。
 4. T0 表全部 PASS 前，不连接真实机械臂控制线，不发送动作帧。

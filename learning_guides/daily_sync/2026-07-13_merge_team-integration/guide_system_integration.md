@@ -18,7 +18,7 @@
 
 ### 📌 核心点三：Git 合并也需要安全门
 * **改动背景与问题**：当前工作区、FPGA 分支和 CPU 分支都包含复杂更新。直接 squash 或覆盖会让队友下次拉取时重新面对同一批差异。
-* **源码剖析**：[CURRENT_STATE.md](file:///d:/第十届集创赛-雄芯院材料/CURRENT_STATE.md#L122-L129) 记录双层控制器的整合裁定；个人更新先以 `c835594` 推送备份，再用两个 `--no-ff` merge commit 保留队友 ancestry。
+* **源码剖析**：[CURRENT_STATE.md](file:///d:/第十届集创赛-雄芯院材料/CURRENT_STATE.md#L129-L135) 记录双层控制器的整合裁定；个人更新先以 `c835594` 推送备份，再用两个 `--no-ff` merge commit 保留队友 ancestry。
 * **经验总结**：Git 历史像货物封条。保留 merge ancestry 等于保留“这箱货已经验收进仓”的凭证，队友之后更容易 fast-forward，而不是再拆箱对账。
 
 ---

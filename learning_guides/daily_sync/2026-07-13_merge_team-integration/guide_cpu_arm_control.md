@@ -17,7 +17,7 @@
 * **经验总结**：这是“留号排队 + 一次性取件码”。不在柜台死等，也不能拿同一张取件码领两次物品。
 
 ### 📌 核心点三：验证通过的是 Host/Mock，不是板级闭环
-* **源码剖析**：[CURRENT_STATE.md](file:///d:/第十届集创赛-雄芯院材料/CURRENT_STATE.md#L122-L129) 记录本次 `795/795` Host 回归和 8 个源文件 RISC-V compile-only 结果。
+* **源码剖析**：[CURRENT_STATE.md](file:///d:/第十届集创赛-雄芯院材料/CURRENT_STATE.md#L129-L135) 记录本次 `795/795` Host 回归和 8 个源文件 RISC-V compile-only 结果。
 * **经验总结**：飞行模拟器里的 795 次安全降落很有价值，但真正跑道的 APB、CDC、OSD、UART 和机械臂仍需逐门放行。
 
 ---
