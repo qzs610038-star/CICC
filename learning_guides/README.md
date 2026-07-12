@@ -19,6 +19,11 @@
     * [guide_cpu_arm_control.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_cpu_arm_control.md)：四任务真源、幂等锁与错误锁存（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-12_merge_dev_wsc6090-CPU/guide_system_integration.md)：机械臂七阶段安全门（面向角色 C）。
 
+## 📑 专项技术方案大白话解读
+
+除了日常分支合并的同步指南，本项目还针对重大的架构设计与拿分方案提供了大白话通俗化解读，帮助非专业背景的决策者低成本看懂技术决策并回答评审决策清单：
+
+* [competition_score_maximization_explanation_guide.md](competition_score_maximization_explanation_guide.md)：决赛最大化得分总控方案的大白话通俗解读与决策面板。
 
 ---
 
