@@ -35,6 +35,14 @@
   - 证据路径：`final_project/docs/review_packets/mycobot_uart2_j52_wiring_review_20260713.md`、`final_project/integration/io_pin_map.md`、`赛方提供材料/硬件文档/开发板使用说明1V0(5).pdf`、`赛方提供材料/硬件文档/TJ375N529_PINOUT_CONFIGURATION.pdf`、`赛方提供材料/硬件文档/TJ375N529开发板端口说明图.jpg`。
   - 下一步门禁：先完成 J52/机械臂端断电双签与双端电平测量，再做机械臂断开的 D2 100/100 帧回环/监听；T0 其余项仍须独立关闭。
 
+- 日期：2026-07-13，来源 Agent：Codex（Fable 5 审查后的首轮无外设整改）
+  - 适用范围：CPU `round_controller` 的寄存器无关事件契约、Host 测试，以及 FPGA 顶层 production/debug 合成入口选择；不表示 `main.c`、SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
+  - 最新结论：`round_controller` 的事件序号/ACK 序号/已消费序号已统一为 16 bit；新事件会按当前状态输出 `ACCEPTED` 或 `REJECTED`，重复及过期序号不重复消费。轻量 `competition_contract` 同步增加首事件标志并移除“序号 0 永久非法”特例，两层均支持 `0xFFFF -> 0x0000` 半范围回绕。新增越界事件、过期/回绕、20 轮和 1000 事件随机流验证，`ARM_DISABLED` 下保持零动作请求并可恢复到 `CONFIG`。FPGA `top.v` 已改为未定义 `COMPETITION_DEBUG_SYNTHETIC` 时默认选择两路真实输入，合成预处理/HDMI 只在显式 debug 宏下启用。
+  - 验证：`run_round_controller_host.ps1` 从当前源码重建并通过 `4919/4919`；`round_controller.c` 通过 Efinity RISC-V GCC 8.3.0 `rv32imac/ilp32 -Wall -Wextra -Werror` compile-only；既有 `competition_rounds 135/135`、更新后的 `competition_contract 45/45`、`competition_host_flow 164/164`、`A13 169/169` 使用 MSVC 从当前源码回归通过。`git diff --check` 通过。本轮未重复运行完整 Efinity map/PNR。
+  - 证据路径：`final_project/docs/review_packets/fable5_remediation_checkpoint_20260713.md`、`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/competition_contract.h`、`final_project/cpu/app/src/competition_contract.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_competition_contract.c`、`final_project/cpu/tests/run_round_controller_host.ps1`、`final_project/fpga/rtl/top/top.v`。
+  - 下一步门禁：`main.c` 的 `ARM_DISABLED` 接入仍须等待同次生成的正式 `soc.h`、APB 时钟/复位证据，以及 `TARGET_CFG/OPERATOR_EVENT/EVENT_ACK/RESULT_COMMIT` 联合 Review Packet；在此之前不得虚构 MMIO 地址或按钮事件源。FPGA 队员须分别生成 production/debug 构建证据，并从 Interface Designer/periphery 修复 1776 IO/outpad PNR 阻塞；不得把 debug 合成结果作为真实摄像头证据。
+  - NOT VERIFIED：正式固件链接/烧录、`main.c` 调度、APB/CDC/OSD、production/debug Efinity map/PNR/时序/bitstream、真实摄像头、板级 20 轮和机械臂动作均未验证。
+
 - 日期：2026-07-13，来源 Agent：Codex（团队整合后的文档新鲜度与 Codebase Memory 刷新）
   - 适用范围：`codex/team-integration-20260713@510caca` 的当前状态、接口候选契约、近期执行方案、架构入口和默认协作图谱；不改变官方细则、系统职责边界或任何板级/机械臂 Gate。
   - 最新结论：已把决赛主方案更新为 `v1.3-main`，将 Host/合成源任务标记为已形成证据，并把当前队列转向 `register_map/board_io` 契约收口、`ARM_DISABLED` 主循环集成、production/debug 构建拆分与 periphery/PNR。`register_map.md` 已和 `board_io.h` 当前候选偏移对齐，但正式基址/扩展字段仍等待同一次 SoC 生成的 `soc.h` 与 Review Packet；新增 `current_code_architecture_2026-07-13.md` 作为当前架构入口。

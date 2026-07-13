@@ -9,7 +9,7 @@ static int task_requires_size(competition_task_mode_t mode)
 
 static int seq_is_newer(uint16_t candidate, uint16_t previous)
 {
-    return candidate != 0u && (int16_t)(candidate - previous) > 0;
+    return (int16_t)(candidate - previous) > 0;
 }
 
 static void clear_result(competition_contract_t *contract)
@@ -80,10 +80,12 @@ int competition_contract_handle_event(competition_contract_t *contract,
     if (contract == 0 || event == 0) {
         return -1;
     }
-    if (event->event_seq == contract->last_event_seq) {
+    if (contract->have_event_seq &&
+        event->event_seq == contract->last_event_seq) {
         return 0; /* Debounced retransmission: no second transaction. */
     }
-    if (!seq_is_newer(event->event_seq, contract->last_event_seq)) {
+    if (contract->have_event_seq &&
+        !seq_is_newer(event->event_seq, contract->last_event_seq)) {
         return -1;
     }
 
@@ -125,6 +127,7 @@ int competition_contract_handle_event(competition_contract_t *contract,
         return -1;
     }
 
+    contract->have_event_seq = 1u;
     contract->last_event_seq = event->event_seq;
     return 0;
 }

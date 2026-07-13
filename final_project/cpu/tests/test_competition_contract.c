@@ -101,11 +101,35 @@ static void test_timeout_and_stale_sequence(void)
     CHECK(contract.transaction.state == COMP_ROUND_TXN_STATE_TIMEOUT);
 }
 
+static void test_event_sequence_wrap(void)
+{
+    competition_contract_t contract;
+    target_config_t red = make_config(COMP_TASK_COLOR_CUBE, COLOR_RED, 0);
+    operator_event_t place = { COMP_EVENT_PLACE, 0xffffu };
+    operator_event_t remove = { COMP_EVENT_REMOVE, 0u };
+    operator_event_t stale = { COMP_EVENT_RESET, 0xffffu };
+    operator_event_t next_place = { COMP_EVENT_PLACE, 1u };
+    vision_result_t red_cube = make_obs(COLOR_RED, SHAPE_CUBE, 0);
+
+    competition_contract_init(&contract, SIZE_STATE_UNAVAILABLE);
+    CHECK(competition_contract_stage_target(&contract, &red) == 0);
+    CHECK(competition_contract_apply_target(&contract) == 0);
+    CHECK(competition_contract_handle_event(&contract, &place, 0u, 20u) == 0);
+    CHECK(competition_contract_observe(&contract, &red_cube, 1u) == 0);
+    CHECK(competition_contract_ack_result(&contract, 0xffffu) == 0);
+    CHECK(competition_contract_handle_event(&contract, &remove, 2u, 20u) == 0);
+    CHECK(contract.last_event_seq == 0u);
+    CHECK(competition_contract_handle_event(&contract, &stale, 3u, 20u) == -1);
+    CHECK(competition_contract_handle_event(&contract, &next_place, 4u, 20u) == 0);
+    CHECK(contract.transaction.event_seq == 1u);
+}
+
 int main(void)
 {
     test_apply_lock_ack_remove();
     test_size_unavailable_and_events();
     test_timeout_and_stale_sequence();
+    test_event_sequence_wrap();
     printf("competition_contract: %d/%d passed\n", checks - failures, checks);
     return failures ? 1 : 0;
 }
