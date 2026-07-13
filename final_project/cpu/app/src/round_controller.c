@@ -56,7 +56,8 @@ static int consume_new_event(round_controller_t *rc,
         return 0;
     }
 
-    if (rc->have_event_seq && in->event_seq == rc->last_event_seq) {
+    if (rc->have_event_seq &&
+        (int16_t)(in->event_seq - rc->last_event_seq) <= 0) {
         return 0;
     }
 
@@ -64,6 +65,27 @@ static int consume_new_event(round_controller_t *rc,
     rc->last_event_seq = in->event_seq;
     *event = in->event;
     return 1;
+}
+
+static int event_is_accepted(round_controller_state_t state,
+                             round_event_t event)
+{
+    switch (event) {
+    case ROUND_EVENT_SESSION_RESET:
+        return 1;
+    case ROUND_EVENT_SOFT_RESET_ROUND:
+    case ROUND_EVENT_ABANDON_ROUND:
+        return state != ROUND_STATE_WAIT_ARM_DONE;
+    case ROUND_EVENT_APPLY_CONFIG:
+        return state == ROUND_STATE_CONFIG;
+    case ROUND_EVENT_PLACE_CONFIRM:
+        return state == ROUND_STATE_WAIT_PLACE_CONFIRM;
+    case ROUND_EVENT_REMOVE_CONFIRM:
+        return state == ROUND_STATE_ROUND_DONE;
+    case ROUND_EVENT_NONE:
+    default:
+        return 0;
+    }
 }
 
 void round_controller_init(round_controller_t *rc,
@@ -96,7 +118,8 @@ void round_controller_tick(round_controller_t *rc,
 {
     round_event_t event = ROUND_EVENT_NONE;
     uint8_t ack_valid = 0u;
-    uint8_t ack_seq = 0u;
+    uint16_t ack_seq = 0u;
+    round_event_ack_status_t ack_status = ROUND_EVENT_ACK_NONE;
     uint8_t request_arm_grab = 0u;
     uint32_t now_ms;
 
@@ -109,9 +132,11 @@ void round_controller_tick(round_controller_t *rc,
     if (consume_new_event(rc, in, &event)) {
         ack_valid = 1u;
         ack_seq = in->event_seq;
+        ack_status = event_is_accepted(rc->state, event) ?
+            ROUND_EVENT_ACK_ACCEPTED : ROUND_EVENT_ACK_REJECTED;
     }
 
-    if (ack_valid) {
+    if (ack_status == ROUND_EVENT_ACK_ACCEPTED) {
         if (event == ROUND_EVENT_SESSION_RESET) {
             rc->round_seq = 0u;
             clear_result(rc);
@@ -134,14 +159,16 @@ void round_controller_tick(round_controller_t *rc,
 
     switch (rc->state) {
     case ROUND_STATE_CONFIG:
-        if (ack_valid && event == ROUND_EVENT_APPLY_CONFIG) {
+        if (ack_status == ROUND_EVENT_ACK_ACCEPTED &&
+            event == ROUND_EVENT_APPLY_CONFIG) {
             clear_result(rc);
             enter_state(rc, ROUND_STATE_WAIT_PLACE_CONFIRM, now_ms);
         }
         break;
 
     case ROUND_STATE_WAIT_PLACE_CONFIRM:
-        if (ack_valid && event == ROUND_EVENT_PLACE_CONFIRM) {
+        if (ack_status == ROUND_EVENT_ACK_ACCEPTED &&
+            event == ROUND_EVENT_PLACE_CONFIRM) {
             clear_result(rc);
             enter_state(rc, ROUND_STATE_ACQUIRE_STABLE, now_ms);
         }
@@ -192,7 +219,8 @@ void round_controller_tick(round_controller_t *rc,
         break;
 
     case ROUND_STATE_ROUND_DONE:
-        if (ack_valid && event == ROUND_EVENT_REMOVE_CONFIRM) {
+        if (ack_status == ROUND_EVENT_ACK_ACCEPTED &&
+            event == ROUND_EVENT_REMOVE_CONFIRM) {
             if (rc->round_seq < 65535u) {
                 rc->round_seq++;
             }
@@ -212,6 +240,7 @@ void round_controller_tick(round_controller_t *rc,
         out->round_seq = rc->round_seq;
         out->event_ack_valid = ack_valid;
         out->event_ack_seq = ack_seq;
+        out->event_ack_status = ack_status;
         out->request_arm_grab = request_arm_grab;
         out->result_valid = rc->result_valid;
         out->decision_action = rc->decision_action;

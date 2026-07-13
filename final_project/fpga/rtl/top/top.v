@@ -2084,14 +2084,17 @@ end
       .rgb_datax2_o   (rgb1_datax2     )//b,g,r,b,g,r
   );
 
-  // Set to 1 only for the camera-independent preprocessing verification path.
-  // This source feeds u_preprocess_ch1_tap only; HDMI and the CSI/DDR path
-  // remain connected to their live signals. Set back to 0 before any live
-  // camera validation or competition build.
+  // Production is the safe default: both selectors use the live camera path.
+  // A debug build must explicitly define COMPETITION_DEBUG_SYNTHETIC. Such a
+  // build is camera-independent verification only and is never competition
+  // evidence for real capture, classification, or end-to-end recognition.
+`ifdef COMPETITION_DEBUG_SYNTHETIC
   localparam PREPROCESS_CH1_USE_SYNTHETIC_SOURCE = 1'b1;
-  // Set to 1 only for an HDMI-visible synthetic-source board test. It uses a
-  // dedicated CDC instance and does not alter the live camera CDC instances.
   localparam HDMI_USE_SYNTHETIC_VERIFY = 1'b1;
+`else
+  localparam PREPROCESS_CH1_USE_SYNTHETIC_SOURCE = 1'b0;
+  localparam HDMI_USE_SYNTHETIC_VERIFY = 1'b0;
+`endif
   wire        synthetic_preprocess_vs;
   wire        synthetic_preprocess_hs;
   wire        synthetic_preprocess_de;

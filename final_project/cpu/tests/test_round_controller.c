@@ -49,7 +49,7 @@ static round_controller_input_t base_input(uint32_t now_ms)
 static void send_event(round_controller_t *rc,
                        round_controller_output_t *out,
                        uint32_t now_ms,
-                       uint8_t seq,
+                       uint16_t seq,
                        round_event_t event)
 {
     round_controller_input_t in = base_input(now_ms);
@@ -71,6 +71,7 @@ static void test_config_apply_place_to_acquire(void)
     CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
     CHECK_EQ(out.event_ack_valid, 1);
     CHECK_EQ(out.event_ack_seq, 1);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
 
     send_event(&rc, &out, 20, 2, ROUND_EVENT_PLACE_CONFIRM);
     CHECK_EQ(out.state, ROUND_STATE_ACQUIRE_STABLE);
@@ -189,7 +190,7 @@ static void test_target_arm_enabled_requests_once(void)
 static void run_one_skip_round(round_controller_t *rc,
                                round_controller_output_t *out,
                                uint32_t base_ms,
-                               uint8_t *event_seq)
+                               uint16_t *event_seq)
 {
     round_controller_input_t in;
 
@@ -216,7 +217,7 @@ static void test_twenty_round_mock_skip_no_deadlock(void)
     TEST("round: 20-round mock SKIP run has no deadlock or arm request");
     round_controller_t rc;
     round_controller_output_t out;
-    uint8_t seq = 1u;
+    uint16_t seq = 1u;
     unsigned i;
 
     round_controller_init(&rc, 0, 0);
@@ -242,11 +243,61 @@ static void test_duplicate_event_seq_ignored(void)
 
     send_event(&rc, &out, 1, 7, ROUND_EVENT_APPLY_CONFIG);
     CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
     CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
 
     send_event(&rc, &out, 2, 7, ROUND_EVENT_SESSION_RESET);
     CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_NONE);
     CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    PASS();
+}
+
+static void test_out_of_state_event_is_explicitly_rejected(void)
+{
+    TEST("round: out-of-state event is ACKed as REJECTED without transition");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_init(&rc, 0, 0);
+
+    send_event(&rc, &out, 1, 300u, ROUND_EVENT_REMOVE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 300u);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_REJECTED);
+    CHECK_EQ(out.state, ROUND_STATE_CONFIG);
+
+    send_event(&rc, &out, 2, 300u, ROUND_EVENT_REMOVE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_NONE);
+    CHECK_EQ(out.state, ROUND_STATE_CONFIG);
+
+    send_event(&rc, &out, 3, 301u, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    PASS();
+}
+
+static void test_event_sequence_rejects_stale_and_accepts_wrap(void)
+{
+    TEST("round: 16-bit event sequence rejects stale and accepts wrap");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_init(&rc, 0, 0);
+
+    send_event(&rc, &out, 1, 0xffffu, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
+    CHECK_EQ(out.event_ack_seq, 0xffffu);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    send_event(&rc, &out, 2, 0xfffeu, ROUND_EVENT_SESSION_RESET);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_NONE);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    send_event(&rc, &out, 3, 0u, ROUND_EVENT_SESSION_RESET);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
+    CHECK_EQ(out.event_ack_seq, 0u);
+    CHECK_EQ(out.state, ROUND_STATE_CONFIG);
     PASS();
 }
 
@@ -272,6 +323,83 @@ static void test_acquire_timeout_and_soft_reset(void)
     PASS();
 }
 
+static uint32_t next_random(uint32_t *state)
+{
+    *state = (*state * 1664525u) + 1013904223u;
+    return *state;
+}
+
+static void test_randomized_event_stream_is_safe_and_recoverable(void)
+{
+    TEST("round: 1000-event randomized stream is safe and recoverable");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_input_t in;
+    uint32_t random_state = 0x375529u;
+    uint16_t model_last_seq = 0u;
+    uint8_t model_have_seq = 0u;
+    unsigned i;
+
+    round_controller_init(&rc, 0, 0);
+
+    for (i = 0u; i < 1000u; ++i) {
+        uint32_t random_value = next_random(&random_state);
+        uint16_t candidate_seq;
+        int expected_new;
+
+        if (!model_have_seq) {
+            candidate_seq = (uint16_t)random_value;
+        } else if ((i % 11u) == 0u) {
+            candidate_seq = (uint16_t)(model_last_seq - 1u);
+        } else if ((i % 7u) == 0u) {
+            candidate_seq = model_last_seq;
+        } else {
+            candidate_seq = (uint16_t)(model_last_seq + 1u);
+        }
+
+        in = base_input(i * 10u);
+        in.event_valid = 1u;
+        in.event_seq = candidate_seq;
+        in.event = (round_event_t)(1u + (random_value % 6u));
+        if (round_controller_get_state(&rc) == ROUND_STATE_ACQUIRE_STABLE &&
+            (random_value & 1u) != 0u) {
+            in.observation_valid = 1u;
+            if ((random_value & 2u) != 0u) {
+                in.match = make_match(MATCH_ACTION_GRAB, 1u,
+                                      REASON_TARGET_MATCH);
+            } else {
+                in.match = make_match(MATCH_ACTION_SKIP, 0u,
+                                      REASON_COLOR_MISMATCH);
+            }
+        }
+
+        expected_new = !model_have_seq ||
+            (int16_t)(candidate_seq - model_last_seq) > 0;
+        round_controller_tick(&rc, &in, &out);
+
+        CHECK(out.state >= ROUND_STATE_CONFIG &&
+              out.state <= ROUND_STATE_ARM_FAULT);
+        CHECK_EQ(out.request_arm_grab, 0u);
+        CHECK_EQ(out.event_ack_valid, expected_new ? 1u : 0u);
+        if (expected_new) {
+            CHECK_EQ(out.event_ack_seq, candidate_seq);
+            CHECK(out.event_ack_status == ROUND_EVENT_ACK_ACCEPTED ||
+                  out.event_ack_status == ROUND_EVENT_ACK_REJECTED);
+            model_have_seq = 1u;
+            model_last_seq = candidate_seq;
+        } else {
+            CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_NONE);
+        }
+    }
+
+    send_event(&rc, &out, 10001u, (uint16_t)(model_last_seq + 1u),
+               ROUND_EVENT_SESSION_RESET);
+    CHECK_EQ(out.event_ack_status, ROUND_EVENT_ACK_ACCEPTED);
+    CHECK_EQ(out.state, ROUND_STATE_CONFIG);
+    CHECK_EQ(out.request_arm_grab, 0u);
+    PASS();
+}
+
 int main(void)
 {
     printf("\n=== round_controller unit tests ===\n\n");
@@ -281,8 +409,11 @@ int main(void)
     test_target_arm_disabled_finishes_not_ready();
     test_target_arm_enabled_requests_once();
     test_duplicate_event_seq_ignored();
+    test_out_of_state_event_is_explicitly_rejected();
+    test_event_sequence_rejects_stale_and_accepts_wrap();
     test_acquire_timeout_and_soft_reset();
     test_twenty_round_mock_skip_no_deadlock();
+    test_randomized_event_stream_is_safe_and_recoverable();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            _test_count - _test_failures, _test_count, _test_failures);
