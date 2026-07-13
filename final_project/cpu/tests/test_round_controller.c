@@ -400,6 +400,283 @@ static void test_randomized_event_stream_is_safe_and_recoverable(void)
     PASS();
 }
 
+/*==========================================================================
+ *  审查补测（2026-07-13）：封堵 B 清单第 9/10/11 项覆盖缺口
+ *
+ *  以下三类行为 round_controller.c 已正确实现，但原测试集未直接覆盖：
+ *    - 第 9 项：ABANDON_ROUND 在非运动态结束本轮并保留原因。
+ *    - 第 10 项：机械臂运动中（WAIT_ARM_DONE）软复位/放弃必须被忽略，
+ *               不得盲目回到放物流程，也不得重复动作脉冲。
+ *    - 第 11 项：ARM_FAULT 输入 / 臂超时进入故障态，且不得清空本轮证据
+ *               （result_valid、is_target 必须保留）。
+ *  本组仅新增 Host/Mock 测试，未改动 round_controller.c/.h 逻辑。
+ *==========================================================================*/
+
+/* 驱动状态机到 WAIT_ARM_DONE（目标 + arm_enabled，已发出一次抓取请求）。
+ * 进入 WAIT_ARM_DONE 的时刻为 now=130，arm_deadline = 130 + arm_timeout。 */
+static void drive_to_wait_arm_done(round_controller_t *rc,
+                                   round_controller_output_t *out,
+                                   const round_controller_config_t *cfg)
+{
+    round_controller_input_t in;
+
+    round_controller_init(rc, cfg, 0);
+    send_event(rc, out, 1, 1, ROUND_EVENT_APPLY_CONFIG);
+    send_event(rc, out, 2, 2, ROUND_EVENT_PLACE_CONFIRM);
+
+    in = base_input(100);
+    in.observation_valid = 1;
+    in.arm_enabled = 1;
+    in.match = make_match(MATCH_ACTION_GRAB, 1, REASON_TARGET_MATCH);
+    round_controller_tick(rc, &in, out);
+    in = base_input(110);
+    in.arm_enabled = 1;
+    round_controller_tick(rc, &in, out);
+    in.now_ms = 120;
+    round_controller_tick(rc, &in, out);
+    in.now_ms = 130;
+    round_controller_tick(rc, &in, out);
+}
+
+static void test_abandon_round_in_acquire_keeps_reason(void)
+{
+    TEST("round: ABANDON in non-motion state ends round and keeps reason");
+    round_controller_t rc;
+    round_controller_output_t out;
+
+    round_controller_init(&rc, 0, 0);
+    send_event(&rc, &out, 1, 1, ROUND_EVENT_APPLY_CONFIG);
+    send_event(&rc, &out, 2, 2, ROUND_EVENT_PLACE_CONFIRM);
+    CHECK_EQ(out.state, ROUND_STATE_ACQUIRE_STABLE);
+
+    send_event(&rc, &out, 30, 3, ROUND_EVENT_ABANDON_ROUND);
+    CHECK_EQ(out.state, ROUND_STATE_ROUND_DONE);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 3);
+    CHECK_EQ(out.result_valid, 1);
+    CHECK_EQ(out.decision_action, MATCH_ACTION_NONE);
+    CHECK_EQ(out.reason, REASON_OPERATOR_ABANDON);
+
+    /* 放弃后本轮已完成，REMOVE_CONFIRM 仍能推进到下一轮 */
+    send_event(&rc, &out, 40, 4, ROUND_EVENT_REMOVE_CONFIRM);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    CHECK_EQ(out.round_seq, 1);
+    PASS();
+}
+
+static void test_arm_motion_blocks_soft_reset_and_abandon(void)
+{
+    TEST("round: arm in motion ignores soft-reset and abandon");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_input_t in;
+
+    drive_to_wait_arm_done(&rc, &out, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_ARM_DONE);
+
+    /* WAIT_ARM_DONE 期间软复位必须被忽略，不得回到放物流程或重复脉冲 */
+    send_event(&rc, &out, 140, 3, ROUND_EVENT_SOFT_RESET_ROUND);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_ARM_DONE);
+    CHECK_EQ(out.request_arm_grab, 0);
+
+    /* WAIT_ARM_DONE 期间放弃也必须被忽略 */
+    send_event(&rc, &out, 150, 4, ROUND_EVENT_ABANDON_ROUND);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_ARM_DONE);
+    CHECK_EQ(out.request_arm_grab, 0);
+
+    /* 只有机械臂真正完成后才推进到本轮完成 */
+    in = base_input(160);
+    in.arm_done = 1;
+    round_controller_tick(&rc, &in, &out);
+    CHECK_EQ(out.state, ROUND_STATE_ROUND_DONE);
+    PASS();
+}
+
+static void test_arm_fault_input_keeps_evidence(void)
+{
+    TEST("round: ARM_FAULT input enters fault and keeps round evidence");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_input_t in;
+
+    drive_to_wait_arm_done(&rc, &out, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_ARM_DONE);
+    CHECK_EQ(out.is_target, 1);
+
+    in = base_input(140);
+    in.arm_fault = 1;
+    round_controller_tick(&rc, &in, &out);
+    CHECK_EQ(out.state, ROUND_STATE_ARM_FAULT);
+    CHECK_EQ(out.reason, REASON_ARM_FAULT);
+    CHECK_EQ(out.result_valid, 1);      /* 证据不清空 */
+    CHECK_EQ(out.is_target, 1);         /* 本轮确为目标，故障不抹除 */
+    CHECK_EQ(out.request_arm_grab, 0);
+
+    /* 故障态是吸收态：普通 tick 不自发脱离，也不再发动作请求 */
+    in = base_input(150);
+    round_controller_tick(&rc, &in, &out);
+    CHECK_EQ(out.state, ROUND_STATE_ARM_FAULT);
+    CHECK_EQ(out.request_arm_grab, 0);
+
+    /* 会话级复位可清场回到 CONFIG */
+    send_event(&rc, &out, 160, 3, ROUND_EVENT_SESSION_RESET);
+    CHECK_EQ(out.state, ROUND_STATE_CONFIG);
+    CHECK_EQ(out.round_seq, 0);
+    PASS();
+}
+
+static void test_arm_timeout_keeps_evidence(void)
+{
+    TEST("round: arm timeout enters fault and preserves is_target evidence");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_input_t in;
+    round_controller_config_t cfg = { 3000u, 50u };  /* 短臂超时便于测试 */
+
+    drive_to_wait_arm_done(&rc, &out, &cfg);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_ARM_DONE);
+
+    /* 进入 WAIT_ARM_DONE 于 now=130，arm_timeout=50ms → 截止 180 */
+    in = base_input(181);
+    round_controller_tick(&rc, &in, &out);
+    CHECK_EQ(out.state, ROUND_STATE_ARM_FAULT);
+    CHECK_EQ(out.reason, REASON_ARM_FAULT);
+    CHECK_EQ(out.result_valid, 1);
+    CHECK_EQ(out.is_target, 1);
+    PASS();
+}
+
+/*==========================================================================
+ *  Codex 复核补测（2026-07-13）：封堵两个 Host 可复现安全缺口
+ *    [P1] arm_busy 安全门：arm_enabled=1 但 arm_busy=1 时目标轮不得发起动作。
+ *    [P2] event_seq 过期/回绕：只接受向前的 16-bit 序号，过期序号不消费不 ACK，
+ *         回绕（65535→0）视为向前。
+ *  仅新增 Host/Mock 测试；round_controller.c 的对应最小实现已同步落地。
+ *==========================================================================*/
+
+static void test_arm_busy_blocks_grab_and_completes_not_ready(void)
+{
+    TEST("round: arm enabled but busy blocks grab, done with ARM_NOT_READY");
+    round_controller_t rc;
+    round_controller_output_t out;
+    round_controller_input_t in;
+
+    round_controller_init(&rc, 0, 0);
+    send_event(&rc, &out, 1, 1, ROUND_EVENT_APPLY_CONFIG);
+    send_event(&rc, &out, 2, 2, ROUND_EVENT_PLACE_CONFIRM);
+
+    in = base_input(100);
+    in.observation_valid = 1;
+    in.arm_enabled = 1;
+    in.arm_busy = 1;                 /* 机械臂正忙 */
+    in.match = make_match(MATCH_ACTION_GRAB, 1, REASON_TARGET_MATCH);
+    round_controller_tick(&rc, &in, &out);   /* ACQUIRE → LATCH_RECOGNITION */
+    in = base_input(110);
+    in.arm_enabled = 1;
+    in.arm_busy = 1;
+    round_controller_tick(&rc, &in, &out);   /* → LATCH_DECISION */
+    in.now_ms = 120;
+    round_controller_tick(&rc, &in, &out);   /* → EXECUTE_OR_SKIP */
+    in.now_ms = 130;
+    round_controller_tick(&rc, &in, &out);   /* busy → ROUND_DONE，不发动作 */
+
+    CHECK_EQ(out.state, ROUND_STATE_ROUND_DONE);
+    CHECK_EQ(out.request_arm_grab, 0);
+    CHECK_EQ(out.reason, REASON_ARM_NOT_READY);
+    CHECK_EQ(out.result_valid, 1);
+    CHECK_EQ(out.is_target, 1);
+    CHECK_EQ(out.decision_action, MATCH_ACTION_NONE);
+    PASS();
+}
+
+static void test_stale_event_seq_rejected(void)
+{
+    TEST("round: stale (older) event_seq is rejected and not acked");
+    round_controller_t rc;
+    round_controller_output_t out;
+
+    round_controller_init(&rc, 0, 0);
+    /* seq=8 被接受 → WAIT_PLACE_CONFIRM */
+    send_event(&rc, &out, 10, 8, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 8);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    /* seq=7 过期：PLACE_CONFIRM 必须被拒绝，状态不变 */
+    send_event(&rc, &out, 20, 7, ROUND_EVENT_PLACE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    /* seq=7 过期：SESSION_RESET 也必须被拒绝，不回到 CONFIG */
+    send_event(&rc, &out, 30, 7, ROUND_EVENT_SESSION_RESET);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    PASS();
+}
+
+static void test_event_seq_wraparound_accepted(void)
+{
+    TEST("round: event_seq wrap 65535->0 is accepted and advances state");
+    round_controller_t rc;
+    round_controller_output_t out;
+
+    round_controller_init(&rc, 0, 0);
+    /* seq=65535 被接受 → WAIT_PLACE_CONFIRM */
+    send_event(&rc, &out, 10, 65535u, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 65535u);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    /* seq=0 回绕视为向前：PLACE_CONFIRM 接受 → ACQUIRE_STABLE */
+    send_event(&rc, &out, 20, 0, ROUND_EVENT_PLACE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 0);
+    CHECK_EQ(out.state, ROUND_STATE_ACQUIRE_STABLE);
+    PASS();
+}
+
+static void test_seq_zero_to_65535_rejected(void)
+{
+    TEST("round: seq 0->65535 (delta=65535) is rejected and not acked");
+    round_controller_t rc;
+    round_controller_output_t out;
+
+    round_controller_init(&rc, 0, 0);
+    /* seq=0 为首事件，无条件接受 → WAIT_PLACE_CONFIRM */
+    send_event(&rc, &out, 10, 0, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    /* seq=65535 相对 0 为过期（delta=65535，落在拒绝半区间），
+     * PLACE_CONFIRM 必须被拒绝，状态不变 */
+    send_event(&rc, &out, 20, 65535u, ROUND_EVENT_PLACE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    PASS();
+}
+
+static void test_seq_delta_32768_rejected(void)
+{
+    TEST("round: seq delta=32768 (10->32778) is rejected and not acked");
+    round_controller_t rc;
+    round_controller_output_t out;
+
+    round_controller_init(&rc, 0, 0);
+    /* seq=10 接受 → WAIT_PLACE_CONFIRM */
+    send_event(&rc, &out, 10, 10, ROUND_EVENT_APPLY_CONFIG);
+    CHECK_EQ(out.event_ack_valid, 1);
+    CHECK_EQ(out.event_ack_seq, 10);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+
+    /* seq=32778：delta=(uint16_t)(32778-10)=32768，正好落在拒绝半区间边界，
+     * PLACE_CONFIRM 必须被拒绝，状态不变 */
+    send_event(&rc, &out, 20, 32778u, ROUND_EVENT_PLACE_CONFIRM);
+    CHECK_EQ(out.event_ack_valid, 0);
+    CHECK_EQ(out.state, ROUND_STATE_WAIT_PLACE_CONFIRM);
+    PASS();
+}
+
 int main(void)
 {
     printf("\n=== round_controller unit tests ===\n\n");
@@ -414,6 +691,19 @@ int main(void)
     test_acquire_timeout_and_soft_reset();
     test_twenty_round_mock_skip_no_deadlock();
     test_randomized_event_stream_is_safe_and_recoverable();
+
+    printf("\n[audit] gap-fill: abandon / arm-motion lockout / arm-fault evidence\n");
+    test_abandon_round_in_acquire_keeps_reason();
+    test_arm_motion_blocks_soft_reset_and_abandon();
+    test_arm_fault_input_keeps_evidence();
+    test_arm_timeout_keeps_evidence();
+
+    printf("\n[codex-fix] arm_busy safety gate / event_seq stale + wraparound\n");
+    test_arm_busy_blocks_grab_and_completes_not_ready();
+    test_stale_event_seq_rejected();
+    test_event_seq_wraparound_accepted();
+    test_seq_zero_to_65535_rejected();
+    test_seq_delta_32768_rejected();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            _test_count - _test_failures, _test_count, _test_failures);

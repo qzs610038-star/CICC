@@ -104,7 +104,7 @@ F2 启用条件：T0 全 PASS + UART2 只读回环 PASS + round_controller→arm
 
 > 本节由 Codex 在 Fable 5 原始审核完成后追加。上方 Fable 审核正文保持原样；追加前原文共 99 行，SHA-256 为 `0604B8AE013EE2794F7F2DA079FDD9872AF9C6472A6FC3BBBA4382D5A9C99550`。
 >
-> 探索修复位于独立分支 `codex/fable5-remediation-20260713`、提交 `758e8649ea5b27e1000cc37936c2828919bd72a8`，尚未合并到 `main`。因此下述测试结果是该探索提交的证据，不代表当前主分支、bitstream 或板级能力已经同步完成。
+> 探索修复源自独立分支 `codex/fable5-remediation-20260713`、提交 `758e8649ea5b27e1000cc37936c2828919bd72a8`；本次 CPU/Fable 集成分支已吸收该提交并进入 PR 验收流程。因此下述测试结果代表集成源码证据，但仍不代表 bitstream、板级能力或真实机械臂闭环已经完成。
 
 ### 1. Codex 对 Fable 方案的复核意见
 

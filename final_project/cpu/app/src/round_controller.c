@@ -48,6 +48,18 @@ static void make_result(round_controller_t *rc, uint8_t action,
     rc->reason = reason;
 }
 
+/* 16-bit event_seq 新旧判定（支持回绕）。
+ * delta = (uint16_t)(seq - last)：
+ *   delta==0        → 同一序号，视为重复；
+ *   1..32767        → 向前的新序号，接受（含回绕，如 65535→0 delta=1）；
+ *   32768..65535    → 过期/倒退序号，拒绝（如 8→7 delta=65535）。
+ * 首个事件由调用方的 have_event_seq==0 单独放行。 */
+static int seq_is_newer(uint16_t seq, uint16_t last)
+{
+    uint16_t delta = (uint16_t)(seq - last);
+    return (delta != 0u) && (delta < 0x8000u);
+}
+
 static int consume_new_event(round_controller_t *rc,
                              const round_controller_input_t *in,
                              round_event_t *event)
@@ -56,8 +68,8 @@ static int consume_new_event(round_controller_t *rc,
         return 0;
     }
 
-    if (rc->have_event_seq &&
-        (int16_t)(in->event_seq - rc->last_event_seq) <= 0) {
+    /* 已有基准序号后，只接受“向前”的序号；重复或过期一律不消费、不 ACK。 */
+    if (rc->have_event_seq && !seq_is_newer(in->event_seq, rc->last_event_seq)) {
         return 0;
     }
 
@@ -194,7 +206,11 @@ void round_controller_tick(round_controller_t *rc,
 
     case ROUND_STATE_EXECUTE_OR_SKIP:
         if (rc->decision_action == MATCH_ACTION_GRAB) {
-            if (!in->arm_enabled) {
+            /* 机械臂不可接收动作时（未使能 或 正忙）不得发起新抓取。
+             * F1 保守策略：识别/判断结果已锁存，但本轮不执行动作，
+             * 直接进入 ROUND_DONE 并以 ARM_NOT_READY 说明原因。
+             * 保留 is_target=1，动作降级为 NONE，绝不 request_arm_grab。 */
+            if (!in->arm_enabled || in->arm_busy) {
                 make_result(rc, MATCH_ACTION_NONE, 1u, REASON_ARM_NOT_READY);
                 enter_state(rc, ROUND_STATE_ROUND_DONE, now_ms);
             } else {

@@ -1157,6 +1157,90 @@ static void test_skip_does_not_lock_round(void)
 }
 
 /*==========================================================================
+ *  测试组 14: 审查补齐（2026-07-13 B 任务清单第 3 项）
+ *
+ *  只补 task_matcher 动作层（NONE/GRAB/SKIP）覆盖：
+ *    - T3 delta=0 边界（obs==reference → SKIP）
+ *    - T1/T2 形状强制（非正方体 → SKIP）
+ *    - 非法 / 未识别 task_mode → 安全侧 NONE，不 GRAB
+ *
+ *  注意：task_matcher_evaluate() 只返回动作码，不产生理由码。task_matcher.h 的
+ *  reason_code_t/REASON_* 由 round_controller 消费；competition_tasks 另用一套
+ *  competition_reason_t/COMP_REASON_*，两套统一/转换层尚未定版——本组只验证动作码，
+ *  不代表理由码已闭环。
+ *==========================================================================*/
+
+static void test_mode3_delta_zero_skip(void)
+{
+    TEST("mode3: |obs-ref|=0 (obs==ref) → SKIP (delta boundary 0)");
+    task_matcher_init();
+    task_target_t t = make_target_ex(COLOR_YELLOW, SHAPE_CUBE, 0, 20, TASK_MODE_3);
+    task_matcher_set_target_ex(&t);
+
+    /* obs.size == reference (20) → delta 0, not 10 → SKIP */
+    vision_result_t obs = make_obs(COLOR_YELLOW, SHAPE_CUBE, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_SKIP);
+    PASS();
+}
+
+static void test_mode1_shape_mismatch_skip(void)
+{
+    TEST("mode1: wrong shape (cylinder) → SKIP (T1 enforces cube)");
+    task_matcher_init();
+    task_target_t t = make_target_ex(COLOR_RED, SHAPE_CUBE, 0, 0, TASK_MODE_1);
+    task_matcher_set_target_ex(&t);
+
+    vision_result_t obs = make_obs(COLOR_RED, SHAPE_CYLINDER, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_SKIP);
+    PASS();
+}
+
+static void test_mode2_shape_mismatch_skip(void)
+{
+    TEST("mode2: non-cube in mixed pool → SKIP (T2 enforces cube)");
+    task_matcher_init();
+    task_target_t t = make_target_ex(COLOR_BLUE, SHAPE_CUBE, 25, 0, TASK_MODE_2);
+    task_matcher_set_target_ex(&t);
+
+    /* mixed-shape pool: a cone of the target color must still SKIP */
+    vision_result_t obs = make_obs(COLOR_BLUE, SHAPE_CONE, 25);
+    CHECK_EQ(task_matcher_evaluate(&obs, 0, 0), MATCH_ACTION_SKIP);
+    PASS();
+}
+
+static void test_invalid_task_mode_none(void)
+{
+    TEST("invalid: TASK_MODE_NONE target never GRABs (safe NONE)");
+    task_matcher_init();
+    task_target_t t = make_target_ex(COLOR_RED, SHAPE_CUBE, 20, 0, TASK_MODE_NONE);
+    task_matcher_set_target_ex(&t);
+
+    /* color+shape match but task_mode invalid → safe side NONE, no grab */
+    vision_result_t obs = make_obs(COLOR_RED, SHAPE_CUBE, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 100, 200), MATCH_ACTION_NONE);
+    CHECK_EQ(task_matcher_get_round_state(), ROUND_TARGET_LOCKED);  /* not armed */
+
+    uint16_t cx = 99, cy = 99;
+    CHECK_EQ(task_matcher_get_grab_coord(&cx, &cy), -1);
+    PASS();
+}
+
+static void test_out_of_range_task_mode_none(void)
+{
+    TEST("invalid: out-of-range task_mode never GRABs (safe NONE)");
+    task_matcher_init();
+    task_target_t t = make_target_ex(COLOR_RED, SHAPE_CUBE, 20, 0, 99);
+    task_matcher_set_target_ex(&t);
+
+    vision_result_t obs = make_obs(COLOR_RED, SHAPE_CUBE, 20);
+    CHECK_EQ(task_matcher_evaluate(&obs, 100, 200), MATCH_ACTION_NONE);
+
+    uint16_t cx = 99, cy = 99;
+    CHECK_EQ(task_matcher_get_grab_coord(&cx, &cy), -1);
+    PASS();
+}
+
+/*==========================================================================
  *  main
  *==========================================================================*/
 
@@ -1250,6 +1334,13 @@ int main(void)
     test_round_reset_clears_all();
     test_round_state_transitions();
     test_skip_does_not_lock_round();
+
+    printf("\n[14] Audit gap-fill (T3 delta=0 / T1&T2 shape / invalid mode)\n");
+    test_mode3_delta_zero_skip();
+    test_mode1_shape_mismatch_skip();
+    test_mode2_shape_mismatch_skip();
+    test_invalid_task_mode_none();
+    test_out_of_range_task_mode_none();
 
     printf("\n=== Results: %d/%d passed, %d failed ===\n",
            _test_count - _test_failures, _test_count, _test_failures);
