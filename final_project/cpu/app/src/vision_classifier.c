@@ -347,7 +347,7 @@ void mf_filter_reset(mf_filter_t *f)
 vision_result_t mf_filter_update(mf_filter_t *f, const vision_result_t *raw,
                                  const classifier_cfg_t *cfg)
 {
-    static const vision_result_t zero_result;   /* all-zero */
+    static const vision_result_t zero_result = {0};   /* all-zero */
 
     if (f == 0 || raw == 0 || cfg == 0)
         return zero_result;
