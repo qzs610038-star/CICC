@@ -97,3 +97,45 @@ F2 启用条件：T0 全 PASS + UART2 只读回环 PASS + round_controller→arm
 - 主模型只打开影响最终结论的精确证据范围，不重读全文
 - 代码发现优先使用 `D-cicc_cbm_link` 图谱（4514 nodes/10958 edges），最终证据回到真实源文件
 - 所有结论绑定精确文件路径+行号
+
+---
+
+## 补充：Codex 复核与独立探索修复记录（2026-07-13）
+
+> 本节由 Codex 在 Fable 5 原始审核完成后追加。上方 Fable 审核正文保持原样；追加前原文共 99 行，SHA-256 为 `0604B8AE013EE2794F7F2DA079FDD9872AF9C6472A6FC3BBBA4382D5A9C99550`。
+>
+> 探索修复位于独立分支 `codex/fable5-remediation-20260713`、提交 `758e8649ea5b27e1000cc37936c2828919bd72a8`，尚未合并到 `main`。因此下述测试结果是该探索提交的证据，不代表当前主分支、bitstream 或板级能力已经同步完成。
+
+### 1. Codex 对 Fable 方案的复核意见
+
+Codex 认可 Fable 的总体裁决：保持现有 FPGA/CPU 职责边界，不推倒重来；当前应优先解决 production 构建、SoC/APB、逐轮事务和真实观测闭环。以下几点需要补充或纠偏：
+
+1. **PNR 根因不能由单一配置项直接推出。** `peri-syn=0` 在初赛和赛方衍生工程中也存在，不能单独证明它导致 1,776 个 IO 无 placement；`constrain.sdc` 中 Ti180J484 的生成头与 TJ375N529 工程真源不一致，属于必须核查的 provenance 风险，但也不能仅凭该注释断定实际器件已选错。应在 ASCII 路径隔离副本中通过 Interface Designer/periphery 重新生成并比较真实产物，禁止盲绑管脚或手改生成文件。
+2. **白/黑真源不是 `LIVE_FG_AREA` 与亮度统计二选一。** 正式判定至少需要同一 `frame_id` 下的一致快照 `{status, bbox, fg_area, roi_pixel_count, sum_y}`；CPU 必须先验证快照一致性，再联合使用前景面积和亮度统计。任何单字段都不足以证明白/黑稳定。
+3. **完整控制器和轻量事务层原先存在事件语义漂移。** `round_controller` 原为 8-bit `event_seq`，而 `competition_contract` 为 16 bit；非法状态的新事件还会在确认状态机可接受前被记录和 ACK。该问题适合先在寄存器无关的纯 C 层收口，再映射 APB。
+4. **F2 放行条件应继续服从决赛主方案和 Gate D。** 除 T0、UART 回环/只读和唯一动作请求路径外，还必须包含 180° 点位、至少 5 轮低速带载、电气/共地、急停/断电、底座固定及无跌落证据。Fable 正文中的简写不能替代完整安全门。
+5. **`main.c` 接入方向正确，但不能先于接口真源。** 在正式 `soc.h`、APB 时钟/复位、`TARGET_CFG/OPERATOR_EVENT/EVENT_ACK/RESULT_COMMIT` 和 OSD 原子提交尚未联合审查前，不应通过虚构 MMIO 地址把 Host 适配直接接入板上主循环。
+
+### 2. 独立探索分支的主要结果
+
+探索分支：[`codex/fable5-remediation-20260713`](https://github.com/qzs610038-star/CICC/tree/codex/fable5-remediation-20260713)
+
+- `round_controller` 的事件序号、ACK 序号和 last-consumed 序号统一为 16 bit；新增 `ACK_NONE/ACCEPTED/REJECTED`，非法状态的新事件会显式拒绝且不迁移状态，重复和过期事件不会二次消费。
+- 完整控制器与轻量 `competition_contract` 统一采用 16-bit 半范围序号规则，支持 `0xFFFF -> 0x0000 -> 0x0001` 回绕；轻量契约新增用例曾先以 `42/45` 失败，修复后 `45/45` 通过。
+- `round_controller` 增加非法状态、过期序号、回绕、20 轮 SKIP、1000 个确定性随机事件和最终恢复测试；Host 当前源码重建为 `4919/4919 passed`，随机流在 `ARM_DISABLED` 下始终无动作请求。
+- FPGA `top.v` 改为 production 安全默认：未定义 `COMPETITION_DEBUG_SYNTHETIC` 时预处理与 HDMI 均选择真实输入；只有显式 debug 宏才启用合成源。该修改只通过静态边界检查，尚无新的 production/debug Efinity map、PNR、时序或 bitstream 证据。
+- `board_io.h` 的占位地址警告增加 MSVC/GCC 兼容处理，并新增可复现的 Host 测试脚本；未把占位地址提升为正式 APB 事实。
+- 探索提交刻意没有修改 `main.c`、`mem_test.xml`、`.peri.xml` 或 `constrain.sdc`，也没有运行机械臂动作。
+
+探索提交内的详细证据文件：`final_project/docs/review_packets/fable5_remediation_checkpoint_20260713.md`。
+
+### 3. 对后续工作的影响与未完成边界
+
+该探索结果可以作为后续实现的候选修复和测试基线，但不能作为已合入主线或板级闭环的声明。建议继续按以下顺序推进：
+
+1. FPGA/SoC 队员分别生成 production/debug 构建证据，并通过 Interface Designer/periphery 关闭 1,776 IO/outpad PNR 阻塞。
+2. 提供同一次 SoC 生成的 `soc.h`、APB 基址、时钟和复位证据；联合冻结五色四任务目标、16-bit 操作事件/ACK、结果理由和原子提交字段。
+3. 在 Host 解码/ACK 测试通过后，才把 `main.c` 接入 `round_controller`，第一版强制 `ARM_DISABLED`，先完成固定结果 OSD，再接同帧真实快照。
+4. 机械臂继续保持 NO-GO，直到完整 F2/Gate D 全部通过；PC、`pymycobot` 或临时脚本不得进入正式比赛闭环。
+
+以上补充不覆盖 Fable 原始审核意见，而是记录其后续独立复核、已尝试的候选优化以及仍需团队协作完成的硬件验证边界。

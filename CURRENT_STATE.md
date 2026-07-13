@@ -27,6 +27,14 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-13，来源：用户提供 / Codex 官方资料交叉核查
+  - 适用范围：TJ375N529 开发板 UART2/J52 到 myCobot 280 的板端接口真源；不表示正式 SDC/SoC/UART 驱动、真实接线、只读通信或机械臂动作已通过。
+  - 最新结论：官方开发板说明、PINOUT 和端口图已交叉确认 J52 为右侧 2.54mm 4Pin UART2；Pin1 GND，Pin2 `FPGA_UART2_RXD/C14/Input`，Pin3 `FPGA_UART2_TXD/F12/Output`，Pin4 `VCC(5V/3.3V)` 必须悬空；C14/F12 均位于 3.3V I/O 域。用户已对 `TJ375N529开发板端口说明图.jpg` 进行人工核验，确认接口位置、外形和四针标签顺序与文字一致。用户确认候选接法为 GND→GND、C14/RXD←机械臂 TX、F12/TXD→机械臂 RX，机械臂独立 12V5A。
+  - 安全纠偏：机械臂官方安装说明的 USB-TTL 接线文字为 TXD→机械臂 TX、RXD→机械臂 RX，与常规交叉接法存在命名冲突；该页也未给出机械臂端电平容限。因此 `io_pin_map.md` 仍保持总体 FAIL，正式交叉线序和“无需电平转换直连”须经断电双人复核、机械臂 TX 空闲电平和开发板 1 Mbps 波形测量后才能 PASS。
+  - 当前工程边界：正式 `constrain.sdc`、`mem_test.xml` 和 `top.v` 尚未检出 C14/F12/UART2 绑定；本次未修改 RTL、约束、Efinity XML，未连接机械臂、未发帧、未动作。
+  - 证据路径：`final_project/docs/review_packets/mycobot_uart2_j52_wiring_review_20260713.md`、`final_project/integration/io_pin_map.md`、`赛方提供材料/硬件文档/开发板使用说明1V0(5).pdf`、`赛方提供材料/硬件文档/TJ375N529_PINOUT_CONFIGURATION.pdf`、`赛方提供材料/硬件文档/TJ375N529开发板端口说明图.jpg`。
+  - 下一步门禁：先完成 J52/机械臂端断电双签与双端电平测量，再做机械臂断开的 D2 100/100 帧回环/监听；T0 其余项仍须独立关闭。
+
 - 日期：2026-07-13，来源 Agent：Codex（团队整合后的文档新鲜度与 Codebase Memory 刷新）
   - 适用范围：`codex/team-integration-20260713@510caca` 的当前状态、接口候选契约、近期执行方案、架构入口和默认协作图谱；不改变官方细则、系统职责边界或任何板级/机械臂 Gate。
   - 最新结论：已把决赛主方案更新为 `v1.3-main`，将 Host/合成源任务标记为已形成证据，并把当前队列转向 `register_map/board_io` 契约收口、`ARM_DISABLED` 主循环集成、production/debug 构建拆分与 periphery/PNR。`register_map.md` 已和 `board_io.h` 当前候选偏移对齐，但正式基址/扩展字段仍等待同一次 SoC 生成的 `soc.h` 与 Review Packet；新增 `current_code_architecture_2026-07-13.md` 作为当前架构入口。
