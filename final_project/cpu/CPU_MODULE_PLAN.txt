@@ -49,11 +49,48 @@
   [2] vision_classifier ✅ 代码完成（历史归档 host 单测 31/31, 2026-07-09；修改前须重跑）
   [3] param_table       ✅ 代码完成（历史归档 host 单测 81/81, 2026-07-09；修改前须重跑）
   [4] task_matcher      ✅ 四任务 Host 契约已实现 / 20轮真源与板级验证未完成
-  [5] round_controller ✅ Host 115/115；两层 CPU 整合回归合计 795/795 / main 与板级事件未接入
+  [5] round_controller ✅ Host 175/175（2026-07-13：+31 abandon/臂运动锁定/臂故障证据，
+                          +19 arm_busy 安全门/event_seq 过期回绕，+10 event_seq 半区间边界回归；
+                          含 round_controller.c 最小修复，边界回归仅追加测试）；
+                          同 795 成员 Host 聚合 2026-07-13 复跑刷新为 863/863（见下方“B 线 8 项 Host 回归复跑”块）/ main 与板级事件未接入
   [6] main              ⚠️ 已有 matcher 锁定/错误锁存占位 / 未接 round_controller、arm_controller / 未上板
 
   注：本文件中的“代码完成”只表示当前 C 源码与已归档测试记录；不表示已生成
       `soc.h`、已锁定 APB 地址、已完成 FPGA CDC/OSD、已生成 bitstream 或已上板。
+
+================================================================================
+  B 线列明的 8 项 CPU Host 回归复跑（2026-07-13，替代旧 795/795 快照）
+================================================================================
+  复跑器: D:\CICC w\tools\mingw64\bin\gcc.exe (14.2.0)
+  编译门: 每项均加 -Wall -Wextra -Werror -Wno-error=cpp -DAPB_VISION_BASE_PLACEHOLDER=0xF0000000u
+          （只放行 board_io.h:23 的 soc.h 占位 warning，其余任何 warning 即编译失败）；
+          全部编译退出码 0、运行退出码 0。
+
+  与旧 795 相同成员（7 项）刷新结果:
+    vision_classifier (test_classifier)                     31/31
+    task_matcher                                            154/154   (旧 146)
+    round_controller                                        175/175   (旧 115)
+    competition_round_transaction (test_competition_rounds) 135/135
+    competition_contract                                    35/35
+    competition_host_flow                                   164/164   (20 rounds)
+    a13_fpga_snapshot_replay                                169/169   (20 rounds; 本次为 MinGW gcc 复跑, 非评审记录的 MSVC)
+    ------------------------------------------------------------------
+    同成员合计                                              863/863   (替代旧 795/795)
+
+  额外项（本不在旧 795 成员内，单列）:
+    param_table                                             81/81
+  含 param_table 的 B 线列明 8 项 Host 回归集合合计         944/944
+
+  边界:
+    - 均为 Host/Mock；未做 RISC-V 交叉编译，未接 soc.h / APB / OSD，无真实摄像头与机械臂动作。
+    - “B 线列明的 8 项”是 B 线当前纳入断言计数的集合，不等于仓库内所有 Host 测试；
+      944/944 是这 8 项的断言合计，不是整个仓库全部 Host 测试的总断言数。
+    - 仓库另有受版本控制的 tests/test_mycobot_arm_skeleton.c 与
+      run_mycobot_arm_skeleton_host.ps1，Codex 复跑编译与运行退出码均 0；但它属 Host/Mock，
+      不连接或驱动真实机械臂，且使用原生 assert、无可直接相加的断言总数，故未纳入 944/944。
+    - 旧 795/795 出自 final_project/docs/review_packets/team_integration_merge_review_20260713.md；
+      现同成员刷新为 863/863，旧值仅保留为历史快照，不再作为当前 B 线 Host 基线。
+    - competition_host_flow / a13 的 size 关系仍为 deferred（20 轮流程通过，尺寸判定未在本集合内强验）。
 
 ================================================================================
   2026-07-12 Claude 下一步执行包（先做 Host 层，不碰硬件）
@@ -457,10 +494,23 @@
 ================================================================================
   [4] task_matcher  —  目标匹配与动作决策
 ================================================================================
-  状态: ✅ 四任务 Host 契约完成；Codex 合并后 host 单测 146/146（2026-07-12）。
-         历史基线：2026-07-09 为 82/82；板级目标输入与 round 推进仍未完成。
+  状态: ✅ 四任务 Host 契约完成；2026-07-13 覆盖审查补齐后 host 单测 154/154。
+         历史基线：2026-07-12 为 146/146；2026-07-09 为 82/82；板级目标输入与 round 推进仍未完成。
   计划文件: app/include/task_matcher.h, app/src/task_matcher.c
-  测试: tests/test_task_matcher.c（当前 146/146；覆盖任务二尺寸通配与同目标重复写入不解锁）
+  测试: tests/test_task_matcher.c（当前 154/154；组[14]补：T3 delta=0→SKIP、
+        MODE_1/MODE_2 非正方体→SKIP、非法/越界 task_mode→安全 NONE）
+  说明(2026-07-13 Codex 复核修正):
+        - task_matcher_evaluate() 只返回动作码 NONE/GRAB/SKIP，不产生理由码。
+        - 仓库存在两套并行理由/任务契约：task_matcher.h/round_controller 用
+          reason_code_t/REASON_*（task_match_result_t.reason，由 round_controller 消费）；
+          competition_tasks.h/.c 用另一套 competition_reason_t/COMP_REASON_*。
+          二者统一/转换层尚未定版；清单第 7-10 项理由码不得写成 competition_tasks 已闭环，
+          本层只验证对应 SKIP/NONE 动作码正确。
+        - T3/T4 基准尺寸 20/30mm：task_matcher 公开路径未强制；competition_tasks 的
+          validate 限制 20/30mm，但无证据证明它校验所有进入 task_matcher 的目标。
+          T4 以 target_size 为比较基准（与官方"目标物差值≤0.5cm"一致），competition_tasks
+          侧命名可能为 reference_size，需统一或显式映射。后续需选定唯一目标配置适配层作入口，
+          并补非法 T3/T4 基准值测试或转换测试。
   依赖: vision_classifier (vision_result_t 输入)
 
   实现:
