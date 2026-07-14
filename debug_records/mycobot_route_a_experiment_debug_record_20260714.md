@@ -149,3 +149,17 @@
 | `mycobot_pc_tests/audit_logs/auto_run_20260714_202151.log` | 修复前故障日志（drop_hover 硬熔断） | ✅ 日志已生成 |
 | `debug_records/mycobot_route_a_experiment_debug_record_20260714.md` | 本调试记录 | ✅ 本文件 |
 | `final_project/docs/debug_sessions/mycobot_a_route_experiment_checklist_20260714.md` | A 路线执行清单 | ✅ 已生成 |
+
+---
+
+## 8. Codex 独立复核补充（覆盖“完全闭环”措辞）
+
+2026-07-14，Codex 回查原始点位与 20:06–20:51 全部 `auto_run` 日志后，将本记录 §3 的“完全闭环通过”收敛为：**PC 端候选路径初步验证 `PASS_WITH_RISKS`**。
+
+- 最新 `auto_run_20260714_204908.log` 实际完成 5/5 连续流程、0 轮人工扶正；SHA-256 为 `EB89B99A2C0A15E40CFBC7DD56406018AC87F12323700EDA59278A5727F9F475`。
+- 5/5 轮 `drop_hover` 均由同步返回 0 后以最大轴误差 2.02°软通过，故它不是严格收敛点。
+- 5 轮共 15 次夹爪动作全部为 `[GRIP_UNVERIFIED]`，不能仅凭日志证明夹持、未滑落和轻放。
+- 候选点内部坐标方位差为 177.72°，落在 180°±10°数值窗口内；但没有外部基准，约 223 mm 半径也未被确认是官方要求的“臂展最大处”。
+- 现场 E3 被跳过，本次成功只能说明当次安装条件下可重复，不能反推底座刚性风险已关闭。
+
+完整评价、明日 G4/G5/D2 放行边界与真实动作 NO-GO 条件见 `final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`。本节为 Codex 复核结论；与 §3 冲突时以本节为准。
