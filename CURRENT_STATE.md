@@ -27,6 +27,20 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
+  - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
+  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
+  - 检查点结果：MSVC `/W4 /WX` 的 disabled/simulated runtime Host 回归均 PASS；严格 QEMU 两后端 PASS，`scratchpad.lds` 已与 `_start` 统一，逐步编译/链接均检查退出码，1 秒无限循环固件超时注入 PASS。RISC-V `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS；disabled bring-up 现包含固定交错 20 轮零请求自检，未通过放宽 `round_controller_tick` 门规避。`-BoardBuild` 现在在创建输出目录前 fail closed；manifest v2 记录规范构建入口、输入/制品 SHA-256、完整 flags、warning policy，Makefile 仅是该 PowerShell 构建器的薄包装。
+  - Gate 状态：G0 PASS；G1 PASS（仅 G0–G3 的 standalone/NOT_FOR_FLASH 构建隔离）；G2 PASS（**structural bridge only**：无受审事件源、无真实时基，legacy matcher 不再冒充逐轮机械臂事务）；G3 PASS（纯软件证据）。G4、正式 SoC/PNR/部署、烧录、J52 和真实机械臂继续 NO-GO。
+  - 集成边界：上述代码/脚本已进入 `main` 的软件基线，但只证明 G0–G3 的 Host/QEMU/NOT_FOR_FLASH 软件门；本轮未修改 FPGA、未烧录、未连接 J52/机械臂、未产生 UART2 或动作帧，不能据此宣称 G4 或板级闭环。
+  - 历史并发记录：最终 QA 时（2026-07-14 14:08:19）共享工作区曾被外部会话切到无关的 `codex/explore-log-return-20260714`；14:16 已切回并在 `b48973b` 完成提交。该记录仅用于追溯，不再描述当前 `main` 工作区。
+  - 协议复核：Elephant Robotics 官方协议确认现有 `FE FE LEN CMD ... FA`、`LEN=payload+2`、1 Mbps 8N1、0x20/0x22/0x65/0x66/0x67 和角度缩放方向基本正确；同时明确 0x22、0x66、0x67、0x29 无返回值，有返回命令应在 500 ms 内响应，且直接协议通信前需 Basic=`transponder`、Atom=最新版 `atomMain`。因此 G7–G11 新增 single-flight/750 ms 初始 deadline、expected-command/精确长度、官方逐关节限位、0x29+0x2B+0x20 停止辅证和 0x69+0x65 夹爪确认；TX 成功不得再写成动作完成。
+  - 责任边界：G1.5–G3.5 已由 Codex 在纯软件范围内关闭。G4 的正式 SoC/PNR/烧录需要用户操作 Efinity/板卡并提供日志；G5 起任何 Programmer、接线、仪器、只读和动作必须由用户现场确认与执行。
+  - 下一步门禁：按用户要求在 G3 Review Packet 后停止。若要进入 G4，用户需另行确认板卡、Efinity 2025.2/许可证、JTAG、UART0 和仪器条件；仍不得依据本条目烧录、连接 J52 或连接机械臂。
+  - 替代旧结论：替代 `mechanical_arm_member_next_step_brief_20260713.md` 中“16-bit 修复尚未合入”和学习指南中“ARM_DISABLED 已是现存宏”的过时状态描述；旧文档的 T0、D2、D3、D5、Gate D、F1/F2 和物理安全门继续有效。
+  - 证据路径：`final_project/docs/review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md`、`final_project/docs/technical_plans/mycobot_cpu_board_bringup_implementation_plan_20260714.md`、`final_project/docs/technical_plans/mycobot_board_bringup_operator_sop_20260712.md`、`final_project/integration/mycobot_protocol_notes.md`、Elephant Robotics 官方 `6.6 基于串口通信协议开发使用`页面、当前分支真实源码/构建脚本。
+  - 失效条件：官方页面或目标机械臂固件版本改变协议，或真实抓包与当前命令/响应语义冲突；冲突关闭前只缩小白名单，不扩大 REAL 放行。
+
 - 日期：2026-07-14，来源 Agent：Codex（队友 CPU 分支 + Fable 整改 + 个人 UART2 证据集成）
   - 适用范围：`dev/wsc6090-CPU@885e97a`、`codex/fable5-remediation-20260713@758e864` 与个人证据分支的本次集成；不表示正式 SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
   - 最新结论：保留队友 CPU 分支新增的 `arm_busy` 发起动作安全门，以及 abandon、机械臂运动期软复位/放弃锁定、故障、超时和任务匹配补测；同时以 Fable 整改后的 16-bit `event_seq`/ACK ABI 为当前契约，采用半范围新旧判定，支持 `65535 -> 0`，拒绝重复、倒退和差值为 32768 的歧义事件。事件消费继续显式返回 `ACCEPTED`/`REJECTED`，1000 事件随机流也纳入回归。`vision_classifier.c` 的零结果常量改为标准 C 显式 `{0}` 初始化，以通过 MSVC `/W4 /WX`，不改变分类语义。

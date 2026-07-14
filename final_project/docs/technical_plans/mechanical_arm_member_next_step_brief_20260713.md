@@ -4,6 +4,7 @@
 > 适用对象：机械臂方向负责成员
 > 复核依据：Fable 5 架构审核及其后续 Codex 复核
 > 当前判定：纯 C 协议、transport、动作控制器和 Mock 已有；J52/C14/F12 与开发板 3.3V VCCIO 已完成文档冻结，但机械臂端线序、电平实测、正式工程约束、结构固定、180°新点位和主循环联动尚未闭环。真实动作当前为 **NO-GO**。
+> 2026-07-14 状态覆盖：详细上板实施以 `mycobot_cpu_board_bringup_implementation_plan_20260714.md` 为准。16-bit event/ACK 已合入 `main@d433bca`；当前新阻塞是仓库尚无真实 `ARM_DISABLED` 构建模式、板上 simulated 后端和 `main -> round_controller -> arm_controller` 调用链。
 
 ## 一句话结论
 
@@ -13,7 +14,7 @@
 
 1. **T0 不是个人自检表，而是 F2 唯一放行表。** `final_project/integration/io_pin_map.md` 中 CPU/SoC、APB、UART2、PLIC、板端电气、机械臂线序、急停和结构八项必须全部 PASS，并由 A/B/C 分别签核。
 2. **禁止旧 matcher 直通机械臂。** `main.c` 第一版必须在 `ARM_DISABLED` 下接入正式 `round_controller`；只有控制器锁存的单次 `request_arm_grab` 才能交给 `arm_controller`。
-3. **当前主线仍有事件契约阻塞。** 当前 `main` 的 `round_controller` 仍使用 8-bit `event_seq/ACK`；Fable 后续探索分支的 16-bit、`ACCEPTED/REJECTED` 和回绕修复尚未合入主线。CPU 成员完成等价修复并重跑测试前，机械臂成员不得把 Host 探索结果视为板上可用。
+3. **事件契约已修复，但板上调用链仍是阻塞。** 当前 `main@d433bca` 已合入 16-bit `event_seq/ACK`、`ACCEPTED/REJECTED` 和半范围回绕；它仍只在 Host/Mock 层有证据。`main.c` 未调用 `round_controller`/`arm_controller`，仓库也没有实际的 disabled/simulated 板上构建模式，因此不得把契约修复外推为板上可用。
 4. **首次动作试验与 F2 比赛启用是两道门。** T0、回环、只读、dry-run 通过后只允许首次低速空载试验；F2 比赛启用还必须补齐 180°点位、至少 5 轮低速带载、电气/共地、急停/断电、底座固定和全程无跌落证据。
 
 ## 你现在先做什么

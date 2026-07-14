@@ -20,21 +20,20 @@
  *==========================================================================*/
 
 #include "bsp.h"
+#include "arm_build_profile.h"
+#include "arm_runtime.h"
 #include "board_io.h"
 #include "vision_classifier.h"
 #include "param_table.h"
+#include "round_controller.h"
 #include "task_matcher.h"
 
 #include <stdint.h>
 #include <string.h>
 
-/*--------------------------------------------------------------------------
- *  ARM 状态码（本人侧只输出，队友 arm_controller 负责执行）
- *--------------------------------------------------------------------------*/
-#define ARM_STATE_UNKNOWN   0
-#define ARM_STATE_IDLE      1
-#define ARM_STATE_GRABBING  2
-#define ARM_STATE_ERROR     9
+#if APP_PROFILE != ARM_PROFILE_COMPETITION
+#error "main.c is only valid for APP_PROFILE=competition"
+#endif
 
 /*--------------------------------------------------------------------------
  *  错误码
@@ -258,6 +257,16 @@ int main(void)
 
     task_matcher_init();
 
+    /* The current FPGA register contract has no verified operator-event
+     * source yet.  Still instantiate the only allowed bridge here so the
+     * production main cannot call arm_controller directly.  With the default
+     * disabled backend it cannot create a transport or a motion request. */
+    arm_runtime_t arm_runtime;
+    arm_runtime_init(&arm_runtime, 0);
+    round_controller_t competition_round;
+    round_controller_output_t competition_round_out;
+    round_controller_init(&competition_round, 0, 0u);
+
     uint16_t seq_cam0 = 0, seq_cam1 = 0;
 
     /* ---- 3. 写入初始配置到两路 staging + commit ---- */
@@ -339,8 +348,43 @@ int main(void)
          */
         task_matcher_read_target_from_fpga();
 
-        /* ---- 任务匹配 ---- */
-        uint8_t action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
+        /* ---- 任务匹配 ----
+         * This legacy result is recognition/decision evidence only.  It is
+         * not a round transaction, must not create a grab request, and must
+         * not be emitted as a per-round execute result. */
+        uint8_t legacy_match_action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
+        uint8_t action = MATCH_ACTION_NONE;
+
+        /* G2 bridge tick: no FPGA event is synthesized here.  In particular,
+         * matcher output is never a direct arm request.  G4/G6 must supply a
+         * verified event/APB source before observation/event fields are wired. */
+        arm_runtime_status_t arm_status;
+        round_controller_input_t round_in;
+        /* No verified monotonic board time source exists in G0-G3.  Do not
+         * relabel loop count as milliseconds or claim timeout behavior here.
+         * G4 must wire a reviewed CLINT/mtime (or equivalent) source first. */
+        arm_runtime_tick(&arm_runtime, 0u);
+        memset(&arm_status, 0, sizeof(arm_status));
+        arm_runtime_get_status(&arm_runtime, &arm_status);
+        memset(&round_in, 0, sizeof(round_in));
+        round_in.now_ms = 0u;
+        round_in.arm_enabled = arm_status.arm_enabled;
+        round_in.arm_busy = arm_status.arm_busy;
+        round_in.arm_done = arm_status.arm_done;
+        round_in.arm_fault = arm_status.arm_fault;
+        round_controller_tick(&competition_round, &round_in,
+                              &competition_round_out);
+        if (competition_round_out.request_arm_grab) {
+            /* This is intentionally unreachable until the verified event
+             * source is connected.  The runtime remains the sole gateway. */
+            (void)arm_runtime_accept_request(&arm_runtime);
+        }
+        if (competition_round_out.result_valid) {
+            action = competition_round_out.decision_action;
+        }
+        if (legacy_match_action != MATCH_ACTION_NONE) {
+            uart_puts(" [LEGACY_MATCH_NO_ROUND]");
+        }
 
         /* ---- 重写两路 match_action 为融合后 action ----
          * 两路都写同一个 action，保证 HDMI/OSD 切任一通道都看到一致的
@@ -365,27 +409,13 @@ int main(void)
         /* ---- 日志：融合结果 + 动作 ---- */
         log_action_fused(action, &fused, obj_cx, obj_cy);
 
-        /* ---- 一轮一事务：round 推进占位 ----
-         * action==GRAB 后 task_matcher 已自动进入 ROUND_GRAB_REQUESTED 锁定。
-         * 释放锁的条件（待 arm_controller 集成后实现）：
-         *   1. arm_controller 报告本轮抓取-放置序列完成 → next_round()
-         *   2. 或 FPGA 物理按键 / UART 命令显式触发下一轮
-         *   3. 或超时（如 30s 无 GRAB → 自动推进）
-         *
-         * 当前占位逻辑（不做任何事，等 arm_controller 接入）：
-         *   if (arm_round_done_flag) {
-         *       task_matcher_next_round();
-         *       arm_round_done_flag = 0;
-         *   }
-         */
-
         /* ---- 全局状态提交 ----
-         * ARM_STATE: 识别侧始终输出 IDLE。队友 arm_controller 负责
-         * 在抓取/分拣时更新为 GRABBING 等实际状态。
+         * ARM state is an explicit arm_runtime APB/OSD mapping, never the
+         * raw arm_controller enum.  The disabled default reports DISABLED.
          * ERROR_CODE: 本轮 + 历史未提交错误的累积。
          * commit_global 失败 → latched_err 锁存，下轮重试提交。
          * commit_global 成功 → latched_err 清零，错误已送达 FPGA。 */
-        board_io_write_global_state(ARM_STATE_IDLE, loop_err);
+        board_io_write_global_state((uint8_t)arm_status.apb_state, loop_err);
         if (board_io_commit_global(&seq_cam0) != 0) {
             /* commit_global 失败：当前 loop_err（含可能的历史锁存 + 本轮新错误）
              * 未能写入 FPGA 寄存器。锁存到下一轮重试。
