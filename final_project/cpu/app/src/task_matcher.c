@@ -16,15 +16,17 @@
 #include "task_matcher.h"
 #include "board_io.h"
 #include <stdlib.h>    /* abs() */
+#include <string.h>    /* memset() */
 
 /*==========================================================================
  *  内部状态
  *==========================================================================*/
 
-static task_target_t  g_target;
-static uint16_t       g_grab_cx;         /* 最近一次 GRAB 匹配的 x 坐标 */
-static uint16_t       g_grab_cy;
-static int            g_grab_valid;      /* 抓取坐标是否有效 */
+static task_target_t       g_target;
+static task_match_result_t g_last_match;   /* 最近一次 evaluate() 的完整结果 */
+static uint16_t            g_grab_cx;      /* 最近一次 GRAB 匹配的 x 坐标 */
+static uint16_t            g_grab_cy;
+static int                 g_grab_valid;   /* 抓取坐标是否有效 */
 
 /*==========================================================================
  *  内部 helper — 绝对值差值
@@ -48,6 +50,7 @@ void task_matcher_init(void)
     g_target.task_mode          = TASK_MODE_NONE;
     g_target.round_state        = ROUND_IDLE;
     g_grab_valid = 0;
+    memset(&g_last_match, 0, sizeof(g_last_match));
 }
 
 /*--------------------------------------------------------------------------
@@ -112,15 +115,28 @@ void task_matcher_set_target_ex(const task_target_t *t)
     g_grab_valid = 0;     /* new target → old grab coordinates are stale */
 }
 
-/*--------------------------------------------------------------------------
+/*==========================================================================
+ *  返回前写 last_match（供 main.c / adapter 读取真实 reason）
+ *==========================================================================*/
+static uint8_t _return_match(uint8_t action, uint8_t is_target,
+                              reason_code_t reason)
+{
+    g_last_match.action    = action;
+    g_last_match.is_target = is_target;
+    g_last_match.reason    = reason;
+    g_last_match.mode      = (task_mode_t)g_target.task_mode;
+    return action;
+}
+
+/*==========================================================================
  *  核心判定 — 按 task_mode 分派
- *--------------------------------------------------------------------------*/
+ *==========================================================================*/
 uint8_t task_matcher_evaluate(const vision_result_t *obs,
                                uint16_t center_x, uint16_t center_y)
 {
     /* ---- 1. 事务锁：只有 TARGET_LOCKED 状态才允许评估 ---- */
     if (g_target.round_state != ROUND_TARGET_LOCKED)
-        return MATCH_ACTION_NONE;
+        return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
 
     /* 每次进入实际评估都作废旧坐标 — 只本轮 GRAB 才能使坐标有效 */
     g_grab_valid = 0;
@@ -128,30 +144,30 @@ uint8_t task_matcher_evaluate(const vision_result_t *obs,
     /* ---- 2. 空指针 → 防御裸机崩溃 ---- */
     if (obs == 0) {
 #if TASK_MATCHER_DEBUG_MODE
-        return MATCH_ACTION_ERROR;
+        return _return_match(MATCH_ACTION_ERROR, 0, REASON_OBSERVATION_UNKNOWN);
 #else
-        return MATCH_ACTION_NONE;
+        return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
 #endif
     }
 
     /* ---- 3. 观测无效 ---- */
     if (obs->color_id == COLOR_UNKNOWN || obs->shape_id == SHAPE_UNKNOWN) {
 #if TASK_MATCHER_DEBUG_MODE
-        return MATCH_ACTION_ERROR;
+        return _return_match(MATCH_ACTION_ERROR, 0, REASON_OBSERVATION_UNKNOWN);
 #else
-        return MATCH_ACTION_NONE;
+        return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
 #endif
     }
 
     /* ---- 4. 颜色不匹配 ---- */
     if (g_target.target_color != COLOR_UNKNOWN &&
         obs->color_id != g_target.target_color)
-        return MATCH_ACTION_SKIP;
+        return _return_match(MATCH_ACTION_SKIP, 0, REASON_COLOR_MISMATCH);
 
     /* ---- 5. 形状不匹配 ---- */
     if (g_target.target_shape != SHAPE_UNKNOWN &&
         obs->shape_id != g_target.target_shape)
-        return MATCH_ACTION_SKIP;
+        return _return_match(MATCH_ACTION_SKIP, 0, REASON_SHAPE_MISMATCH);
 
     /* ---- 6. 尺寸判定（按 task_mode 分派） ---- */
     uint8_t mode = g_target.task_mode;
@@ -164,30 +180,30 @@ uint8_t task_matcher_evaluate(const vision_result_t *obs,
     } else if (mode == TASK_MODE_3) {
         /* MODE_3: 相对参照物边长差 = 10mm (1cm) */
         if (obs->size_cm_x10 == 0)
-            return MATCH_ACTION_NONE;       /* 等待 Cam1 尺寸 */
+            return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
         if (g_target.reference_size_cm_x10 == 0)
-            return MATCH_ACTION_NONE;       /* 参照物尺寸未设定 */
+            return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
         if (_abs_diff_u8(obs->size_cm_x10, g_target.reference_size_cm_x10)
             != TASK3_SIZE_DELTA_CM_X10)
-            return MATCH_ACTION_SKIP;
+            return _return_match(MATCH_ACTION_SKIP, 0, REASON_SIZE_NOT_EQ_10MM);
     } else if (mode == TASK_MODE_4) {
         /* MODE_4: 相对目标物边长差 ≤ 5mm (0.5cm) */
         if (obs->size_cm_x10 == 0)
-            return MATCH_ACTION_NONE;       /* 等待 Cam1 尺寸 */
+            return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
         if (_abs_diff_u8(obs->size_cm_x10, g_target.target_size_cm_x10)
             > TASK4_SIZE_DELTA_MAX_CM_X10)
-            return MATCH_ACTION_SKIP;
+            return _return_match(MATCH_ACTION_SKIP, 0, REASON_SIZE_OUTSIDE_5MM);
     } else if (mode == TASK_MODE_LEGACY_EXACT) {
         /* 旧 API 兼容：颜色+形状+尺寸精确匹配。 */
         if (g_target.target_size_cm_x10 != 0) {
             if (obs->size_cm_x10 == 0)
-                return MATCH_ACTION_NONE;
+                return _return_match(MATCH_ACTION_NONE, 0, REASON_OBSERVATION_UNKNOWN);
             if (obs->size_cm_x10 != g_target.target_size_cm_x10)
-                return MATCH_ACTION_SKIP;
+                return _return_match(MATCH_ACTION_SKIP, 0, REASON_SIZE_OUTSIDE_5MM);
         }
     } else {
         /* 未识别的 task_mode → 安全侧：NONE */
-        return MATCH_ACTION_NONE;
+        return _return_match(MATCH_ACTION_NONE, 0, REASON_TARGET_INVALID);
     }
 
     /* ---- 7. 全部匹配 → GRAB，保存坐标，锁定事务 ---- */
@@ -198,7 +214,7 @@ uint8_t task_matcher_evaluate(const vision_result_t *obs,
     /* 自动推进事务锁：防止同轮连续帧重复 GRAB */
     g_target.round_state = ROUND_GRAB_REQUESTED;
 
-    return MATCH_ACTION_GRAB;
+    return _return_match(MATCH_ACTION_GRAB, 1, REASON_TARGET_MATCH);
 }
 
 /*--------------------------------------------------------------------------
@@ -220,6 +236,14 @@ int task_matcher_get_grab_coord(uint16_t *cx, uint16_t *cy)
 const task_target_t *task_matcher_get_target(void)
 {
     return (g_target.round_state != ROUND_IDLE) ? &g_target : 0;
+}
+
+/*--------------------------------------------------------------------------
+ *  最近一次 evaluate() 的完整 match result
+ *--------------------------------------------------------------------------*/
+void task_matcher_get_last_match(task_match_result_t *out)
+{
+    if (out) *out = g_last_match;
 }
 
 /*--------------------------------------------------------------------------
