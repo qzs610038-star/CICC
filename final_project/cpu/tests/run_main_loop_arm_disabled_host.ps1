@@ -10,13 +10,7 @@ $cpuDir = Split-Path -Parent $testDir
 $repoRoot = Split-Path -Parent (Split-Path -Parent $cpuDir)
 $includeDir = Join-Path $cpuDir "app\include"
 $srcDir = Join-Path $cpuDir "app\src"
-$testSource = Join-Path $testDir "test_main_loop_arm_disabled.c"
 # 直接链接候选 adapter 实现；当前正式 main.c 待 G4 事件源/时基后再启用。
-$adapterSource = Join-Path $srcDir "main_loop_adapter.c"
-$semanticsSource = Join-Path $srcDir "cpu_result_semantics.c"
-$adaptersSource = Join-Path $srcDir "cpu_result_semantics_adapters.c"
-$controllerSource = Join-Path $srcDir "round_controller.c"
-$matcherSource = Join-Path $srcDir "task_matcher.c"
 $buildDir = Join-Path $testDir "build\main_loop_arm_disabled_host"
 $exePath = Join-Path $buildDir "test_main_loop_arm_disabled.exe"
 
@@ -61,12 +55,25 @@ Push-Location $buildDir
 try {
     if ($useMsvc) {
         Write-Output "[compiler] MSVC cl.exe (/W4 /WX)"
+        $msvcSourceMap = [ordered]@{
+            test = (Join-Path $testDir 'test_main_loop_arm_disabled.c')
+            adapter = (Join-Path $srcDir 'main_loop_adapter.c')
+            semantics = (Join-Path $srcDir 'cpu_result_semantics.c')
+            semantics_adapters = (Join-Path $srcDir 'cpu_result_semantics_adapters.c')
+            controller = (Join-Path $srcDir 'round_controller.c')
+            matcher = (Join-Path $srcDir 'task_matcher.c')
+        }
+        foreach ($entry in $msvcSourceMap.GetEnumerator()) {
+            if (-not $entry.Value -or -not (Test-Path -LiteralPath $entry.Value)) {
+                throw "Required MSVC source '$($entry.Key)' is missing: $($entry.Value)"
+            }
+        }
+        $msvcSources = @($msvcSourceMap.Values)
+        $quotedSources = ($msvcSources | ForEach-Object { '"' + $_ + '"' }) -join ' '
         $compile = 'call "{0}" >nul && cl /nologo /std:c11 /utf-8 /W4 /WX ' +
                    '/DAPB_VISION_BASE_PLACEHOLDER=0x40000000u /I"{1}" ' +
-                   '"{2}" "{3}" "{4}" "{5}" "{6}" "{7}" /Fe:"{8}"'
-        $compile = $compile -f $resolvedVcVars64, $includeDir, $testSource,
-            $adapterSource, $semanticsSource, $adaptersSource,
-            $controllerSource, $matcherSource, $exePath
+                   '{2} /Fe:"{3}"'
+        $compile = $compile -f $resolvedVcVars64, $includeDir, $quotedSources, $exePath
         & cmd.exe /d /c $compile
     }
     elseif ($useGcc -and (Test-Path -LiteralPath $mingwGcc)) {
