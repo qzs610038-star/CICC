@@ -52,7 +52,7 @@ Claude 开始任何任务前按以下顺序读取：
 
 本项目已启用 codebase-memory-mcp，用于让 Claude/Codex/队友 Agent 在阅读代码前快速定位真实入口。
 
-- 默认图谱项目：`D-cicc_cbm_link`
+- 默认图谱项目：`D-cicc_cbm-main`；旧 `D-cicc_cbm_link` 仅作历史兼容查询。
 - 默认索引入口：`D:\cicc_cbm_link`
 - 主 artifact：`.codebase-memory/graph.db.zst`
 - Phase 2 资料库 artifact：`.codebase-memory/phase2/official_demo/`、`.codebase-memory/phase2/prelim_src/`、`.codebase-memory/phase2/prelim_sw/`
@@ -93,7 +93,7 @@ Invoke-Item "final_project\fpga\efinity\mem_test.xml"
 确认 codebase-memory 主图谱：
 
 ```powershell
-codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm_link`"}"
+codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm-main`"}"
 ```
 
 运行 RAM IP 仿真：

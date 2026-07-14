@@ -30,7 +30,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_fpga_vision_front.md)：PNR 约束缺陷、SoC PLL 冲突与 APB 隔离基线（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_cpu_arm_control.md)：16位回绕去重、`arm_busy` 动作屏蔽、编译矩阵 ELF 修复与 QEMU 入口纠偏（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_system_integration.md)：官方协议无应答事实、两维正交构建降级与人机职责边界划定（面向角色 C）。
-    * [guide_codex_review_clarification.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_codex_review_clarification.md)：🚨 Codex 评审意见深度拆解与 FPGA-CPU 联合决策指南（重点辅导）。
+  * [daily_sync/2026-07-14_merge_single-camera_mycobot-main/](daily_sync/2026-07-14_merge_single-camera_mycobot-main/)：7 月 14 日将 myCobot G0-G3 软件门与单摄候选工程依次合入本地 main 后生成的最终三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_fpga_vision_front.md)：候选工程身份、白平衡除零与 M0 板级复现门（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_cpu_arm_control.md)：可移植工具链发现、结构桥与 NOT_FOR_FLASH 边界（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_system_integration.md)：语义冲突处理、分层证据与队友同步（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 

@@ -11,6 +11,7 @@
 - `final_project/`：当前正式协作主线，CPU、机械臂、接口契约和既有 FPGA 验证证据继续在此维护。
 - `competition_project_single_camera/`：隔离单摄候选工程。53 个 XML 设计引用和 2 个 IP 设置文件已做存在性复核，但修改后源码尚无新 Efinity flow、匹配 bitstream、烧录或板级复现，因此不替代正式主线。
 - 候选工程初始 75/75 哈希是历史复制快照；`white_balance.v` 已有 M0-09 与主线合并增量，必须结合 delta manifest 阅读。
+- 当前 Codebase 图谱项目为 `D-cicc_cbm-main`（6078 nodes / 14146 edges）；旧 `D-cicc_cbm_link` 缺少本次新增符号，只作历史兼容查询。
 
 ## 系统职责边界
 

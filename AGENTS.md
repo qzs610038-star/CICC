@@ -17,7 +17,8 @@
 ## Codebase Knowledge Graph
 本项目已初始化 codebase-memory-mcp 图谱。Agent 做代码发现时应先使用图谱缩小范围，再回到真实文件核查。
 
-- 默认项目：`D-cicc_cbm_link`
+- 默认项目：`D-cicc_cbm-main`（2026-07-14 双分支合并后重建，6078 nodes / 14146 edges）
+- 兼容别名：`D-cicc_cbm_link` 是旧缓存项目，仅用于历史查询；它缺少本次 `arm_runtime` 和单摄候选符号，不再作为当前图谱真源。
 - 默认入口：`D:\cicc_cbm_link` junction 指向本仓库真实路径。
 - 主图谱 artifact：`.codebase-memory/graph.db.zst`
 - Phase 2 资料库图谱：`.codebase-memory/phase2/official_demo/`、`.codebase-memory/phase2/prelim_src/`、`.codebase-memory/phase2/prelim_sw/`
@@ -66,7 +67,7 @@
 仓库根目录没有统一的包管理器、Makefile 或自动化构建脚本。正式工程优先使用 `final_project/`；`competition_project_single_camera/` 仅按其 M0 Gate 做候选工程复现；赛方主 demo 只作为来源参考和必要时的对照工程。FPGA 构建以 Efinity 2025.2 为准。
 
 ```powershell
-codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm_link`"}"
+codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm-main`"}"
 Invoke-Item "final_project\fpga\efinity\mem_test.xml"
 rg --files "final_project\fpga\rtl"
 Set-Location "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\ip\ram\Testbench"
