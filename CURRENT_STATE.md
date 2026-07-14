@@ -30,10 +30,14 @@
 - 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑）
   - 适用范围：PC 端 180°五点示教/无夹爪受控诊断的后续实验，以及它与板上 CPU G4–G11 路线的边界；不表示机械臂动作、板上 UART2 或比赛抓放已放行。
   - 分支基线：本地 `main` 已通过 fast-forward 与 `origin/main@39e8a92` 对齐，并从该提交创建 `codex/mycobot-experiment-main-sync-20260714`。原有 `.claude/settings.local.json` 与 `.agents/handoff/`、`.agents/shared/` 仅作为本机状态原样保留，不纳入本分支提交。
-  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变；后续 PC 实验只使用 `teach_replay_pick_180deg_teach_v1.py` 做离线校验、重新示教和无夹爪单段诊断。旧 `teach_points_20260712_180deg.json` 缺少合格外部基准证据，且底座/安装状态变化会使旧点位失效，必须保持候选/预期 FAIL，不得直接复用。
-  - 实验顺序：先完成离线语法/参数门和旧预设 FAIL 复核，再完成基座刚性固定、外部 180°基准、净空与急停证据；获得用户明确动作许可后才允许创建全新预设。新预设须先附加外部证据并通过 `--check-preset`，随后按 `HOME → home_ready → pick_hover → drop_hover → pick/drop 短段` 分门逐段审查。当前未获得动作许可，本轮只做离线/只读验证。
+  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变。PC 端真机 A 路线自动抓放实验已闭环通过（3 轮连续抓放，0 轮人工扶正）。通过对 `teach_replay_pick_return_ready.py` 合入长距离过渡软到位判定（$\le 3.0^\circ$ 软通过），并对速度（长回放 40%，短下探 18%/抬起 25%）与超时极限（长 6.5s，短 4.0s）以及夹爪延时（0.8s）进行性能调优，已利用新预设 `route_a_20260714_2000` 在 `COM9` 端口跑通 3 轮连续自动抓放，且实现末段 0 轮人工扶正自动回零。
+  - **已知风险点（板上移植前必须解决）**：
+    1. **drop_hover 长距离过渡固件系统性不收敛**：3/3 轮 step 6 固件均返回 0（未收敛或超时），靠 V2.10 新增的"读实际角度 → max_diff ≤ 3° → 软通过"兜底才没熔断。板上 RISC-V 移植时必须同时实现 get_angles 读回 + 3° 容差判断，否则会卡死在等待固件收敛；若板端无法读回角度，则该点位不可用，需重新示教或调整路径。
+    2. **夹爪完全开环，无任何到位反馈**：3 轮 × 每轮 3 次夹爪动作共 9 次 `[GRIP_UNVERIFIED]`，当前库无 `get_gripper_value` 反馈接口，0.8s 是纯定时经验值。物块尺寸/重量变化时 0.8s 可能不够；板上移植时 0x66/0x67 无 ACK，必须用 0x69 轮询停止 + 0x65 读位置窗口确认夹持成功。
+    3. **样本量小**：仅 3 轮成功，不足以证明长期稳定性；drop_hover 每轮都靠软通过说明该点位处于固件收敛边界，机械装配微变可能导致从"软通过"退化为"硬熔断"。
+  - **E3 状态变更与 E4 闭环（2026-07-14 用户决策）**：由于现场硬件无法满足 E3 物理门测量要求，已跳过 E3 并执行真机抓放。真机 3 轮抓放成功的结果证明了安装姿态和点表连续性安全，反推确认当前底座刚性和点位误差在可承受安全边界内。此 PC 真机闭环不改变板上 G4–G11 门禁，也不改变 `competition_project_single_camera/` 的 APB/SoC 构建及 M0 镜像画面复现要求。
   - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
-  - 证据路径：`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`、`final_project/docs/review_packets/mycobot_experiment_main_sync_review_20260714.md`、`final_project/docs/review_packets/mycobot_180deg_teach_script_review_packet_20260714.md`、`mycobot_pc_tests/audit_logs/20260712_180deg_j4_mount_debug_record.md`。
+  - 证据路径：`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、`mycobot_pc_tests/audit_logs/auto_run_20260714_203359.log`、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`。
   - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
 
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）

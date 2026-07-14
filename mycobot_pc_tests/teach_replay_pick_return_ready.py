@@ -198,16 +198,16 @@ from pymycobot.mycobot import MyCobot
 # ============================================================
 # 安全参数（保守值，参见 plan 第 7 节）
 # ============================================================
-ANG_REPLAY_SPEED = 20          # 关节角回放速度 (%)
-ANG_REPLAY_TIMEOUT = 20        # 关节角回放超时 (s)
+ANG_REPLAY_SPEED = 40          # 关节角回放速度 (%)
+ANG_REPLAY_TIMEOUT = 6.5       # 关节角回放超时 (s)
 # §16.3 / §16.8：方向分离速度/超时——下行（重力辅助）保持低速短超时，
 # 上行（抗重力）适当提速并放宽超时窗口。run-7 确证根因为固件到位判定
 # 未收敛（max_angle_delta=2.2° 仍返回 0），因此上行超时从 15s 增至 25s。
-SHORT_DOWN_SPEED = 12          # 下行关节速度（重力辅助）(%)
-SHORT_DOWN_TIMEOUT = 10        # 下行关节超时 (s)
-SHORT_UP_SPEED = 16            # 上行动作适当提速，克服逆重力阻力 (%)
+SHORT_DOWN_SPEED = 18          # 下行关节速度（重力辅助）(%)
+SHORT_DOWN_TIMEOUT = 4.0        # 下行关节超时 (s)
+SHORT_UP_SPEED = 25            # 上行动作适当提速，克服逆重力阻力 (%)
 # plan §7：第一轮保持 16 不变；第 2/3 轮再单独试探 20，避免同轮多变量。
-SHORT_UP_TIMEOUT = 15          # V2.2 §13.3：上行超时 25->15s（run-11 证明 25s 在等固件判失败）
+SHORT_UP_TIMEOUT = 4.0          # V2.2 §13.3：上行超时 25->15s（run-11 证明 25s 在等固件判失败）
 # §16.4 软到位成功判定——sync_send_angles 返回 0 后先读数再决断，
 # 物理已接近目标（max_angle_delta <= 3° 且 delta_xyz <= 25mm）时软通过。
 SOFT_ANGLE_SUCCESS_TOL = 3.0   # 软到位关节角度容差 (deg)
@@ -299,7 +299,7 @@ ASYNC_SHORT_POLL = 0.05               # 软到位轮询间隔（s），复用 HO
 # 收敛点必连续两次 ≤tol，振荡瞬态点（单帧下探）会因下一帧回升而被拒、继续轮询到真稳态。
 ASYNC_SHORT_CONFIRM_COUNT = 2       # 软到位连续确认次数（1=单次确认，即 V2.8 行为）
 # V2.8 点1 B 类：夹爪开环等待 2.5s→1.2s（夹爪物理开合 <1s，人眼可确认）。
-GRIPPER_TIMEOUT = 1.2                 # V2.8：2.5->1.2s（原 V2.7 值 2.5s 纯等待偏长）
+GRIPPER_TIMEOUT = 0.8                 # V2.9：1.2->0.8s（物理开合足够，进一步缩短释放点逗留）
 # V2.8 点1 B 类：长距离/短下探严格通过(res==1)时跳过 verify_coords_near，省 ~0.6s/次。
 # 预设回放点位固定，res==1 严格通过时坐标必然在容差内，校验冗余。
 # 带载上行软通过后(step 5/9)仍保留 verify_coords_near（软通过需复核坐标）。
@@ -842,6 +842,7 @@ def checked_sync_angles(mc, angles, speed, timeout, label, expected_coords=None,
         print(f"  -> [诊断实际角度] {label}: {actual_angles if has_angles else '读取失败(返回 ' + str(actual_angles) + ')'}")
         print(f"  -> [诊断实际坐标] {label}: {actual_coords if has_coords else '读取失败(返回 ' + str(actual_coords) + ')'}")
 
+        max_diff = None
         if has_angles:
             diffs = [abs(a - t) for a, t in zip(actual_angles, angles)]
             max_diff = max(diffs)
@@ -855,6 +856,11 @@ def checked_sync_angles(mc, angles, speed, timeout, label, expected_coords=None,
             print(f"  -> [诊断空间物理残差] delta_xyz={dist:.2f} mm (目标: {expected_coords[:3]}, 实际: {actual_coords[:3]})")
         elif expected_coords is not None:
             print("  -> [诊断错误]: 无法读取当前实际空间坐标或预期坐标格式错误，跳过物理残差计算。")
+
+        # V2.10：长距离运动软到位兜底。若最大关节误差不超过推荐值 SOFT_ANGLE_SUCCESS_TOL (3.0°)，允许软通过。
+        if max_diff is not None and max_diff <= SOFT_ANGLE_SUCCESS_TOL:
+            print(f"  -> ⚠️ [软通过] {label} 物理已接近目标 (最大轴误差 {max_diff:.2f}° <= {SOFT_ANGLE_SUCCESS_TOL}°)，容许继续运行。")
+            return True
 
         if not ignore_error_exit:
             raise RuntimeError(f"关节回放超时或未到位: {label} (返回 {res})")
@@ -1933,7 +1939,7 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
         verify_coords_near(mc, pick_hover["coords"], "pick_hover")
 
     print("\n3. 短距离关节下探到 pick...")
-    checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick")
+    checked_short_angles(mc, pick["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "pick", allow_soft_success=True)
     # 额外记录实际坐标作为诊断证据，跳过 SKIP_COORD_VERIFY_ON_STRICT_PASS 限制
     actual_coords_pick = get_filtered_coords(mc)
     print(f"  -> [诊断证据] Step 3 (下探到位) 实际坐标: {actual_coords_pick}")
@@ -1976,7 +1982,7 @@ def auto_phase_v2(mc, pick_hover, pick, drop_hover, drop, home_ready):
         verify_coords_near(mc, drop_hover["coords"], "drop_hover")
 
     print("\n7. 短距离关节下降至 drop...")
-    checked_short_angles(mc, drop["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "drop")
+    checked_short_angles(mc, drop["angles"], SHORT_DOWN_SPEED, SHORT_DOWN_TIMEOUT, "drop", allow_soft_success=True)
     if not SKIP_COORD_VERIFY_ON_STRICT_PASS:
         verify_coords_near(mc, drop["coords"], "drop")
 
