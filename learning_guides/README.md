@@ -35,6 +35,11 @@
     * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_cpu_arm_control.md)：可移植工具链发现、结构桥与 NOT_FOR_FLASH 边界（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_system_integration.md)：语义冲突处理、分层证据与队友同步（面向角色 C）。
 
+  * [daily_sync/2026-07-15_merge_wsc-cpu_mycobot/](daily_sync/2026-07-15_merge_wsc-cpu_mycobot/)：7 月 15 日以 wsc CPU 环境为主门、保留 myCobot 安全证据完成融合后生成的三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-15_merge_wsc-cpu_mycobot/guide_fpga_vision_front.md)：CPU 内部语义与 FPGA wire ABI/CDC 的边界（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-15_merge_wsc-cpu_mycobot/guide_cpu_arm_control.md)：跨编译器等价门、统一结果语义和目标链接矩阵（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-15_merge_wsc-cpu_mycobot/guide_system_integration.md)：myCobot 风险证据、语义冲突与 NO-GO 维护（面向角色 C）。
+
 ## 📑 专项技术方案大白话解读
 
 除了日常分支合并的同步指南，本项目还针对重大的架构设计与拿分方案提供了大白话通俗化解读，帮助非专业背景的决策者低成本看懂技术决策并回答评审决策清单：

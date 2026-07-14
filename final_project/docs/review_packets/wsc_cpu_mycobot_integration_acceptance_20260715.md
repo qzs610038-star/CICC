@@ -2,7 +2,7 @@
 
 ## 1. 验收目标
 
-本验收包用于确认 `codex/wsc-mycobot-integration-20260715` 是否可以作为 CPU 集成 PR 候选。CPU 语义与 Host 行为以 wsc 的 MinGW/Efinity 环境为主验收环境；Codex 的 MSVC 结果作为跨编译器兼容门。
+本验收包用于确认代码集成提交 `64bbae69520d9663456f175aa7a3e66b0605f496` 是否可以作为 CPU 集成 PR 候选。CPU 语义与 Host 行为以 wsc 的 MinGW/Efinity 环境为主验收环境；Codex 的 MSVC 结果作为跨编译器兼容门。
 
 本轮只覆盖 G0–G3 软件门：统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、`arm_runtime` structural bridge 和 `NOT_FOR_FLASH` 目标构建。它不放行正式 SoC、APB/OSD wire ABI、烧录、UART2、J52 接线或真实机械臂动作。
 
@@ -14,6 +14,7 @@
 - 候选 `main_loop_adapter.c` 已加入 competition 构建清单，但在 G4 取得受审事件源和单调时基前不由正式 main 调用。
 - 修复两个 `PASS()` 宏的 C4456 变量遮蔽。
 - Host 脚本支持 `-Compiler auto|msvc|gcc`，VS 使用显式路径、`VCVARS64_PATH` 或 `vswhere` 发现。
+- 两份 Host runner 保持 ASCII-only，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文注释按本地代码页误解码并破坏命令解析。
 - GCC 严格门增加 `-Wshadow -Werror`。
 - 正式构建器纳入三个 wsc 新源文件，并修复 Windows PowerShell 丢失完整 gcc stderr 的问题；退出码和 warning allowlist 没有放宽。
 
@@ -24,6 +25,7 @@
 - Efinity RISC-V GCC 8.3.0：`competition/arm_bringup × disabled/simulated` 四组合 BUILD/ELF PASS。
 - 四组合全部为 `NOT_FOR_FLASH=True`，UART2/real transport 排除门保持有效。
 - Codex 本机没有 PATH gcc，也没有仓库 `tools/mingw64/bin/gcc.exe`，因此带 `-Wshadow` 的 MinGW 复验必须由 wsc 环境完成。
+- Windows PowerShell 5.1 与 PowerShell 7 均应使用仓库脚本原文；不得重新加入非 ASCII 注释，除非团队同时冻结 UTF-8 BOM 编码策略。
 
 ## 4. 先前复现失败的准确记录
 
@@ -38,9 +40,11 @@ wsc 原环境报告 MinGW GCC 14.2.0 下 `374/374`、`117/117` PASS。Codex 在�
 ```powershell
 $ErrorActionPreference = 'Stop'
 git fetch origin
-git switch --detach origin/codex/wsc-mycobot-integration-20260715
-git status --porcelain
-git rev-parse HEAD
+$expected = '64bbae69520d9663456f175aa7a3e66b0605f496'
+git rev-parse --verify $expected
+git switch --detach $expected
+if ((git status --porcelain).Count -ne 0) { throw 'worktree is not clean' }
+if ((git rev-parse HEAD) -ne $expected) { throw 'unexpected commit' }
 
 $gcc = Resolve-Path '.\tools\mingw64\bin\gcc.exe'
 & $gcc --version

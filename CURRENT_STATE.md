@@ -29,13 +29,13 @@
 
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
   - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
-  - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。
+  - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`；runner 保持 ASCII-only，避免 Windows PowerShell 5.1 对无 BOM UTF-8 中文注释误解码。不得通过 `/wd4456` 或降低 `/WX` 规避。
   - 接入结论：同步 main 后丢失的状态口径已纠正。正式 `main.c` 现在消费 `cpu_display_from_round_output()`，以统一语义层校验 action/reason/is_target 并对矛盾组合 fail closed；`main_loop_adapter.c` 已进入 competition 目标构建清单，但在 G4 取得受审事件源和单调时基前不由正式 main 调用。禁止恢复 wsc 旧版未受审 UART 单字符事件和直接 CLINT 假设。
   - 目标构建：Efinity RISC-V GCC 8.3.0 对 `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS，制品继续标记 `NOT_FOR_FLASH`，UART2/real transport 继续被排除；构建器同时修复 Windows PowerShell 原生 stderr 被提前升级为异常、导致完整 gcc 诊断丢失的问题，warning allowlist 与退出码门保持不变。
   - 环境差异记录：wsc 原环境报告 MinGW GCC 14.2.0 下 `374/374`、`117/117` PASS；Codex 修复前在 MSVC `/W4 /WX` 因 C4456 于断言执行前失败。该差异由警告策略不对称暴露了真实测试可移植性问题，不构成 CPU 功能逻辑失败。Codex 本机无 PATH gcc、也无仓库 `tools/mingw64/bin/gcc.exe`，带 `-Wshadow` 的 GCC 复验仍需 wsc 在其环境执行。
   - 替代旧结论：替代下方 2026-07-14 条目中“main.c 与 Host 测试链接同一 main_loop_adapter 实现”和“MSVC 本机不可用”的旧口径；旧 Host 结果保留为 wsc 原环境证据，不再描述当前正式 main 接入状态。
   - 证据路径：`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/build_tools/build_arm_profile.ps1`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/docs/review_packets/wsc_cpu_mycobot_integration_acceptance_20260715.md`。
-  - 下一门：由 wsc 在同一集成 commit 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
+  - 下一门：由 wsc 在代码集成提交 `64bbae69520d9663456f175aa7a3e66b0605f496` 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
   - 失效条件：集成 commit、语义枚举、main/adapter 接法、构建源码清单、编译器 flags 或目标工具链发生变化，或任一回归失败。
 
 - 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑与独立复核）
