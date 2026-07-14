@@ -27,9 +27,18 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑）
+  - 适用范围：PC 端 180°五点示教/无夹爪受控诊断的后续实验，以及它与板上 CPU G4–G11 路线的边界；不表示机械臂动作、板上 UART2 或比赛抓放已放行。
+  - 分支基线：本地 `main` 已通过 fast-forward 与 `origin/main@39e8a92` 对齐，并从该提交创建 `codex/mycobot-experiment-main-sync-20260714`。原有 `.claude/settings.local.json` 与 `.agents/handoff/`、`.agents/shared/` 仅作为本机状态原样保留，不纳入本分支提交。
+  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变；后续 PC 实验只使用 `teach_replay_pick_180deg_teach_v1.py` 做离线校验、重新示教和无夹爪单段诊断。旧 `teach_points_20260712_180deg.json` 缺少合格外部基准证据，且底座/安装状态变化会使旧点位失效，必须保持候选/预期 FAIL，不得直接复用。
+  - 实验顺序：先完成离线语法/参数门和旧预设 FAIL 复核，再完成基座刚性固定、外部 180°基准、净空与急停证据；获得用户明确动作许可后才允许创建全新预设。新预设须先附加外部证据并通过 `--check-preset`，随后按 `HOME → home_ready → pick_hover → drop_hover → pick/drop 短段` 分门逐段审查。当前未获得动作许可，本轮只做离线/只读验证。
+  - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
+  - 证据路径：`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`、`final_project/docs/review_packets/mycobot_experiment_main_sync_review_20260714.md`、`final_project/docs/review_packets/mycobot_180deg_teach_script_review_packet_20260714.md`、`mycobot_pc_tests/audit_logs/20260712_180deg_j4_mount_debug_record.md`。
+  - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
+
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
   - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
-  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
+  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已通过合并提交 `81657c4` 进入 `origin/main@39e8a92`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
   - 检查点结果：MSVC `/W4 /WX` 的 disabled/simulated runtime Host 回归均 PASS；严格 QEMU 两后端 PASS，`scratchpad.lds` 已与 `_start` 统一，逐步编译/链接均检查退出码，1 秒无限循环固件超时注入 PASS。RISC-V `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS；disabled bring-up 现包含固定交错 20 轮零请求自检，未通过放宽 `round_controller_tick` 门规避。`-BoardBuild` 现在在创建输出目录前 fail closed；manifest v2 记录规范构建入口、输入/制品 SHA-256、完整 flags、warning policy，Makefile 仅是该 PowerShell 构建器的薄包装。
   - Gate 状态：G0 PASS；G1 PASS（仅 G0–G3 的 standalone/NOT_FOR_FLASH 构建隔离）；G2 PASS（**structural bridge only**：无受审事件源、无真实时基，legacy matcher 不再冒充逐轮机械臂事务）；G3 PASS（纯软件证据）。G4、正式 SoC/PNR/部署、烧录、J52 和真实机械臂继续 NO-GO。
   - 集成边界：上述代码/脚本已进入 `main` 的软件基线，但只证明 G0–G3 的 Host/QEMU/NOT_FOR_FLASH 软件门；本轮未修改 FPGA、未烧录、未连接 J52/机械臂、未产生 UART2 或动作帧，不能据此宣称 G4 或板级闭环。
