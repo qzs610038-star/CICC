@@ -2088,10 +2088,10 @@ end
   // This source feeds u_preprocess_ch1_tap only; HDMI and the CSI/DDR path
   // remain connected to their live signals. Set back to 0 before any live
   // camera validation or competition build.
-  localparam PREPROCESS_CH1_USE_SYNTHETIC_SOURCE = 1'b1;
+  localparam PREPROCESS_CH1_USE_SYNTHETIC_SOURCE = 1'b0;
   // Set to 1 only for an HDMI-visible synthetic-source board test. It uses a
   // dedicated CDC instance and does not alter the live camera CDC instances.
-  localparam HDMI_USE_SYNTHETIC_VERIFY = 1'b1;
+  localparam HDMI_USE_SYNTHETIC_VERIFY = 1'b0;
   wire        synthetic_preprocess_vs;
   wire        synthetic_preprocess_hs;
   wire        synthetic_preprocess_de;

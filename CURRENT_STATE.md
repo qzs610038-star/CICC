@@ -27,6 +27,15 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-13，来源 Agent：Codex（真实摄像头源恢复）
+  - 适用范围：`final_project/fpga/rtl/top/top.v` 的 ch1 预处理输入与 HDMI 显示输入选择；不表示真实摄像头、PNR、bitstream 或板级画面已经验证。
+  - 最新结论：已将 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE` 与 `HDMI_USE_SYNTHETIC_VERIFY` 默认值从 `1'b1` 改为 `1'b0`。预处理现选择第二路摄像头 Debayer 输出 `rgb1_*`，HDMI 现按 `channel_sel` 选择两路真实摄像头 CDC 输出；合成源和专用验证 CDC 保留但不再被默认选中。
+  - 替代旧结论：本文件及 `final_project/docs/architecture/current_code_architecture_2026-07-13.md` 中“顶层常量当前启用合成源”的状态描述。
+  - 验证：通过 ASCII junction `D:\cicc_cbm_link` 使用 Efinity 2025.2 执行 map PASS；资源为 `EFX_ADD=2081`、`EFX_LUT4=11939`、`EFX_FF=10492`、`EFX_RAM10=250`、`EFX_DPRAM10=8`。`mem_test.warn.log` 有 135 行，综合网表摘要 586 条 warning，未标记为可忽略。综合网表保留两路 CSI、framebuffer、Debayer、ch1 预处理与两路 HDMI CDC。
+  - 证据路径：`final_project/fpga/rtl/top/top.v`、`final_project/fpga/efinity/mem_test.xml`、`final_project/docs/debug_sessions/camera_source_restore_20260713.md`。
+  - 下一步门禁：必须先解决正式工程 periphery/IO 导出导致的 PNR 阻塞，再生成新 bitstream 并上板验证真实摄像头帧；不得沿用此前合成源 bitstream 宣称摄像头链路通过。
+  - NOT VERIFIED：Efinity PNR/时序、bitstream、JTAG 下载以及真实摄像头/HDMI/预处理板级结果均未验证。
+
 - 日期：2026-07-13，来源 Agent：Codex（团队整合后的文档新鲜度与 Codebase Memory 刷新）
   - 适用范围：`codex/team-integration-20260713@510caca` 的当前状态、接口候选契约、近期执行方案、架构入口和默认协作图谱；不改变官方细则、系统职责边界或任何板级/机械臂 Gate。
   - 最新结论：已把决赛主方案更新为 `v1.3-main`，将 Host/合成源任务标记为已形成证据，并把当前队列转向 `register_map/board_io` 契约收口、`ARM_DISABLED` 主循环集成、production/debug 构建拆分与 periphery/PNR。`register_map.md` 已和 `board_io.h` 当前候选偏移对齐，但正式基址/扩展字段仍等待同一次 SoC 生成的 `soc.h` 与 Review Packet；新增 `current_code_architecture_2026-07-13.md` 作为当前架构入口。
@@ -40,7 +49,7 @@
   - 最新结论：中文仓库路径直接运行 map 会因 Efinity `filesystem error: Illegal byte sequence / EFX-0002` 在 HDL 前失败；改用仓库 ASCII junction `D:\cicc_cbm_link` 后 map PASS。资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`；`mem_test.warn.log` 有 132 条 warning 记录，综合摘要报告 post-synthesis netlist 共 1098 warnings，不能标记为可忽略。
   - PNR 结果：FAIL。工具报告 1776 个 IO 无 placement、将被随机放置，随后触发内部断言 `!available_io_sites.empty(): outpad`；未生成可验收 bitstream。该失败再次证明不能给所有顶层端口盲补约束，须先审查 Interface Designer/periphery 导出边界、普通 VDB 与 debug VDB、正式顶层端口和 `.peri.xml`。
   - 证据路径：`final_project/docs/review_packets/team_integration_merge_review_20260713.md`。原始 Efinity 输出位于本次临时构建目录，关键命令、资源、warning 计数和首个 PNR 错误已摘录到 Review Packet；生成型 VDB/netlist/outflow 不提交仓库。
-  - 下一步门禁：先解决生产构建模式与 periphery/IO 绑定方法，再重跑 PNR/时序；当前 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1` 也必须在生产构建中显式回到真实输入。禁止把 map PASS 描述成 PNR、bitstream 或上板 PASS。
+  - 下一步门禁：先解决生产构建模式与 periphery/IO 绑定方法，再重跑 PNR/时序；该整合快照当时令 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1`，现已由上方“真实摄像头源恢复”条目覆盖为 `1'b0`。禁止把 map PASS 描述成 PNR、bitstream 或上板 PASS。
 
 - 日期：2026-07-12，来源 Agent：Codex（A11 合成五色预处理隔离 Map）
   - 适用范围：摄像头无稳定数据流期间的 FPGA ROI/颜色面积/bbox/中心快照候选工程；不适用于 D 盘 HDMI 基线或正式比赛构建。

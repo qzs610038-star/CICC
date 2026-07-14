@@ -25,7 +25,7 @@
 
 | 层 | 当前实现 | 已验证范围 | 未闭环边界 |
 |---|---|---|---|
-| FPGA 视频/预处理 | `vision_preprocess_channel`、ROI/统计 RTL；`synthetic_2ppc_source` 已在 `top.v` 提供验证输入 | 整合工程 Efinity map PASS | 合成选择当前由顶层常量启用；尚未拆分 production/debug profile；真实 CSI、PNR、bitstream、板级帧均未通过 |
+| FPGA 视频/预处理 | `vision_preprocess_channel`、ROI/统计 RTL；`synthetic_2ppc_source` 已在 `top.v` 提供验证输入 | 整合工程 Efinity map PASS | 顶层默认已切回真实摄像头输入；尚未拆分 production/debug profile；真实 CSI、PNR、bitstream、板级帧均未通过 |
 | CPU 识别 | `vision_classifier`、`param_table`、五色/四任务 `task_matcher` | Host 回归与 A13 snapshot replay 已覆盖 | 白/黑仍需要真实 `LIVE_FG_AREA`；板上目标入口仍是旧红/蓝/黄候选 |
 | 完整逐轮编排 | `round_controller`：CONFIG/放置/识别/判定/等待机械臂/移除/故障等完整状态 | 独立 Host 状态机和 20 轮无死锁测试 | 尚未接入 `main.c`、正式事件源、arm done/ACK |
 | 轻量事务层 | `competition_round_transaction`：观测、event_seq、ACK、超时、放弃 | contract/host-flow/snapshot replay | 与正式 APB 寄存器的事件字段尚未冻结 |
@@ -48,7 +48,7 @@
 
 ### FPGA 构建
 
-`top.v` 当前同时令 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1`。下一步不是删除合成源，而是建立可审查的 production/debug 两套入口：production 默认真实输入，debug 才显式启用合成验证。
+`top.v` 当前令 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b0`、`HDMI_USE_SYNTHETIC_VERIFY=1'b0`，默认选择真实摄像头输入。合成源与专用验证 CDC 仍保留；后续仍需建立可审查的 production/debug 两套入口，确保只有 debug 构建显式启用合成验证。
 
 PNR 必须从 Interface Designer/periphery、正式顶层端口、普通/debug VDB 与 `.peri.xml` 一致性排查；禁止给 1,776 个端口批量盲绑管脚。
 
