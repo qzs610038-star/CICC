@@ -27,14 +27,60 @@
 
 ## 活跃状态与路线覆盖项
 
-- 日期：2026-07-13，来源 Agent：Codex（真实摄像头源恢复）
-  - 适用范围：`final_project/fpga/rtl/top/top.v` 的 ch1 预处理输入与 HDMI 显示输入选择；不表示真实摄像头、PNR、bitstream 或板级画面已经验证。
-  - 最新结论：已将 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE` 与 `HDMI_USE_SYNTHETIC_VERIFY` 默认值从 `1'b1` 改为 `1'b0`。预处理现选择第二路摄像头 Debayer 输出 `rgb1_*`，HDMI 现按 `channel_sel` 选择两路真实摄像头 CDC 输出；合成源和专用验证 CDC 保留但不再被默认选中。
-  - 替代旧结论：本文件及 `final_project/docs/architecture/current_code_architecture_2026-07-13.md` 中“顶层常量当前启用合成源”的状态描述。
-  - 验证：通过 ASCII junction `D:\cicc_cbm_link` 使用 Efinity 2025.2 执行 map PASS；资源为 `EFX_ADD=2081`、`EFX_LUT4=11939`、`EFX_FF=10492`、`EFX_RAM10=250`、`EFX_DPRAM10=8`。`mem_test.warn.log` 有 135 行，综合网表摘要 586 条 warning，未标记为可忽略。综合网表保留两路 CSI、framebuffer、Debayer、ch1 预处理与两路 HDMI CDC。
-  - 证据路径：`final_project/fpga/rtl/top/top.v`、`final_project/fpga/efinity/mem_test.xml`、`final_project/docs/debug_sessions/camera_source_restore_20260713.md`。
-  - 下一步门禁：必须先解决正式工程 periphery/IO 导出导致的 PNR 阻塞，再生成新 bitstream 并上板验证真实摄像头帧；不得沿用此前合成源 bitstream 宣称摄像头链路通过。
-  - NOT VERIFIED：Efinity PNR/时序、bitstream、JTAG 下载以及真实摄像头/HDMI/预处理板级结果均未验证。
+- 日期：2026-07-14，来源 Agent：Codex（队友 CPU 分支 + Fable 整改 + 个人 UART2 证据集成）
+  - 适用范围：`dev/wsc6090-CPU@885e97a`、`codex/fable5-remediation-20260713@758e864` 与个人证据分支的本次集成；不表示正式 SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
+  - 最新结论：保留队友 CPU 分支新增的 `arm_busy` 发起动作安全门，以及 abandon、机械臂运动期软复位/放弃锁定、故障、超时和任务匹配补测；同时以 Fable 整改后的 16-bit `event_seq`/ACK ABI 为当前契约，采用半范围新旧判定，支持 `65535 -> 0`，拒绝重复、倒退和差值为 32768 的歧义事件。事件消费继续显式返回 `ACCEPTED`/`REJECTED`，1000 事件随机流也纳入回归。`vision_classifier.c` 的零结果常量改为标准 C 显式 `{0}` 初始化，以通过 MSVC `/W4 /WX`，不改变分类语义。
+  - 替代旧结论：替代队友源分支中 8-bit `event_seq`/`last_event_seq` 和 175/175、944/944 的阶段性口径；也刷新 Fable 整改的 `round_controller 4919/4919` 快照。历史提交与 Review Packet 仍可追溯，但后续实现必须以 16-bit 契约为准。
+  - 验证：MSVC 从当前集成源码重建并通过 classifier 31/31、param_table 81/81、task_matcher 154/154、round_controller 4979/4979、competition_rounds 135/135、competition_contract 45/45、competition_host_flow 164/164、A13 replay 169/169，合计 5758/5758；myCobot skeleton Host/Mock 原生断言运行通过但不计入总数。`round_controller.c`、`vision_classifier.c`、`task_matcher.c` 通过 Efinity RISC-V GCC 8.3.0 `rv32imac/ilp32` compile-only，仅放行 `soc.h`/APB 占位告警。
+  - FPGA 构建：Efinity 2025.2 production/default map PASS，资源为 `EFX_ADD=2081`、`EFX_LUT4=11939`、`EFX_FF=10492`、`EFX_RAM10=250`、`EFX_DPRAM10=8`；`mem_test.warn.log` 137 行，不能标记为可忽略。PNR 仍 FAIL：2288 个 IO 无 placement，随后 `!available_io_sites.empty(): outpad` 断言失败；无可验收 bitstream/STA。显式 `COMPETITION_DEBUG_SYNTHETIC=1` 的 debug map 也 PASS，资源回到 ADD 1827、LUT4 10339、FF 7991、RAM10 154，warning 日志 138 行；它只证明合成源入口可显式打开，不能代替 production 或真实视频验收。
+  - 证据路径：`final_project/docs/review_packets/cpu_branch_merge_adaptation_20260714.md`、`final_project/cpu/CPU_MODULE_PLAN.txt`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_task_matcher.c`、`final_project/fpga/rtl/top/top.v`。
+  - 下一步门禁：先修复 Interface Designer/periphery 与顶层 IO 导出边界并重跑 PNR/STA；正式 `soc.h`、APB/CDC/OSD、UART2 D2 回环和真实机械臂 T0 未关闭前，保持 `ARM_DISABLED`，不得连接或驱动机械臂。
+
+- 日期：2026-07-13，来源：用户提供 / Codex 官方资料交叉核查
+  - 适用范围：TJ375N529 开发板 UART2/J52 到 myCobot 280 的板端接口真源；不表示正式 SDC/SoC/UART 驱动、真实接线、只读通信或机械臂动作已通过。
+  - 最新结论：官方开发板说明、PINOUT 和端口图已交叉确认 J52 为右侧 2.54mm 4Pin UART2；Pin1 GND，Pin2 `FPGA_UART2_RXD/C14/Input`，Pin3 `FPGA_UART2_TXD/F12/Output`，Pin4 `VCC(5V/3.3V)` 必须悬空；C14/F12 均位于 3.3V I/O 域。用户已对 `TJ375N529开发板端口说明图.jpg` 进行人工核验，确认接口位置、外形和四针标签顺序与文字一致。用户确认候选接法为 GND→GND、C14/RXD←机械臂 TX、F12/TXD→机械臂 RX，机械臂独立 12V5A。
+  - 安全纠偏：机械臂官方安装说明的 USB-TTL 接线文字为 TXD→机械臂 TX、RXD→机械臂 RX，与常规交叉接法存在命名冲突；该页也未给出机械臂端电平容限。因此 `io_pin_map.md` 仍保持总体 FAIL，正式交叉线序和“无需电平转换直连”须经断电双人复核、机械臂 TX 空闲电平和开发板 1 Mbps 波形测量后才能 PASS。
+  - 当前工程边界：正式 `constrain.sdc`、`mem_test.xml` 和 `top.v` 尚未检出 C14/F12/UART2 绑定；本次未修改 RTL、约束、Efinity XML，未连接机械臂、未发帧、未动作。
+  - 证据路径：`final_project/docs/review_packets/mycobot_uart2_j52_wiring_review_20260713.md`、`final_project/integration/io_pin_map.md`、`赛方提供材料/硬件文档/开发板使用说明1V0(5).pdf`、`赛方提供材料/硬件文档/TJ375N529_PINOUT_CONFIGURATION.pdf`、`赛方提供材料/硬件文档/TJ375N529开发板端口说明图.jpg`。
+  - 下一步门禁：先完成 J52/机械臂端断电双签与双端电平测量，再做机械臂断开的 D2 100/100 帧回环/监听；T0 其余项仍须独立关闭。
+
+- 日期：2026-07-13，来源 Agent：Codex（Fable 5 审查后的首轮无外设整改）
+  - 适用范围：CPU `round_controller` 的寄存器无关事件契约、Host 测试，以及 FPGA 顶层 production/debug 合成入口选择；不表示 `main.c`、SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
+  - 最新结论：`round_controller` 的事件序号/ACK 序号/已消费序号已统一为 16 bit；新事件会按当前状态输出 `ACCEPTED` 或 `REJECTED`，重复及过期序号不重复消费。轻量 `competition_contract` 同步增加首事件标志并移除“序号 0 永久非法”特例，两层均支持 `0xFFFF -> 0x0000` 半范围回绕。新增越界事件、过期/回绕、20 轮和 1000 事件随机流验证，`ARM_DISABLED` 下保持零动作请求并可恢复到 `CONFIG`。FPGA `top.v` 已改为未定义 `COMPETITION_DEBUG_SYNTHETIC` 时默认选择两路真实输入，合成预处理/HDMI 只在显式 debug 宏下启用。
+  - 验证：`run_round_controller_host.ps1` 从当前源码重建并通过 `4919/4919`；`round_controller.c` 通过 Efinity RISC-V GCC 8.3.0 `rv32imac/ilp32 -Wall -Wextra -Werror` compile-only；既有 `competition_rounds 135/135`、更新后的 `competition_contract 45/45`、`competition_host_flow 164/164`、`A13 169/169` 使用 MSVC 从当前源码回归通过。`git diff --check` 通过。本轮未重复运行完整 Efinity map/PNR。
+  - 证据路径：`final_project/docs/review_packets/fable5_remediation_checkpoint_20260713.md`、`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/competition_contract.h`、`final_project/cpu/app/src/competition_contract.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_competition_contract.c`、`final_project/cpu/tests/run_round_controller_host.ps1`、`final_project/fpga/rtl/top/top.v`。
+  - 下一步门禁：`main.c` 的 `ARM_DISABLED` 接入仍须等待同次生成的正式 `soc.h`、APB 时钟/复位证据，以及 `TARGET_CFG/OPERATOR_EVENT/EVENT_ACK/RESULT_COMMIT` 联合 Review Packet；在此之前不得虚构 MMIO 地址或按钮事件源。FPGA 队员须分别生成 production/debug 构建证据，并从 Interface Designer/periphery 修复 1776 IO/outpad PNR 阻塞；不得把 debug 合成结果作为真实摄像头证据。
+  - NOT VERIFIED：正式固件链接/烧录、`main.c` 调度、APB/CDC/OSD、production/debug Efinity map/PNR/时序/bitstream、真实摄像头、板级 20 轮和机械臂动作均未验证。
+
+- 日期：2026-07-13，来源 Agent：Claude（B/CPU 支援：B 线列明 8 项 CPU Host 回归复跑，刷新 795 快照）
+  - 适用范围：当前分支 `dev/wsc6090-CPU` 工作区、B 线当前纳入计数的 8 项 CPU Host 单测集合的聚合计数；仅 Host/Mock，不适用于 RISC-V 交叉、`soc.h`、APB、OSD、真实摄像头或机械臂。
+  - 最新结论：用 `D:\CICC w\tools\mingw64\bin\gcc.exe`（14.2.0）逐项复跑，每项编译均加 `-Werror -Wno-error=cpp`（只放行 board_io.h:23 占位 warning，其它 warning 即编译失败），编译与运行退出码均 0，全部 PASS：vision_classifier 31/31、task_matcher 154/154、round_controller 175/175、competition_round_transaction 135/135、competition_contract 35/35、competition_host_flow 164/164（20 rounds）、a13_fpga_snapshot_replay 169/169（20 rounds；本次为 MinGW gcc 复跑，非评审记录里的 MSVC）。与旧 795/795 相同的 7 项成员刷新为 `863/863` PASS（唯一增量来自 task_matcher 146→154、round_controller 115→175，其余不变）。另 param_table 81/81 复跑通过，但本不在 795 成员内，作额外项记录；含 param_table 的 B 线列明 8 项 Host 回归集合为 `944/944` PASS。措辞订正：这里的“B 线列明 8 项”是 B 线当前纳入断言计数的集合，`944/944` 是该 8 项的断言合计，不等于仓库内全部 Host 测试的总断言数——仓库另有受版本控制的 `tests/test_mycobot_arm_skeleton.c` 与 `run_mycobot_arm_skeleton_host.ps1`，Codex 复跑编译/运行退出码均 0，但它属 Host/Mock、不连接或驱动真实机械臂，且使用原生 assert、无可直接相加的断言总数，故未纳入 `944/944`。
+  - 替代了哪个旧结论：正式替代 `team_integration_merge_review_20260713.md` 的 `Host 合计 795/795` 快照——同成员刷新为 863/863；旧 795 不再作为当前 B 线 Host 基线，仅保留为历史快照。不替代任何板级、APB/CDC/OSD、真实特征、`main` 集成或机械臂未闭环的事实。
+  - 证据路径：`final_project/cpu/tests/`（test_classifier / test_param_table / test_task_matcher / test_round_controller / test_competition_rounds / test_competition_contract / test_competition_host_flow / test_a13_fpga_snapshot_replay；另 test_mycobot_arm_skeleton 见下）、`final_project/cpu/tests/run_competition_*_host.ps1`、`final_project/cpu/tests/run_a13_fpga_snapshot_replay.ps1`、`final_project/cpu/tests/test_mycobot_arm_skeleton.c` 与 `run_mycobot_arm_skeleton_host.ps1`（Host/Mock、原生 assert、未纳入 944）、`final_project/docs/review_packets/team_integration_merge_review_20260713.md`（旧 795 来源表）、`final_project/cpu/CPU_MODULE_PLAN.txt`（“B 线列明的 8 项 CPU Host 回归复跑”块）。
+  - 失效条件：任一 CPU Host 源/测试改动、成员集合调整，或在正式 `soc.h`/APB/OSD/板级/机械臂接入后需改以板级证据为准。
+
+- 日期：2026-07-13，来源 Agent：Claude（B/CPU 支援：task_matcher 覆盖审查补齐）
+  - 适用范围：`task_matcher` 动作层（NONE/GRAB/SKIP）的 Host 单测覆盖完整度；不适用于板级、APB、OSD、真实摄像头或机械臂。
+  - 最新结论：按 7月13日 B 任务清单第 3 项逐项核对 `test_task_matcher.c`，五色目标、T1/T2（CUBE&&color）、T3（|obs-ref|==10mm）、T4（|obs-target|≤5mm）、UNKNOWN/size=0/NULL 不误触发、非目标 SKIP、旧版精确匹配兼容均已覆盖。补齐三处 task_matcher 层缺口（纯新增测试，未改源码）：T3 `delta=0`→SKIP 边界、MODE_1/MODE_2 非正方体→SKIP、非法/越界 `task_mode`→安全 NONE。Host 结果 `task_matcher 154/154`（146 基线 + 8 新断言），gcc 14.2.0，仅 board_io.h:23 占位 warning。
+  - 关键澄清（Codex 复核修正）：`task_matcher_evaluate()` 只返回动作码 NONE/GRAB/SKIP，不产生理由码。当前仓库存在两套并行理由/任务契约：`task_matcher.h`/`round_controller` 使用 `reason_code_t`/`REASON_*`（`task_match_result_t.reason`，由 round_controller 消费），`competition_tasks.h/.c` 使用另一套 `competition_reason_t`/`COMP_REASON_*`；二者的统一/转换层尚未定版，无证据证明已闭环。故清单第 7—10 项的理由码派生不能写成”已由 competition_tasks 闭环”，只能说 task_matcher Host 层已验证对应动作码 SKIP/NONE 正确，不代表理由码统一完成。
+  - T3/T4 基准尺寸校验（Codex 复核修正）：task_matcher 公开路径当前不强制 T3/T4 基准尺寸只能是 20/30mm；`competition_tasks` 的 validate 确实限制 20/30mm，但无证据证明它会校验所有进入 task_matcher 的目标。T4 以 `target_size` 为比较基准，与官方”评委选定目标物、差值≤0.5cm”语义一致，但 competition_tasks 侧可能称 `reference_size`，命名需统一或显式映射。本轮 Host 已验证官方有效值路径与非法/越界 mode 的安全行为；后续需选定唯一目标配置适配层作为入口，并补非法 T3/T4 基准值测试或转换测试。
+  - 替代了哪个旧结论：将 `test_task_matcher.c` 计数从 146/146 更新为 154/154；不替代任何板级、APB/CDC/OSD、真实特征或机械臂未闭环的事实。
+  - 证据路径：`final_project/cpu/tests/test_task_matcher.c`（组[14]）、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/CPU_MODULE_PLAN.txt` [4]。
+  - 失效条件：task_matcher 接口/动作语义变更、理由码职责上移到本层，或后续回归重跑失败。
+
+- 日期：2026-07-13，来源 Agent：Claude（B/CPU 支援：round_controller Codex 安全缺口最小修复）
+  - 适用范围：`round_controller` 的 arm_busy 安全门与 event_seq 过期/回绕规则；仍为 Host/Mock 层，不适用于板级、APB、OSD、`main.c` 集成或机械臂真实动作。
+  - 最新结论：按 Codex 复核意见对 `round_controller.c` 做最小实现修复（本轮确有改源码，非纯补测）。[P1] arm_busy 安全门——目标轮 action=GRAB 且 arm_enabled=1 但 arm_busy=1 时，不发 request_arm_grab、不进入 WAIT_ARM_DONE，直接进入 ROUND_DONE，保留 `result_valid=1`/`is_target=1`，`decision_action=NONE`，`reason=REASON_ARM_NOT_READY`（等价 F1 下识别/判断已锁存但机械臂不可接收动作、不执行）。[P2] event_seq 过期/回绕——新增 `seq_is_newer(seq,last)`：`delta=(uint8_t)(seq-last)`，仅 `delta!=0 && delta<128` 视为向前并接受；重复(delta=0)与过期/倒退(delta>=128)一律不消费、不 ACK；回绕 255→0(delta=1) 接受、0→255(delta=255) 拒绝；`consume_new_event` 改用此判定。Host 结果 `round_controller 165/165`（146 基线 + 19 新断言），gcc 14.2.0，仅 board_io.h:23 占位 warning。随后按 Codex P3 建议追加两个 event_seq 半区间边界回归（`0→255` delta=255 拒绝、`10→138` delta=128 拒绝，各不改状态/不 ACK）+10 断言，Host 计数升至 `175/175`；该 P3 轮仅追加测试，未改 round_controller.c。
+  - 替代了哪个旧结论：将 `test_round_controller.c` 计数从 146/146 更新为 175/175，`CPU_MODULE_PLAN.txt` [5] 同步；并修正上一条 round_controller 审查条目“纯新增测试、未改源码”的表述——本轮已对 round_controller.c 做最小逻辑修复（arm_busy/event_seq），其后 event_seq 半区间边界回归仅追加测试。不替代任何板级、APB/CDC/OSD、main 集成或机械臂未闭环的事实。
+  - 证据路径：`final_project/cpu/app/src/round_controller.c`（`seq_is_newer`、EXECUTE_OR_SKIP 的 arm_busy 门）、`final_project/cpu/tests/test_round_controller.c`（`[codex-fix]` 组）、`final_project/cpu/CPU_MODULE_PLAN.txt` [5]。
+  - 失效条件：round_controller 状态机/事件语义变更、接入 `main.c` 后行为改变，或后续回归重跑失败。
+
+- 日期：2026-07-13，来源 Agent：Claude（B/CPU 支援：round_controller 覆盖审查补齐）
+  - 适用范围：`round_controller` 逐轮编排状态机的 Host/Mock 单测覆盖完整度；不适用于板级、APB、OSD、真实摄像头、`main.c` 集成或机械臂真实动作。
+  - 最新结论：按 7月13日 B 任务清单第 4 项逐项核对 `test_round_controller.c`。event_seq/ACK 去重、PLACE/REMOVE/SOFT_RESET/SESSION_RESET 独立事件、识别/判断单次锁存、单轮≤1 次动作请求、单 tick 脉冲、非目标 SKIP 直接完成、ARM_DISABLED→ARM_NOT_READY、识别超时可恢复、20 轮 Mock 无死锁均已由原测试覆盖。补齐三处 round_controller 层缺口（纯新增测试，未改源码/头文件逻辑）：ABANDON_ROUND 非运动态结束本轮并保留 `REASON_OPERATOR_ABANDON`；WAIT_ARM_DONE 期间软复位/放弃被忽略（不盲复位、不重复脉冲）；ARM_FAULT 输入与臂超时进入 `ROUND_STATE_ARM_FAULT` 且保留 `result_valid`/`is_target` 证据。Host 结果 `round_controller 146/146`（115 基线 + 31 新断言），gcc 14.2.0，仅 board_io.h:23 占位 warning。
+  - 替代了哪个旧结论：将 `test_round_controller.c` 计数从 115/115 更新为 146/146，`CPU_MODULE_PLAN.txt` [5] 同步。不替代任何板级、APB/CDC/OSD、真实特征、main 集成或机械臂未闭环的事实；早前记录的两层整合回归 795/795 为更早快照，未含本轮及 task_matcher 154 增量，需全量复跑刷新。
+  - 证据路径：`final_project/cpu/tests/test_round_controller.c`（审查补测组）、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/app/include/round_controller.h`、`final_project/cpu/CPU_MODULE_PLAN.txt` [5]。
+  - 失效条件：round_controller 状态机/事件语义变更、接入 `main.c` 后行为改变，或后续回归重跑失败。
 
 - 日期：2026-07-13，来源 Agent：Codex（团队整合后的文档新鲜度与 Codebase Memory 刷新）
   - 适用范围：`codex/team-integration-20260713@510caca` 的当前状态、接口候选契约、近期执行方案、架构入口和默认协作图谱；不改变官方细则、系统职责边界或任何板级/机械臂 Gate。

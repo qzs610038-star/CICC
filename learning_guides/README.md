@@ -22,6 +22,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-13_merge_team-integration/guide_fpga_vision_front.md)：合成源、生产构建开关与真实摄像头验收边界（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-13_merge_team-integration/guide_cpu_arm_control.md)：逐轮状态机与观察事务层的职责拆分（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-13_merge_team-integration/guide_system_integration.md)：J4/底座风险、板上安全门与低冲突 Git 维护（面向角色 C）。
+  * [daily_sync/2026-07-14_merge_dev_wsc6090-CPU/](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/)：7 月 14 日吸收队友 CPU 安全补测、Fable 16 位事件契约与个人 UART2 证据时生成的讲解指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_fpga_vision_front.md)：production/debug 构建边界与 PNR 阻塞（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_cpu_arm_control.md)：16 位序号、显式 ACK 与 `arm_busy` 安全门（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_system_integration.md)：J52 门禁、分层验收与可追溯合并（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 

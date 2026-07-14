@@ -45,6 +45,7 @@ typedef struct {
 typedef struct {
     target_config_t staging;
     target_config_t active;
+    uint8_t have_event_seq;
     uint16_t last_event_seq;
     size_state_t size_state;
     competition_round_txn_t transaction;

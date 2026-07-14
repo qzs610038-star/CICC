@@ -31,6 +31,12 @@ typedef enum {
     ROUND_EVENT_SESSION_RESET
 } round_event_t;
 
+typedef enum {
+    ROUND_EVENT_ACK_NONE = 0,
+    ROUND_EVENT_ACK_ACCEPTED,
+    ROUND_EVENT_ACK_REJECTED
+} round_event_ack_status_t;
+
 typedef struct {
     uint32_t acquire_timeout_ms;
     uint32_t arm_timeout_ms;
@@ -39,7 +45,7 @@ typedef struct {
 typedef struct {
     uint32_t now_ms;
     uint8_t event_valid;
-    uint8_t event_seq;
+    uint16_t event_seq;
     round_event_t event;
     uint8_t observation_valid;
     task_match_result_t match;
@@ -53,7 +59,8 @@ typedef struct {
     round_controller_state_t state;
     uint16_t round_seq;
     uint8_t event_ack_valid;
-    uint8_t event_ack_seq;
+    uint16_t event_ack_seq;
+    round_event_ack_status_t event_ack_status;
     uint8_t request_arm_grab;
     uint8_t result_valid;
     uint8_t decision_action;
@@ -66,7 +73,7 @@ typedef struct {
     round_controller_config_t cfg;
     uint16_t round_seq;
     uint8_t have_event_seq;
-    uint8_t last_event_seq;
+    uint16_t last_event_seq;
     uint8_t result_valid;
     uint8_t decision_action;
     uint8_t is_target;

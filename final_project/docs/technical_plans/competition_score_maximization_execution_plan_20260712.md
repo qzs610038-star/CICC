@@ -626,7 +626,7 @@ round_seq + recognition + decision + reason + action + arm_state
 
 2026-07-13 整合后，原 Host/合成源 checkpoint 已完成，下一并行 checkpoint 调整为：
 
-1. FPGA/SoC 线：把合成验证入口拆成明确的 debug/production 配置，审查 periphery/Interface Designer 与顶层 IO 导出，先关闭 1,776 IO 的 PNR 阻塞。
+1. FPGA/SoC 线：源码侧已把合成验证入口拆成显式 `COMPETITION_DEBUG_SYNTHETIC` 与默认 production 真实输入；下一步分别生成两种构建证据，并审查 periphery/Interface Designer 与顶层 IO 导出，先关闭 1,776 IO 的 PNR 阻塞。
 2. CPU 线：统一 `register_map.md`、`board_io.h` 与竞赛契约，在 `ARM_DISABLED` 下把正式 `round_controller` 最小接入 `main.c`，保持轻量 transaction 层负责 event_seq/ACK。
 3. SoC/APB 线：继续在隔离副本完成 CPU Hello、heartbeat 和单个 APB MAGIC；正式 `soc.h` 到位前不冻结地址。
 4. 机械臂/物理线：只推进 T0、D1/D2、结构加固和外部基准复核；真实臂只读及动作继续按独立安全门放行。
@@ -658,7 +658,7 @@ round_seq + recognition + decision + reason + action + arm_state
 | 人力 | FPGA/SoC成员每天6—8h；CPU成员1—2h且其他成员可接管纯C；机械臂成员6—8h | 必须三线并行，CPU设计审查与编码执行拆开 |
 | 摄像头 | 两只旧摄像头交叉任一接口均花屏；官方fallback纯色轮切稳定；ch1 I2C地址阶段ACK且`0x0100` bit0读高，但未见CSI DE | 显示后端可用，故障在ch1控制后、CSI有效帧前；“摄像头损坏”未定案 |
 | 新摄像头 | 预计7月13日到货 | 只做单变量替换；失败后当天借万用表/示波器测电源、复位、MCLK |
-| 合成源 | `synthetic_2ppc_source.v` 已合入，并被当前 `top.v` 的预处理与 HDMI 验证常量选中 | 已解锁下游 map/Host 回放；必须拆分 production/debug 配置，且不得作为真实识别验收 |
+| 合成源 | `synthetic_2ppc_source.v` 已合入；`top.v` 默认选择 production 真实输入，仅在显式定义 `COMPETITION_DEBUG_SYNTHETIC` 时选择预处理与 HDMI 合成入口 | 源码选择已拆分；仍须分别生成 production/debug 构建日志，debug 不得作为真实识别验收 |
 | 视频工程 | 整合工程 map PASS；PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言 FAIL，无本次可验收 bitstream | 不得描述为生产构建或视频基线通过 |
 | CPU启动 | 赛方独立RISC-V例程历史上板成功，源码仍在赛方材料；团队选择暂不重复独立复现 | 有历史基线，但当前工具/步骤未新鲜复验 |
 | SoC/APB | 成功CPU例程与视频工程是两个独立bitstream；正式视频工程无SoC IP、生成`soc.h`、APB从机和结果CDC | 当前为A档，系统集成第一硬阻塞 |
