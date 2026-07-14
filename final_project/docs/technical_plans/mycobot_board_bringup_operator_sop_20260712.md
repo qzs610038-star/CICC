@@ -3,6 +3,7 @@
 > 日期：2026-07-13（基于 2026-07-12 SOP 更新基线）
 > 适用对象：A（FPGA/SoC）、B（CPU）、C（机械臂现场安全员）
 > 总原则：每一门只增加一个新变量；前门未 PASS，禁止进入后门。真实动作当前为 **NO-GO**。
+> 2026-07-14 协议勘误：事务与命令语义以 `mycobot_cpu_board_bringup_implementation_plan_20260714.md` 和 `final_project/integration/mycobot_protocol_notes.md` 为准；官方确认有返回命令在 500 ms 内响应，而 0x22/0x66/0x67/0x29 无返回值。
 
 ## 0. 先看当前结论
 
@@ -104,16 +105,17 @@ NO-GO：只查时钟/分频/引脚/方向/电平；不得拿真实机械臂“�
 - 底座连接已加固，外部基准复核无可见相对位移；
 - S1–S4 全 PASS；机械臂固定、周边净空、断电方式明确；
 - 线序按已签核 `io_pin_map.md` 连接，不能凭“TX/RX 应该交叉/同名”猜测；
+- 已确认并记录 Basic `transponder` 与最新版 Atom `atomMain` 的来源、版本或文件哈希；
 - 固件白名单只允许 `0x20 GET_ANGLES`，禁止 `0x22`、`0x66`、`0x67` 和扭矩/使能类命令。
 
 操作：
 
 1. 先断电接线并复核 GND/逻辑电平，再上电；机械臂保持静止。
-2. 每 500 ms 发送一次 `FE FE 02 20 FA`，一次只允许一个未完成请求。
-3. 预期响应为 `FE FE 0E 20 <12-byte angles> FA`；用 `mycobot_decode_get_angles_response()` 解为 6 个 `deg_x10` 关节角。
-4. 连续 30 次记录 TX/RX 十六进制、延迟、解析状态和角度；任何未知命令、长度、尾字节或超时立即停止发送并断开控制线。
+2. 首测请求周期不快于 1 s，一次只允许一个未完成请求；响应 deadline 初始为 750 ms，收到匹配帧或超时并完成重同步前不得发送下一请求，首测不自动重发。
+3. 预期响应为 `FE FE 0E 20 <12-byte angles> FA`；必须匹配返回命令 0x20、精确 12 字节 payload 和尾字节，再用 `mycobot_decode_get_angles_response()` 解为 6 个 `deg_x10` 关节角并检查逐关节官方范围。
+4. 连续 30 次记录 TX/RX 十六进制、响应延迟、expected command/length、解析状态、角度和迟到/重复/未知帧计数；任何错配或超时立即停止发送并断开控制线。
 
-GO：30/30 正确，无未知帧、无机械臂动作、无结构位移。
+GO：30/30 正确，零超时、零迟到/重复/未知帧、无机械臂动作、无结构位移。
 
 NO-GO：回退 S4；不自动重发动作命令，不释放扭矩。
 
@@ -137,7 +139,8 @@ NO-GO：回退轮询只读；不得进入动作。
 2. 对 `HOME`、`home_ready`、`pick_hover`、`pick`、`drop_hover`、`drop` 逐点做单位、角度、速度、最大关节差、半径和夹爪值核对，并通过 `arm_controller_plan_validate()`。
 3. 先只允许 `HOME -> home_ready` 一段；不带工件、不闭合夹爪，现场 C 手持断电/急停。
 4. 速度采用新点位中经 PC 单步确认的低速值；不得直接套旧默认表的 12/16/20/30，也不得超过 30。
-5. 到位后只读角度；严格失败走 `POST_READBACK -> SOFT_PASS / RETRY_ONCE -> FAULT`，最多一次重试。
+5. 0x22 无返回值，不得等待或伪造动作 ACK；到位后只读角度，严格失败走 `POST_READBACK -> SOFT_PASS / RETRY_ONCE -> FAULT`，最多一次重试。
+6. G10 前补充软件 stop：0x29 有界发送后用 0x2B + 0x20 核验；0x29 无返回且不是安全额定急停，现场断电/急停不可撤销。
 
 任何结构位移、姿态异常、碰撞、超时、解析错误、急停或无法立即断电：立即停止新命令，记录 `FAULT`，回退 S5/F1。
 
@@ -150,7 +153,9 @@ home_ready -> pick_hover -> pick -> close_gripper
 -> pick_hover -> drop_hover -> drop -> open_gripper -> home_ready
 ```
 
-先空载路径，再单个已验证正方体，最后才接 matcher。`SKIP` 必须零动作并输出原因；`GRAB` 在同一轮只能锁存一次。完整 `round_controller` 和轻量 transaction 已在 Host 层存在，但 `main.c`、OSD 理由码、arm done/ACK 与正式 UART 尚未闭环；完成这些板级连接前不得接自动识别触发。
+先空载路径，再单个已验证正方体，最后才接 matcher。`SKIP` 必须零动作并输出原因；`GRAB` 在同一轮只能锁存一次。完整 `round_controller` 和轻量 transaction 已在 Host 层存在，但 `main.c`、OSD 理由码、round-controller `arm_done/event ACK` 与正式 UART 尚未闭环；这里的 ACK 是板内逐轮事务，不是 0x22/0x66/0x67 的协议返回。完成这些板级连接前不得接自动识别触发。
+
+0x66/0x67 无返回值。闭爪/开爪后必须 single-flight 轮询 0x69 至停止，再用 0x65 检查稳定位置窗口；位置读回不能证明夹持力或物体未滑落，仍需低速带载抬升观察和失败测试。
 
 ## 10. 每次实机记录模板
 
@@ -158,8 +163,9 @@ home_ready -> pick_hover -> pick -> close_gripper
 
 - bitstream/ELF/commit/Efinity 版本、生成 `soc.h` 路径；
 - UART2 基址/分频/IRQ/引脚/电平证据；
+- Basic `transponder`、Atom `atomMain` 的来源、版本/哈希与核验时间；
 - 现场固定、净空、断电/急停、安全员；
-- TX/RX 原始字节、延迟、解析、overflow/noise/bad-frame；
+- TX/RX 原始字节、expected command/length、最大延迟、超时/迟到/重复/未知帧、overflow/noise/bad-frame；
 - 是否发送动作帧；若发送，点位版本、段、速度、空载/工件、录像名；
 - PASS/FAIL/WARN、回退版本和下一门是否放行。
 
