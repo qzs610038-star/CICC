@@ -16,7 +16,7 @@ Claude 开始任何任务前按以下顺序读取：
 
 ## 仓库性质
 
-本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
+本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`competition_project_single_camera/` 是等待 M0 新构建、匹配 bitstream、烧录和板级复现的隔离候选工程，未过 Gate 前不得替代正式主线。`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
 
 除非任务明确要求，否则以下内容按只读处理：
 
@@ -38,6 +38,8 @@ Claude 开始任何任务前按以下顺序读取：
 - CPU BSP / MMIO 边界：`final_project/cpu/app/include/bsp.h`
 - 接口契约和文档：`final_project/integration/`、`final_project/docs/`
 
+候选单摄工程：`competition_project_single_camera/mem_test.xml`。只有 `CURRENT_STATE.md` 明确记录 M0 板级复现通过后，才可更新本节并讨论升格；在此之前不得把历史 bitstream 归因于候选仓库源码。
+
 赛方对照工程：
 
 - 工具链 / 器件：Efinity `2025.2.288.4.15`，Titanium `TJ375N529`，时序模型 `I3`
@@ -50,7 +52,7 @@ Claude 开始任何任务前按以下顺序读取：
 
 本项目已启用 codebase-memory-mcp，用于让 Claude/Codex/队友 Agent 在阅读代码前快速定位真实入口。
 
-- 默认图谱项目：`D-cicc_cbm_link`
+- 默认图谱项目：`D-cicc_cbm-main`；旧 `D-cicc_cbm_link` 仅作历史兼容查询。
 - 默认索引入口：`D:\cicc_cbm_link`
 - 主 artifact：`.codebase-memory/graph.db.zst`
 - Phase 2 资料库 artifact：`.codebase-memory/phase2/official_demo/`、`.codebase-memory/phase2/prelim_src/`、`.codebase-memory/phase2/prelim_sw/`
@@ -91,7 +93,7 @@ Invoke-Item "final_project\fpga\efinity\mem_test.xml"
 确认 codebase-memory 主图谱：
 
 ```powershell
-codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm_link`"}"
+codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm-main`"}"
 ```
 
 运行 RAM IP 仿真：

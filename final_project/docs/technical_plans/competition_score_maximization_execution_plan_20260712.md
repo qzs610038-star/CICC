@@ -1,10 +1,10 @@
 # 分赛区决赛主方案：最大化得分总控执行方案
 
-> 版本：v1.3-main
-> 日期：2026-07-13（在 2026-07-12 主方案上追加整合进度）
+> 版本：v1.4-main
+> 日期：2026-07-14（追加单摄候选工程与 myCobot G0-G3 主线集成边界）
 > 状态：**决赛主方案（已由用户标定）**；作为当前最高执行方案，不代表任何硬件或机械臂闭环已经完成
 > 目标：在 0710 官方细则下，以最小风险获得尽可能高的现场有效分
-> 适用工程：`final_project/`
+> 适用工程：正式主线 `final_project/`；隔离候选 `competition_project_single_camera/` 仅适用下述 M0 升格门
 
 ## 0. 权威来源与适用边界
 
@@ -30,6 +30,13 @@
 - PC、`pymycobot`、myBlockly 只用于开发期标定、健康检查和日志，不进入正式闭环。
 - 未确认电平、接线、协议、急停和安全姿态前，不执行机械臂动作。
 - 本方案本身不解除 `CURRENT_STATE.md` 中已暂缓的 testbench、真实 Debayer、PNR/bitstream、板级采集门槛；恢复对应工作需要用户明确授权，并按 Codex Gate 执行。
+
+### 0.2 单摄候选工程与机械臂软件门
+
+- `competition_project_single_camera/` 是用于降低现有双摄 PNR/真实画面风险的隔离候选，不因白名单复制或历史 bitstream 可运行而自动成为正式主线。
+- 升格前必须从候选仓库源码完成 Efinity 2025.2 全流程，记录匹配源码/bitstream 哈希，并通过烧录、3 次冷启动和 10 分钟 J48/ch0→HDMI 画面复现；任一失败即保持 `final_project/` 正式主线并提交最小差异报告。
+- 初始 M0 的 75/75 哈希只冻结复制时快照；后续 `white_balance.v` 增量以 `m0_post_baseline_delta_20260714.csv` 和 `WORK_LOG.md` 为准，历史 bitstream 不得归因于修改后的源码。
+- myCobot G0-G3 已进入主线的范围仅为 Host/QEMU/`NOT_FOR_FLASH` 软件门；G4、正式 SoC、PNR、烧录、J52、真实 UART2 和机械臂动作继续 NO-GO。
 
 ## 1. 执行摘要
 

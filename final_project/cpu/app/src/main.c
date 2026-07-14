@@ -1,60 +1,45 @@
 /*==========================================================================
- *  main.c  —  识别主循环集成（模块 5 + ARM_DISABLED round_controller 接入）
+ *  main.c  —  识别主循环集成（模块 5）
  *
- *  集成 board_io + vision_classifier + param_table + task_matcher +
- *  round_controller + cpu_result_semantics。
+ *  集成 board_io + vision_classifier + param_table + task_matcher，
+ *  输出固定点抓取授权 match_action。
  *
  *  识别侧边界（严格）：
  *    - grab_center 仅用于 UART 日志和 OSD 偏差检查。
+ *    - match_action=GRAB 仅表示"授权队友执行预设固定 P_pick 序列"，
+ *      不提供视觉坐标给机械臂做实时伺服。
  *    - 机械臂控制 (arm_controller) 不在本人范围。
- *    - ARM_DISABLED=1：arm_enabled 固定为 0，目标轮直接 ARM_NOT_READY，
- *      绝对不发生 request_arm_grab 或任何机械臂动作请求。
  *
- *  主循环流程：
+ *  主循环流程（按 CPU_MODULE_PLAN §5）：
  *    1. 心跳
- *    2. Cam0/1 轮询：读特征 → 分类 → 滤波 → ack → 回写分类结果
- *    3. 融合 + 任务匹配 → action (task_matcher)
- *    4. 两路 match_action 重写（OSD 一致性）
- *    5. UART 事件注入 + round_controller_tick + cpu_result_semantics 投影
+ *    2. Cam0 轮询：读特征 → 分类 → 滤波 → ack → 回写分类结果(action=0)
+ *    3. Cam1 轮询：同上
+ *    4. 融合 + 目标读取 + 任务匹配 → 最终 action
+ *    5. 两路 match_action 重写为融合后 action（OSD 切任意通道一致）
  *    6. 全局状态提交
  *==========================================================================*/
 
 #include "bsp.h"
+#include "arm_build_profile.h"
+#include "arm_runtime.h"
 #include "board_io.h"
 #include "vision_classifier.h"
 #include "param_table.h"
-#include "task_matcher.h"
 #include "round_controller.h"
-#include "cpu_result_semantics.h"
-#include "cpu_result_semantics_adapters.h"
-#include "main_loop_adapter.h"
+#include "task_matcher.h"
 
 #include <stdint.h>
 #include <string.h>
 
-/*--------------------------------------------------------------------------
- *  ARM 状态码（本人侧只输出，队友 arm_controller 负责执行）
- *--------------------------------------------------------------------------*/
-#define ARM_STATE_UNKNOWN   0
-#define ARM_STATE_IDLE      1
-#define ARM_STATE_GRABBING  2
-#define ARM_STATE_ERROR     9
+#if APP_PROFILE != ARM_PROFILE_COMPETITION
+#error "main.c is only valid for APP_PROFILE=competition"
+#endif
 
 /*--------------------------------------------------------------------------
  *  错误码
  *--------------------------------------------------------------------------*/
 #define ERR_NO_FPGA           1   /* APB 握手失败 — FPGA 未就绪或基地址错误 */
 #define ERR_COMMIT_TIMEOUT     2   /* CFG_COMMIT 超时 — staging 未进入 active */
-
-/*--------------------------------------------------------------------------
- *  ARM_DISABLED：编译期全局机械臂安全开关。
- *  置 1 时 round_controller arm_enabled 固定为 0，目标轮直接 ARM_NOT_READY，
- *  绝对不发生 request_arm_grab 或任何机械臂动作请求。
- *  仅当正式 soc.h / APB / UART2 D2 / 机械臂 T0 全部关闭后才允许置 0。
- *--------------------------------------------------------------------------*/
-#ifndef ARM_DISABLED
-#define ARM_DISABLED 1
-#endif
 
 /*--------------------------------------------------------------------------
  *  配置写入占位值
@@ -240,44 +225,7 @@ static int process_camera(int cam, mf_filter_t *filt,
 }
 
 /*==========================================================================
- *  round_controller 辅助 — 板载计时与 UART 事件注入
- *==========================================================================*/
-
-/* 从 CLINT mtime 读取当前毫秒。Host mock 可替换为测试用计数器。 */
-static uint32_t get_now_ms(void)
-{
-    volatile uint64_t *mtime = (volatile uint64_t *)(SYSTEM_CLINT_CTRL + 0xBFF8);
-    return (uint32_t)(*mtime / (SYSTEM_CLINT_HZ / 1000u));
-}
-
-/* 非阻塞读一个 UART 字符；无数据返回 0。 */
-static char uart_getchar_nb(void)
-{
-    uint32_t rx_occ = (read_u32(BSP_UART_TERMINAL + UART_STATUS) >> 24) & 0xFF;
-    if (rx_occ == 0) return 0;
-    return (char)(read_u32(BSP_UART_TERMINAL + UART_DATA) & 0xFF);
-}
-
-/* 从 UART 消费单字符命令 → round_event_t。
- *   'p' = PLACE, 'r' = REMOVE, 'a' = ABANDON,
- *   's' = SOFT_RESET, 'x' = SESSION_RESET
- * 返回 1=消费了事件，0=无事件或非法字符。 */
-static int consume_uart_event(round_event_t *ev)
-{
-    char c = uart_getchar_nb();
-    if (c == 0) return 0;
-    switch (c) {
-    case 'p': *ev = ROUND_EVENT_PLACE_CONFIRM;    return 1;
-    case 'r': *ev = ROUND_EVENT_REMOVE_CONFIRM;   return 1;
-    case 'a': *ev = ROUND_EVENT_ABANDON_ROUND;    return 1;
-    case 's': *ev = ROUND_EVENT_SOFT_RESET_ROUND; return 1;
-    case 'x': *ev = ROUND_EVENT_SESSION_RESET;    return 1;
-    default:  return 0;
-    }
-}
-
-/*==========================================================================
- *  main — 识别主循环（含 ARM_DISABLED round_controller 接入）
+ *  main — 识别主循环
  *==========================================================================*/
 
 int main(void)
@@ -309,6 +257,16 @@ int main(void)
 
     task_matcher_init();
 
+    /* The current FPGA register contract has no verified operator-event
+     * source yet.  Still instantiate the only allowed bridge here so the
+     * production main cannot call arm_controller directly.  With the default
+     * disabled backend it cannot create a transport or a motion request. */
+    arm_runtime_t arm_runtime;
+    arm_runtime_init(&arm_runtime, 0);
+    round_controller_t competition_round;
+    round_controller_output_t competition_round_out;
+    round_controller_init(&competition_round, 0, 0u);
+
     uint16_t seq_cam0 = 0, seq_cam1 = 0;
 
     /* ---- 3. 写入初始配置到两路 staging + commit ---- */
@@ -319,32 +277,9 @@ int main(void)
         for (;;) { board_io_heartbeat(); }
     }
     uart_puts("[INIT] Both cameras configured.\r\n\r\n");
-
-    /* ---- 3b. round_controller 初始化（ARM_DISABLED dry-run）---- */
-    round_controller_t rc;
-    round_controller_config_t rc_cfg;
-    rc_cfg.acquire_timeout_ms = 3000u;
-    rc_cfg.arm_timeout_ms     = 15000u;
-    {
-        round_controller_input_t  rc_in;
-        round_controller_output_t rc_out;
-        uint32_t t0 = get_now_ms();
-        round_controller_init(&rc, &rc_cfg, t0);
-        /* 首次 APPLY_CONFIG → WAIT_PLACE_CONFIRM */
-        memset(&rc_in, 0, sizeof(rc_in));
-        rc_in.now_ms     = t0;
-        rc_in.event_valid = 1;
-        rc_in.event_seq   = 1;
-        rc_in.event       = ROUND_EVENT_APPLY_CONFIG;
-        round_controller_tick(&rc, &rc_in, &rc_out);
-        uart_puts("[INIT] round_controller: CONFIG -> WAIT_PLACE_CONFIRM\r\n");
-    }
-
-    uart_puts("[LOOP] Entering main recognition loop...\r\n");
-    uart_puts("[LOOP] UART cmds: p=PLACE r=REMOVE a=ABANDON s=SOFT_RESET x=SESSION_RESET\r\n\r\n");
+    uart_puts("[LOOP] Entering main recognition loop...\r\n\r\n");
 
     /* ---- 4. 主循环 ---- */
-    uint16_t uart_event_seq = 2;  /* seq 1 已被 APPLY_CONFIG 占用 */
     uint16_t latched_err = 0;    /* persists across iterations until commit_global succeeds */
     for (;;) {
         /* Carry forward any error that couldn't be committed to FPGA last iteration */
@@ -413,8 +348,43 @@ int main(void)
          */
         task_matcher_read_target_from_fpga();
 
-        /* ---- 任务匹配 ---- */
-        uint8_t action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
+        /* ---- 任务匹配 ----
+         * This legacy result is recognition/decision evidence only.  It is
+         * not a round transaction, must not create a grab request, and must
+         * not be emitted as a per-round execute result. */
+        uint8_t legacy_match_action = task_matcher_evaluate(&fused, obj_cx, obj_cy);
+        uint8_t action = MATCH_ACTION_NONE;
+
+        /* G2 bridge tick: no FPGA event is synthesized here.  In particular,
+         * matcher output is never a direct arm request.  G4/G6 must supply a
+         * verified event/APB source before observation/event fields are wired. */
+        arm_runtime_status_t arm_status;
+        round_controller_input_t round_in;
+        /* No verified monotonic board time source exists in G0-G3.  Do not
+         * relabel loop count as milliseconds or claim timeout behavior here.
+         * G4 must wire a reviewed CLINT/mtime (or equivalent) source first. */
+        arm_runtime_tick(&arm_runtime, 0u);
+        memset(&arm_status, 0, sizeof(arm_status));
+        arm_runtime_get_status(&arm_runtime, &arm_status);
+        memset(&round_in, 0, sizeof(round_in));
+        round_in.now_ms = 0u;
+        round_in.arm_enabled = arm_status.arm_enabled;
+        round_in.arm_busy = arm_status.arm_busy;
+        round_in.arm_done = arm_status.arm_done;
+        round_in.arm_fault = arm_status.arm_fault;
+        round_controller_tick(&competition_round, &round_in,
+                              &competition_round_out);
+        if (competition_round_out.request_arm_grab) {
+            /* This is intentionally unreachable until the verified event
+             * source is connected.  The runtime remains the sole gateway. */
+            (void)arm_runtime_accept_request(&arm_runtime);
+        }
+        if (competition_round_out.result_valid) {
+            action = competition_round_out.decision_action;
+        }
+        if (legacy_match_action != MATCH_ACTION_NONE) {
+            uart_puts(" [LEGACY_MATCH_NO_ROUND]");
+        }
 
         /* ---- 重写两路 match_action 为融合后 action ----
          * 两路都写同一个 action，保证 HDMI/OSD 切任一通道都看到一致的
@@ -439,99 +409,13 @@ int main(void)
         /* ---- 日志：融合结果 + 动作 ---- */
         log_action_fused(action, &fused, obj_cx, obj_cy);
 
-        /* ---- round_controller ARM_DISABLED dry-run 接入 ----
-         * 调用可测试适配器 main_loop_arm_disabled_step()。
-         * 事件源：UART 单字符命令。观测源：task_matcher_get_last_match()
-         * （含真实 color/shape/size reason，不再硬编码 COLOR_MISMATCH）。
-         * ARM_DISABLED: arm_enabled 固定为 0，目标轮直接 ARM_NOT_READY。 */
-        {
-            round_controller_output_t rc_out;
-            cpu_display_result_t      display;
-            round_event_t             ev = ROUND_EVENT_NONE;
-            int                       has_ev = 0;
-            task_match_result_t       match;
-            const task_match_result_t *match_ptr = 0;
-
-            /* UART 事件注入 */
-            if (consume_uart_event(&ev)) {
-                has_ev = 1;
-            }
-
-            /* 观测注入：从 matcher 读取最近一次真实 match result。
-             * 仅 GRAB/SKIP 作为有效观测；NONE 不喂入。 */
-            if (action == MATCH_ACTION_GRAB || action == MATCH_ACTION_SKIP) {
-                task_matcher_get_last_match(&match);
-                match_ptr = &match;
-            }
-
-            int rc_ret = main_loop_arm_disabled_step(
-                &rc, &uart_event_seq, get_now_ms(),
-                match_ptr, ev, has_ev,
-                &display, &rc_out);
-
-            /* 日志：轮次结果 */
-            if (display.valid) {
-                uart_puts("[RC] round=");
-                uart_put_dec(rc_out.round_seq);
-                uart_puts(" decision=");
-                uart_puts(cpu_decision_text(display.decision));
-                uart_puts(" exec=");
-                uart_puts(cpu_execution_text(display.execution));
-                uart_puts(" reason=");
-                uart_puts(cpu_reason_text(display.reason));
-                uart_puts(" is_target=");
-                uart_put_dec(display.is_target);
-                uart_puts(" req_grab=");
-                uart_put_dec(rc_out.request_arm_grab);
-                uart_puts("\r\n");
-            }
-
-            /* ACK 日志 */
-            if (rc_out.event_ack_valid) {
-                uart_puts("[RC] ACK seq=");
-                uart_put_dec(rc_out.event_ack_seq);
-                uart_puts(" status=");
-                uart_puts(rc_out.event_ack_status == ROUND_EVENT_ACK_ACCEPTED
-                          ? "ACCEPTED" : "REJECTED");
-                uart_puts("\r\n");
-            }
-
-            /* P1-2: 按适配器返回值分派解锁/复位。
-             * 1 = REMOVE_CONFIRM accepted → 解锁 matcher
-             * -1 = SESSION_RESET accepted → 重新初始化 */
-            if (rc_ret == 1) {
-                task_matcher_next_round();
-                uart_puts("[RC] REMOVE accepted, matcher unlocked\r\n");
-            } else if (rc_ret == -1) {
-                /* SESSION_RESET：重设 RC + matcher */
-                uint32_t t0 = get_now_ms();
-                round_controller_config_t cfg;
-                cfg.acquire_timeout_ms = 3000u;
-                cfg.arm_timeout_ms     = 15000u;
-                round_controller_init(&rc, &cfg, t0);
-                {
-                    round_controller_input_t  rc_in;
-                    round_controller_output_t ro;
-                    memset(&rc_in, 0, sizeof(rc_in));
-                    rc_in.now_ms = t0;
-                    rc_in.event_valid = 1;
-                    rc_in.event_seq   = 1;
-                    rc_in.event       = ROUND_EVENT_APPLY_CONFIG;
-                    round_controller_tick(&rc, &rc_in, &ro);
-                }
-                uart_event_seq = 2;
-                task_matcher_round_reset();
-                uart_puts("[RC] SESSION_RESET: RC + matcher re-initialized\r\n");
-            }
-        }
-
         /* ---- 全局状态提交 ----
-         * ARM_STATE: ARM_DISABLED 期间固定输出 IDLE。队友 arm_controller
-         * 负责在抓取/分拣时更新为 GRABBING 等实际状态。
+         * ARM state is an explicit arm_runtime APB/OSD mapping, never the
+         * raw arm_controller enum.  The disabled default reports DISABLED.
          * ERROR_CODE: 本轮 + 历史未提交错误的累积。
          * commit_global 失败 → latched_err 锁存，下轮重试提交。
          * commit_global 成功 → latched_err 清零，错误已送达 FPGA。 */
-        board_io_write_global_state(ARM_STATE_IDLE, loop_err);
+        board_io_write_global_state((uint8_t)arm_status.apb_state, loop_err);
         if (board_io_commit_global(&seq_cam0) != 0) {
             /* commit_global 失败：当前 loop_err（含可能的历史锁存 + 本轮新错误）
              * 未能写入 FPGA 寄存器。锁存到下一轮重试。
