@@ -27,6 +27,19 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-14，来源：用户批准 / Codex执行M0基线审计
+  - 适用范围：分赛区决赛视频工程基线、单摄系统架构、CPU/机械臂迁移与M0基线复现；不表示新构建、单摄裁剪、SoC/APB/OSD或机械臂闭环。
+  - 最新结论：候选新主线改为`competition_project_single_camera/`，视频基线来自已在J48/ch0稳定输出真实摄像头到HDMI的`D:\TJ375N529_SC431HAI2LCD_Demo_V3`。仅废弃`final_project`双摄视频工程的继续演进；其CPU五色/四任务、单一`round_controller`、16位事件/ACK、myCobot协议/控制器和Host测试作为选择性迁移来源。新路线采用单个斜上方摄像头、固定投放点、可配置识别框、硬核QCRV32、UART先行、最终HDMI OSD，并按任务一五色→任务二CUBE/NON_CUBE→任务三/四尺寸→F1四任务20轮→F2机械臂推进。
+  - 交互冻结：第一版只使用`PLACE`和独立`ABANDON`小闭环，不设`REMOVE`、自动空场互锁或复杂按键菜单；目标配置开发期走UART。尺寸在标定前必须输出`UNAVAILABLE`。F1保持`ARM_ENABLED=0`。
+  - 工程与同步边界：候选正式源码位于仓库，D盘后续仅作为人工Efinity构建/烧录镜像；Codex负责差异检查和增量同步，用户只负责综合、烧录和反馈。每个FPGA Gate均须回归J48/ch0到HDMI画面，任何回归立即停止并回退。
+  - M0执行结果：按`mem_test.xml`引用和编译期依赖建立白名单，共复制75个文件到新工程，D盘与仓库副本SHA-256为75/75一致；53个设计文件、2个IP设置、SDC和4个include/mem依赖全部存在。首次D盘同步为75项`NO_OP_MATCH`，未覆盖或修改D盘。历史bitstream身份已冻结为`A99F14AB8922783C51A71953288F9A25DE1C70DC3E3962F5508BBF53EF75057C`，用户已确认它可稳定显示J48/ch0真实画面。
+  - 构建风险：历史Efinity 2025.2.288.4.15 flow从map到bitstream成功，资源ADD 2416/LUT4 14540/FF 11516/RAM10 211/DPRAM10 4，CDC报告无Synchronizer warning；但timing报告存在跨时钟setup负slack，最差`mipi_clk -> i_sysclk_div2 = -1.433ns`，因此只能称历史可运行基线，不能称STA PASS或warning可忽略。
+  - 当前发现：D盘除官方目录结构外还存在`outflow_ch0_*`、多个`work_*`、`.lock`、源码内`.bak`和仿真数据库，因此M0采用白名单复制，未把整个D盘目录视为干净官方原版，也未删除任何历史产物。
+  - 替代旧结论：替代继续以`final_project/fpga`修复双摄、PNR和SoC作为默认正式视频主线；不删除旧工程，不覆盖其历史验证结论，也不改变`AGENTS.md`中的FPGA/CPU/PC职责和机械臂安全硬边界。
+  - 证据路径：`competition_project_single_camera/docs/review_packets/m0_demo_baseline_review_packet_20260714.md`、`competition_project_single_camera/docs/baseline/m0_source_manifest_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_historical_build_artifacts_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_initial_d_drive_sync_20260714.csv`。
+  - 下一步门禁：用户按`competition_project_single_camera/docs/debug_sessions/m0_manual_build_board_check_20260714.md`手动运行完整Efinity构建、烧录、3次冷启动和10分钟画面复现。全部通过前，不裁剪ch1/DSI、不生成SoC、不迁移CPU、不修改视频链。
+  - NOT VERIFIED：仓库副本对应的新Efinity构建/bitstream、重新烧录和画面复现、历史负slack约束安全性、单摄裁剪、SoC资源、UART1、APB、特征、按键、OSD、四任务、20轮和机械臂均未验证。
+
 - 日期：2026-07-14，来源 Agent：Codex（队友 CPU 分支 + Fable 整改 + 个人 UART2 证据集成）
   - 适用范围：`dev/wsc6090-CPU@885e97a`、`codex/fable5-remediation-20260713@758e864` 与个人证据分支的本次集成；不表示正式 SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
   - 最新结论：保留队友 CPU 分支新增的 `arm_busy` 发起动作安全门，以及 abandon、机械臂运动期软复位/放弃锁定、故障、超时和任务匹配补测；同时以 Fable 整改后的 16-bit `event_seq`/ACK ABI 为当前契约，采用半范围新旧判定，支持 `65535 -> 0`，拒绝重复、倒退和差值为 32768 的歧义事件。事件消费继续显式返回 `ACCEPTED`/`REJECTED`，1000 事件随机流也纳入回归。`vision_classifier.c` 的零结果常量改为标准 C 显式 `{0}` 初始化，以通过 MSVC `/W4 /WX`，不改变分类语义。

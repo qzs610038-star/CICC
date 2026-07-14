@@ -1,0 +1,30 @@
+# Efinity working/output trees, including checkpoint-specific names
+outflow*/
+work_*/
+.metadata/
+.lock
+
+# Generated debug and database products
+*.vdb
+*.qdb
+*.db
+*.lbf
+*.lpf
+*.rs
+*.map.out
+*.place.out
+*.route.out
+*.tcl.out
+*.pgm.out
+*.raminfo.pb
+*.troutingtraces
+
+# Simulation products
+**/work/
+*.wlf
+*.vcd
+*.gtkw
+
+# Local backup files
+*.bak
+
