@@ -1,6 +1,7 @@
 OUTPUT_ARCH( "riscv" )
 
-ENTRY( _startup )
+/* Keep this test-only linker entry aligned with qemu_test_startup.S. */
+ENTRY( _start )
 
 MEMORY
 {
