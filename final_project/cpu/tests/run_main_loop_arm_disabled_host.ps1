@@ -1,5 +1,6 @@
 param(
-    [string]$VcVars64 = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+    [string]$VcVars64 = "",
+    [ValidateSet('auto', 'msvc', 'gcc')][string]$Compiler = 'auto'
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +11,7 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $cpuDir)
 $includeDir = Join-Path $cpuDir "app\include"
 $srcDir = Join-Path $cpuDir "app\src"
 $testSource = Join-Path $testDir "test_main_loop_arm_disabled.c"
-# 与 main.c 链接同一份 adapter 实现（P1-1 关键：测试真实覆盖 main.c 适配代码）
+# 直接链接候选 adapter 实现；当前正式 main.c 待 G4 事件源/时基后再启用。
 $adapterSource = Join-Path $srcDir "main_loop_adapter.c"
 $semanticsSource = Join-Path $srcDir "cpu_result_semantics.c"
 $adaptersSource = Join-Path $srcDir "cpu_result_semantics_adapters.c"
@@ -19,29 +20,62 @@ $matcherSource = Join-Path $srcDir "task_matcher.c"
 $buildDir = Join-Path $testDir "build\main_loop_arm_disabled_host"
 $exePath = Join-Path $buildDir "test_main_loop_arm_disabled.exe"
 
+function Resolve-VcVars64([string]$RequestedPath) {
+    if ($RequestedPath) {
+        if (-not (Test-Path -LiteralPath $RequestedPath)) {
+            throw "Explicit vcvars64 path does not exist: $RequestedPath"
+        }
+        return (Resolve-Path -LiteralPath $RequestedPath).Path
+    }
+    if ($env:VCVARS64_PATH -and (Test-Path -LiteralPath $env:VCVARS64_PATH)) {
+        return (Resolve-Path -LiteralPath $env:VCVARS64_PATH).Path
+    }
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path -LiteralPath $vswhere) {
+        $install = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+        if ($LASTEXITCODE -eq 0 -and $install) {
+            $candidate = Join-Path ($install | Select-Object -First 1) `
+                'VC\Auxiliary\Build\vcvars64.bat'
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+    }
+    return $null
+}
+
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
 $mingwGcc = Join-Path $repoRoot "tools\mingw64\bin\gcc.exe"
+$resolvedVcVars64 = if ($Compiler -ne 'gcc') { Resolve-VcVars64 $VcVars64 } else { $null }
+$useMsvc = ($Compiler -eq 'msvc') -or ($Compiler -eq 'auto' -and $resolvedVcVars64)
+$useGcc = ($Compiler -eq 'gcc') -or ($Compiler -eq 'auto' -and -not $resolvedVcVars64)
+if ($Compiler -eq 'msvc' -and -not $resolvedVcVars64) {
+    throw 'MSVC requested but vcvars64.bat could not be resolved.'
+}
+if ($Compiler -eq 'gcc' -and -not (Test-Path -LiteralPath $mingwGcc)) {
+    throw "GCC requested but repo compiler is missing: $mingwGcc"
+}
 
 Push-Location $buildDir
 try {
-    if (Test-Path -LiteralPath $VcVars64) {
+    if ($useMsvc) {
         Write-Output "[compiler] MSVC cl.exe (/W4 /WX)"
         $compile = 'call "{0}" >nul && cl /nologo /std:c11 /utf-8 /W4 /WX ' +
                    '/DAPB_VISION_BASE_PLACEHOLDER=0x40000000u /I"{1}" ' +
                    '"{2}" "{3}" "{4}" "{5}" "{6}" "{7}" /Fe:"{8}"'
-        $compile = $compile -f $VcVars64, $includeDir, $testSource,
+        $compile = $compile -f $resolvedVcVars64, $includeDir, $testSource,
             $adapterSource, $semanticsSource, $adaptersSource,
             $controllerSource, $matcherSource, $exePath
         & cmd.exe /d /c $compile
     }
-    elseif (Test-Path -LiteralPath $mingwGcc) {
-        Write-Output "[compiler] repo mingw64 gcc (-Wall -Wextra -Werror -Wno-error=cpp)"
+    elseif ($useGcc -and (Test-Path -LiteralPath $mingwGcc)) {
+        Write-Output "[compiler] repo mingw64 gcc (-Wall -Wextra -Wshadow -Werror -Wno-error=cpp)"
         Push-Location $repoRoot
         $relInc = "final_project\cpu\app\include"
         $relSrc = "final_project\cpu\app\src"
         $relTest = "final_project\cpu\tests"
-        & $mingwGcc -std=c11 -Wall -Wextra -Werror -Wno-error=cpp "-DAPB_VISION_BASE_PLACEHOLDER=0x40000000u" "-I$relInc" "$relTest\test_main_loop_arm_disabled.c" "$relSrc\main_loop_adapter.c" "$relSrc\cpu_result_semantics.c" "$relSrc\cpu_result_semantics_adapters.c" "$relSrc\round_controller.c" "$relSrc\task_matcher.c" -o $exePath
+        & $mingwGcc -std=c11 -Wall -Wextra -Wshadow -Werror -Wno-error=cpp "-DAPB_VISION_BASE_PLACEHOLDER=0x40000000u" "-I$relInc" "$relTest\test_main_loop_arm_disabled.c" "$relSrc\main_loop_adapter.c" "$relSrc\cpu_result_semantics.c" "$relSrc\cpu_result_semantics_adapters.c" "$relSrc\round_controller.c" "$relSrc\task_matcher.c" -o $exePath
         Pop-Location
     }
     else {

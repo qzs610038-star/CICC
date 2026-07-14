@@ -58,8 +58,18 @@ foreach ($tool in @($gcc, $objcopy, $objdump, $nm)) {
 $allowedWarningPattern = 'warning: #warning "APB3 base address not provided by soc\.h'
 $observedAllowedWarnings = [System.Collections.Generic.List[string]]::new()
 function Invoke-StrictNative([string]$Label, [string]$Tool, [string[]]$Arguments) {
-    $output = @(& $Tool @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    # Windows PowerShell may turn native stderr records into terminating
+    # NativeCommandError objects when the script-wide preference is Stop.
+    # Capture the complete compiler diagnostic first, then enforce the exit
+    # code and warning allowlist ourselves below.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $Tool @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $outputText = @($output | ForEach-Object { [string]$_ })
     $warningLines = @($outputText | Where-Object { $_ -match '(?i)\bwarning:' })
     $unexpectedWarnings = @($warningLines | Where-Object {
@@ -115,6 +125,9 @@ $sources = if ($Profile -eq 'competition') {
         (Join-Path $srcDir 'param_table.c'),
         (Join-Path $srcDir 'task_matcher.c'),
         (Join-Path $srcDir 'round_controller.c'),
+        (Join-Path $srcDir 'cpu_result_semantics.c'),
+        (Join-Path $srcDir 'cpu_result_semantics_adapters.c'),
+        (Join-Path $srcDir 'main_loop_adapter.c'),
         (Join-Path $srcDir 'arm_runtime.c')
     )
 } else {

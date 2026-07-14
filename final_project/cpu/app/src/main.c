@@ -23,6 +23,8 @@
 #include "arm_build_profile.h"
 #include "arm_runtime.h"
 #include "board_io.h"
+#include "cpu_result_semantics.h"
+#include "cpu_result_semantics_adapters.h"
 #include "vision_classifier.h"
 #include "param_table.h"
 #include "round_controller.h"
@@ -379,8 +381,21 @@ int main(void)
              * source is connected.  The runtime remains the sole gateway. */
             (void)arm_runtime_accept_request(&arm_runtime);
         }
-        if (competition_round_out.result_valid) {
-            action = competition_round_out.decision_action;
+        /* wsc unified semantics is the only projection from the round
+         * transaction to the externally visible decision.  It validates the
+         * action/reason/is_target combination and fails closed on any
+         * contradiction.  This is CPU-internal only; no APB/OSD wire ABI is
+         * claimed here. */
+        cpu_display_result_t display_result;
+        cpu_display_from_round_output(&competition_round_out, &display_result);
+        if (display_result.valid) {
+            if (display_result.decision == CPU_DECISION_EXECUTE) {
+                action = MATCH_ACTION_GRAB;
+            } else if (display_result.decision == CPU_DECISION_SKIP) {
+                action = MATCH_ACTION_SKIP;
+            } else {
+                action = MATCH_ACTION_NONE;
+            }
         }
         if (legacy_match_action != MATCH_ACTION_NONE) {
             uart_puts(" [LEGACY_MATCH_NO_ROUND]");

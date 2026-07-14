@@ -27,6 +27,17 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
+  - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
+  - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。
+  - 接入结论：同步 main 后丢失的状态口径已纠正。正式 `main.c` 现在消费 `cpu_display_from_round_output()`，以统一语义层校验 action/reason/is_target 并对矛盾组合 fail closed；`main_loop_adapter.c` 已进入 competition 目标构建清单，但在 G4 取得受审事件源和单调时基前不由正式 main 调用。禁止恢复 wsc 旧版未受审 UART 单字符事件和直接 CLINT 假设。
+  - 目标构建：Efinity RISC-V GCC 8.3.0 对 `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS，制品继续标记 `NOT_FOR_FLASH`，UART2/real transport 继续被排除；构建器同时修复 Windows PowerShell 原生 stderr 被提前升级为异常、导致完整 gcc 诊断丢失的问题，warning allowlist 与退出码门保持不变。
+  - 环境差异记录：wsc 原环境报告 MinGW GCC 14.2.0 下 `374/374`、`117/117` PASS；Codex 修复前在 MSVC `/W4 /WX` 因 C4456 于断言执行前失败。该差异由警告策略不对称暴露了真实测试可移植性问题，不构成 CPU 功能逻辑失败。Codex 本机无 PATH gcc、也无仓库 `tools/mingw64/bin/gcc.exe`，带 `-Wshadow` 的 GCC 复验仍需 wsc 在其环境执行。
+  - 替代旧结论：替代下方 2026-07-14 条目中“main.c 与 Host 测试链接同一 main_loop_adapter 实现”和“MSVC 本机不可用”的旧口径；旧 Host 结果保留为 wsc 原环境证据，不再描述当前正式 main 接入状态。
+  - 证据路径：`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/build_tools/build_arm_profile.ps1`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/docs/review_packets/wsc_cpu_mycobot_integration_acceptance_20260715.md`。
+  - 下一门：由 wsc 在同一集成 commit 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
+  - 失效条件：集成 commit、语义枚举、main/adapter 接法、构建源码清单、编译器 flags 或目标工具链发生变化，或任一回归失败。
+
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
   - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
   - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
@@ -81,9 +92,9 @@
     - 主动 ARM_FAULT 与机械臂等待超时在本层仍同映射 ARM_FAULT→FAULT（未拆分，待后续接入时决定）。
   - 失效条件：cpu_result_semantics 接口/枚举语义变更、main.c/APB/OSD 接入后行为改变，或后续回归重跑失败。
 
-- 日期：2026-07-14，来源 Agent：Claude（Fable 5，ARM_DISABLED Host/mock main loop adapter Gate APPROVE）
-  - 适用范围：`main_loop_adapter` ARM_DISABLED 主循环适配器（含 `main_loop_adapter.c/.h`、`task_matcher` 的 `_return_match()`/`get_last_match()` 真值 reason、`main.c` 的 `#ifndef ARM_DISABLED` 可覆盖开关与适配器调用）；不适用于 APB/OSD wire ABI、UART2、真实机械臂、板级闭环。
-  - 最新结论：ARM_DISABLED Host/mock 主循环适配器已完成并通过 Gate APPROVE。三个 P1 全部关闭：(P1-1) `main_loop_arm_disabled_step()` 抽出为独立函数，main.c 和 Host 测试链接同一份 `main_loop_adapter.c`，测试真实覆盖 main.c 适配代码；(P1-2) `attempted_event` 精确保存，只在 `REMOVE_CONFIRM+ACCEPTED` 时返回 1（ABANDON 不冒充 REMOVE），`SESSION_RESET+ACCEPTED` 返回 -1；(P1-3) `task_matcher_evaluate()` 的 `_return_match()` 保存完整 `task_match_result_t`（含真实 color/shape/size reason），`main.c` 通过 `task_matcher_get_last_match()` 获取，不再硬编码 `COLOR_MISMATCH`。
+- 日期：2026-07-14，来源 Agent：Claude（Fable 5，ARM_DISABLED Host/mock main loop adapter Gate APPROVE；当前接入状态由 2026-07-15 条目覆盖）
+  - 适用范围：`main_loop_adapter` ARM_DISABLED 候选适配器（含 `main_loop_adapter.c/.h`、`task_matcher` 的 `_return_match()`/`get_last_match()` 真值 reason）；不适用于当前正式 main 接入、APB/OSD wire ABI、UART2、真实机械臂或板级闭环。
+  - 最新结论：ARM_DISABLED Host/mock 候选适配器已完成并通过其原环境 Gate。三个 P1 在候选实现内关闭：(P1-1) `main_loop_arm_disabled_step()` 抽出为独立函数并由 Host 测试直接链接；(P1-2) `attempted_event` 精确保存，只在 `REMOVE_CONFIRM+ACCEPTED` 时返回 1（ABANDON 不冒充 REMOVE），`SESSION_RESET+ACCEPTED` 返回 -1；(P1-3) `task_matcher_evaluate()` 的 `_return_match()` 保存完整 `task_match_result_t`（含真实 color/shape/size reason）。当前正式 main 仅接入统一结果语义投影，adapter 待 G4 事件源/时基后再接。
   - 验证（2026-07-14 复跑；本机 repo mingw64 gcc 14.2.0，`-Wall -Wextra -Werror -Wno-error=cpp`）：
     - test_main_loop_arm_disabled：**117/117 PASS**（16 测试）
     - test_cpu_result_semantics：**374/374 PASS**（回退无）

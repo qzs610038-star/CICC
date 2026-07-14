@@ -1,8 +1,8 @@
 /*==========================================================================
  *  test_main_loop_arm_disabled.c  —  ARM_DISABLED Host/Mock 测试
  *
- *  链接 main_loop_adapter.c（与 main.c 同一份实现），保证测试真实覆盖
- *  所有 main.c 适配代码（P1-1）。
+ *  直接链接 main_loop_adapter.c，覆盖候选 ARM_DISABLED 单步逻辑。
+ *  当前正式 main.c 在 G4 取得受审事件源/单调时基前不调用该适配器。
  *
  *  覆盖：
  *    - 非目标 SKIP（color/shape/size 三类真实 reason）                (P1-3)
@@ -47,11 +47,12 @@ static void _check(const char *file, int line, int cond, const char *msg)
 #define TEST(name) \
     printf("  %-64s", name " "); fflush(stdout); _test_start = _test_failures
 #define PASS() \
-    do { int d = _test_failures - _test_start; \
-         if (d == 0) printf("PASS\n"); else printf("%d FAILED\n", d); } while (0)
+    do { int pass_failure_delta = _test_failures - _test_start; \
+         if (pass_failure_delta == 0) printf("PASS\n"); \
+         else printf("%d FAILED\n", pass_failure_delta); } while (0)
 
 /*==========================================================================
- *  测试夹具 — 调用 main_loop_arm_disabled_step()（与 main.c 同一实现）
+ *  测试夹具 — 调用候选 main_loop_arm_disabled_step() 实现
  *==========================================================================*/
 
 /* 快捷：初始化 RC + 发送 APPLY_CONFIG */

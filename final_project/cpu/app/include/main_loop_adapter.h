@@ -1,8 +1,9 @@
 /*==========================================================================
  *  main_loop_adapter.h  —  ARM_DISABLED 主循环适配器（可测试函数）
  *
- *  从 main.c 提取的 round_controller + cpu_result_semantics 集成逻辑。
- *  main.c 和 Host 测试链接同一份实现，保证测试真实覆盖所有适配代码。
+ *  从 wsc 旧版 main.c 提取的 round_controller + cpu_result_semantics
+ *  单步逻辑。当前正式 main.c 保留 arm_runtime structural bridge，在 G4
+ *  取得受审事件源/单调时基前不调用本适配器；Host 测试直接覆盖本实现。
  *
  *  ARM_DISABLED 约束：
  *    - arm_enabled 固定为 0

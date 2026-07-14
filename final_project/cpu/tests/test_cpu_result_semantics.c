@@ -44,8 +44,9 @@ static void _check(const char *file, int line, int cond, const char *msg)
 #define TEST(name) \
     printf("  %-64s", name " "); fflush(stdout); _test_start = _test_failures
 #define PASS() \
-    do { int d = _test_failures - _test_start; \
-         if (d == 0) printf("PASS\n"); else printf("%d FAILED\n", d); } while (0)
+    do { int pass_failure_delta = _test_failures - _test_start; \
+         if (pass_failure_delta == 0) printf("PASS\n"); \
+         else printf("%d FAILED\n", pass_failure_delta); } while (0)
 
 /*==========================================================================
  *  reason_code_t → 统一理由映射（每个合法值 + 非法值）

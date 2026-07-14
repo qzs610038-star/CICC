@@ -2,7 +2,7 @@
   CPU 端 6 大模块开发计划（识别侧 + 固定点抓取授权）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
-  更新: 2026-07-14（整合队友 CPU 安全补测与 Fable 16-bit 事件契约；板级闭环仍待验证）
+  更新: 2026-07-15（整合 wsc 统一语义层与跨编译器门；板级闭环仍待验证）
 ================================================================================
 
 先看这里：2026-07-12 决赛真实状态（不是代码完成度）
@@ -997,12 +997,13 @@
   状态: ✅ 代码完成 + Host 测试通过（Gate APPROVE）；未接 APB/OSD wire ABI、UART2、真实机械臂、
         板级闭环。Gate 通过，待后续接入。
   文件:
-    - app/include/main_loop_adapter.h         适配器接口声明（P1-1 关键：同一份实现供 main.c + test 链接）
+    - app/include/main_loop_adapter.h         候选 ARM_DISABLED 单步适配器接口（G4 事件源/时基前仅 Host 覆盖）
     - app/src/main_loop_adapter.c             适配器实现（事件注入 + 观测注入 + ARM_DISABLED 安全门 + 返回值语义）
 
   三个 P1 修复（相对首版 main.c 内联代码）:
-    P1-1: 抽出 main_loop_arm_disabled_step() 为独立函数；main.c 和 Host 测试链接同一份 .c，
-          测试真实覆盖 main.c 适配代码（非头文件 inline、非复制粘贴）。
+    P1-1: 抽出 main_loop_arm_disabled_step() 为独立函数，Host 测试直接链接同一份 .c。
+          2026-07-15 融合后，正式 main.c 保留 arm_runtime structural bridge；在 G4
+          取得受审事件源/单调时基前不调用该 adapter，禁止恢复旧 UART/CLINT 注入。
     P1-2: 只在 event==REMOVE_CONFIRM && ACK_ACCEPTED 时返回 1（ABANDON 不冒充 REMOVE）；
           SESSION_RESET 返回 -1 触发全部重新初始化。
     P1-3: SKIP reason 不再硬编码 COLOR_MISMATCH。task_matcher_evaluate() 内部
