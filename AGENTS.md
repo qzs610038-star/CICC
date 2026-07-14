@@ -17,7 +17,7 @@
 ## Codebase Knowledge Graph
 本项目已初始化 codebase-memory-mcp 图谱。Agent 做代码发现时应先使用图谱缩小范围，再回到真实文件核查。
 
-- 默认项目：`D-cicc_cbm-main`（2026-07-14 双分支合并后重建，6078 nodes / 14146 edges）
+- 默认项目：`D-cicc_cbm-main`（2026-07-14 双分支合并后完整重建，6078 nodes；精确边数以 `.codebase-memory/artifact.json` 为准）
 - 兼容别名：`D-cicc_cbm_link` 是旧缓存项目，仅用于历史查询；它缺少本次 `arm_runtime` 和单摄候选符号，不再作为当前图谱真源。
 - 默认入口：`D:\cicc_cbm_link` junction 指向本仓库真实路径。
 - 主图谱 artifact：`.codebase-memory/graph.db.zst`

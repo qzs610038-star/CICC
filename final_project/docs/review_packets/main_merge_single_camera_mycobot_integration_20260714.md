@@ -28,7 +28,7 @@
 | IP `settings.json` | 2/2 JSON 可解析；`base_path=..` | 未验证重新生成行为 |
 | `constrain.sdc` | 存在，55,570 bytes，检出 13 条 `create_clock` | 自动生成文件未手改；历史负 slack 未关闭 |
 | include/mem | XML 引用源与现有 include/mem 依赖均保留 | 未运行 HDL 编译/仿真 |
-| Codebase 图谱 | `D-cicc_cbm-main` 全量重建为 6078 nodes / 14146 edges；可查到 18 个 `arm_runtime` 相关节点与单摄 `white_balance` | 旧 `D-cicc_cbm_link` 保留为历史兼容别名 |
+| Codebase 图谱 | `D-cicc_cbm-main` 全量重建为 6078 nodes；可查到 18 个 `arm_runtime` 相关节点与单摄 `white_balance` | 精确边数见 artifact；旧 `D-cicc_cbm_link` 仅作历史兼容别名 |
 
 镜像 RTL/IP/SDC 保留来源格式，未为消除历史空格而批量格式化；本次 authored 文档与脚本使用排除镜像文件后的 `git diff --check` 验证。
 
