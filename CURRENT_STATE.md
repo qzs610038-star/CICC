@@ -38,9 +38,22 @@
   - 下一门：由 wsc 在同一集成 commit 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
   - 失效条件：集成 commit、语义枚举、main/adapter 接法、构建源码清单、编译器 flags 或目标工具链发生变化，或任一回归失败。
 
+- 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑与独立复核）
+  - 适用范围：PC 端 180°候选五点路径真机初步验证，以及它与板上 CPU G4–G11 路线的边界；不表示官方 180°/最大臂展验收、板上 UART2 或比赛抓放已经闭环。
+  - 分支基线：本地 `main` 已通过 fast-forward 与 `origin/main@39e8a92` 对齐，并从该提交创建 `codex/mycobot-experiment-main-sync-20260714`。原有 `.claude/settings.local.json` 与 `.agents/handoff/`、`.agents/shared/` 仅作为本机状态原样保留，不纳入本分支提交。
+  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变。PC 端真机 A 路线候选路径初步验证为 `PASS_WITH_RISKS`：最新 `auto_run_20260714_204908.log` 在 `COM9` 完成 5/5 连续流程、0 轮人工扶正，日志未记录异常；但这不是官方目标位或板上闭环验收。候选点内部坐标方位差为 177.72°，pick/drop 平面半径约 223.5/223.0 mm；没有外部 180°基准或“臂展最大处”证据。
+  - **已知风险点（板上移植前必须解决）**：
+    1. **drop_hover 长距离过渡固件系统性不收敛**：最新 5/5 轮 step 6 固件均返回 0（未收敛或超时），靠“读实际角度 → max_diff=2.02° ≤ 3° → 软通过”兜底才没熔断。板上 RISC-V 移植时必须实现 `get_angles` 读回 + 3° 容差判断；读回不稳定时该点位不可放行动作。
+    2. **夹爪完全开环，无任何到位反馈**：最新 5 轮 × 每轮 3 次夹爪动作共 15 次 `[GRIP_UNVERIFIED]`，0.8s 是纯定时经验值。板上移植时 0x66/0x67 无 ACK，必须用 0x69 轮询停止 + 0x65 读位置窗口确认；位置读回仍不能单独证明夹持力或未滑落。
+    3. **外部几何与结构风险未关闭**：点位 JSON 无 `external_reference`；内部 177.72°不能替代台面外部量角，约 223 mm 半径未确认是“臂展最大处”。E3 被跳过，本次重复成功只证明当次条件下可运行，不能反推底座刚性风险已关闭。
+  - **E3/E4 状态（2026-07-14 用户决策 + Codex 复核）**：现场因硬件条件跳过 E3 后完成 PC 真机候选路径验证，E4 记为 `PASS_WITH_RISKS`，E3 仍为 `NOT_VERIFIED`。本结果允许明日推进 G4 正式 SoC/PNR、G5 断臂板上模拟和 D2 UART2 无臂回环；不得直接放行真实机械臂接线或动作。
+  - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
+  - 证据路径：`final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`、`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、本机忽略日志 `mycobot_pc_tests/audit_logs/auto_run_20260714_204908.log`（SHA-256 `EB89B99A...F9F475`）、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`。
+  - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
+
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
   - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
-  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
+  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已通过合并提交 `81657c4` 进入 `origin/main@39e8a92`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
   - 检查点结果：MSVC `/W4 /WX` 的 disabled/simulated runtime Host 回归均 PASS；严格 QEMU 两后端 PASS，`scratchpad.lds` 已与 `_start` 统一，逐步编译/链接均检查退出码，1 秒无限循环固件超时注入 PASS。RISC-V `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS；disabled bring-up 现包含固定交错 20 轮零请求自检，未通过放宽 `round_controller_tick` 门规避。`-BoardBuild` 现在在创建输出目录前 fail closed；manifest v2 记录规范构建入口、输入/制品 SHA-256、完整 flags、warning policy，Makefile 仅是该 PowerShell 构建器的薄包装。
   - Gate 状态：G0 PASS；G1 PASS（仅 G0–G3 的 standalone/NOT_FOR_FLASH 构建隔离）；G2 PASS（**structural bridge only**：无受审事件源、无真实时基，legacy matcher 不再冒充逐轮机械臂事务）；G3 PASS（纯软件证据）。G4、正式 SoC/PNR/部署、烧录、J52 和真实机械臂继续 NO-GO。
   - 集成边界：上述代码/脚本已进入 `main` 的软件基线，但只证明 G0–G3 的 Host/QEMU/NOT_FOR_FLASH 软件门；本轮未修改 FPGA、未烧录、未连接 J52/机械臂、未产生 UART2 或动作帧，不能据此宣称 G4 或板级闭环。

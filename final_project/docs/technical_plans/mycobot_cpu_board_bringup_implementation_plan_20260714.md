@@ -1,11 +1,11 @@
 # myCobot 机械臂代码上板详细实施方案
 
 > 日期：2026-07-14
-> 状态：G1–G3 初始草稿检查点已复核；尚未进入 G4，未修改 FPGA 工程、接线或烧录状态。
-> 审计基线：分支 `codex/mycobot-g0-g3-bringup-20260714`，基线提交 `d433bca`；草稿仍为未提交工作树内容。
-> 当前结论：Host 回归通过；QEMU 断言虽运行到 PASS，但测试入口/超时门不完整；RISC-V 四组合为 3/4 PASS。G1、G2、G3 均为 PARTIAL，板上无臂模拟、正式烧录和真实机械臂动作均未放行。
-> 工作区边界：现有 `Makefile/main.c/deploy.bat`、`arm_build_profile.h`、`arm_runtime.*`、`arm_sim_transport.*`、profile/build/test 脚本已经完成只读审查；其来源仍是当前未提交工作树，不得描述为 `d433bca` 已具备。测试临时目录已清理，原有文档和本机配置改动继续保留。
-> 并发记录（已恢复）：最终 QA 时共享工作区曾被外部会话切到无关的 `codex/explore-log-return-20260714`；按用户明确指令已切回 `codex/mycobot-g0-g3-bringup-20260714`。未提交文件完整，未执行清理或提交；后续仍应在写入前核对分支。
+> 状态：G0–G3 纯软件门已复核并进入主线；尚未进入 G4，未修改 FPGA 工程、接线或烧录状态。
+> 审计基线：原实现分支 `codex/mycobot-g0-g3-bringup-20260714@b48973b` 已通过 `81657c4` 合入 `origin/main@39e8a92`；当前机械臂实验续跑分支直接基于该云端主线提交创建。
+> 当前结论：Host disabled/simulated、严格 QEMU、RISC-V 四组合 4/4、ELF/manifest 与 BoardBuild fail-closed 均 PASS，证据只适用于 G0–G3 和 `NOT_FOR_FLASH`。G4 正式 SoC/PNR/部署、板上无臂模拟、正式烧录和真实机械臂动作均未放行。
+> 工作区边界：`Makefile/main.c/deploy.bat`、`arm_build_profile.h`、`arm_runtime.*`、`arm_sim_transport.*` 与 profile/build/test 脚本已经进入主线软件基线；这不代表正式 `soc.h`、板级时基、UART2 transport、bitstream 或机械臂闭环存在。
+> 历史并发记录：最终 QA 时共享工作区曾被外部会话切到无关分支，后已恢复并提交。该记录仅用于追溯，不再描述当前工作区；任何后续修改仍应先核对分支和 dirty 状态。
 > 上位约束：官方比赛细则、`AGENTS.md`、`CURRENT_STATE.md` 和 `competition_score_maximization_execution_plan_20260712.md`。
 > 状态覆盖：更新 2026-07-12/13 机械臂方案中的实现状态；旧方案的物理安全门、接线门和 F1/F2 回退规则继续有效。
 > 协议复核：已按 Elephant Robotics 官方[串口通信协议](https://docs.elephantrobotics.com/docs/mycobot_280_ar_cn/3-FunctionsAndApplications/6.developmentGuide/CommunicationProtocolPackage/18-communication.html)于 2026-07-14 校验；本方案 §3、§4.5、§4.6、G7–G11 已据此收紧。
@@ -24,12 +24,12 @@
 
 | 项目 | 当前证据 | 判定 |
 |---|---|---|
-| CPU 安全契约 | 16-bit `event_seq/ACK`、显式 ACCEPTED/REJECTED、半范围回绕和 `arm_busy` 门已合入 `main@d433bca` | Host 层 GO |
+| CPU 安全契约 | 16-bit `event_seq/ACK`、显式 ACCEPTED/REJECTED、半范围回绕和 `arm_busy` 门已进入 `origin/main@39e8a92` | Host 层 GO |
 | Host/Mock | 基线 skeleton QEMU、`round_controller` 4979/4979 以及新增 disabled/simulated runtime Host 回归均通过 | Host 层 GO |
-| 正式入口 | 工作树 `main.c` 已建立 `main -> round_controller -> arm_runtime` 结构桥，且没有合成未验证事件；尚无真实 `event_valid/observation_valid` 源，时基也只是循环计数 | G2 PARTIAL，不是逐轮闭环 |
-| RISC-V 链接 | `competition+disabled`、`competition+simulated`、`arm_bringup+simulated` 通过；`arm_bringup+disabled` 因 `round_controller_tick` 被回收而被 ELF gate 拒绝 | 3/4 PASS，G3 未完成 |
-| 安全模式 | 工作树已有 disabled/simulated profile、runtime 和模拟 transport；当前 ELF 均标为 `NOT_FOR_FLASH`，真实 UART backend 未加入 | 方向正确，仍须 G1.5–G3.5 加固 |
-| QEMU 门 | disabled/simulated 均运行到断言 PASS，但 linker `ENTRY(_startup)` 与启动文件 `_start` 不一致，`TimeoutSeconds` 未生效 | 条件 PASS，严格门 FAIL |
+| 正式入口 | 主线 `main.c` 已建立 `main -> round_controller -> arm_runtime` 结构桥，且没有合成未验证事件；尚无受审的真实 `event_valid/observation_valid` 源，正式时基也未接入 | G2 软件门 PASS；仍不是板级逐轮闭环 |
+| RISC-V 链接 | `competition/arm_bringup × disabled/simulated` 四组合均通过；disabled bring-up 保留 20 轮零请求自检和 `round_controller_tick` | 4/4 PASS，仅 `NOT_FOR_FLASH` |
+| 安全模式 | disabled/simulated profile、runtime 和模拟 transport 已进入主线；当前 ELF 均标为 `NOT_FOR_FLASH`，真实 UART backend 被排除 | G1–G3 软件门 PASS |
+| QEMU 门 | disabled/simulated 严格运行均 PASS；linker `ENTRY(_start)`、退出码、逐步构建检查与 1 秒超时注入已经闭合 | 严格门 PASS |
 | BSP/SoC | `bsp.h` 和 linker 仍含占位信息；正式构建要求同一 SoC 工程生成的 `soc.h`、linker、startup/debug profile | 正式构建 NO-GO |
 | FPGA 构建 | production/debug map 有记录，但 PNR 仍因大量 IO/outpad 问题失败，无可验收 bitstream/STA | 烧录 NO-GO |
 | 部署 | `cpu/build_tools/deploy.bat` 仍为说明占位，没有经过验证的 Programmer/OpenOCD 命令 | 烧录 NO-GO |
@@ -37,7 +37,7 @@
 | 协议基础 | 当前 C builder 的 `FE FE LEN CMD ... FA`、`LEN=payload+2`、0x20/0x22/0x65/0x66/0x67 和角度 big-endian 缩放与官方示例对齐 | 基础编码 GO，真实事务仍 NO-GO |
 | 协议事务 | 官方规定有返回值命令在 500 ms 内响应，0x22/0x66/0x67/0x29 无返回；当前代码没有 single-flight、expected-command/deadline、STOP/夹爪回读和官方逐关节硬限位 | G7–G11 阻塞 |
 
-因此，当前最合理的推进顺序是：先关闭 G1.5–G3.5 的构建/证据问题，使 G3 真正达到 4/4 严格通过；再闭合 SoC/bitstream/烧录平台，最后才触碰 UART2 和真实机械臂。详细检查点证据见 `../review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md`。
+因此，G1.5–G3.5 不再是待实现项；当前推进顺序是先闭合 G4 的同批次 SoC/bitstream/PNR/烧录真源，再做 G5 机械臂断开的板上模拟，最后才触碰 UART2 和真实机械臂。已关闭检查点证据见 `../review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md`。
 
 ## 3. 不可违反的安全不变量
 
@@ -155,27 +155,27 @@ APP_PROFILE entry
 
 具体命令真值表、实现差距和歧义处理统一维护在 `final_project/integration/mycobot_protocol_notes.md`；任何后续代码不得只凭 `pymycobot has_reply=True` 推断线协议存在 ACK。
 
-## 5. 计划修改的文件
+## 5. 文件状态与后续修改计划
 
-下一会话应小步提交，下面是目标改动面，不表示本轮已经创建这些源码。
+下表同时列出已经进入主线的 G0–G3 文件和仍待 G4–G11 实现的改动面；“已完成”只表示纯软件门，不表示板级或真实机械臂闭环。
 
-| 文件 | 计划动作 | Codex 验收点 |
+| 文件 | 当前/后续动作 | Codex 验收点 |
 |---|---|---|
-| `cpu/app/Makefile` | 从无条件 `src/*.c` 改为显式 common sources + profile entry；显式纳入选定 params 点位源；接受 `APP_PROFILE`、`ARM_BACKEND`、正式 linker/startup/soc 路径 | 默认后端 disabled；无效组合构建失败；两个入口不会同时链接；点位符号可在 ELF 证明 |
-| `cpu/app/include/arm_build_profile.h` | 新增构建枚举、默认值、组合静态检查 | 未定义时为 disabled；real 需要额外显式门 |
-| `cpu/app/include/arm_runtime.h`、`src/arm_runtime.c` | 新增逐轮控制器到动作控制器的唯一适配层和内部状态到 APB/OSD 状态的显式映射 | 请求单次、done/fault/busy 映射、无重复触发；不复用冲突的 ARM_STATE 数值 |
-| `cpu/app/include/arm_sim_transport.h`、`src/arm_sim_transport.c` | 把测试 Mock 抽成无 MMIO 的目标可编译后端 | 支持确定性收敛与故障注入；无 UART 依赖 |
-| `cpu/app/profiles/arm_bringup_main.c` | 新增独立 CPU 上板自检入口 | UART0 输出 build manifest、测试用例和 PASS/FAIL；不访问 APB/UART2 |
-| `cpu/app/src/main.c` | 在 disabled 下最小接入正式 `round_controller` 和 `arm_runtime`，后续再启用 simulated | 不从 matcher 直通 arm；现有识别主循环行为可回归 |
+| `cpu/app/Makefile` | G0–G3 已改为显式 common sources + profile entry；G4 以后再接正式 linker/startup/soc 真源 | 默认后端 disabled；无效组合构建失败；两个入口不会同时链接；正式板级输入仍须独立门 |
+| `cpu/app/include/arm_build_profile.h` | G0–G3 已加入构建枚举、默认值和组合静态检查；REAL 仍未实现/放行 | 未定义时为 disabled；real 需要额外显式门 |
+| `cpu/app/include/arm_runtime.h`、`src/arm_runtime.c` | G0–G3 已建立逐轮控制器到动作控制器的适配层；正式事件源、硬件时基和 APB/OSD 映射仍待 G4+ | 请求单次、done/fault/busy 映射、无重复触发；不复用冲突状态数值 |
+| `cpu/app/include/arm_sim_transport.h`、`src/arm_sim_transport.c` | G0–G3 已提供无 MMIO 的确定性模拟后端和故障注入 | 无 UART 依赖；不得解释为真实 transport |
+| `cpu/app/profiles/arm_bringup_main.c` | G0–G3 已提供独立目标自检入口和 20 轮零请求/模拟检查；G5 才能验证真实板上 UART0 输出 | 不访问 APB/UART2；当前制品不可烧录 |
+| `cpu/app/src/main.c` | G2 已在 disabled 下最小接入 `round_controller` 和 `arm_runtime`；受审事件源和正式时基仍待后续 | 不从 matcher 直通 arm；structural bridge 不冒充逐轮闭环 |
 | `cpu/app/include/bsp.h` | 将正式地址映射到生成 `soc.h`；硬编码地址只允许测试配置 | 正式构建缺真源直接 `#error` |
 | `cpu/app/linker/`、`cpu/bsp_vendor/` | 接入同一 SoC 生成批次的 linker/startup/trap/debug profile，并记录来源与哈希 | 不混用示例工程地址；核对 DDR/RAM origin、`_sidata`、`.data/.bss`、栈、`mtvec` 和异常路径 |
-| `cpu/build_tools/build_arm_profile.ps1` | 新增统一构建包装器和 manifest；按 profile/backend 生成不同文件名 | 记录 commit/profile/backend/soc/linker/hash/flags；禁止 placeholder board build；测试产物不能与可烧录产物同名 |
-| `cpu/build_tools/verify_arm_elf.ps1` | 新增符号与禁用路径检查 | simulated 必须包含 arm/round/sim，且不得包含 UART2 backend；disabled 不得含真实动作路径 |
+| `cpu/build_tools/build_arm_profile.ps1` | G0–G3 统一构建包装器和 manifest 已进入主线；G4 必须另建正式 board-policy verifier 和同批次真源入口 | 已记录 commit/profile/backend/source/hash/flags；placeholder board build fail closed；测试产物不能与可烧录产物同名 |
+| `cpu/build_tools/verify_arm_elf.ps1` | G0–G3 符号、来源和禁用路径检查已进入主线；正式板级制品不得复用该 `NOT_FOR_FLASH` verifier 冒充通过 | simulated 必须包含 arm/round/sim，且不得包含 UART2 backend；disabled 不得含真实动作路径 |
 | `cpu/app/include/mycobot_protocol.h`、`src/mycobot_protocol.c` | G7–G11 补 0x29/0x2B/0x69、0x65/布尔解码、官方长度窗口和关节限位 helper | 官方示例/边界向量通过；未知命令或错误长度不能到达控制器 |
 | `cpu/app/include/mycobot_uart.h`、`src/mycobot_uart.c` | D2 阶段新增 single-flight 有界事务，之后可加 PLIC | 复用现有 `mycobot_transport`；expected command/length、750 ms deadline、迟到/重复/未知计数齐全；不重复造 ring buffer |
 | `cpu/app/include/arm_controller.h`、`src/arm_controller.c` | G10/G11 增加 stop、夹爪确认和 REAL 逐关节绝对限位 | 0x22/0x66/0x67/0x29 均不得等待 ACK；失败停线且保留证据 |
 | `cpu/params/arm_positions_180deg_v1.c/.h` | 动作门后新增版本化点位，不覆盖旧表 | 来源、日期、底板版本、单位、速度和验证证据齐全 |
-| `cpu/tests/test_arm_runtime.c` 及 runner | 新增后端组合和 20 轮端到端测试 | disabled 零请求；simulated 单轮一次；故障可恢复/停线 |
+| `cpu/tests/test_arm_runtime.c` 及 runner | disabled/simulated Host、严格 QEMU、超时注入与 20 轮测试已进入主线；相关源码变化后必须全量复验 | disabled 零请求；simulated 单轮一次；故障可恢复/停线 |
 | `cpu/build_tools/deploy.*` | 只有正式 Programmer/OpenOCD 命令验证后才从占位升级；在此之前调用必须非零退出 | 读取 manifest，显示目标板/bitstream/ELF，默认只 dry-run；禁止现有占位脚本以退出码 0 冒充部署成功 |
 
 ## 6. Codex、用户和共同任务边界
@@ -481,16 +481,16 @@ final_project/docs/debug_sessions/mycobot_cpu_board_run_YYYYMMDD_NN.md
 
 ## 11. 新对话的推荐执行边界
 
-### 11.1 第一轮先关闭 G1.5–G3.5
+### 11.1 G1.5–G3.5 已关闭，只在相关源码变化后复验
 
-当前 G1–G3 已有初始草稿，下一轮由 Codex 在现有分支上做加固，不重复从零实现：修复构建/测试门，收紧 disabled 主循环语义，补齐 simulated 自检，并重跑 Host/QEMU/RISC-V/ELF 矩阵。此轮不打开 Efinity GUI、不修改 FPGA 工程、不烧录、不连接 J52。
+G1.5–G3.5 已通过 `81657c4` 进入 `origin/main@39e8a92`。下一轮不得重复实现；只有相关 CPU 源码、构建器、linker/QEMU runner 或 manifest verifier 变化时，才重跑 Host/QEMU/RISC-V/ELF 矩阵。复验仍不打开 Efinity GUI、不修改 FPGA 工程、不烧录、不连接 J52。
 
-第一轮结束必须交付：
+已归档交付物：
 
-- 修改文件与关键 diff，并逐项关闭 G1–G3 审查包问题；
-- 全部回归命令和日志；
-- 四种 profile/backend 的 4/4 结果及 `arm_bringup + simulated` ELF/map/manifest 生成方法；
-- `nm/map` 证明 arm 代码存在、UART2 backend 不存在；
+- G1–G3 审查包与关键 diff；
+- 全部回归命令和日志摘要；
+- 四种 profile/backend 的 4/4 结果及 ELF/map/manifest 生成方法；
+- `nm/map/objdump` 证明所需 arm 代码存在、UART2 backend 不存在；
 - G4 仍缺的 SoC/PNR/烧录真源清单。
 
 ### 11.2 第二轮在用户准备好硬件后做 G4–G5
@@ -510,21 +510,24 @@ final_project/docs/debug_sessions/mycobot_cpu_board_run_YYYYMMDD_NN.md
 请按 final_project/docs/technical_plans/
 mycobot_cpu_board_bringup_implementation_plan_20260714.md 执行。
 
-当前分支 codex/mycobot-g0-g3-bringup-20260714 已有 G1-G3 初始草稿。
-先阅读 final_project/docs/review_packets/
-mycobot_g1_g3_protocol_checkpoint_review_20260714.md，只关闭 G1.5-G3.5：
-修复 QEMU entry/真实超时/退出码与 warning 门，修复 arm_bringup+disabled，
-补 BoardBuild fail-closed、manifest 哈希/source/flags 和构建入口一致性，
-明确 main 的 structural bridge/时基/legacy matcher 语义，再重跑完整矩阵。
+G0-G3 已通过 81657c4 合入 origin/main@39e8a92；先阅读
+final_project/docs/review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md
+和 CURRENT_STATE.md，不要重复实现或把 NOT_FOR_FLASH 制品烧录上板。
+
+若继续 PC 端 180°实验，按
+final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md
+执行；PC 点位与日志不能替代 G4-G11。
+
+若继续板上路线，先清点 G4 的 Efinity/SoC/PNR/JTAG/UART0 条件，
+生成同批次真源并形成新的 G4 Review Packet；条件不足即停止。
 
 协议真值以 final_project/integration/mycobot_protocol_notes.md 为准；
 0x22/0x66/0x67/0x29 均无 ACK。本轮 G0-G3 不实现真实 UART 命令，
 也不得把模拟 backend 的函数返回解释成真实机械臂完成证据。
 
-本轮不修改 FPGA RTL/SDC/XML，不烧录，不连接 J52 或机械臂，不产生真实 UART2 帧。
-保留当前 dirty 文件；每个 checkpoint 给出修改、测试、未验证项和回退方式。
-只有 Host、严格 QEMU、四种 RISC-V 组合 4/4、ELF/manifest 门全部通过，
-才把 G3 标为 PASS。随后停止，等待我确认是否具备 G4-G5 的板卡/Efinity/JTAG 条件。
+未经新的 G4 Review Packet，不修改 FPGA RTL/SDC/XML，不烧录，不连接 J52 或机械臂，不产生真实 UART2 帧。
+保留现有本机 dirty 文件；每个 checkpoint 给出修改、测试、未验证项和回退方式。
+G3 已是 PASS；现在等待我确认是否具备 G4-G5 的板卡/Efinity/JTAG/UART0 条件。
 ```
 
 ## 12. 完成定义
