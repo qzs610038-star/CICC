@@ -241,20 +241,26 @@ ROM[8'h9d] = {16'h3210,8'h01,1'b0};
 ROM[8'h9e] = {16'h3211,8'h44,1'b0};
 ROM[8'h9f] = {16'h3212,8'h00,1'b0};
 ROM[8'ha0] = {16'h3213,8'h05,1'b0};
+// SC431HAI approximately 3x analogue gain, derived from the public Rockchip
+// driver. Keep digital gain at 1x and leave the vendor exposure unchanged.
+ROM[8'ha1] = {16'h3e06,8'h00,1'b0};
+ROM[8'ha2] = {16'h3e07,8'h80,1'b0};
+ROM[8'ha3] = {16'h3e08,8'h80,1'b0};
+ROM[8'ha4] = {16'h3e09,8'h3e,1'b0};
 
-end 
+end
 // write is unused
-wire [ADDR_WIDTH-1:0] ADDRA = {ADDR_WIDTH{1'b0}}; 
-wire                  WEA   = 1'b0; 
+wire [ADDR_WIDTH-1:0] ADDRA = {ADDR_WIDTH{1'b0}};
+wire                  WEA   = 1'b0;
 always @ (posedge clock)
 begin
     if (WEA) begin
         ROM[ADDRA] <= DATAA;
     end
 end
-   
+
 assign RADDR = addr_ptr;
-   
+
 reg [ROM_SIZE-1:0] RDATA;
 always @ (posedge clock)
 begin
@@ -262,5 +268,5 @@ begin
 end
 
 assign rdata_out = RDATA;
-   
-endmodule			      
+
+endmodule

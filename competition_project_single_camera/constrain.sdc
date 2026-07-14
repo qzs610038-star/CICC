@@ -63,6 +63,10 @@ set_clock_groups -asynchronous -group {mipi_dphy_rx_inst1_byte_clk} -group {mipi
 ############################
  create_clock -period 10.000 -name mipi_rx_ck0_CLKOUT [get_ports {mipi_rx_ck0_CLKOUT}]
  create_clock -period 10.000 -name mipi_rx_ck1_CLKOUT [get_ports {mipi_rx_ck1_CLKOUT}]
+# The CSI byte clocks are recovered independently from each MIPI input. The
+# CSI IP crosses them into i_sysclk_div2 through its asynchronous FIFOs and
+# reset synchronizers; use the actual clock names reported by STA.
+set_clock_groups -asynchronous -group {i_sysclk_div2} -group {mipi_rx_ck0_CLKOUT} -group {mipi_rx_ck1_CLKOUT}
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -max 1.414 [get_ports {mipi_rx_dp00_FIFO_RD}]
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -min -0.006 [get_ports {mipi_rx_dp00_FIFO_RD}]
 set_output_delay -clock mipi_rx_ck0_CLKOUT -reference_pin [get_ports {mipi_rx_ck0_CLKOUT~CLKOUT~25~963}] -max 1.172 [get_ports {mipi_rx_dp00_RST}]

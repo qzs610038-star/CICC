@@ -77,6 +77,7 @@ module soft_mipi_rx_top #(
 //========================================================================== 
 wire mipi_dphy_rx_reset_byte_HS_n;
 wire reset_pixel_n;
+wire reset_mipi_n;
     
 reset
 #(
@@ -102,6 +103,19 @@ inst_pixel_clk_rst
 	.i_arst	(arst_n),
 	.i_clk	(i_sysclk_div2),//pixel_clk
 	.o_srst	(reset_pixel_n)
+);
+
+reset
+#(
+	.IN_RST_ACTIVE	("LOW"),
+	.OUT_RST_ACTIVE	("LOW"),
+	.CYCLE			(3)
+)
+inst_mipi_clk_rst
+(
+	.i_arst	(arst_n),
+	.i_clk	(mipi_clk),
+	.o_srst	(reset_mipi_n)
 );
     
 
@@ -198,9 +212,9 @@ wire sda_padoen_o;
 
 reg [12:0] i2c_rst_cnt = 'd0;
 
-always @( posedge mipi_clk or negedge reset_pixel_n )
+always @( posedge mipi_clk or negedge reset_mipi_n )
 begin
-    if( !reset_pixel_n )
+    if( !reset_mipi_n )
        i2c_rst_cnt <= 'd0;
     else 
        i2c_rst_cnt <= i2c_rst_cnt[12] ? i2c_rst_cnt : i2c_rst_cnt + 1'b1;
