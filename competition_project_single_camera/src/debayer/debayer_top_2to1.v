@@ -1,4 +1,6 @@
-module debayer_top_2to1
+module debayer_top_2to1 #(
+	parameter BAYER_ROW_SWAP = 1'b0
+)
 (
 	input			in_pclk,
 	input			in_rstn,
@@ -104,7 +106,8 @@ inst_rgb_gain
 		raw_to_rgb
 		#(
 			.P_DEPTH	(8),
-			.LEGACY		(1'b1)
+			.LEGACY		(1'b1),
+			.BAYER_ROW_SWAP(BAYER_ROW_SWAP)
 		)
 		inst_raw_to_rgb
 		(

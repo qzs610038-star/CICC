@@ -36,7 +36,16 @@ parameter	HBP				= 8'd88,
 parameter	HFP				= 8'd120,
 parameter	VSP				= 6'd2,
 parameter	VBP				= 6'd20,
-parameter	VFP				= 6'd20
+parameter	VFP				= 6'd20,
+
+// SC431HAI active window starts at odd X/Y coordinates. The framebuffer
+// exposes two adjacent RAW samples, so this switch selects their Bayer phase.
+parameter CH0_BAYER_SWAP_PIXELS = 1'b0,
+parameter CH1_BAYER_SWAP_PIXELS = 1'b0,
+parameter CH0_BAYER_ROW_SWAP    = 1'b1,
+parameter CH1_BAYER_ROW_SWAP    = 1'b1,
+// Keep auto white balance out of the color-order bring-up path.
+parameter HDMI_BYPASS_WHITE_BALANCE = 1'b1
 
 
 )(
@@ -875,6 +884,8 @@ wire [PACK_BIT-1:0] rx_out_data1;
   wire ch0_vs;
   wire ch0_hs;
   wire ch0_de;
+  wire [15:0] ch0_bayer_2pix;
+  assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -1247,7 +1258,9 @@ end
   wire        rgb1_valid;
   wire [47:0] rgb1_datax2;
   
-  debayer_top_2to1 debayer_top
+  debayer_top_2to1 #(
+      .BAYER_ROW_SWAP(CH0_BAYER_ROW_SWAP)
+  ) debayer_top
   (
       .in_pclk		  (i_sysclk_div2),//(i_mipi_rx_pclk ),
       .in_rstn		  (pixel_data_en	),
@@ -1256,7 +1269,7 @@ end
       .raw_hs_i		  (ch0_hs		  ),//(ch1_hs	     ),//	 
       .raw_de_i		  (ch0_de		  ),//(ch1_de	     ),//	
       .raw_valid_i	  (ch0_de	      ),//(ch1_de	     ),//	
-      .raw_datax4_i	  ({ch0_b,ch0_g}  ),//
+      .raw_datax4_i	  (ch0_bayer_2pix ),//
       
       .rgb_vs_o		  (rgb_vs         ),
       .rgb_hs_o		  (rgb_hs         ),
@@ -1267,7 +1280,9 @@ end
   
 
 
-  debayer_top_2to1 debayer_top1
+  debayer_top_2to1 #(
+      .BAYER_ROW_SWAP(CH1_BAYER_ROW_SWAP)
+  ) debayer_top1
   (
       .in_pclk		  (i_sysclk_div2),//(i_mipi_rx_pclk ),
       .in_rstn		  (pixel_data_en	),
@@ -1276,7 +1291,7 @@ end
       .raw_hs_i		  (ch1_hs		  ),//(ch1_hs	     ),//	 
       .raw_de_i		  (ch1_de		  ),//(ch1_de	     ),//	
       .raw_valid_i	  (ch1_de	      ),//(ch1_de	     ),//	
-      .raw_datax4_i	  ({ch1_b,ch1_g}  ),//
+      .raw_datax4_i	  (CH1_BAYER_SWAP_PIXELS ? {ch1_b, ch1_g} : {ch1_g, ch1_b}),//
       
       .rgb_vs_o		  (rgb1_vs         ),
       .rgb_hs_o		  (rgb1_hs         ),
@@ -1297,6 +1312,13 @@ wire            wb1_hs_out;
 wire            wb1_vs_out;
 wire            wb1_de_out;
 wire [47:0]     wb1_data_out;
+// debayer_top_2to1 packs {B,G,R,B,G,R}; HDMI consumes {R,G,B} pixels.
+wire [47:0] rgb0_data_rgb = {rgb_datax2[31:24], rgb_datax2[39:32], rgb_datax2[47:40],
+                             rgb_datax2[7:0],   rgb_datax2[15:8],   rgb_datax2[23:16]};
+wire            hdmi0_hs_out   = HDMI_BYPASS_WHITE_BALANCE ? rgb_hs : wb0_hs_out;
+wire            hdmi0_vs_out   = HDMI_BYPASS_WHITE_BALANCE ? rgb_vs : wb0_vs_out;
+wire            hdmi0_de_out   = HDMI_BYPASS_WHITE_BALANCE ? rgb_de : wb0_de_out;
+wire [47:0]     hdmi0_data_out = HDMI_BYPASS_WHITE_BALANCE ? rgb0_data_rgb : wb0_data_out;
 white_balance u0_white_balance (
     .clk            (i_sysclk_div2),
     .rst_n          (pixel_data_en      ),
@@ -1465,13 +1487,13 @@ end
 
 always @( posedge hdmi_tx_slow_clk )
 begin
-    rgb_vs_r <= wb0_vs_out     ;
-    rgb_hs_r <= wb0_hs_out     ;
-    rgb_de_r <= wb0_de_out     ;
+    rgb_vs_r <= hdmi0_vs_out   ;
+    rgb_hs_r <= hdmi0_hs_out   ;
+    rgb_de_r <= hdmi0_de_out   ;
     if( sel ) begin 
-            rgb_datax1 <= wb0_data_out[47:24] ;
+            rgb_datax1 <= hdmi0_data_out[47:24] ;
     end else begin
-        rgb_datax1 <= wb0_data_out[23:0] ;
+        rgb_datax1 <= hdmi0_data_out[23:0] ;
     end
 end
   hdmi_top  hdmi_top_inst (

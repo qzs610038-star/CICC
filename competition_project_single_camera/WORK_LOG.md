@@ -317,3 +317,58 @@ git status --short --branch
 - 结果：`STATIC PASS / BOARD NOT VERIFIED`。
 - NOT VERIFIED：Efinity Map/PNR/bitstream；烧录后蓝/红/白色画面的恢复程度；三次冷启动、10 分钟稳定性、原始 HDMI 抓帧；Bayer phase、镜头焦距和照明条件。
 - 下一步门禁：用户以 D 盘工程完成完整 Efinity flow 后，反馈 Map/PNR/bitstream、蓝/红/白物体画面和是否仍有真实拖影；仅在新画面仍明显偏色时再讨论 Bayer phase 或传感器寄存器，禁止盲目改动帧缓存/HDMI 链路。
+
+### [M0-10] 用户现场反馈：白平衡修复后蓝变黄、红变紫
+
+- 触发：用户烧录 M0-09 版本后提供新的蓝/红实物对照图，并明确左侧实物为蓝色、右侧实物为红色；画面中分别呈黄色和紫色。
+- 用户现场反馈：
+  - 截图文件：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-c4d2f4fb-559f-41d1-adc2-1ee16d5fe0fd.png`。
+  - 结论：M0-09 不能作为颜色修复完成；自动白平衡改变了色彩，但未恢复正确颜色。
+- 复核与结论：
+  - 取消“自动白平衡是最高优先级根因”的结论。蓝变黄、红变紫更符合 Bayer 相位或 RAW 双像素顺序错误，而非单纯 R/B 字节整体交换。
+  - 正式工程 `src/top.v` 将帧缓存的两个 RAW8 样本固定送入 Debayer；该阶段的 `ch*_g/ch*_b` 仅是 RAW 容器名称，不是颜色通道。
+  - 传感器初始化 ROM 设置有效窗口起点为 `X=0x0007`、`Y=0x00b3`，均为奇数。原始 `raw_to_rgb.v` 把首行 Bayer 相位硬编码，未将裁剪起点奇偶性作为参数。
+  - 历史 `final_project` 审计记录已将 `{ch*_g,ch*_b}` 与 `{ch*_b,ch*_g}` 的选择登记为真实 Bayer 相位风险，并提供可切换开关；当前正式工程缺少该控制。
+  - 外部 SC431 Bayer 阵列检索未获得可验证资料（搜索超时或索引限流），因此不把原生阵列类型标为已证实。
+- D 盘同步前核查：用户要求以正式工程 `white_balance.v` 为准。两份文件内容级 `git diff --no-index` 无差异，初始 SHA-256 不同是 LF/CRLF 行尾差异；随后按用户指令以正式工程版本同步到 D 盘。
+- NOT VERIFIED：SC431 原生 Bayer 阵列；目前截图是否为本轮完整构建的 bitstream；本轮实际 Map/PNR/bitstream 结果。
+
+### [M0-11] Bayer 相位参数化、HDMI 显式 RGB 与白平衡旁路
+
+- 触发：M0-10 已证明只修正白平衡不足；用户要求全面排查并修复。
+- 目标：仅在 RAW→Debayer→HDMI 的颜色解释边界修复问题，保持 MIPI 接收、RAW10 截取、DDR 帧缓存、HDMI 时钟、SDC、XML、IP 和板级引脚不变。
+- 修改文件：
+  - `src/top.v`。
+  - `src/debayer/debayer_top_2to1.v`。
+  - `src/debayer/raw_to_rgb.v`。
+- 实际修改：
+  - 新增 `CH0_BAYER_SWAP_PIXELS` / `CH1_BAYER_SWAP_PIXELS` 参数，显式选择帧缓存导出的两个相邻 RAW 样本顺序。
+  - 新增 `CH0_BAYER_ROW_SWAP` / `CH1_BAYER_ROW_SWAP` 参数，将裁剪起点导致的首行 Bayer 相位纳入 Debayer；默认 `1'b1` 对应当前 ROM 的奇数 `Y=0x00b3` 起点。
+  - 默认 `CH*_BAYER_SWAP_PIXELS=1'b0`，即使用 `{ch*_g,ch*_b}`；若上板红/蓝仍不正确，可只翻转该单一参数为 `1'b1`，不重构链路。
+  - `raw_to_rgb.v` 新增 `BAYER_ROW_SWAP` 参数，以 `r_y_cnt[0] ^ BAYER_ROW_SWAP` 选择两种已有插值分支；未改插值算术、行缓冲或数据位宽。
+  - `debayer_top_2to1.v` 将行相位参数传给 `raw_to_rgb`，接口除参数外不变。
+  - HDMI 主路径默认旁路自动白平衡，直接使用 Debayer 输出；新增明确的 `{B,G,R,B,G,R}` → `{R,G,B,R,G,B}` 重排，避免 HDMI 将 BGR 数据误作 RGB。
+  - 保留 `white_balance` 实例与 M0-09 修复版本，但它不再参与 HDMI 颜色基线；待 Bayer 相位正确后才考虑重新启用。
+- 静态验证：
+  - `PASS`：工程参数列表闭合。
+  - `PASS`：ch0 双像素相位开关、行相位开关和 Debayer 实例参数均连通。
+  - `PASS`：Debayer 的行相位参数传递到 `raw_to_rgb`，且 XOR 分支存在。
+  - `PASS`：HDMI 使用唯一、显式的 BGR→RGB 重排，并在默认下旁路白平衡。
+  - `PASS`：`mem_test.xml` 已引用三个修改 RTL 与 `white_balance.v`，无需修改工程 XML。
+  - `NOT VERIFIED`：本机未找到 `iverilog`、`verilator` 或 `vlog`，未做本地 HDL 编译/仿真；Efinity Map/PNR/bitstream 与板级颜色仍由用户验证。
+- D 盘写入：待本条后的哈希一致性同步完成后记录。
+- 下一步门禁：用户用蓝、红、白物块验证本版。若蓝/红仍呈相反色，只改变 `CH0_BAYER_SWAP_PIXELS`；若两色仍整体错相位但不相反，只改变 `CH0_BAYER_ROW_SWAP`。每次只翻转一个参数并保留截图，禁止触碰 MIPI/DDR/HDMI 时序。
+
+### [M0-12] M0-11 D 盘原子同步与交付核查
+
+- 触发：M0-11 静态检查通过。
+- 同步方向：正式工程 `competition_project_single_camera/` → `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件（仅 3 个）：
+  - `src/top.v`：同步前 `7F6537C5F9544709E66997B685361BC81D25236A6C6C6A166711A8BD4CA0828D`；同步后与正式工程一致为 `1CBEA522BE4ADAFC19B96C87F2AEFA3F75832DC54770AA564DD37AE6FF6DDBF3`。
+  - `src/debayer/debayer_top_2to1.v`：同步前 `51D68128153104DCEC1FFA1EBDE35B53A141DCBD4DA478F0D7049E6B92D021C2`；同步后与正式工程一致为 `400CC2CE0FD224D7B1B151944B05CDD4AEC7E976D33D61010409747EAE5E95DC`。
+  - `src/debayer/raw_to_rgb.v`：同步前 `F58EAE1405ED86DD747D1E52E03FBA1D08213307FD70435D3311EDBC37A4CCEF`；同步后与正式工程一致为 `0AD7F89132DB7B2011401806CAB0D510B0349A509F83F16B427012E34C788A2B`。
+- 保持同步的前置白平衡文件：`src/uvc_src/white_balance.v`，正式工程/D 盘 SHA-256 均为 `A8DF8324CC84BCE4BEE9A4C7E37C58EDA63A51F93DD7B7D335FEDC958B89F199`。
+- 未写入：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、任何 IP 设置、`outflow/`、`work_*`、bitstream 或其它 D 盘文件。
+- 结果：`SYNC PASS / EFINITY AND BOARD NOT VERIFIED`。
+- 用户执行请求：打开 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml`，完整综合/PNR/bitstream 后烧录；用左蓝右红和白色物块复测。反馈 Map/PNR/bitstream 结果及截图。
+- 下一步门禁：若颜色仍不正确，按 M0-11 的单参数翻转顺序处理，先 `CH0_BAYER_SWAP_PIXELS`，后 `CH0_BAYER_ROW_SWAP`；不得同时改两项。

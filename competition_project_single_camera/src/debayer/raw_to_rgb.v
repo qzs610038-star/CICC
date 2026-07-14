@@ -2,7 +2,9 @@ module raw_to_rgb
 #(
 	parameter	P_DEPTH			= 10,
 	parameter	PW				= P_DEPTH*2,
-	parameter	LEGACY			= 1'b1
+	parameter	LEGACY			= 1'b1,
+	// Invert the first-line Bayer phase when the sensor crop starts on an odd row.
+	parameter	BAYER_ROW_SWAP	= 1'b0
 )
 (
 	input			i_arstn,
@@ -314,7 +316,7 @@ begin
 			r_g_00_00_1P	<= {PW{1'b0}};
 			r_b_00_00_1P	<= {PW{1'b0}};	
 		end
-		else if (r_y_cnt[0])//偶数行
+		else if (r_y_cnt[0] ^ BAYER_ROW_SWAP)//Bayer row phase
 		begin
 			/* R Gr RG R */
 			// if (r_valid_1P)
