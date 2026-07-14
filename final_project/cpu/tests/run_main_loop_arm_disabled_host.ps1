@@ -10,9 +10,11 @@ $cpuDir = Split-Path -Parent $testDir
 $repoRoot = Split-Path -Parent (Split-Path -Parent $cpuDir)
 $includeDir = Join-Path $cpuDir "app\include"
 $srcDir = Join-Path $cpuDir "app\src"
-# 直接链接候选 adapter 实现；当前正式 main.c 待 G4 事件源/时基后再启用。
-$buildDir = Join-Path $testDir "build\main_loop_arm_disabled_host"
-$exePath = Join-Path $buildDir "test_main_loop_arm_disabled.exe"
+# Host links the candidate adapter directly; production main waits for G4.
+$testPaths = @{
+    'build' = "$PSScriptRoot\build\main_loop_arm_disabled_host";
+    'exe' = "$PSScriptRoot\build\main_loop_arm_disabled_host\test_main_loop_arm_disabled.exe";
+}
 
 function Resolve-VcVars64([string]$RequestedPath) {
     if ($RequestedPath) {
@@ -38,7 +40,7 @@ function Resolve-VcVars64([string]$RequestedPath) {
     return $null
 }
 
-New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+New-Item -ItemType Directory -Force -Path $testPaths.build | Out-Null
 
 $mingwGcc = Join-Path $repoRoot "tools\mingw64\bin\gcc.exe"
 $resolvedVcVars64 = if ($Compiler -ne 'gcc') { Resolve-VcVars64 $VcVars64 } else { $null }
@@ -51,7 +53,7 @@ if ($Compiler -eq 'gcc' -and -not (Test-Path -LiteralPath $mingwGcc)) {
     throw "GCC requested but repo compiler is missing: $mingwGcc"
 }
 
-Push-Location $buildDir
+Push-Location $testPaths.build
 try {
     if ($useMsvc) {
         Write-Output "[compiler] MSVC cl.exe (/W4 /WX)"
@@ -73,7 +75,7 @@ try {
         $compile = 'call "{0}" >nul && cl /nologo /std:c11 /utf-8 /W4 /WX ' +
                    '/DAPB_VISION_BASE_PLACEHOLDER=0x40000000u /I"{1}" ' +
                    '{2} /Fe:"{3}"'
-        $compile = $compile -f $resolvedVcVars64, $includeDir, $quotedSources, $exePath
+        $compile = $compile -f $resolvedVcVars64, $includeDir, $quotedSources, $testPaths.exe
         & cmd.exe /d /c $compile
     }
     elseif ($useGcc -and (Test-Path -LiteralPath $mingwGcc)) {
@@ -82,7 +84,7 @@ try {
         $relInc = "final_project\cpu\app\include"
         $relSrc = "final_project\cpu\app\src"
         $relTest = "final_project\cpu\tests"
-        & $mingwGcc -std=c11 -Wall -Wextra -Wshadow -Werror -Wno-error=cpp "-DAPB_VISION_BASE_PLACEHOLDER=0x40000000u" "-I$relInc" "$relTest\test_main_loop_arm_disabled.c" "$relSrc\main_loop_adapter.c" "$relSrc\cpu_result_semantics.c" "$relSrc\cpu_result_semantics_adapters.c" "$relSrc\round_controller.c" "$relSrc\task_matcher.c" -o $exePath
+        & $mingwGcc -std=c11 -Wall -Wextra -Wshadow -Werror -Wno-error=cpp "-DAPB_VISION_BASE_PLACEHOLDER=0x40000000u" "-I$relInc" "$relTest\test_main_loop_arm_disabled.c" "$relSrc\main_loop_adapter.c" "$relSrc\cpu_result_semantics.c" "$relSrc\cpu_result_semantics_adapters.c" "$relSrc\round_controller.c" "$relSrc\task_matcher.c" -o $testPaths.exe
         Pop-Location
     }
     else {
@@ -92,7 +94,7 @@ try {
         throw "main_loop_arm_disabled host compile failed with exit code $LASTEXITCODE"
     }
 
-    & $exePath
+    & $testPaths.exe
     if ($LASTEXITCODE -ne 0) {
         throw "main_loop_arm_disabled host tests failed with exit code $LASTEXITCODE"
     }
