@@ -181,6 +181,10 @@ void task_matcher_round_reset(void);
 /* 获取当前 round_state，供 main 循环 / 调试使用 */
 uint8_t task_matcher_get_round_state(void);
 
+/* 获取最近一次 evaluate() 产生的完整 match result（含 reason / is_target / mode）。
+ * 若 evaluate() 尚未被调用过，返回全零结果（action=NONE）。 */
+void task_matcher_get_last_match(task_match_result_t *out);
+
 /* 从 FPGA TARGET_SEL 寄存器读取并构建 cube 目标。
  * target_shape 固定为 SHAPE_CUBE（识别侧只抓正方体）。
  * 内部调用 board_io_read_target_sel_raw() 解码。

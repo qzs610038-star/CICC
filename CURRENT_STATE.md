@@ -35,6 +35,45 @@
   - FPGA 构建：Efinity 2025.2 production/default map PASS，资源为 `EFX_ADD=2081`、`EFX_LUT4=11939`、`EFX_FF=10492`、`EFX_RAM10=250`、`EFX_DPRAM10=8`；`mem_test.warn.log` 137 行，不能标记为可忽略。PNR 仍 FAIL：2288 个 IO 无 placement，随后 `!available_io_sites.empty(): outpad` 断言失败；无可验收 bitstream/STA。显式 `COMPETITION_DEBUG_SYNTHETIC=1` 的 debug map 也 PASS，资源回到 ADD 1827、LUT4 10339、FF 7991、RAM10 154，warning 日志 138 行；它只证明合成源入口可显式打开，不能代替 production 或真实视频验收。
   - 证据路径：`final_project/docs/review_packets/cpu_branch_merge_adaptation_20260714.md`、`final_project/cpu/CPU_MODULE_PLAN.txt`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_task_matcher.c`、`final_project/fpga/rtl/top/top.v`。
   - 下一步门禁：先修复 Interface Designer/periphery 与顶层 IO 导出边界并重跑 PNR/STA；正式 `soc.h`、APB/CDC/OSD、UART2 D2 回环和真实机械臂 T0 未关闭前，保持 `ARM_DISABLED`，不得连接或驱动机械臂。
+- 日期：2026-07-14，来源 Agent：Claude（Fable 5，cpu_result_semantics 统一语义层 Codex Gate 通过后归档）
+  - 适用范围：`cpu_result_semantics` 统一结果/理由展示语义层（纯语义头 + 适配头拆分、上游枚举→统一语义转换、round_controller_output→cpu_display_result 合法组合精确校验）；不适用于 main.c、OSD/APB wire ABI、板级、UART2、真实机械臂闭环。
+  - 最新结论：cpu_result_semantics 统一语义层已通过 Codex Gate 复审，当前为 Gate 通过版。核心实现：(1) 纯语义头 `cpu_result_semantics.h` 仅依赖 `<stdint.h>`，可独立编译，不含 board_io.h 的 APB 占位 warning；(2) 适配头 `cpu_result_semantics_adapters.h` 提供上游枚举/结构→统一语义的三条转换路径；(3) `cpu_display_from_round_output()` 精确校验 `(action + reason + is_target)` 完整组合，仅接受 A/B/C/D 四类合法组合，阻止/故障分支严格校验 is_target（ARM_NOT_READY/ARM_FAULT 只接受 is_target=1，其余阻止理由只接受 is_target=0），不匹配组合一律安全兜底 ERROR/FAULT/INVALID_INTERNAL，绝不 REQUESTED/正常 SKIP；(4) 全部公开枚举显式赋值，NONE=0，INVALID_INTERNAL=255（`_Static_assert` 固定），并注明仅用于 CPU 内部语义，非 APB/OSD wire ABI，禁止直接序列化。
+  - 替代了哪个旧结论：替代 cpu_result_semantics 首版（未拆分头文件、未精确校验 is_target、理由码未细分、白名单为"超集"的旧口径）；将 CPU_MODULE_PLAN.txt [7] 模块状态从"实现完成，等待 Codex Gate 复审"更新为"Gate 通过，待后续接入"。
+  - 验证（2026-07-14 复跑）：
+    - test_cpu_result_semantics（repo mingw64 gcc 14.2.0，`-Wall -Wextra -Werror -Wno-error=cpp`）：**374/374 PASS**，含纯语义头独立编译门（无 APB 占位宏、不加 `-Wno-error=cpp`，纯 TU 无 board_io warning 输出）。
+    - round_controller MinGW gcc 回归（同门）：**4979/4979 PASS**（round_controller.c/.h 未改，无回退）。
+    - RISC-V compile-only（Efinity riscv-none-embed-gcc 8.3.0，rv32imac/ilp32，`-c`）：cpu_result_semantics.c exit 0，obj 5092，无 warning；cpu_result_semantics_adapters.c exit 0，obj 4292，仅既有 board_io.h:26 soc.h/APB 占位 warning。
+    - `git diff --check`：pass。
+  - 仅有的 warning：既有 `board_io.h:26` 的 soc.h/APB 占位 `#warning`，出现在 adapters TU / round_controller TU（经 vision_classifier.h 传递），由既有 `-Wno-error=cpp` 放行。纯语义头 TU 在严格门下无 warning。其余 warning=0。
+  - 证据路径：`final_project/cpu/app/include/cpu_result_semantics.h`、`final_project/cpu/app/include/cpu_result_semantics_adapters.h`、`final_project/cpu/app/src/cpu_result_semantics.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/tests/test_cpu_result_semantics.c`、`final_project/cpu/tests/test_cpu_semantics_pure.c`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 未完成边界：
+    - 未接入 main.c。
+    - 未接 OSD/APB wire ABI；未定义任何 APB 地址/寄存器位布局；硬件映射留给后续适配层。
+    - 未做板级、UART2、真实机械臂闭环。
+    - 未连接或驱动机械臂。
+    - 本机无 MSVC，`/W4 /WX` 主路径未实跑（run 脚本保留 MSVC 主路径 + mingw64 兜底）。
+    - 主动 ARM_FAULT 与机械臂等待超时在本层仍同映射 ARM_FAULT→FAULT（未拆分，待后续接入时决定）。
+  - 失效条件：cpu_result_semantics 接口/枚举语义变更、main.c/APB/OSD 接入后行为改变，或后续回归重跑失败。
+
+- 日期：2026-07-14，来源 Agent：Claude（Fable 5，ARM_DISABLED Host/mock main loop adapter Gate APPROVE）
+  - 适用范围：`main_loop_adapter` ARM_DISABLED 主循环适配器（含 `main_loop_adapter.c/.h`、`task_matcher` 的 `_return_match()`/`get_last_match()` 真值 reason、`main.c` 的 `#ifndef ARM_DISABLED` 可覆盖开关与适配器调用）；不适用于 APB/OSD wire ABI、UART2、真实机械臂、板级闭环。
+  - 最新结论：ARM_DISABLED Host/mock 主循环适配器已完成并通过 Gate APPROVE。三个 P1 全部关闭：(P1-1) `main_loop_arm_disabled_step()` 抽出为独立函数，main.c 和 Host 测试链接同一份 `main_loop_adapter.c`，测试真实覆盖 main.c 适配代码；(P1-2) `attempted_event` 精确保存，只在 `REMOVE_CONFIRM+ACCEPTED` 时返回 1（ABANDON 不冒充 REMOVE），`SESSION_RESET+ACCEPTED` 返回 -1；(P1-3) `task_matcher_evaluate()` 的 `_return_match()` 保存完整 `task_match_result_t`（含真实 color/shape/size reason），`main.c` 通过 `task_matcher_get_last_match()` 获取，不再硬编码 `COLOR_MISMATCH`。
+  - 验证（2026-07-14 复跑；本机 repo mingw64 gcc 14.2.0，`-Wall -Wextra -Werror -Wno-error=cpp`）：
+    - test_main_loop_arm_disabled：**117/117 PASS**（16 测试）
+    - test_cpu_result_semantics：**374/374 PASS**（回退无）
+    - round_controller MinGW gcc 回归：**4979/4979 PASS**（回退无）
+    - test_task_matcher：**154/154 PASS**（回退无）
+    - RISC-V compile-only（Efinity riscv-none-embed-gcc 8.3.0，rv32imac/ilp32，`-c`）：main.c exit 0、main_loop_adapter.c exit 0、task_matcher.c exit 0、cpu_result_semantics.c exit 0（仅既有 board_io.h:26 soc.h/APB 占位 warning，由 `-Wno-error=cpp` 放行）
+    - `git diff --check`：pass
+  - 仅有的 warning：既有 `board_io.h:26` 的 soc.h/APB 占位 `#warning`，经 `-Wno-error=cpp` 放行。其余 warning=0。
+  - 证据路径：`final_project/cpu/app/include/main_loop_adapter.h`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/tests/test_main_loop_arm_disabled.c`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 明确定义"未闭环"（非"已接入/已连接"）：
+    - 未接入 OSD/APB wire ABI；未定义任何 APB 地址/寄存器位布局
+    - 未接 arm_controller_request_*、UART2、myCobot transport
+    - 不连接或驱动真实机械臂
+    - 无板级证据
+    - MSVC `/W4 /WX` 本机不可用（未实跑主路径；run 脚本保留 MSVC + mingw64 兜底）
+  - 失效条件：main_loop_adapter 接口/返回语义变更、APB/OSD 接入后行为改变、ARM_ENABLED 过渡后 arm_enabled=1 路径重写，或后续回归重跑失败。
 
 - 日期：2026-07-13，来源：用户提供 / Codex 官方资料交叉核查
   - 适用范围：TJ375N529 开发板 UART2/J52 到 myCobot 280 的板端接口真源；不表示正式 SDC/SoC/UART 驱动、真实接线、只读通信或机械臂动作已通过。
