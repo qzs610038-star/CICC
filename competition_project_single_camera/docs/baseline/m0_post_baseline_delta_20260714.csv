@@ -1,0 +1,2 @@
+"path","initial_manifest_sha256","m0_09_recorded_sha256","main_integration_worktree_sha256","change_summary","verification"
+"src/uvc_src/white_balance.v","BC84655C198CADB948F94B5125D6ED5AA35AD5C0006017E74FF921B62D20F507","DF9D141353D743BDE5FAB4A5D91D9CED9D37441B802B2D3D4A55DE34B284739F","44CBE404F18602C7DFE07956CC65F714144E8FA091F0D710917BAB527EE56567","M0-09 frame-sync and BGR/RGB contract repair; main integration adds pixel_cnt zero guard","STATIC_PASS_BOARD_NOT_VERIFIED"

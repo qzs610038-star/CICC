@@ -40,6 +40,18 @@
   - 替代旧结论：替代 `mechanical_arm_member_next_step_brief_20260713.md` 中“16-bit 修复尚未合入”和学习指南中“ARM_DISABLED 已是现存宏”的过时状态描述；旧文档的 T0、D2、D3、D5、Gate D、F1/F2 和物理安全门继续有效。
   - 证据路径：`final_project/docs/review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md`、`final_project/docs/technical_plans/mycobot_cpu_board_bringup_implementation_plan_20260714.md`、`final_project/docs/technical_plans/mycobot_board_bringup_operator_sop_20260712.md`、`final_project/integration/mycobot_protocol_notes.md`、Elephant Robotics 官方 `6.6 基于串口通信协议开发使用`页面、当前分支真实源码/构建脚本。
   - 失效条件：官方页面或目标机械臂固件版本改变协议，或真实抓包与当前命令/响应语义冲突；冲突关闭前只缩小白名单，不扩大 REAL 放行。
+- 日期：2026-07-14，来源：用户批准 / Codex M0 基线审计与主线合并复核
+  - 适用范围：分赛区决赛单摄候选视频工程、CPU/机械臂迁移方案与 M0 基线复现；不表示新构建、单摄裁剪、SoC/APB/OSD 或机械臂闭环。
+  - 最新结论：`competition_project_single_camera/` 作为隔离的单摄候选工程合入，来源是曾在 J48/ch0 稳定输出真实摄像头到 HDMI 的本地 Demo 镜像。`final_project/` 在候选工程完成新 Efinity 构建、匹配 bitstream、烧录和板级复现前仍是正式协作主线；不得提前废弃其视频工程或把候选工程写成唯一正式源码。候选路线采用单个斜上方摄像头、固定投放点、可配置识别框、硬核 QCRV32、UART 先行、最终 HDMI OSD，并按任务一五色→任务二 CUBE/NON_CUBE→任务三/四尺寸→F1 四任务 20 轮→F2 机械臂推进。
+  - 交互冻结：第一版只使用`PLACE`和独立`ABANDON`小闭环，不设`REMOVE`、自动空场互锁或复杂按键菜单；目标配置开发期走UART。尺寸在标定前必须输出`UNAVAILABLE`。F1保持`ARM_ENABLED=0`。
+  - 工程与同步边界：候选源码位于仓库，本地 Demo 目录仅作为人工 Efinity 构建/烧录镜像；每个 FPGA Gate 均须回归 J48/ch0 到 HDMI 画面，任何回归立即停止并回退。候选工程通过 M0 板级复现后，才可另行更新 `AGENTS.md`、主方案和状态索引以升格。
+  - M0 执行结果：初始白名单复制时共 75 个文件与镜像 SHA-256 一致，53 个设计文件、2 个 IP 设置、SDC 和 4 个 include/mem 依赖存在；该 75/75 只描述初始快照。随后 M0-09 修改了 `white_balance.v`，本次合并又增加除零防护，当前状态必须结合新增的 delta manifest 阅读，不能再称当前树与初始镜像 75/75 一致。历史 bitstream 哈希 `A99F14AB8922783C51A71953288F9A25DE1C70DC3E3962F5508BBF53EF75057C` 只绑定历史可运行镜像，不绑定当前仓库源码。
+  - 构建风险：历史Efinity 2025.2.288.4.15 flow从map到bitstream成功，资源ADD 2416/LUT4 14540/FF 11516/RAM10 211/DPRAM10 4，CDC报告无Synchronizer warning；但timing报告存在跨时钟setup负slack，最差`mipi_clk -> i_sysclk_div2 = -1.433ns`，因此只能称历史可运行基线，不能称STA PASS或warning可忽略。
+  - 当前发现：本地镜像除官方目录结构外还存在 `outflow_ch0_*`、多个 `work_*`、`.lock`、源码内 `.bak` 和仿真数据库，因此 M0 采用白名单复制，未把整个目录视为干净官方原版，也未删除任何历史产物。
+  - 路线关系：本条新增单摄候选与回退路线，不替代 `final_project/` 的正式主线身份，不覆盖其历史验证结论，也不改变 `AGENTS.md` 中的 FPGA/CPU/PC 职责和机械臂安全硬边界。
+  - 证据路径：`competition_project_single_camera/docs/review_packets/m0_demo_baseline_review_packet_20260714.md`、`competition_project_single_camera/docs/baseline/m0_source_manifest_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_post_baseline_delta_20260714.csv`、`competition_project_single_camera/WORK_LOG.md`。
+  - 下一步门禁：用户按`competition_project_single_camera/docs/debug_sessions/m0_manual_build_board_check_20260714.md`手动运行完整Efinity构建、烧录、3次冷启动和10分钟画面复现。全部通过前，不裁剪ch1/DSI、不生成SoC、不迁移CPU、不修改视频链。
+  - NOT VERIFIED：仓库副本对应的新Efinity构建/bitstream、重新烧录和画面复现、历史负slack约束安全性、单摄裁剪、SoC资源、UART1、APB、特征、按键、OSD、四任务、20轮和机械臂均未验证。
 
 - 日期：2026-07-14，来源 Agent：Codex（队友 CPU 分支 + Fable 整改 + 个人 UART2 证据集成）
   - 适用范围：`dev/wsc6090-CPU@885e97a`、`codex/fable5-remediation-20260713@758e864` 与个人证据分支的本次集成；不表示正式 SoC/APB/OSD、PNR、bitstream、真实摄像头或机械臂闭环。
@@ -109,7 +121,7 @@
   - 最新结论：中文仓库路径直接运行 map 会因 Efinity `filesystem error: Illegal byte sequence / EFX-0002` 在 HDL 前失败；改用仓库 ASCII junction `D:\cicc_cbm_link` 后 map PASS。资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`；`mem_test.warn.log` 有 132 条 warning 记录，综合摘要报告 post-synthesis netlist 共 1098 warnings，不能标记为可忽略。
   - PNR 结果：FAIL。工具报告 1776 个 IO 无 placement、将被随机放置，随后触发内部断言 `!available_io_sites.empty(): outpad`；未生成可验收 bitstream。该失败再次证明不能给所有顶层端口盲补约束，须先审查 Interface Designer/periphery 导出边界、普通 VDB 与 debug VDB、正式顶层端口和 `.peri.xml`。
   - 证据路径：`final_project/docs/review_packets/team_integration_merge_review_20260713.md`。原始 Efinity 输出位于本次临时构建目录，关键命令、资源、warning 计数和首个 PNR 错误已摘录到 Review Packet；生成型 VDB/netlist/outflow 不提交仓库。
-  - 下一步门禁：先解决生产构建模式与 periphery/IO 绑定方法，再重跑 PNR/时序；当前 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1` 也必须在生产构建中显式回到真实输入。禁止把 map PASS 描述成 PNR、bitstream 或上板 PASS。
+  - 下一步门禁：先解决生产构建模式与 periphery/IO 绑定方法，再重跑 PNR/时序；该整合快照当时令 `PREPROCESS_CH1_USE_SYNTHETIC_SOURCE=1'b1`、`HDMI_USE_SYNTHETIC_VERIFY=1'b1`，现已由上方“真实摄像头源恢复”条目覆盖为 `1'b0`。禁止把 map PASS 描述成 PNR、bitstream 或上板 PASS。
 
 - 日期：2026-07-12，来源 Agent：Codex（A11 合成五色预处理隔离 Map）
   - 适用范围：摄像头无稳定数据流期间的 FPGA ROI/颜色面积/bbox/中心快照候选工程；不适用于 D 盘 HDMI 基线或正式比赛构建。
