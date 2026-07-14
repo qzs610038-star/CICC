@@ -42,8 +42,16 @@ $ErrorActionPreference = 'Stop'
 git fetch origin
 $expected = '64bbae69520d9663456f175aa7a3e66b0605f496'
 git rev-parse --verify $expected
-git switch --detach $expected
-if ((git status --porcelain).Count -ne 0) { throw 'worktree is not clean' }
+$sourceRepo = (Get-Location).Path
+$acceptWt = Join-Path $env:TEMP 'cicc-wsc-cpu-accept-64bbae6'
+if (Test-Path -LiteralPath $acceptWt) {
+  throw "acceptance worktree already exists: $acceptWt"
+}
+git worktree add --detach $acceptWt $expected
+if ($LASTEXITCODE -ne 0) { throw 'failed to create acceptance worktree' }
+Push-Location $acceptWt
+try {
+if ((git status --porcelain).Count -ne 0) { throw 'acceptance worktree is not clean' }
 if ((git rev-parse HEAD) -ne $expected) { throw 'unexpected commit' }
 
 $gcc = Resolve-Path '.\tools\mingw64\bin\gcc.exe'
@@ -78,9 +86,14 @@ foreach ($profile in @('competition', 'arm_bringup')) {
 Get-ChildItem -LiteralPath $out -Recurse -Filter '*.manifest.json' |
   Select-Object FullName
 git diff --check origin/main...HEAD
+} finally {
+  Pop-Location
+}
 ```
 
 如果 wsc 机器的 Efinity 安装位置不同，只允许修改 `$toolchain` 为实际 Efinity 2025.2 RISC-V toolchain 根目录，不得修改编译 flags 或源文件清单。
+
+验收结束后先保留 `$acceptWt` 和 `$out` 供回传日志；确认结果已归档后，再由 Agent 核对路径确实位于 `$env:TEMP` 后执行 `git worktree remove $acceptWt`，不得清理原开发工作区。
 
 ## 6. Agent 验收回报格式
 
