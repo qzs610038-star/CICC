@@ -27,16 +27,29 @@
 
 ## 活跃状态与路线覆盖项
 
-- 日期：2026-07-14，来源：用户批准 / Codex执行M0基线审计
-  - 适用范围：分赛区决赛视频工程基线、单摄系统架构、CPU/机械臂迁移与M0基线复现；不表示新构建、单摄裁剪、SoC/APB/OSD或机械臂闭环。
-  - 最新结论：候选新主线改为`competition_project_single_camera/`，视频基线来自已在J48/ch0稳定输出真实摄像头到HDMI的`D:\TJ375N529_SC431HAI2LCD_Demo_V3`。仅废弃`final_project`双摄视频工程的继续演进；其CPU五色/四任务、单一`round_controller`、16位事件/ACK、myCobot协议/控制器和Host测试作为选择性迁移来源。新路线采用单个斜上方摄像头、固定投放点、可配置识别框、硬核QCRV32、UART先行、最终HDMI OSD，并按任务一五色→任务二CUBE/NON_CUBE→任务三/四尺寸→F1四任务20轮→F2机械臂推进。
+- 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
+  - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
+  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
+  - 检查点结果：MSVC `/W4 /WX` 的 disabled/simulated runtime Host 回归均 PASS；严格 QEMU 两后端 PASS，`scratchpad.lds` 已与 `_start` 统一，逐步编译/链接均检查退出码，1 秒无限循环固件超时注入 PASS。RISC-V `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS；disabled bring-up 现包含固定交错 20 轮零请求自检，未通过放宽 `round_controller_tick` 门规避。`-BoardBuild` 现在在创建输出目录前 fail closed；manifest v2 记录规范构建入口、输入/制品 SHA-256、完整 flags、warning policy，Makefile 仅是该 PowerShell 构建器的薄包装。
+  - Gate 状态：G0 PASS；G1 PASS（仅 G0–G3 的 standalone/NOT_FOR_FLASH 构建隔离）；G2 PASS（**structural bridge only**：无受审事件源、无真实时基，legacy matcher 不再冒充逐轮机械臂事务）；G3 PASS（纯软件证据）。G4、正式 SoC/PNR/部署、烧录、J52 和真实机械臂继续 NO-GO。
+  - 集成边界：上述代码/脚本已进入 `main` 的软件基线，但只证明 G0–G3 的 Host/QEMU/NOT_FOR_FLASH 软件门；本轮未修改 FPGA、未烧录、未连接 J52/机械臂、未产生 UART2 或动作帧，不能据此宣称 G4 或板级闭环。
+  - 历史并发记录：最终 QA 时（2026-07-14 14:08:19）共享工作区曾被外部会话切到无关的 `codex/explore-log-return-20260714`；14:16 已切回并在 `b48973b` 完成提交。该记录仅用于追溯，不再描述当前 `main` 工作区。
+  - 协议复核：Elephant Robotics 官方协议确认现有 `FE FE LEN CMD ... FA`、`LEN=payload+2`、1 Mbps 8N1、0x20/0x22/0x65/0x66/0x67 和角度缩放方向基本正确；同时明确 0x22、0x66、0x67、0x29 无返回值，有返回命令应在 500 ms 内响应，且直接协议通信前需 Basic=`transponder`、Atom=最新版 `atomMain`。因此 G7–G11 新增 single-flight/750 ms 初始 deadline、expected-command/精确长度、官方逐关节限位、0x29+0x2B+0x20 停止辅证和 0x69+0x65 夹爪确认；TX 成功不得再写成动作完成。
+  - 责任边界：G1.5–G3.5 已由 Codex 在纯软件范围内关闭。G4 的正式 SoC/PNR/烧录需要用户操作 Efinity/板卡并提供日志；G5 起任何 Programmer、接线、仪器、只读和动作必须由用户现场确认与执行。
+  - 下一步门禁：按用户要求在 G3 Review Packet 后停止。若要进入 G4，用户需另行确认板卡、Efinity 2025.2/许可证、JTAG、UART0 和仪器条件；仍不得依据本条目烧录、连接 J52 或连接机械臂。
+  - 替代旧结论：替代 `mechanical_arm_member_next_step_brief_20260713.md` 中“16-bit 修复尚未合入”和学习指南中“ARM_DISABLED 已是现存宏”的过时状态描述；旧文档的 T0、D2、D3、D5、Gate D、F1/F2 和物理安全门继续有效。
+  - 证据路径：`final_project/docs/review_packets/mycobot_g1_g3_protocol_checkpoint_review_20260714.md`、`final_project/docs/technical_plans/mycobot_cpu_board_bringup_implementation_plan_20260714.md`、`final_project/docs/technical_plans/mycobot_board_bringup_operator_sop_20260712.md`、`final_project/integration/mycobot_protocol_notes.md`、Elephant Robotics 官方 `6.6 基于串口通信协议开发使用`页面、当前分支真实源码/构建脚本。
+  - 失效条件：官方页面或目标机械臂固件版本改变协议，或真实抓包与当前命令/响应语义冲突；冲突关闭前只缩小白名单，不扩大 REAL 放行。
+- 日期：2026-07-14，来源：用户批准 / Codex M0 基线审计与主线合并复核
+  - 适用范围：分赛区决赛单摄候选视频工程、CPU/机械臂迁移方案与 M0 基线复现；不表示新构建、单摄裁剪、SoC/APB/OSD 或机械臂闭环。
+  - 最新结论：`competition_project_single_camera/` 作为隔离的单摄候选工程合入，来源是曾在 J48/ch0 稳定输出真实摄像头到 HDMI 的本地 Demo 镜像。`final_project/` 在候选工程完成新 Efinity 构建、匹配 bitstream、烧录和板级复现前仍是正式协作主线；不得提前废弃其视频工程或把候选工程写成唯一正式源码。候选路线采用单个斜上方摄像头、固定投放点、可配置识别框、硬核 QCRV32、UART 先行、最终 HDMI OSD，并按任务一五色→任务二 CUBE/NON_CUBE→任务三/四尺寸→F1 四任务 20 轮→F2 机械臂推进。
   - 交互冻结：第一版只使用`PLACE`和独立`ABANDON`小闭环，不设`REMOVE`、自动空场互锁或复杂按键菜单；目标配置开发期走UART。尺寸在标定前必须输出`UNAVAILABLE`。F1保持`ARM_ENABLED=0`。
-  - 工程与同步边界：候选正式源码位于仓库，D盘后续仅作为人工Efinity构建/烧录镜像；Codex负责差异检查和增量同步，用户只负责综合、烧录和反馈。每个FPGA Gate均须回归J48/ch0到HDMI画面，任何回归立即停止并回退。
-  - M0执行结果：按`mem_test.xml`引用和编译期依赖建立白名单，共复制75个文件到新工程，D盘与仓库副本SHA-256为75/75一致；53个设计文件、2个IP设置、SDC和4个include/mem依赖全部存在。首次D盘同步为75项`NO_OP_MATCH`，未覆盖或修改D盘。历史bitstream身份已冻结为`A99F14AB8922783C51A71953288F9A25DE1C70DC3E3962F5508BBF53EF75057C`，用户已确认它可稳定显示J48/ch0真实画面。
+  - 工程与同步边界：候选源码位于仓库，本地 Demo 目录仅作为人工 Efinity 构建/烧录镜像；每个 FPGA Gate 均须回归 J48/ch0 到 HDMI 画面，任何回归立即停止并回退。候选工程通过 M0 板级复现后，才可另行更新 `AGENTS.md`、主方案和状态索引以升格。
+  - M0 执行结果：初始白名单复制时共 75 个文件与镜像 SHA-256 一致，53 个设计文件、2 个 IP 设置、SDC 和 4 个 include/mem 依赖存在；该 75/75 只描述初始快照。随后 M0-09 修改了 `white_balance.v`，本次合并又增加除零防护，当前状态必须结合新增的 delta manifest 阅读，不能再称当前树与初始镜像 75/75 一致。历史 bitstream 哈希 `A99F14AB8922783C51A71953288F9A25DE1C70DC3E3962F5508BBF53EF75057C` 只绑定历史可运行镜像，不绑定当前仓库源码。
   - 构建风险：历史Efinity 2025.2.288.4.15 flow从map到bitstream成功，资源ADD 2416/LUT4 14540/FF 11516/RAM10 211/DPRAM10 4，CDC报告无Synchronizer warning；但timing报告存在跨时钟setup负slack，最差`mipi_clk -> i_sysclk_div2 = -1.433ns`，因此只能称历史可运行基线，不能称STA PASS或warning可忽略。
-  - 当前发现：D盘除官方目录结构外还存在`outflow_ch0_*`、多个`work_*`、`.lock`、源码内`.bak`和仿真数据库，因此M0采用白名单复制，未把整个D盘目录视为干净官方原版，也未删除任何历史产物。
-  - 替代旧结论：替代继续以`final_project/fpga`修复双摄、PNR和SoC作为默认正式视频主线；不删除旧工程，不覆盖其历史验证结论，也不改变`AGENTS.md`中的FPGA/CPU/PC职责和机械臂安全硬边界。
-  - 证据路径：`competition_project_single_camera/docs/review_packets/m0_demo_baseline_review_packet_20260714.md`、`competition_project_single_camera/docs/baseline/m0_source_manifest_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_historical_build_artifacts_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_initial_d_drive_sync_20260714.csv`。
+  - 当前发现：本地镜像除官方目录结构外还存在 `outflow_ch0_*`、多个 `work_*`、`.lock`、源码内 `.bak` 和仿真数据库，因此 M0 采用白名单复制，未把整个目录视为干净官方原版，也未删除任何历史产物。
+  - 路线关系：本条新增单摄候选与回退路线，不替代 `final_project/` 的正式主线身份，不覆盖其历史验证结论，也不改变 `AGENTS.md` 中的 FPGA/CPU/PC 职责和机械臂安全硬边界。
+  - 证据路径：`competition_project_single_camera/docs/review_packets/m0_demo_baseline_review_packet_20260714.md`、`competition_project_single_camera/docs/baseline/m0_source_manifest_20260714.csv`、`competition_project_single_camera/docs/baseline/m0_post_baseline_delta_20260714.csv`、`competition_project_single_camera/WORK_LOG.md`。
   - 下一步门禁：用户按`competition_project_single_camera/docs/debug_sessions/m0_manual_build_board_check_20260714.md`手动运行完整Efinity构建、烧录、3次冷启动和10分钟画面复现。全部通过前，不裁剪ch1/DSI、不生成SoC、不迁移CPU、不修改视频链。
   - NOT VERIFIED：仓库副本对应的新Efinity构建/bitstream、重新烧录和画面复现、历史负slack约束安全性、单摄裁剪、SoC资源、UART1、APB、特征、按键、OSD、四任务、20轮和机械臂均未验证。
 

@@ -2,7 +2,7 @@
 
 > 状态：**等待用户执行**
 >
-> 工程：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml`
+> 工程：`<local-demo-mirror>/mem_test.xml`（操作者先将占位符映射为本机构建镜像）
 >
 > Efinity：`2025.2.288.4.15`
 >
@@ -12,7 +12,7 @@
 
 - [ ] 确认没有其他成员修改D盘源码。
 - [ ] 关闭或确认无旧Efinity构建仍在运行。
-- [ ] 打开`D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml`。
+- [ ] 打开 `<local-demo-mirror>/mem_test.xml`。
 - [ ] 确认器件为`TJ375N529`、Timing Model为`I3`。
 - [ ] 不修改RTL、IP、periphery、SDC或Debugger设置。
 
@@ -74,4 +74,3 @@ outflow/mem_test.bit
 - 构建、烧录、3次冷启动和10分钟稳定全部通过：M0 `PASS`，允许进入M1A“只禁用ch1实例”。
 - 构建通过但画面失败：M0 `FAIL`，只核查构建身份和板级差异。
 - 构建失败：M0 `FAIL`，不烧录、不修改视频链猜测修复。
-

@@ -92,9 +92,9 @@ module white_balance #(
             end
         end
     end
-    wire [DATA_WIDTH-1:0] avg_r_calc = sum_r / pixel_cnt;
-    wire [DATA_WIDTH-1:0] avg_g_calc = sum_g / pixel_cnt;
-    wire [DATA_WIDTH-1:0] avg_b_calc = sum_b / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_r_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_r / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_g_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_g / pixel_cnt;
+    wire [DATA_WIDTH-1:0] avg_b_calc = (pixel_cnt == {CNT_WIDTH{1'b0}}) ? {DATA_WIDTH{1'b0}} : sum_b / pixel_cnt;
 
      always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

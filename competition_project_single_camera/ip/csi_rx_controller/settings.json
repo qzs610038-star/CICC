@@ -3,7 +3,7 @@
         "-o",
         "csi_rx_controller",
         "--base_path",
-        "D:\\Computer\\FPGA_Prj\\14_tj375_demo\\TJ375N529\\06_t375N529_sc431hai2lcd_demo\\TJ375N529_SC431HAI2LCD_Demo_V3\\ip",
+        "..",
         "--vlnv",
         {
             "vendor": "efinixinc.com",

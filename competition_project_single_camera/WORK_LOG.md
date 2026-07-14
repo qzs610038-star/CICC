@@ -2,7 +2,7 @@
 
 > 起始日期：2026-07-14
 >
-> 适用范围：`competition_project_single_camera/`候选正式工程，以及受控同步到`D:\TJ375N529_SC431HAI2LCD_Demo_V3`的构建镜像
+> 适用范围：`competition_project_single_camera/` 隔离候选工程，以及受控同步到 `<local-demo-mirror>` 的构建镜像
 >
 > 记录原则：本文件是新方案获批后的连续动作总账。只追加已发生动作，不提前填写计划为完成，不删除失败记录，不用后续结果改写历史事实。
 
@@ -43,13 +43,13 @@
 - 触发：用户决定放弃`final_project`双摄视频工程，改用已跑通摄像头的官方Demo作为新视频基线。
 - 目标：在修改工程前冻结视频、CPU、状态机、OSD、机械臂、协作和D盘同步边界。
 - 输入基线：
-  - 已跑通参考/构建镜像：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`
+  - 已跑通参考/构建镜像：`<local-demo-mirror>`
   - 摄像头：J48/ch0，斜上方单摄，固定投放点
   - 显示：只保留HDMI到电脑，不需要MIPI DSI
   - CPU：Efinity硬核QCRV32，最终与视频处于同一bitstream
   - 工具：Efinity `2025.2.288.4.15`
 - 实际动作：通过多轮需求访谈冻结以下决策：
-  - 新工程路径为`C:\Users\20306\Desktop\赛题资料\CICC\competition_project_single_camera`。
+  - 新工程路径为仓库内 `competition_project_single_camera/`。
   - 只废弃旧视频工程，选择性迁移CPU、机械臂和Host测试模块。
   - FPGA负责视频前端、ROI/基础统计、APB/CDC和OSD渲染；CPU负责分类、四任务、逐轮状态和myCobot。
   - 开发顺序为任务一五色→任务二`CUBE/NON_CUBE`→任务三/四尺寸→F1→F2。
@@ -126,7 +126,7 @@ git status --short --branch
 
 - 触发：健康检查通过。
 - 目标：证明当前历史bitstream、工程XML、日志和源码是否属于同一构建时间链。
-- 输入基线：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`。
+- 输入基线：`<local-demo-mirror>`。
 - 实际动作：
   - 读取`mem_test.xml`的工具版本、器件、`last_run_flow`和`last_run_state`。
   - 核对`outflow/`中map、Debugger、PNR、timing、CDC、programmer、bitstream和hex的时间链。
@@ -249,7 +249,7 @@ git status --short --branch
 - 触发：用户提供已烧录后的 HDMI 画面截图，并反馈“有真实画面，但是画面有点偏绿，有点模糊，不知道是不是摄像机像素低的问题”。
 - 目标：在不破坏已跑通的 J48/ch0→HDMI 链路前，区分传感器分辨率、色彩处理、RAW 数据顺序、时序/帧缓存和拍屏伪影的影响。
 - 用户现场反馈：
-  - 截图文件：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-dde39a93-a897-47a9-bb49-700eb8e29e7f.png`。
+  - 截图文件：会话临时截图（未纳入仓库）。
   - 可见真实场景，说明当前画面不是纯 fallback 色条。
   - 整体有明显绿色偏色。
   - 黑色矩形边缘和背景纹理存在水平拖影/重影；但截图为拍摄 HDMI 显示器的二次图像，显示器像素栅格、刷新扫描和相机曝光可能放大横纹与模糊，不能直接等价为 FPGA 像素错位。
@@ -277,7 +277,7 @@ git status --short --branch
 
 - 触发：用户提供两块颜色实物的现场对照图，并明确实物位置为“左边蓝色、右边红色”。
 - 用户现场反馈：
-  - 截图文件：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-4ffcfea3-ec41-4731-846a-15435f6605af.png`。
+  - 截图文件：会话临时截图（未纳入仓库）。
   - 左侧蓝色方块在 HDMI 画面中偏青绿；右侧红色方块偏橙棕；背景同样明显偏绿。
 - 实际动作：
   - 重新核查 `src/uvc_src/white_balance.v` 的帧同步、颜色解包和增益更新逻辑；未修改 RTL、工程 XML、SDC、IP 或 D 盘文件。
@@ -310,13 +310,22 @@ git status --short --branch
   - `PASS`：奇/偶像素输出均为 RGB 顺序。
   - 本机未找到 `iverilog`、`verilator` 或 `vlog`，因此未进行本地 HDL 编译/仿真；Efinity 综合、PNR 和板级验收仍由用户执行。
 - D 盘同步：
-  - 同步方向：`competition_project_single_camera/src/uvc_src/white_balance.v` → `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src\uvc_src\white_balance.v`。
+  - 同步方向：`competition_project_single_camera/src/uvc_src/white_balance.v` → `<local-demo-mirror>/src/uvc_src/white_balance.v`。
   - 同步前 D 盘 SHA-256：`BC84655C198CADB948F94B5125D6ED5AA35AD5C0006017E74FF921B62D20F507`。
   - 同步后仓库/D 盘 SHA-256：`DF9D141353D743BDE5FAB4A5D91D9CED9D37441B802B2D3D4A55DE34B284739F`，一致。
   - D 盘写入仅此一个源码文件；未写入 `outflow/`、`work_*`、IP、SDC、XML 或 bitstream。
 - 结果：`STATIC PASS / BOARD NOT VERIFIED`。
 - NOT VERIFIED：Efinity Map/PNR/bitstream；烧录后蓝/红/白色画面的恢复程度；三次冷启动、10 分钟稳定性、原始 HDMI 抓帧；Bayer phase、镜头焦距和照明条件。
 - 下一步门禁：用户以 D 盘工程完成完整 Efinity flow 后，反馈 Map/PNR/bitstream、蓝/红/白物体画面和是否仍有真实拖影；仅在新画面仍明显偏色时再讨论 Bayer phase 或传感器寄存器，禁止盲目改动帧缓存/HDMI 链路。
+
+### [主线合并复核] M0-09 增量登记与除零防护
+
+- 触发：将单摄候选分支合入本地 `main` 前进行约束、证据和 RTL 安全复核。
+- 修改文件：`src/uvc_src/white_balance.v`、`docs/baseline/m0_post_baseline_delta_20260714.csv` 及路线/状态文档。
+- 实际修改：为三个平均值除法增加 `pixel_cnt == 0` 防护；不修改端口、时钟、复位极性、MIPI、帧缓存、HDMI、SDC、XML 或 IP 生成参数。补充 delta manifest，明确初始 75/75 清单是历史快照，不再描述当前树。
+- 约束清点：`constrain.sdc`、`mem_test.xml`、`mem_test.peri.xml` 未作功能修改；两个 IP `settings.json` 仅将生成器的历史绝对 `base_path` 改为相对于各 IP 目录的 `..`，未重新生成 IP。
+- 结果：`STATIC PASS / BOARD NOT VERIFIED`。历史 bitstream 不绑定本次修改后的源码。
+- 下一步门禁：从当前候选仓库源码完成 Efinity 全流程、匹配源码/bitstream 哈希、烧录、3 次冷启动和 10 分钟画面复现；通过前保持隔离候选身份。
 
 ### [M0-10] 用户现场反馈：白平衡修复后蓝变黄、红变紫
 

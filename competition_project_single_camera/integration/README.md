@@ -14,4 +14,3 @@ round_controller
 ```
 
 所有正式地址、UART、GPIO、IRQ、时钟和复位必须来自新Demo同一次Efinity SoC生成物。不得复制`final_project`的候选MMIO地址。
-

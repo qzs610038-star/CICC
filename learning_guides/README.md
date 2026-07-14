@@ -26,12 +26,21 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_fpga_vision_front.md)：production/debug 构建边界与 PNR 阻塞（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_cpu_arm_control.md)：16 位序号、显式 ACK 与 `arm_busy` 安全门（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-14_merge_dev_wsc6090-CPU/guide_system_integration.md)：J52 门禁、分层验收与可追溯合并（面向角色 C）。
+  * [daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/)：7 月 14 日针对分支 `mycobot-g0-g3-bringup-20260714` 上的 G1–G3 检查点和官方串口协议微调时生成的讲解指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_fpga_vision_front.md)：PNR 约束缺陷、SoC PLL 冲突与 APB 隔离基线（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_cpu_arm_control.md)：16位回绕去重、`arm_busy` 动作屏蔽、编译矩阵 ELF 修复与 QEMU 入口纠偏（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-14_merge_mycobot-g0-g3-bringup-20260714/guide_system_integration.md)：官方协议无应答事实、两维正交构建降级与人机职责边界划定（面向角色 C）。
+  * [daily_sync/2026-07-14_merge_single-camera_mycobot-main/](daily_sync/2026-07-14_merge_single-camera_mycobot-main/)：7 月 14 日将 myCobot G0-G3 软件门与单摄候选工程依次合入本地 main 后生成的最终三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_fpga_vision_front.md)：候选工程身份、白平衡除零与 M0 板级复现门（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_cpu_arm_control.md)：可移植工具链发现、结构桥与 NOT_FOR_FLASH 边界（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_system_integration.md)：语义冲突处理、分层证据与队友同步（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 
 除了日常分支合并的同步指南，本项目还针对重大的架构设计与拿分方案提供了大白话通俗化解读，帮助非专业背景的决策者低成本看懂技术决策并回答评审决策清单：
 
 * [competition_score_maximization_explanation_guide.md](competition_score_maximization_explanation_guide.md)：决赛最大化得分总控方案的大白话通俗解读与决策面板。
+* [mycobot_cpu_board_bringup_explanation_guide.md](mycobot_cpu_board_bringup_explanation_guide.md)：myCobot 机械臂上板主实施方案的大白话通俗解读与分级门禁指南。
 
 ---
 

@@ -2,11 +2,11 @@
 
 第十届集创赛雄芯院方向项目资料与分赛区决赛开发工程。
 
-## 当前候选主线
+## 当前协作入口
 
-- [`competition_project_single_camera/`](competition_project_single_camera/README.md)：基于已跑通 J48/ch0 摄像头官方 Demo 的单摄候选正式工程。方案已批准，M0白名单源码复制和身份审计完成，当前等待人工重新构建、烧录和画面复现。
+- [`final_project/`](final_project/README.md)：当前正式协作主线，保留 FPGA、CPU、机械臂、接口契约、测试和历史验证证据。
+- [`competition_project_single_camera/`](competition_project_single_camera/README.md)：基于已跑通 J48/ch0 摄像头 Demo 的隔离单摄候选工程。初始 M0 白名单复制完成，随后已有一项白平衡增量；当前仍等待新构建、匹配 bitstream、烧录和板级复现，未替代正式主线。
 - [`CURRENT_STATE.md`](CURRENT_STATE.md)：当前完成度、阻塞、路线覆盖项和下一步的权威索引。
-- [`final_project/`](final_project/README.md)：旧双摄视频工程与 CPU/机械臂模块来源库。其视频工程停止继续演进，但历史证据、CPU、机械臂和测试仍保留供选择性迁移。
 
 ## 项目成员
 

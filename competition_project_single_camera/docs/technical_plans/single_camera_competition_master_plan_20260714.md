@@ -6,9 +6,11 @@
 >
 > 状态：**用户已批准；M0源码复制/身份审计完成，人工构建与板级复现待执行**
 >
-> 候选正式工程：`C:\Users\20306\Desktop\赛题资料\CICC\competition_project_single_camera`
+> 候选工程：仓库内 `competition_project_single_camera/`
 >
-> 已跑通参考与手工构建/烧录镜像：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`
+> 已跑通参考与手工构建/烧录镜像：`<local-demo-mirror>`
+>
+> 主线关系：本文件是候选路线的局部计划，服从仓库根 `AGENTS.md`、`CURRENT_STATE.md` 与 `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`；M0 板级复现前不替代 `final_project/`。
 >
 > 工具：Efinity `2025.2.288.4.15`
 
@@ -203,7 +205,7 @@ calibrate
 
 ## 7. M0前的D盘事实审计
 
-用户确认当前`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`可稳定显示J48/ch0真实画面，且对应当前源码。当前只读清点同时发现D盘存在：
+用户确认历史 `<local-demo-mirror>/outflow/mem_test.bit` 可稳定显示 J48/ch0 真实画面；该证据只绑定历史镜像，不能证明后续白平衡增量对应的当前源码。当前只读清点同时发现本地镜像存在：
 
 - `src/`、`ip/`、`mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`；
 - `src/top.v`已启用`FRAME_BUFFER`与`HDMI_OUT_EN`，源码树同时含`mipi_dsi/`和`dvi_tx/hdmi_top.v`，支持按独立Gate裁剪DSI并保留HDMI；
@@ -412,7 +414,7 @@ Checkpoint B的OSD显示评分所需最小固定字段。UART和OSD由同一语�
 
 ## 13. D盘同步与回退
 
-M0后，仓库新工程为唯一正式源码，D盘为构建/烧录镜像。
+M0 的新构建、匹配 bitstream、烧录、3 次冷启动和 10 分钟画面复现全部通过，并完成主线文档升格后，仓库新工程才可成为正式源码；此前它保持隔离候选，本地目录仅作构建/烧录镜像。
 
 每次同步固定流程：
 
@@ -472,7 +474,7 @@ M0后，仓库新工程为唯一正式源码，D盘为构建/烧录镜像。
 
 ## 17. 审核后首个动作
 
-本方案已由用户于2026-07-14批准。M0已完成白名单源码复制、源/目标哈希核对、历史构建身份审计和D盘首次零差异同步核查；尚未运行新构建或板级复现。
+本候选方案已由用户于 2026-07-14 批准。M0 已完成初始白名单源码复制、源/目标哈希核对、历史构建身份审计和本地镜像首次零差异同步核查；随后 `white_balance.v` 已有受审增量，详见 delta manifest。尚未运行修改后源码的新构建或板级复现。
 
 批准后的第一动作仅为M0：
 

@@ -3,7 +3,7 @@
         "-o",
         "dsi_tx",
         "--base_path",
-        "D:\\Project\\TJ375N529_DemoBoard\\Ti60f225_csi2dsi_sc431hai_v3.4\\ip",
+        "..",
         "--vlnv",
         {
             "vendor": "efinixinc.com",

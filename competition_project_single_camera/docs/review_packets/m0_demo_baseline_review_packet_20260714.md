@@ -2,7 +2,7 @@
 
 > 日期：2026-07-14
 >
-> 来源：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`
+> 来源：`<local-demo-mirror>`（历史本地构建镜像别名）
 >
 > 目标：建立可追溯的新单摄工程源码基线，不改变视频功能
 >
@@ -50,7 +50,7 @@ last_run_state= pass
 历史可运行bitstream：
 
 ```text
-path   = D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit
+path   = <local-demo-mirror>/outflow/mem_test.bit
 size   = 12418911 bytes
 sha256 = A99F14AB8922783C51A71953288F9A25DE1C70DC3E3962F5508BBF53EF75057C
 ```
@@ -131,4 +131,3 @@ PNR和bitstream生成完成。CDC报告为`No Synchronizer warnings to report`�
 - 历史负slack路径的约束正确性或CDC安全性。
 - ch1/DSI裁剪后的资源、时序和视频回归。
 - QCRV32、UART1、APB、按键、特征、OSD和机械臂。
-
