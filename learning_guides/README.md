@@ -34,6 +34,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_fpga_vision_front.md)：候选工程身份、白平衡除零与 M0 板级复现门（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_cpu_arm_control.md)：可移植工具链发现、结构桥与 NOT_FOR_FLASH 边界（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-14_merge_single-camera_mycobot-main/guide_system_integration.md)：语义冲突处理、分层证据与队友同步（面向角色 C）。
+  * [daily_sync/2026-07-15_merge_dev_libaoxun688/](daily_sync/2026-07-15_merge_dev_libaoxun688/)：7 月 15 日合并 lib 的 HDMI-only 单摄 FPGA 候选后生成的三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_fpga_vision_front.md)：DSI 解耦、真实时钟 CDC 约束与显示校正证据边界（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_cpu_arm_control.md)：显示支路与 CPU 识别真源分离、APB 接入待办（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_system_integration.md)：固定 SHA、证据保质期与候选路线升格门（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 
