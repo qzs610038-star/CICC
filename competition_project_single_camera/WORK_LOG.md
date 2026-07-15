@@ -648,3 +648,48 @@ git status --short --branch
 - 写入范围：仅 D 盘 `src/top.v`。未写入 `constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、传感器 I2C ROM、其他 RTL、`outflow/`、`work_*` 或 bitstream。
 - 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
 - 用户执行请求：使用 D 盘工程完整重跑 Map、PNR、bitstream 并烧录；旧 bitstream SHA-256 `0A69113CB3AAC7EB1DF0E6FDFF9964C98FDF9B8E59CE48848C093FB1AA7BE8CC` 不包含本次 HDMI 相位和固定点白平衡修改。
+
+### [M0-30] 五色白平衡验收、下游色条排除与 framebuffer 诊断修复
+
+- 触发：用户回传 M0-28 新版五色静止截图，并补充“FPGA 本地产生的标准色条没有重影”。
+- 对应构建证据：
+  - Timing 报告：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt`，生成时间 `2026-07-14 22:07:32`。
+  - bitstream：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`，生成时间 `2026-07-14 22:07:50`。
+  - WNS `+1.731 ns`，WHS `+0.026 ns`；`i_sysclk_div2 -> hdmi_tx_slow_clk` setup slack `+4.507 ns`、hold slack `+0.121 ns`；CDC 为 `No Synchronizer warnings to report`。
+- 五色量化：红约 `(89,41,57)`，黄约 `(125,112,86)`，白约 `(156,154,151)`，蓝约 `(56,60,85)`，黑约 `(24,17,29)`。白块通道已接近平衡，五色主通道关系正确，固定点白平衡和约 `2.98x` 模拟增益在本轮冻结，不再继续调系数。
+- 关键边界：同一 HDMI/TMDS/线缆/采集卡链路的 FPGA 本地标准色条无重影，因此水平重影不在 HDMI 编码器、TMDS 物理输出、线缆、采集卡或显示器。排查范围收缩到真实摄像头数据路径的 `摄像头/CSI -> RAW 打包 -> DDR/framebuffer -> Debayer`。
+- CBM 状态：按新 `AGENTS.md` 请求查询 `D-cicc_cbm-main`，服务返回 `project not found or not indexed / No projects indexed yet`。本轮停止依赖图谱，改用候选工程真实 RTL 和真实构建报告做最小范围核查；未重建图谱。
+- 发现的确定性 RTL 缺陷：`src/framebuffer/frame_info_det.v` 原先在帧结束时执行 `frame_len_d0 <= frame_end_r0`，把 1 bit 帧结束脉冲写入 24 bit 帧长度历史，导致 `frame_stable` 比较基本失去实际帧长度检测能力。坏帧、短帧或长度波动可能仍被错误标记为稳定并进入 DDR/framebuffer。
+- 修改文件：
+  - `src/framebuffer/frame_info_det.v`
+  - `src/framebuffer/frame_buffer.v`
+  - `src/top.v`
+- 帧长度门修复：
+  - `frame_len_d0` 改为锁存真实 `frame_pix_num`。
+  - 仅在连续两个非零帧长度相等时置 `frame_stable=1`。
+  - `total_frame_bytes` 复位为 0，并统一使用非阻塞赋值。
+- 只读可观测性：`frame_buffer` 导出 `o_frame_stable` 和既有 `data_tx.fifo_rd_underflow`；ch0 映射为 LED20/F3=`frame_stable`、LED21/F2=`fifo_rd_underflow` 锁存。LED21 一旦出现欠流保持点亮，直到重新配置/复位。
+- DDR 前诊断源：
+  - SW4/V19 为低有效诊断输入。松开保持真实摄像头画面；按住时仅将 ch0 RAW8 payload 替换为四像素同值的灰度棋盘。
+  - CSI 的 VS/DE 帧控制、DDR/framebuffer、Debayer、固定点白平衡、HDMI/TMDS 全部仍参与，因此它不同于已知干净的 HDMI 下游标准色条。
+  - 若按住 SW4 的 RAW 棋盘也重影，根因在 DDR/framebuffer 或其后至 Debayer；若 RAW 棋盘干净而真实画面重影，根因在摄像头/CSI/RAW 数据侧。
+- 保持不变：传感器 ROM、曝光、模拟/数字增益、Bayer 相位、白平衡系数、HDMI 相位修复、SDC、`mem_test.xml`、`.peri.xml` 和 IP settings。公开 Rockchip 驱动显示模式寄存器应在停流时配置后再启流，但为保持本轮变量隔离，尚未修改当前 Demo 的启流顺序。
+- 静态验证：`git diff --check` 通过；2 个 `frame_buffer` 实例均连接新增端口；LED2/LED3 各只有一个驱动；传感器 ROM 仍为 165 项连续索引且 SHA-256 与 D 盘上一版一致。本机无 `iverilog`、`verilator`、`vlog`、`yosys` 或 Verible，未运行 RTL 编译/仿真。
+- 结果：`SOURCE PATCHED / STATIC CHECK PASS / MAP-PNR-BOARD NOT VERIFIED`。
+- 下一步门禁：同步三处 RTL 后完整重跑 Map/PNR/bitstream。烧录后先松开 SW4 截取真实五色画面并记录 LED20/LED21，再按住 SW4 截取 RAW 棋盘并再次记录 LED20/LED21；同时回传 WNS/WHS 与 CDC。
+
+### [M0-31] M0-30 D 盘同步与诊断版发布核查
+
+- 同步方向：`competition_project_single_camera/` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件与 SHA-256：
+  - `src/framebuffer/frame_info_det.v`：同步前 `BFC24B363E28F18807D5CF3967E4CBC6935A3FFB8327C14FB35685318C2A7766`；同步后正式工程/D 盘一致为 `24806B61653C57C4BCAA218B0417AD7C257FE723CF4A21502A376F93F3229154`。
+  - `src/framebuffer/frame_buffer.v`：同步前 `C5BC80D22F721A03168FFD14B625F1D4B49F1DE2E25E03DAC9B2E20383E740A6`；同步后正式工程/D 盘一致为 `8C4C8D7A5DF3C9198ADFE85006B2A24BA4A5D8163A68960D90BC2A8C1120EB7A`。
+  - `src/top.v`：同步前 `7A8111B36CE05F51B402BBB9424F53A6728B634F60E81EBE01DD8F279E89DD85`；同步后正式工程/D 盘一致为 `5F30CED8F6392ACCCEFD23FADEE918400E57A736E5CC2E405A48693B3D8C45C1`。
+- 未写入：传感器 I2C ROM、`constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、`outflow/`、`work_*` 和 bitstream。
+- 操作说明：
+  - SW4 松开：真实 J48/ch0 五色画面。
+  - SW4 按住：DDR 前灰度 RAW 棋盘诊断画面；必须持续按住拍照，松开自动恢复真实画面。
+  - LED20/F3 亮：ch0 连续两帧实际像素数一致；灭：帧长度门未稳定。
+  - LED21/F2 亮：本次上电后曾发生 framebuffer 输出 FIFO 欠流；该状态锁存到重新配置/复位。
+- 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
+- 用户执行请求：完整重跑 D 盘工程并烧录；回传 Timing/CDC、SW4 松开与按住的两张 Windows 直接截图、LED20/LED21 在两种状态下的亮灭。旧 2026-07-14 22:07 bitstream 不包含本次修改。

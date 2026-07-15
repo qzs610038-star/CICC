@@ -902,8 +902,42 @@ wire [PACK_BIT-1:0] rx_out_data1;
   wire ch0_vs;
   wire ch0_hs;
   wire ch0_de;
+  wire ch0_frame_stable;
+  wire ch0_fifo_rd_underflow;
+  reg  ch0_fifo_rd_underflow_seen = 1'b0;
   wire [15:0] ch0_bayer_2pix;
   assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
+
+  // SW4/V19 is active low. While held, replace only the RAW payload with a
+  // grayscale checkerboard; CSI timing and the full DDR-to-HDMI path remain.
+  (* async_reg = "true" *) reg [1:0] raw_diag_sw_sync = 2'b11;
+  reg        raw_diag_de_r = 1'b0;
+  reg [9:0]  raw_diag_x = 10'd0;
+  reg [10:0] raw_diag_y = 11'd0;
+  always @(posedge i_sysclk_div2 or negedge pixel_data_en) begin
+      if (!pixel_data_en) begin
+          raw_diag_sw_sync <= 2'b11;
+          raw_diag_de_r <= 1'b0;
+          raw_diag_x <= 10'd0;
+          raw_diag_y <= 11'd0;
+      end else begin
+          raw_diag_sw_sync <= {raw_diag_sw_sync[0], i_sw[1]};
+          raw_diag_de_r <= rx_out_de;
+          if (rx_out_vs && !rx_out_vs_r)
+              raw_diag_y <= 11'd0;
+          else if (raw_diag_de_r && !rx_out_de)
+              raw_diag_y <= raw_diag_y + 1'b1;
+          if (rx_out_de)
+              raw_diag_x <= raw_diag_x + 1'b1;
+          else
+              raw_diag_x <= 10'd0;
+      end
+  end
+  wire raw_diag_en = ~raw_diag_sw_sync[1];
+  wire [7:0] raw_diag_level = raw_diag_x[5] ^ raw_diag_y[5] ? 8'he0 : 8'h20;
+  wire [31:0] ch0_camera_raw8 = {rx_out_data[39:32], rx_out_data[29:22],
+                                  rx_out_data[19:12], rx_out_data[9:2]};
+  wire [31:0] ch0_framebuffer_vin = raw_diag_en ? {4{raw_diag_level}} : ch0_camera_raw8;
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -927,7 +961,7 @@ frame_buffer #(
 /*i*/.i_clk			(i_sysclk_div2      ),
 /*i*/.i_vs			(rx_out_vs	),
 /*i*/.i_de			(rx_out_de 	),
-/*i*/.vin 			({rx_out_data[39:32],rx_out_data[29:22],rx_out_data[19:12],rx_out_data[9:2]}	),
+/*i*/.vin 			(ch0_framebuffer_vin),
 
     .o_clk  (i_sysclk_div2) ,
     // .o_hs   (fb_ch0_hs) ,
@@ -939,6 +973,8 @@ frame_buffer #(
 /*i*/.o_vs    		(ch0_vs		),			
 /*i*/.o_de    		(ch0_de		),			
 /*i*/.vout    		({ch0_g,ch0_b}	),//ch0_r,
+/*o*/.o_frame_stable(ch0_frame_stable),
+/*o*/.o_fifo_rd_underflow(ch0_fifo_rd_underflow),
 
     .H_FRONT_PORCH 	(HFP/2	    ),
     .H_SYNC 		(HSP/2	    ),	
@@ -987,6 +1023,16 @@ frame_buffer #(
 .bvalid     (axi_m_bvalid	  [1*1-1      : 0]				),//(m0_axi_bvalid    ),//(AXI_MUX_EN ? : axi0_BVALID   ),
 .bready     (axi_m_bready	  [1*1-1      : 0]				)//(m0_axi_bready    ) //(AXI_MUX_EN ? : axi0_BREADY   )
 );
+
+always @(posedge i_sysclk_div2 or negedge pixel_data_en) begin
+    if (!pixel_data_en)
+        ch0_fifo_rd_underflow_seen <= 1'b0;
+    else if (ch0_fifo_rd_underflow)
+        ch0_fifo_rd_underflow_seen <= 1'b1;
+end
+
+assign led[2] = ch0_frame_stable;             // LED20/F3: consecutive frame lengths match
+assign led[3] = ch0_fifo_rd_underflow_seen;   // LED21/F2: latched framebuffer output underflow
 
 
 
@@ -1056,6 +1102,8 @@ wire [7:0]  ch1_b;
 wire ch1_vs;
 wire ch1_hs;
 wire ch1_de;
+wire ch1_frame_stable_unused;
+wire ch1_fifo_rd_underflow_unused;
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -1086,6 +1134,8 @@ frame_buffer #(
 /*i*/.o_vs    		(ch1_vs	    ),			
 /*i*/.o_de    		(ch1_de	    ),			
 /*i*/.vout    		({ch1_g,ch1_b}	),//ch0_r,
+/*o*/.o_frame_stable(ch1_frame_stable_unused),
+/*o*/.o_fifo_rd_underflow(ch1_fifo_rd_underflow_unused),
 
    .H_FRONT_PORCH 	(HFP/2	    ),
     .H_SYNC 		(HSP/2	    ),	
