@@ -1,5 +1,5 @@
 module i2c_master_ctrl_top #(
-	parameter DATA_LENGTH = 161,
+	parameter DATA_LENGTH = 165,
 	parameter I2C_REG_ADDR_WIDTH = 16,
 	parameter I2C_DATA_WIDTH = 8,
 	parameter I2C_DEVICE_ADDR = 8'h60,

@@ -1,5 +1,4 @@
 # 单摄新方案工作日志
-
 > 起始日期：2026-07-14
 >
 > 适用范围：`competition_project_single_camera/` 隔离候选工程，以及受控同步到 `<local-demo-mirror>` 的构建镜像
@@ -326,3 +325,326 @@ git status --short --branch
 - 约束清点：`constrain.sdc`、`mem_test.xml`、`mem_test.peri.xml` 未作功能修改；两个 IP `settings.json` 仅将生成器的历史绝对 `base_path` 改为相对于各 IP 目录的 `..`，未重新生成 IP。
 - 结果：`STATIC PASS / BOARD NOT VERIFIED`。历史 bitstream 不绑定本次修改后的源码。
 - 下一步门禁：从当前候选仓库源码完成 Efinity 全流程、匹配源码/bitstream 哈希、烧录、3 次冷启动和 10 分钟画面复现；通过前保持隔离候选身份。
+
+### [M0-10] 用户现场反馈：白平衡修复后蓝变黄、红变紫
+
+- 触发：用户烧录 M0-09 版本后提供新的蓝/红实物对照图，并明确左侧实物为蓝色、右侧实物为红色；画面中分别呈黄色和紫色。
+- 用户现场反馈：
+  - 截图文件：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-c4d2f4fb-559f-41d1-adc2-1ee16d5fe0fd.png`。
+  - 结论：M0-09 不能作为颜色修复完成；自动白平衡改变了色彩，但未恢复正确颜色。
+- 复核与结论：
+  - 取消“自动白平衡是最高优先级根因”的结论。蓝变黄、红变紫更符合 Bayer 相位或 RAW 双像素顺序错误，而非单纯 R/B 字节整体交换。
+  - 正式工程 `src/top.v` 将帧缓存的两个 RAW8 样本固定送入 Debayer；该阶段的 `ch*_g/ch*_b` 仅是 RAW 容器名称，不是颜色通道。
+  - 传感器初始化 ROM 设置有效窗口起点为 `X=0x0007`、`Y=0x00b3`，均为奇数。原始 `raw_to_rgb.v` 把首行 Bayer 相位硬编码，未将裁剪起点奇偶性作为参数。
+  - 历史 `final_project` 审计记录已将 `{ch*_g,ch*_b}` 与 `{ch*_b,ch*_g}` 的选择登记为真实 Bayer 相位风险，并提供可切换开关；当前正式工程缺少该控制。
+  - 外部 SC431 Bayer 阵列检索未获得可验证资料（搜索超时或索引限流），因此不把原生阵列类型标为已证实。
+- D 盘同步前核查：用户要求以正式工程 `white_balance.v` 为准。两份文件内容级 `git diff --no-index` 无差异，初始 SHA-256 不同是 LF/CRLF 行尾差异；随后按用户指令以正式工程版本同步到 D 盘。
+- NOT VERIFIED：SC431 原生 Bayer 阵列；目前截图是否为本轮完整构建的 bitstream；本轮实际 Map/PNR/bitstream 结果。
+
+### [M0-11] Bayer 相位参数化、HDMI 显式 RGB 与白平衡旁路
+
+- 触发：M0-10 已证明只修正白平衡不足；用户要求全面排查并修复。
+- 目标：仅在 RAW→Debayer→HDMI 的颜色解释边界修复问题，保持 MIPI 接收、RAW10 截取、DDR 帧缓存、HDMI 时钟、SDC、XML、IP 和板级引脚不变。
+- 修改文件：
+  - `src/top.v`。
+  - `src/debayer/debayer_top_2to1.v`。
+  - `src/debayer/raw_to_rgb.v`。
+- 实际修改：
+  - 新增 `CH0_BAYER_SWAP_PIXELS` / `CH1_BAYER_SWAP_PIXELS` 参数，显式选择帧缓存导出的两个相邻 RAW 样本顺序。
+  - 新增 `CH0_BAYER_ROW_SWAP` / `CH1_BAYER_ROW_SWAP` 参数，将裁剪起点导致的首行 Bayer 相位纳入 Debayer；默认 `1'b1` 对应当前 ROM 的奇数 `Y=0x00b3` 起点。
+  - 默认 `CH*_BAYER_SWAP_PIXELS=1'b0`，即使用 `{ch*_g,ch*_b}`；若上板红/蓝仍不正确，可只翻转该单一参数为 `1'b1`，不重构链路。
+  - `raw_to_rgb.v` 新增 `BAYER_ROW_SWAP` 参数，以 `r_y_cnt[0] ^ BAYER_ROW_SWAP` 选择两种已有插值分支；未改插值算术、行缓冲或数据位宽。
+  - `debayer_top_2to1.v` 将行相位参数传给 `raw_to_rgb`，接口除参数外不变。
+  - HDMI 主路径默认旁路自动白平衡，直接使用 Debayer 输出；新增明确的 `{B,G,R,B,G,R}` → `{R,G,B,R,G,B}` 重排，避免 HDMI 将 BGR 数据误作 RGB。
+  - 保留 `white_balance` 实例与 M0-09 修复版本，但它不再参与 HDMI 颜色基线；待 Bayer 相位正确后才考虑重新启用。
+- 静态验证：
+  - `PASS`：工程参数列表闭合。
+  - `PASS`：ch0 双像素相位开关、行相位开关和 Debayer 实例参数均连通。
+  - `PASS`：Debayer 的行相位参数传递到 `raw_to_rgb`，且 XOR 分支存在。
+  - `PASS`：HDMI 使用唯一、显式的 BGR→RGB 重排，并在默认下旁路白平衡。
+  - `PASS`：`mem_test.xml` 已引用三个修改 RTL 与 `white_balance.v`，无需修改工程 XML。
+  - `NOT VERIFIED`：本机未找到 `iverilog`、`verilator` 或 `vlog`，未做本地 HDL 编译/仿真；Efinity Map/PNR/bitstream 与板级颜色仍由用户验证。
+- D 盘写入：待本条后的哈希一致性同步完成后记录。
+- 下一步门禁：用户用蓝、红、白物块验证本版。若蓝/红仍呈相反色，只改变 `CH0_BAYER_SWAP_PIXELS`；若两色仍整体错相位但不相反，只改变 `CH0_BAYER_ROW_SWAP`。每次只翻转一个参数并保留截图，禁止触碰 MIPI/DDR/HDMI 时序。
+
+### [M0-12] M0-11 D 盘原子同步与交付核查
+
+- 触发：M0-11 静态检查通过。
+- 同步方向：正式工程 `competition_project_single_camera/` → `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件（仅 3 个）：
+  - `src/top.v`：同步前 `7F6537C5F9544709E66997B685361BC81D25236A6C6C6A166711A8BD4CA0828D`；同步后与正式工程一致为 `1CBEA522BE4ADAFC19B96C87F2AEFA3F75832DC54770AA564DD37AE6FF6DDBF3`。
+  - `src/debayer/debayer_top_2to1.v`：同步前 `51D68128153104DCEC1FFA1EBDE35B53A141DCBD4DA478F0D7049E6B92D021C2`；同步后与正式工程一致为 `400CC2CE0FD224D7B1B151944B05CDD4AEC7E976D33D61010409747EAE5E95DC`。
+  - `src/debayer/raw_to_rgb.v`：同步前 `F58EAE1405ED86DD747D1E52E03FBA1D08213307FD70435D3311EDBC37A4CCEF`；同步后与正式工程一致为 `0AD7F89132DB7B2011401806CAB0D510B0349A509F83F16B427012E34C788A2B`。
+- 保持同步的前置白平衡文件：`src/uvc_src/white_balance.v`，正式工程/D 盘 SHA-256 均为 `A8DF8324CC84BCE4BEE9A4C7E37C58EDA63A51F93DD7B7D335FEDC958B89F199`。
+- 未写入：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、任何 IP 设置、`outflow/`、`work_*`、bitstream 或其它 D 盘文件。
+- 结果：`SYNC PASS / EFINITY AND BOARD NOT VERIFIED`。
+- 用户执行请求：打开 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml`，完整综合/PNR/bitstream 后烧录；用左蓝右红和白色物块复测。反馈 Map/PNR/bitstream 结果及截图。
+- 下一步门禁：若颜色仍不正确，按 M0-11 的单参数翻转顺序处理，先 `CH0_BAYER_SWAP_PIXELS`，后 `CH0_BAYER_ROW_SWAP`；不得同时改两项。
+
+### [M0-13] 补光对照量化、绿色偏强显示校正与暗场结论
+
+- 触发：用户提供两个新画面：未补光暗场和补光画面；用户指出补光后蓝色物块看起来像绿色。
+- 用户现场反馈：
+  - 暗场截图：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-3c610082-9ed7-4d04-bf1c-42fc959dde8e.png`。
+  - 补光截图：`C:\Users\20306\Pictures\Screenshots\屏幕截图 2026-07-14 192101.png`。
+- 工作区状态确认：
+  - 用户确认正式工程 `src/uvc_src/white_balance.v` 的新版本是有意修改。
+  - 该修改仅增加 `pixel_cnt==0` 时的平均值除零防护；当前 `top.v` 的 HDMI 默认旁路白平衡，因此它不是本次补光绿偏的直接原因，予以保留并同步。
+- 截图量化（每个物块中心区域下采样平均 RGB）：
+  - 未补光蓝块约 `(8.7, 21.3, 13.6)`，红块约 `(15.2, 12.5, 6.9)`；整体信号很低，FPGA 数字提亮只能放大噪声，不能替代补光/传感器曝光。
+  - 补光蓝块约 `(94.3, 206.0, 142.3)`，红块约 `(202.4, 127.6, 83.7)`。
+  - 此结果表明 R/B 不再发生整体交换：红块仍为 R 主导；蓝块是 G 过强、B 不足，故偏青绿。Bayer 相位修复保持有效，当前问题转为颜色增益与亮度校正。
+- 传感器寄存器审计：当前 ROM 含 `3e00/3e01/3e02`（曝光）和 `3e16..3e19`（增益相关）写入；未取得可验证的 SC431HAI 寄存器手册，故本轮不盲改 I2C 曝光/模拟增益。
+- 修改文件：
+  - `src/top.v`。
+- 实际修改：
+  - 在 Debayer 后、HDMI 前新增固定点显示校正函数；不接入 MIPI、DDR、帧缓存、Debayer、DSI 或 HDMI 时钟。
+  - 默认启用 `HDMI_COLOR_CORRECTION_EN=1'b1`；对每个 RGB 像素进行饱和校正：`R x 300/256 + 12`、`G x 141/256 + 12`、`B x 320/256 + 12`。
+  - 补光截图预测：蓝块约从 `(94,206,142)` 调整为 `(122,125,189)`；红块约从 `(202,128,84)` 调整为 `(249,82,116)`。
+  - 暗场蓝块预测仅约 `(22,23,29)`；因此现场小闭环的硬件前提是固定、稳定、漫反射的白色补光，不能承诺无补光可用。
+- 静态验证：
+  - `PASS`：固定点函数有 8 位饱和输出，避免溢出回绕。
+  - `PASS`：两个像素的六个字节均为 R/G/B 对应增益，字节顺序未改变。
+  - `PASS`：默认 HDMI 路径为 Debayer→BGR/RGB 重排→显示校正→HDMI；白平衡仍保留但默认旁路。
+  - `PASS`：`mem_test.xml` 已引用 `src/top.v` 与 `src/uvc_src/white_balance.v`，无需改 XML。
+  - `NOT VERIFIED`：本机无 `iverilog`、`verilator`、`vlog`，未做 HDL 仿真；Efinity 与板级验证待用户执行。
+- D 盘写入：待本条后的哈希同步记录。
+- 下一步门禁：在固定补光下，用蓝、红、白物块复测。若仍有轻微色偏，只调 `HDMI_R_GAIN_Q8` / `HDMI_G_GAIN_Q8` / `HDMI_B_GAIN_Q8`，不改变 Bayer、MIPI 或 DDR；暗场问题以补光治具为解决边界，后续若需要再依据 SC431 手册单独审计曝光寄存器。
+
+### [M0-14] M0-13 D 盘同步与最终一致性核查
+
+- 触发：M0-13 静态验证通过。
+- 同步方向：`competition_project_single_camera/` → `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件（仅 2 个）：
+  - `src/top.v`：同步前 `1CBEA522BE4ADAFC19B96C87F2AEFA3F75832DC54770AA564DD37AE6FF6DDBF3`；同步后仓库/D 盘一致为 `303F52D839D07458B128D71AAD44911F0EA48FD08F8F30EECC1CB2F3C56B693E`。
+  - `src/uvc_src/white_balance.v`：同步前 `A8DF8324CC84BCE4BEE9A4C7E37C58EDA63A51F93DD7B7D335FEDC958B89F199`；同步后仓库/D 盘一致为 `44CBE404F18602C7DFE07956CC65F714144E8FA091F0D710917BAB527EE56567`。
+- 未写入：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、`outflow/`、`work_*`、bitstream、MIPI I2C ROM或其它 D 盘文件。
+- 结果：`SYNC PASS / EFINITY AND BOARD NOT VERIFIED`。
+- 用户执行请求：在固定白色补光下，使用 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml` 完成完整 Efinity flow 后烧录；用蓝、红、白物块复测并反馈 Map/PNR/bitstream 结果与截图。
+
+### [M0-15] 暗场根因复核与 HDMI 低照度 Gamma 提亮
+
+- 触发：用户反馈烧录 M0-13 后画面依旧很暗，并提供截图 `C:\Users\20306\AppData\Local\Temp\codex-clipboard-d71e57ec-610a-4e80-be9c-5461ffb17911.png`。
+- 当前源码基线：后续修改继续基于 `competition_project_single_camera/`，每次核查通过后同步至 `D:\TJ375N529_SC431HAI2LCD_Demo_V3/` 供用户烧录。
+- 现场图像量化：
+  - 蓝物块区域均值约 `(24.6,20.0,31.5)`，最大值约 `39`。
+  - 红物块区域均值约 `(34.8,15.4,24.4)`，最大值约 `45`。
+  - 背景均值约 `(19.6,12.2,19.0)`，最大值约 `24`。
+  - 结论：画面并非 HDMI 丢失或 RGB 通道错误，Raw/Debayer 后的有效显示量级本身接近黑位；M0-13 的 `+12` 黑位抬升无法显著改善此量级。
+- 传感器 ROM 审计：
+  - 用户指定以正式工程 ROM 为准。
+  - 正式工程与 D 盘 ROM 的有效寄存器写入逐条相同，`3e00..3e19` 曝光/增益相关值相同；SHA-256 差异仅为 LF/CRLF 行尾格式。
+  - 未取得可验证的 SC431HAI 寄存器手册，故本轮不盲改 `3e00..3e19`，避免破坏帧时序、曝光上限或引入噪声/花屏。
+- 修改文件：
+  - `src/top.v`。
+- 实际修改：
+  - 在既有 Debayer→BGR/RGB 重排→固定色彩校正之后、HDMI 之前新增 `hdmi_low_light_gamma`。
+  - 默认 `HDMI_LOW_LIGHT_GAMMA_EN=1'b1`；采用单调四段固定点 gamma：`0..31 -> 0..87`、`32..63 -> 90..126`、`64..127 -> 128..180`、`128..255 -> 181..254`。
+  - 六个 RGB 字节均经过同一 gamma，保持颜色通道关系；不改变 MIPI、I2C、RAW10、帧缓存、Debayer、DSI、HDMI 时钟、SDC、XML、IP 或端口。
+  - 根据当前截图，预测蓝物块约从 `(25,20,32)` 提升到 `(99,64,112)`，红物块约提升到 `(113,56,101)`；背景也会提升到约 `(92,50,93)`，这是显示侧提亮的已知取舍。
+- 静态验证：
+  - `PASS`：gamma 开关、四段分支、6 个 RGB 字节连接和 HDMI 选择路径存在。
+  - `PASS`：边界输出 `0->0`、`31->87`、`32->90`、`63->126`、`64->128`、`127->180`、`128->181`、`255->254`，单调且无 8 位溢出回绕。
+  - `PASS`：`mem_test.xml` 已引用 `src/top.v`，无需修改工程 XML。
+  - `NOT VERIFIED`：本机无 HDL 编译器；Efinity Map/PNR/bitstream 与板级结果待用户验证。
+- D 盘写入：待本条后的哈希同步记录。
+- 下一步门禁：先验证本版 Gamma。若仍无法满足识别亮度，下一步必须获取 SC431HAI 手册或可读回的传感器寄存器证据后，单独制定并审查曝光/模拟增益修改；不得继续无证据猜写 I2C 寄存器。
+
+### [M0-16] M0-15 D 盘同步与颜色链一致性核查
+
+- 触发：M0-15 静态检查通过。
+- 同步方向：`competition_project_single_camera/src/top.v` → `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src/top.v`。
+- D 盘写入：仅 `src/top.v`。
+  - 同步前 SHA-256：`303F52D839D07458B128D71AAD44911F0EA48FD08F8F30EECC1CB2F3C56B693E`。
+  - 同步后仓库/D 盘一致 SHA-256：`BDDEAEF8EAD672105F985552E819242DC2AB82E6D06F238933A03BAEA7FBEF7A`。
+- 一致性核查：当前 `top.v`、`debayer_top_2to1.v`、`raw_to_rgb.v`、`white_balance.v` 均已核对仓库/D 盘 SHA-256 一致。
+- 未写入：传感器 I2C ROM、`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、`outflow/`、`work_*` 或 bitstream。
+- 结果：`SYNC PASS / EFINITY AND BOARD NOT VERIFIED`。
+- 用户执行请求：以 D 盘工程完整综合、烧录，确认 Gamma 是否将暗部提升到可辨识水平；同时反馈 Map/PNR/bitstream 与补光状态。若画面仍不可用，停止继续增加显示侧增益，转入“取得 SC431 曝光寄存器证据后再改 I2C”的受控步骤。
+
+### [M0-17] 用户现场反馈：补光对照仍异常，撤回显示侧拟合处理
+
+- 触发：用户提供新的 HDMI 截图：未补光 `C:\Users\20306\Pictures\Screenshots\屏幕截图 2026-07-14 200709.png`，手动补光 `C:\Users\20306\Pictures\Screenshots\屏幕截图 2026-07-14 200743.png`，反馈画面仍然异常。
+- 目标：停止对拍屏样本做固定 RGB 增益和 Gamma 拟合，先恢复可追溯的中性 HDMI 基线，再分离照明/曝光与 Bayer 问题。
+- 用户现场反馈与判断：两张图均呈现全局偏紫灰和与补光不一致的显示效果。此前新增的 `R x1.17 + 12`、`G x0.55 + 12`、`B x1.25 + 12` 与分段低照度 Gamma 不是传感器标定结果，不能作为颜色修复方案；继续微调只会加重异常。
+- 实际动作：已从正式工程 `src/top.v` 撤除上述固定颜色校正与 Gamma，恢复为 `Debayer -> 显式 BGR 到 RGB 重排 -> HDMI`。保留已验证的 RAW10 抽取、Bayer 像素/行相位参数和 HDMI 旁路白平衡设置。
+- 未修改：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、MIPI 时钟、DDR、HDMI 时序、传感器 I2C ROM、`outflow/`、`work_*` 和 bitstream。
+- 静态验证：正式工程 `src/top.v` 不含 `HDMI_COLOR_CORRECTION_EN`、`HDMI_LOW_LIGHT_GAMMA_EN`、`hdmi_color_correct` 或 `hdmi_low_light_gamma`；`CH0_BAYER_SWAP_PIXELS`、`CH0_BAYER_ROW_SWAP`、`HDMI_BYPASS_WHITE_BALANCE` 和 `rgb0_data_rgb` 路径仍在。
+- 同步前基线：正式工程 `src/top.v` SHA-256 为 `0F869D63507683A061CF507AEEA0733FD3DA8B8C4F9306A3F8FECE84171522EC`；D 盘同名文件仍为含 Gamma 版本，SHA-256 为 `BDDEAEF8EAD672105F985552E819242DC2AB82E6D06F238933A03BAEA7FBEF7A`。
+- NOT VERIFIED：Efinity Map/PNR/bitstream、上板图像、SC431HAI 曝光/模拟增益寄存器语义。本机未发现可用 HDL 仿真/编译器，未声明 HDL 仿真通过。
+- 下一步门禁：将当前正式工程 `src/top.v` 同步到 D 盘并校验哈希。用户用 D 盘工程重新完整综合、烧录后，在固定补光下回传红/蓝/白物块对照、Map/PNR/bitstream 结果。若中性基线仍明显偏色或过暗，先取得 SC431HAI 寄存器手册或可读回寄存器证据，再单独审查 I2C 曝光试验。
+
+### [M0-18] M0-17 D 盘同步与中性颜色基线核查
+
+- 触发：M0-17 正式工程显示侧固定颜色校正和低照度 Gamma 已撤除。
+- 同步方向：`competition_project_single_camera/src/top.v` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src\top.v`。
+- D 盘写入：仅 `src/top.v`。
+  - 同步前 SHA-256：`BDDEAEF8EAD672105F985552E819242DC2AB82E6D06F238933A03BAEA7FBEF7A`。
+  - 正式工程源 SHA-256：`0F869D63507683A061CF507AEEA0733FD3DA8B8C4F9306A3F8FECE84171522EC`。
+  - 同步后 D 盘 SHA-256：`0F869D63507683A061CF507AEEA0733FD3DA8B8C4F9306A3F8FECE84171522EC`，与正式工程一致。
+- 同步后静态核查：D 盘 `src/top.v` 无 `HDMI_COLOR_CORRECTION_EN`、`HDMI_LOW_LIGHT_GAMMA_EN`、`hdmi_color_correct` 或 `hdmi_low_light_gamma` 残留；保留 `CH0_BAYER_SWAP_PIXELS=0`、`CH0_BAYER_ROW_SWAP=1`、`HDMI_BYPASS_WHITE_BALANCE=1` 和 `rgb0_data_rgb` HDMI 数据路径。
+- 未写入：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、传感器 I2C ROM、`outflow/`、`work_*`、bitstream 或其他 D 盘文件。
+- 结果：`SYNC PASS / EFINITY AND BOARD NOT VERIFIED`。
+- 用户执行请求：使用 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml` 重新完整综合、PNR、生成 bitstream 并烧录。固定同一补光条件，拍摄红、蓝、白物块对照并回传画面，以及 Map/PNR/bitstream 结果。此版本是后续传感器曝光调查的唯一中性显示基线。
+
+### [M0-19] 用户现场反馈：暗场仍严重且 PNR 时序失败，隔离白平衡除法路径
+
+- 触发：用户回传未补光 HDMI 图 `C:\Users\20306\Pictures\Screenshots\屏幕截图 2026-07-14 202643.png` 和 Efinity Timing 截图，显示 WNS `-34.08 ns`、WHS `0.014 ns`。
+- 用户现场反馈与图像判断：不补光画面接近黑位，只依靠 HDMI 后端数字提亮不能生成有效的信号；后续必须基于 SC431HAI 寄存器证据审查曝光/增益，不再重新添加拍屏拟合的 RGB 增益或 Gamma。
+- 时序证据：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt` 时间为 2026-07-14 20:25:20。最差路径为 `u0_white_balance/pixel_cnt[22]~FF|CLK -> u0_white_balance/gain_b[8]~FF|D`，同域 `i_sysclk_div2` 约束为 `14.286 ns`，数据路径为 `49.246 ns`、`210` 个逻辑级，因此 WNS 为 `-34.080 ns`。这是硬时序失败，不可以用约束屏蔽或标记为通过。
+- 根因分析：HDMI 已经旁路白平衡，但 `u0_white_balance` 仍被 MIPI DSI 实例使用。其每帧求均值和增益更新含运行时除法，导致本次最差路径。直接删除 DSI 不安全：当前 `dsi_tx_top` 还产生 `pixel_data_en`，该信号是既有摄像头/帧缓存复位释放链的一部分。
+- 实际修改：在正式工程 `src/top.v` 中移除两路 `white_balance` 实例与所有 `wb*` 网线。保留 `dsi_tx_top` 以保持 `pixel_data_en` 启动链，其像素输入改为 ch0 Debayer 后已显式重排的 `rgb0_data_rgb`。HDMI 仍使用同一 ch0 RGB。
+- 静态验证：`src/top.v` 无 `white_balance` 或 `wb0_`/`wb1_` 引用；HDMI 与 DSI 像素输入为 `rgb_hs/rgb_vs/rgb_de/rgb0_data_rgb`。`git diff --check` 通过。`white_balance.v` 仍保留在工程中，但无顶层实例，新综合将其排除。
+- 未修改：`white_balance.v`、MIPI RX、RAW10 抽取、DDR、Debayer、HDMI 时钟、`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、I2C ROM、`outflow/`、`work_*` 和 bitstream。
+- NOT VERIFIED：新 Efinity Map/PNR/bitstream、新 WNS/WHS、板级 HDMI 图像。旧 timing report 仍是修改前产物，不能用来推断本次修改后的时序。
+- 下一步门禁：同步正式工程 `src/top.v` 至 D 盘，然后由用户完整重新综合、PNR、烧录。必须回传新的 WNS/WHS、最差路径以及 HDMI 画面；只有 WNS >= 0 才可进入下一步图像调试。
+
+### [M0-20] M0-19 D 盘同步与时序修复前完整性核查
+
+- 触发：M0-19 顶层白平衡实例已移除，需要发布到 D 盘给用户重新 PNR。
+- 同步方向：`competition_project_single_camera/src/top.v` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src\top.v`。
+- D 盘写入：仅 `src/top.v`。
+  - 同步前 SHA-256：`0F869D63507683A061CF507AEEA0733FD3DA8B8C4F9306A3F8FECE84171522EC`。
+  - 正式工程源 SHA-256：`11349BEB991BD43E3AC5AD6BAB0A9162CA156772ED97C0CA9D5F1F25B0B0B95E`。
+  - 同步后 D 盘 SHA-256：`11349BEB991BD43E3AC5AD6BAB0A9162CA156772ED97C0CA9D5F1F25B0B0B95E`，与正式工程一致。
+- 关键文件一致性：`top.v`、`debayer_top_2to1.v`、`raw_to_rgb.v`、`white_balance.v` 在正式工程/D 盘的 SHA-256 均一致。D 盘 `top.v` 中无 `white_balance` 或 `wb0_`/`wb1_` 引用。
+- 未写入：`mem_test.xml`、`.peri.xml`、`constrain.sdc`、IP、I2C ROM、`outflow/`、`work_*`、bitstream 或其他 D 盘文件。
+- 结果：`SYNC PASS / NEW PNR AND BOARD NOT VERIFIED`。
+- 用户执行请求：使用 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml` 重新完整综合、PNR、生成 bitstream 并烧录。首先回传 WNS/WHS 和最差路径；必须确认 `u0_white_balance` 不再出现于时序报告。再回传 HDMI 画面。
+
+### [M0-21] 新 PNR 反馈：白平衡路径消失，剩余 DSI/CSI 跨时钟约束问题
+
+- 触发：用户回传新 Timing 截图和未补光 HDMI 图。Timing 显示 WNS `-1.308 ns`、WHS `0.013 ns`；画面仍接近黑位。
+- 构建证据：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt` 生成于 2026-07-14 20:38:51，Efinity `2025.2.288.4.15`；bitstream 生成于 20:39:08。
+- 上一轮修复验证：新 timing report 中 `u0_white_balance` 和 `u1_white_balance` 引用数均为 0，原 `-34.080 ns` 的除法路径已消失。CDC 报告为 `No Synchronizer warnings to report`。
+- 当前最差路径：`dsi_tx_top_inst1/w_confdone~FF|CLK -> dsi_tx_top_inst1/dly_cnt[25]~FF|CE`，Launch Clock 为 `mipi_clk`，Capture Clock 为 `i_sysclk_div2`，约束仅 `0.002 ns`，Slack `-1.308 ns`。报告还存在 DSI PHY 的 `mipi_dphy_tx_SLOWCLK -> mipi_dphy_tx_FASTCLK_D` 负路径。
+- 后续路径预查：删除 DSI 后，timing report 中仍可见 `mipi_rx_ck0_CLKOUT` / `mipi_rx_ck1_CLKOUT` 与 `i_sysclk_div2` 之间的负路径；起终点位于 CSI IP 的异步 FIFO、Gray 指针同步和复位同步结构。现有 SDC 使用旧别名 `dphy_byte_clk` / `mipi_dphy_rx_inst1_byte_clk`，没有覆盖 STA 实际报告的两个 MIPI RX 时钟名。
+- 图像判断：移除白平衡后画面亮度几乎不变，进一步证明暗场不是白平衡或 HDMI 后处理造成。当前不修改 SC431HAI 曝光/增益寄存器，因为本地资料未找到可验证的寄存器手册。
+- 结论：WNS 虽大幅改善但仍为硬失败；必须先清除不需要的 DSI 活动逻辑，并修正 CSI 异步时钟组的约束对象，不能用旧 bitstream 继续图像功能开发。
+
+### [M0-22] HDMI-only 启动解耦、DSI 禁用与 CSI 时钟组修正
+
+- 目标：在不改变 ch0 摄像头、DDR、Debayer 和 HDMI 像素链的前提下，移除不使用的 DSI 对启动和时序的影响，并让 STA 正确识别 CSI IP 的异步时钟关系。
+- 修改文件：
+  - `src/top.v`
+  - `constrain.sdc`
+- `src/top.v` 修改：
+  - 顶层 `arst_n` 不再依赖已不用的 `MIPI_TX_PLL_LOCKED`，保留 `sys_pll_lock & ddr_pll_lock & pll_byteclk_locked`。
+  - 新增 `pixel_reset_sync` 两级同步器，将 `i_fb_clk` 域产生的 `ddr_cfg_ok/sys_rst_n` 在 `i_sysclk_div2` 域异步拉低、同步释放。
+  - 新增 `pixel_enable_cnt`，在同步释放后保留原 DSI 启动链约 1 秒的等待，再产生 `pixel_data_en`。
+  - 使用未定义的 `MIPI_DSI_OUT_EN` 宏隔离原 `reset`、`color_bar_rgb` 和 `dsi_tx_top` 实例；正式 HDMI-only 构建不会综合这些逻辑。
+  - 两组共 70 个 MIPI TX 物理输出全部显式置于 `OE=0`、数据为 0、复位有效；`P1_lcd_power_en=0`。
+  - `white_balance` / `wb0_` / `wb1_` 顶层引用仍为 0，HDMI 保持 `rgb_hs/rgb_vs/rgb_de/rgb0_data_rgb` 直连。
+- `constrain.sdc` 修改：在创建 `mipi_rx_ck0_CLKOUT` 和 `mipi_rx_ck1_CLKOUT` 后，新增 `set_clock_groups -asynchronous -group {i_sysclk_div2} -group {mipi_rx_ck0_CLKOUT} -group {mipi_rx_ck1_CLKOUT}`。该约束使用 STA 真实时钟名，只隔离 CSI IP 已有异步 FIFO/复位同步跨域，不放宽任何同域路径。
+- 静态验证：
+  - `PASS`：MIPI_DSI_OUT_EN 未定义，DSI 活动实例处于预处理禁用分支。
+  - `PASS`：70 个 DSI TX 输出均有唯一的禁用分支赋值。
+  - `PASS`：`pixel_data_en` 只由本地 `i_sysclk_div2` 计数器产生。
+  - `PASS`：SDC 的实际 MIPI RX 时钟在创建后再进入异步组。
+  - `PASS`：`git diff --check`。
+  - `NOT VERIFIED`：本机无 `iverilog`、`verilator` 或 `vlog`；未完成新 Map/PNR/bitstream 和板级 HDMI 验证。
+- 未修改：MIPI CSI RX RTL/IP、RAW10 抽取、DDR、Debayer、HDMI 时钟和数据链、传感器 I2C ROM、`mem_test.xml`、`.peri.xml`、IP settings、`outflow/`、`work_*` 和 bitstream。
+- 下一步门禁：同步 `src/top.v` 与 `constrain.sdc` 到 D 盘，完整重跑 Efinity。必须核查 WNS/WHS、Clock Relationship Summary、CDC 报告，以及报告中 `dsi_tx_top_inst1` 是否完全消失。WNS >= 0 且 HDMI 画面保持后，才能进入 SC431HAI 曝光资料审计和受控曝光试验。
+
+### [M0-23] M0-22 D 盘同步与发布核查
+
+- 同步方向：`competition_project_single_camera/` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件：
+  - `src/top.v`：同步前 SHA-256 `11349BEB991BD43E3AC5AD6BAB0A9162CA156772ED97C0CA9D5F1F25B0B0B95E`；同步后正式工程/D 盘一致为 `E0F6509169545B16E4146618186929C280DD354EEB6ADD1C2E03FE382E9E7AD1`。
+  - `constrain.sdc`：同步前 SHA-256 `7224DE3FFCC6B05A82DDDD27792CF2DC245DCFA254E324D07A796E534CBDDD87`；同步后正式工程/D 盘一致为 `B6E30866ED09CADCA083FCE4D7A2D831A90E3C0E689CBB4D3B97369874AE316D`。
+- D 盘同步后核查：`MIPI_DSI_OUT_EN` 定义数为 0；`white_balance` / `wb0_` / `wb1_` 顶层引用数为 0；本地 `pixel_data_en`、DSI 禁用输出和真实 MIPI RX 时钟异步组均存在。
+- 未写入：`mem_test.xml`、`.peri.xml`、IP、MIPI CSI RX RTL、I2C ROM、`outflow/`、`work_*`、bitstream 或其他 D 盘文件。
+- 结果：`SYNC PASS / NEW MAP-PNR-BOARD NOT VERIFIED`。
+- 用户执行请求：完整重跑 D 盘 Efinity flow，不能只复用旧 route/bitstream。回传新的 Timing 总览、Clock Relationship Summary、CDC 报告和 HDMI 画面；确认 `dsi_tx_top_inst1` 不再出现在 map/timing 报告中。
+
+### [M0-24] 用户现场反馈：五色正方体仍全部压在暗部
+
+- 触发：用户回传最新 HDMI 画面并确认画面中放置了白、黑、红、蓝、黄五个正方体。
+- 对应构建证据：
+  - Timing 报告：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt`，生成时间 `2026-07-14 20:57:32`。
+  - bitstream：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`，SHA-256 `F799DA980C427F2869E808A4DFA7C64272B9EEFF6FBDCA1F6BF5DABAD96B2D12`。
+  - Timing：WNS `-0.741 ns`，WHS `0.026 ns`；`dsi_tx_top_inst1` 和顶层 `white_balance` 引用均已消失；CDC 报告为 `No Synchronizer warnings to report`。
+- 图像量化：最新截图全图 RGB 均值约为 `(10.52, 16.70, 8.14)`，RGB p99 约为 `(37, 64, 32)`，最大值约为 `(42, 68, 37)`。白色和黄色样本也被压入暗部，当前画面不具备可靠五色识别所需的动态范围。
+- 附加现象：画面存在明显横向重影/分块，不能把问题仅归因为传感器曝光或像素数；本轮先做传感器增益单变量试验，重影在亮度恢复后单独定位。
+- 结论：`BOARD IMAGE FAIL / FIVE-COLOR SEPARATION NOT AVAILABLE`。不得将当前画面描述为五色识别链路已闭环。
+
+### [M0-25] SC431HAI 约 2.98 倍模拟增益试验与 mipi_clk 复位域修复
+
+- 目标：不改动 ch0、RAW10 抽取、DDR、Debayer、HDMI 像素链、曝光时间和帧率，分别处理暗场输入幅度不足与当前 WNS 最差复位跨域路径。
+- 修改文件：
+  - `src/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_ctrl_top.v`
+  - `src/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_reg_rom.v`
+  - `src/mipi_csi/soft_mipi_rx_top.v`
+- 传感器寄存器证据：Rockchip Linux `drivers/media/i2c/sc431hai.c`，固定 commit `b4ef083dc0c3608e744deabb43dc6b781aadbe6e`。公开驱动定义 `0x3e06/0x3e07` 为数字粗/细增益，`0x3e08/0x3e09` 为模拟粗/细增益；其分段公式证明 `{0x3e08,0x3e09}={0x80,0x3e}` 对应约 `2.98x` 模拟增益。
+- 增益修改：
+  - `DATA_LENGTH` 从 `161` 增至 `165`。
+  - 追加 `3e06=00`、`3e07=80`，保持数字增益约 `1x`。
+  - 追加 `3e08=80`、`3e09=3e`，设置模拟增益约 `2.98x`。
+  - 保持原曝光寄存器 `3e00=00`、`3e01=ba`、`3e02=d0` 不变；该曝光值与公开驱动的 2560x1440/30fps 模式一致且已接近帧周期上限，因此本轮不继续延长曝光。
+- ROM 完整性：共 `165` 项，索引从 `0x00` 连续到 `0xa4`；发送状态机使用 `cnt < DATA_LENGTH`，因此 `DATA_LENGTH=165` 会发送全部 165 项。
+- 时序根因：最新最差路径由 `i_sysclk_div2` 域 `reset_pixel_n` 驱动 `mipi_clk` 域 `i2c_rst_cnt[*]` 异步复位端，形成 10 条 WNS `-0.741 ns` 路径。
+- 时序修改：在 `soft_mipi_rx_top.v` 中新增由 `arst_n` 输入、在 `mipi_clk` 域同步释放的 `reset_mipi_n`，仅将 `i2c_rst_cnt` 的异步复位由 `reset_pixel_n` 改为 `reset_mipi_n`。两个 CSI 模块实例都会获得各自本地 `mipi_clk` 域复位。
+- 保持不变：`src/top.v`、`constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、RAW/DDR/Debayer/HDMI 数据链、曝光时间、帧率、HDMI Gamma 和固定 RGB 增益。
+- 静态状态：源代码修改已完成；等待格式检查、D 盘同步和 SHA-256 核对。
+- NOT VERIFIED：新 Map/PNR/bitstream、WNS/WHS、CDC、上板 HDMI 亮度、五色分离、白/黄色是否饱和、噪声水平和横向重影。
+- 下一步门禁：同步三处源文件到 D 盘后，由用户完整重跑 Map/PNR/bitstream 并烧录。首先要求 WNS/WHS 均非负，再在相同机位、相同环境和相同五色摆放下拍摄对照图。
+
+### [M0-26] M0-25 D 盘同步与发布核查
+
+- 同步方向：`competition_project_single_camera/` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件与 SHA-256：
+  - `src/mipi_csi/soft_mipi_rx_top.v`：同步前 `B7D8DD592F24B15F55DE5D6EDCA34A109B0E45F631F1A8E9AC58A5DA94BFC038`；同步后正式工程/D 盘一致为 `0EAADE836681756416D63ED08805BD0235E4B2377FBC512B24F7C4E3320C5F70`。
+  - `src/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_ctrl_top.v`：同步前 `FACC87B16657874BEDA8F1051649970A1C8A78E52F0224726904F30C1CFAD21F`；同步后正式工程/D 盘一致为 `234E58D7F5F1AA46CA9D14F044C9D2BA74EC42F55EBB8AB4E79A0F297B59B317`。
+  - `src/mipi_csi/cam_i2c_ctrl/i2c/i2c_master_reg_rom.v`：同步前 `DA82D962F02D3E585C97BF81EA057A9E0E9766915449960F98EF6C903B695928`；同步后正式工程/D 盘一致为 `3762EA124998A7CDC5B3C58285AECE0C52B264F05E168FB80F78EB734F20983C`。
+- 发布前静态核查：`git diff --check` 通过；ROM 条目数 `165`、索引 `0..164` 连续无缺口；临时公开驱动副本 `_tmp_sc431hai.c` 已删除，未纳入仓库。
+- 未写入：`src/top.v`、`constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、`outflow/`、`work_*`、bitstream 和其他 D 盘文件。
+- 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
+- 用户执行请求：从 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml` 完整重跑 Map、PNR 和 bitstream 后烧录。回传 WNS、WHS、新最差路径、CDC 报告，以及相同位置、相同环境下包含白/黑/红/蓝/黄五个正方体的 HDMI 画面。优先确认 WNS/WHS 均非负，再判断亮度、五色分离、饱和、噪声和横向重影。
+
+### [M0-27] 用户现场反馈：复位域时序修复通过，增益有效但五色画面仍未通过
+
+- 触发：用户完成新一轮完整构建、烧录并回传 Timing 截图和 Windows 直接 HDMI 画面截图 `屏幕截图 2026-07-14 214056.png`。
+- 构建证据：
+  - Timing 报告：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt`，生成时间 `2026-07-14 21:39:18`。
+  - bitstream：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`，生成时间 `2026-07-14 21:39:36`，SHA-256 `0A69113CB3AAC7EB1DF0E6FDFF9964C98FDF9B8E59CE48848C093FB1AA7BE8CC`。
+  - WNS `+1.674 ns`，WHS `+0.026 ns`；原 `reset_pixel_n -> i2c_rst_cnt[*]` 负路径不再是失败路径。
+  - CDC 报告：`No Synchronizer warnings to report`。
+- 时序结论：`TIMING PASS / CDC REPORT PASS`。M0-25 的 `mipi_clk` 域复位修复已由本次真实 PNR 验证有效。
+- 图像量化：
+  - 整图 RGB 均值约 `(29.34, 46.65, 22.16)`，p99 约 `(104, 187, 91)`，最大值约 `(119, 198, 102)`；相比上一版亮度提升约 `2.5x..3x`，且没有通道达到 255，说明约 `2.98x` 模拟增益已经生效、当前未出现数字饱和。
+  - 红色样本均值约 `(41.03, 33.30, 19.33)`；蓝色样本约 `(20.68, 44.86, 28.07)`。红块仍为 R 最大，蓝块仍满足 B 大于 R，因此不支持再次盲目交换 R/B 或 Bayer 横纵相位。
+  - 白色样本均值约 `(73.48, 132.82, 61.91)`，`G/R≈1.81`、`G/B≈2.15`；绿色偏置仍明显，五色分类输入尚不合格。
+  - 黑色样本均值约 `(6.93, 13.26, 6.16)`，黑色与其他样本已有亮度差，但中性色和蓝/黄仍受绿色偏置影响。
+- 图像结构问题：Windows 直接截图中仍存在明显水平方向多重轮廓/拖影，排除“手机拍显示器”作为唯一原因。当前传感器曝光接近整帧，固定支架或物体轻微振动可能产生运动拖影；顶层双像素到 HDMI 的 2:1 拆分也缺少基于 `DE/HS/VS` 的显式相位重对齐。现有证据不足以把任一项定为唯一根因。
+- 决策：
+  - 保持模拟增益约 `2.98x`，不继续加增益，不追加 Gamma，不盲改 Bayer 相位。
+  - 先要求摄像头刚性固定、五个方块完全静止后再取得一张 Windows 直接截图；若重影显著消失，优先缩短曝光并用适量增益补偿；若重影仍保持固定的多级像素偏移，再隔离审计帧缓存和双像素 HDMI 拆分。
+  - 重影根因关闭后，再依据中性白/灰 ROI 设计低成本固定点白平衡；不得恢复带运行时除法的旧 `white_balance` 模块。
+- 结果：`TIMING PASS / BRIGHTNESS IMPROVED / IMAGE QUALITY FAIL / FIVE-COLOR NOT VERIFIED`。
+- 本轮工程写入：仅追加本工作日志；未修改 RTL、SDC、工程 XML、IP、D 盘源文件或 bitstream。
+
+### [M0-28] 静止画面确认重影与 HDMI 输出前端改进
+
+- 触发：用户回传摄像头和五色物块保持静止后的 Windows 直接截图 `codex-clipboard-08b530ba-8093-466d-9f54-7c602809bf26.png`，并要求继续改进。
+- 图像复核：静止截图仍保持多级水平轮廓，排除物体移动、相机晃动和手机拍屏作为唯一原因；重影属于当前视频输出链的真实问题。
+- 五色 ROI 均值：红约 `(44.10,35.18,20.65)`，黄约 `(61.76,102.34,33.20)`，白约 `(73.68,133.06,62.07)`，蓝约 `(21.74,49.20,31.33)`，黑约 `(6.62,12.55,5.70)`。
+- 根因审计：`src/top.v` 原 HDMI 2:1 拆分使用自由翻转 `sel`，没有在每行消隐期根据 `DE/HS/VS` 重新锚定双像素相位。其启动相位依赖 70 MHz/140 MHz 相关时钟的启动关系，复位或相位扰动后可能交换像素对的第一/第二像素。
+- 修改文件：`src/top.v`。
+- HDMI 相位修改：删除独立的自由运行 `sel <= ~sel`；在 `hdmi_tx_slow_clk` 域检测 `hdmi0_de_out=0` 时将 `sel` 复位为 0，并在有效行内严格按原工程顺序输出低 24 位、再输出高 24 位。该修改不改变 2:1 时钟关系、TMDS 编码器或 HDMI 时序参数。
+- 固定点白平衡：
+  - 新增顶层参数 `HDMI_FIXED_WB_EN=1`，可单参数关闭。
+  - 仅在 HDMI 显示支路使用 `R=1.75x`、`G=1x`、`B=2x`，采用移位加法与 8 位饱和裁剪，不使用乘法器或除法器。
+  - 系数依据静止白块 `G/R≈1.81`、`G/B≈2.14`，保守取 1.75 和 2.0；白块预测由约 `(74,133,62)` 变为约 `(129,133,124)`。
+  - 原始 `rgb0_data_rgb` 语义保持不变；传感器增益、曝光、CSI、RAW10、DDR、Debayer 和后续识别数据边界均未修改。
+- 静态验证：`git diff --check` 通过；饱和边界手工/脚本核查通过；原低半字后高半字像素顺序保持；本机无 `iverilog`、`verilator` 或 `vlog`，未运行 RTL 编译。
+- 风险：新增 10 位移位加法和饱和选择位于 `i_sysclk_div2 -> hdmi_tx_slow_clk` 相关时钟路径；上一版该关系 setup slack 为 `+6.228 ns`，但新 PNR 前不得推断仍然通过。行相位修复是明确稳健性修复，但尚不能宣称它是全部多级重影的唯一根因。
+- 结果：`SOURCE PATCHED / STATIC CHECK PASS / MAP-PNR-BOARD NOT VERIFIED`。
+- 下一步门禁：同步 `src/top.v` 到 D 盘后完整重跑 Map/PNR/bitstream。必须回传 WNS/WHS、`i_sysclk_div2 -> hdmi_tx_slow_clk` slack、CDC 结果和相同五色静止截图；分别判断重影和白平衡是否改善。
+
+### [M0-29] M0-28 D 盘同步与发布核查
+
+- 同步方向：`competition_project_single_camera/src/top.v` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src\top.v`。
+- SHA-256：D 盘同步前 `E0F6509169545B16E4146618186929C280DD354EEB6ADD1C2E03FE382E9E7AD1`；同步后正式工程/D 盘一致为 `7A8111B36CE05F51B402BBB9424F53A6728B634F60E81EBE01DD8F279E89DD85`。
+- 写入范围：仅 D 盘 `src/top.v`。未写入 `constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、传感器 I2C ROM、其他 RTL、`outflow/`、`work_*` 或 bitstream。
+- 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
+- 用户执行请求：使用 D 盘工程完整重跑 Map、PNR、bitstream 并烧录；旧 bitstream SHA-256 `0A69113CB3AAC7EB1DF0E6FDFF9964C98FDF9B8E59CE48848C093FB1AA7BE8CC` 不包含本次 HDMI 相位和固定点白平衡修改。

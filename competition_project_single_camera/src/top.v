@@ -36,9 +36,16 @@ parameter	HBP				= 8'd88,
 parameter	HFP				= 8'd120,
 parameter	VSP				= 6'd2,
 parameter	VBP				= 6'd20,
-parameter	VFP				= 6'd20
+parameter	VFP				= 6'd20,
 
-
+// SC431HAI active window starts at odd X/Y coordinates. The framebuffer
+// exposes two adjacent RAW samples, so this switch selects their Bayer phase.
+parameter CH0_BAYER_SWAP_PIXELS = 1'b0,
+parameter CH1_BAYER_SWAP_PIXELS = 1'b0,
+parameter CH0_BAYER_ROW_SWAP    = 1'b1,
+parameter CH1_BAYER_ROW_SWAP    = 1'b1,
+parameter HDMI_FIXED_WB_EN      = 1'b1
+// MIPI DSI is disabled; HDMI is the only display output.
 )(
   (* syn_peri_port = 0 *) input mipi_clk,
   (* syn_peri_port = 0 *) input clk_74p25m,
@@ -592,8 +599,8 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
   wire    [S_COUNT-1:0]           		axi_m_rlast;
   wire    [S_COUNT-1:0]           		axi_m_rvalid;
   wire    [S_COUNT-1:0]          			axi_m_rready;// 
-  reg [5:0] vs_cnt ;
-  reg  out_sync;
+   reg [5:0] vs_cnt ;
+   reg  out_sync;
 //=========================================================================
 //signal define
 //=========================================================================
@@ -607,7 +614,7 @@ assign pll_byteclk_rstn = i_sw[0];
 assign led[0] = ~ddr_cfg_ok; //D14
 assign led[1] = vs_cnt[5];   //D15
 
-assign arst_n = sys_pll_lock & ddr_pll_lock & pll_byteclk_locked & MIPI_TX_PLL_LOCKED ;//& DdrResetn;
+assign arst_n = sys_pll_lock & ddr_pll_lock & pll_byteclk_locked;
 reg [20:0] rst_cnt = 'd0;
 always@( posedge i_fb_clk or negedge arst_n )
 begin
@@ -671,7 +678,27 @@ assign ddr_inst_CFG_SEL      = 1'b0;
 assign axi0_ARESETn = ddr_cfg_ok;
 assign axi1_ARESETn = ddr_cfg_ok;
 wire sys_rst_n = ddr_cfg_ok;
-wire pixel_data_en;
+
+// Preserve the original post-configuration settling delay without depending
+// on the unused DSI panel sequencer or crossing its mipi_clk status signal.
+(* async_reg = "true" *) reg [1:0] pixel_reset_sync = 2'b00;
+reg [26:0] pixel_enable_cnt = 27'd0;
+always @(posedge i_sysclk_div2 or negedge sys_rst_n) begin
+    if (!sys_rst_n) begin
+        pixel_reset_sync <= 2'b00;
+    end else begin
+        pixel_reset_sync <= {pixel_reset_sync[0], 1'b1};
+    end
+end
+
+always @(posedge i_sysclk_div2) begin
+    if (!pixel_reset_sync[1]) begin
+        pixel_enable_cnt <= 27'd0;
+    end else if (!pixel_enable_cnt[26]) begin
+        pixel_enable_cnt <= pixel_enable_cnt + 1'b1;
+    end
+end
+wire pixel_data_en = pixel_enable_cnt[26];
 //============================================================================================ 
 //
 //============================================================================================
@@ -875,6 +902,8 @@ wire [PACK_BIT-1:0] rx_out_data1;
   wire ch0_vs;
   wire ch0_hs;
   wire ch0_de;
+  wire [15:0] ch0_bayer_2pix;
+  assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -1247,7 +1276,9 @@ end
   wire        rgb1_valid;
   wire [47:0] rgb1_datax2;
   
-  debayer_top_2to1 debayer_top
+  debayer_top_2to1 #(
+      .BAYER_ROW_SWAP(CH0_BAYER_ROW_SWAP)
+  ) debayer_top
   (
       .in_pclk		  (i_sysclk_div2),//(i_mipi_rx_pclk ),
       .in_rstn		  (pixel_data_en	),
@@ -1256,7 +1287,7 @@ end
       .raw_hs_i		  (ch0_hs		  ),//(ch1_hs	     ),//	 
       .raw_de_i		  (ch0_de		  ),//(ch1_de	     ),//	
       .raw_valid_i	  (ch0_de	      ),//(ch1_de	     ),//	
-      .raw_datax4_i	  ({ch0_b,ch0_g}  ),//
+      .raw_datax4_i	  (ch0_bayer_2pix ),//
       
       .rgb_vs_o		  (rgb_vs         ),
       .rgb_hs_o		  (rgb_hs         ),
@@ -1267,7 +1298,9 @@ end
   
 
 
-  debayer_top_2to1 debayer_top1
+  debayer_top_2to1 #(
+      .BAYER_ROW_SWAP(CH1_BAYER_ROW_SWAP)
+  ) debayer_top1
   (
       .in_pclk		  (i_sysclk_div2),//(i_mipi_rx_pclk ),
       .in_rstn		  (pixel_data_en	),
@@ -1276,7 +1309,7 @@ end
       .raw_hs_i		  (ch1_hs		  ),//(ch1_hs	     ),//	 
       .raw_de_i		  (ch1_de		  ),//(ch1_de	     ),//	
       .raw_valid_i	  (ch1_de	      ),//(ch1_de	     ),//	
-      .raw_datax4_i	  ({ch1_b,ch1_g}  ),//
+      .raw_datax4_i	  (CH1_BAYER_SWAP_PIXELS ? {ch1_b, ch1_g} : {ch1_g, ch1_b}),//
       
       .rgb_vs_o		  (rgb1_vs         ),
       .rgb_hs_o		  (rgb1_hs         ),
@@ -1285,48 +1318,40 @@ end
       .rgb_datax2_o   (rgb1_datax2     )//b,g,r,b,g,r
   );
 
-//============================================================================= 
-//mipi dsi
-//=============================================================================
-wire            wb0_hs_out;
-wire            wb0_vs_out;
-wire            wb0_de_out;
-wire [47:0]     wb0_data_out;
+// debayer_top_2to1 packs {B,G,R,B,G,R}; HDMI consumes {R,G,B} pixels.
+wire [47:0] rgb0_data_rgb = {rgb_datax2[31:24], rgb_datax2[39:32], rgb_datax2[47:40],
+                             rgb_datax2[7:0],   rgb_datax2[15:8],   rgb_datax2[23:16]};
 
-wire            wb1_hs_out;
-wire            wb1_vs_out;
-wire            wb1_de_out;
-wire [47:0]     wb1_data_out;
-white_balance u0_white_balance (
-    .clk            (i_sysclk_div2),
-    .rst_n          (pixel_data_en      ),
-    .hs_in          (rgb_hs         ),
-    .vs_in          (rgb_vs         ),
-    .de_in          (rgb_de         ),
-    .data_in        (rgb_datax2     ),
-    .hs_out         (wb0_hs_out      ),
-    .vs_out         (wb0_vs_out      ),
-    .de_out         (wb0_de_out      ),
-    .data_out       (wb0_data_out    )
-  );
+// Display-only fixed-point white balance, derived from the stationary white
+// reference block. R uses 1.75x, G uses 1x, and B uses 2x with saturation.
+function [7:0] hdmi_sat_u10_to_u8;
+    input [9:0] value;
+    begin
+        hdmi_sat_u10_to_u8 = |value[9:8] ? 8'hff : value[7:0];
+    end
+endfunction
 
-white_balance u1_white_balance (
-    .clk            (i_sysclk_div2),
-    .rst_n          (pixel_data_en   ),
-    .hs_in          (rgb1_hs         ),
-    .vs_in          (rgb1_vs         ),
-    .de_in          (rgb1_de         ),
-    .data_in        (rgb1_datax2     ),
-    .hs_out         (wb1_hs_out      ),
-    .vs_out         (wb1_vs_out      ),
-    .de_out         (wb1_de_out      ),
-    .data_out       (wb1_data_out    )
-  );
+wire [9:0] hdmi_p0_r_scaled = {2'b0, rgb0_data_rgb[47:40]} +
+                               ({2'b0, rgb0_data_rgb[47:40]} >> 1) +
+                               ({2'b0, rgb0_data_rgb[47:40]} >> 2);
+wire [9:0] hdmi_p0_b_scaled = {2'b0, rgb0_data_rgb[31:24]} << 1;
+wire [9:0] hdmi_p1_r_scaled = {2'b0, rgb0_data_rgb[23:16]} +
+                               ({2'b0, rgb0_data_rgb[23:16]} >> 1) +
+                               ({2'b0, rgb0_data_rgb[23:16]} >> 2);
+wire [9:0] hdmi_p1_b_scaled = {2'b0, rgb0_data_rgb[7:0]} << 1;
+wire [47:0] rgb0_data_wb = {
+    hdmi_sat_u10_to_u8(hdmi_p0_r_scaled), rgb0_data_rgb[39:32], hdmi_sat_u10_to_u8(hdmi_p0_b_scaled),
+    hdmi_sat_u10_to_u8(hdmi_p1_r_scaled), rgb0_data_rgb[15:8],  hdmi_sat_u10_to_u8(hdmi_p1_b_scaled)
+};
+wire            hdmi0_hs_out   = rgb_hs;
+wire            hdmi0_vs_out   = rgb_vs;
+wire            hdmi0_de_out   = rgb_de;
+wire [47:0]     hdmi0_data_out = HDMI_FIXED_WB_EN ? rgb0_data_wb : rgb0_data_rgb;
 
 //============================================================================= 
 //mipi dsi
 //=============================================================================
- 
+`ifdef MIPI_DSI_OUT_EN
 reset
 #(
 	.IN_RST_ACTIVE	("LOW"),
@@ -1389,17 +1414,18 @@ dsi_tx_top # (
     .VBP(VBP),
     .VFP(VFP)
   )
-  dsi_tx_top_inst1 (
+dsi_tx_top_inst1 (
 	.rst_n(arst_n),
     .i_mipi_clk(mipi_clk),
     .i_mipi_tx_pclk(mipi_dphy_tx_SLOWCLK),
     .i_sysclk_div_2(i_sysclk_div2),
 
-   /*i*/.pixel_vs_i  (wb0_vs_out				  ),//(o_vs),                //(rgb_vs				  ),//
-   /*i*/.pixel_hs_i  (wb0_hs_out				  ),//(o_hs),                //(rgb_hs				  ),//
-   /*i*/.pixel_de_i  (wb0_de_out				  ),//(o_de),                //(rgb_de				  ),//
-   /*i*/.pixel_data_i({16'd0,wb0_data_out }	      ),//({16'd0,dout}),        //({16'd0,rgb_datax2}	  ),//
-   /*o*/.pixel_data_en(pixel_data_en),
+   // Optional legacy DSI path. It does not control the HDMI startup gate.
+   /*i*/.pixel_vs_i  (rgb_vs                  ),
+   /*i*/.pixel_hs_i  (rgb_hs                  ),
+   /*i*/.pixel_de_i  (rgb_de                  ),
+   /*i*/.pixel_data_i({16'd0,rgb0_data_rgb    }),
+   /*o*/.pixel_data_en(),
 
     .LCD_POWER           (P1_lcd_power_en),
     .LCD_RST_P           (P1_lcd_rstp),
@@ -1447,6 +1473,80 @@ dsi_tx_top # (
 	  .mipi_dp_data2_RST   (mipi_tx_dp12_RST),
     .mipi_dp_data3_RST     (mipi_tx_dp13_RST)
   );
+`else
+// The competition build uses HDMI only. Keep both DSI PHY interfaces inactive.
+assign P1_lcd_power_en = 1'b0;
+assign mipi_tx_ck0_HS_OE = 1'b0;
+assign mipi_tx_ck0_HS_OUT = 8'd0;
+assign mipi_tx_ck0_LP_N_OE = 1'b0;
+assign mipi_tx_ck0_LP_N_OUT = 1'b0;
+assign mipi_tx_ck0_LP_P_OE = 1'b0;
+assign mipi_tx_ck0_LP_P_OUT = 1'b0;
+assign mipi_tx_ck0_RST = 1'b1;
+assign mipi_tx_dp00_HS_OE = 1'b0;
+assign mipi_tx_dp00_HS_OUT = 8'd0;
+assign mipi_tx_dp00_LP_N_OE = 1'b0;
+assign mipi_tx_dp00_LP_N_OUT = 1'b0;
+assign mipi_tx_dp00_LP_P_OE = 1'b0;
+assign mipi_tx_dp00_LP_P_OUT = 1'b0;
+assign mipi_tx_dp00_RST = 1'b1;
+assign mipi_tx_dp01_HS_OE = 1'b0;
+assign mipi_tx_dp01_HS_OUT = 8'd0;
+assign mipi_tx_dp01_LP_N_OE = 1'b0;
+assign mipi_tx_dp01_LP_N_OUT = 1'b0;
+assign mipi_tx_dp01_LP_P_OE = 1'b0;
+assign mipi_tx_dp01_LP_P_OUT = 1'b0;
+assign mipi_tx_dp01_RST = 1'b1;
+assign mipi_tx_dp02_HS_OE = 1'b0;
+assign mipi_tx_dp02_HS_OUT = 8'd0;
+assign mipi_tx_dp02_LP_N_OE = 1'b0;
+assign mipi_tx_dp02_LP_N_OUT = 1'b0;
+assign mipi_tx_dp02_LP_P_OE = 1'b0;
+assign mipi_tx_dp02_LP_P_OUT = 1'b0;
+assign mipi_tx_dp02_RST = 1'b1;
+assign mipi_tx_dp03_HS_OE = 1'b0;
+assign mipi_tx_dp03_HS_OUT = 8'd0;
+assign mipi_tx_dp03_LP_N_OE = 1'b0;
+assign mipi_tx_dp03_LP_N_OUT = 1'b0;
+assign mipi_tx_dp03_LP_P_OE = 1'b0;
+assign mipi_tx_dp03_LP_P_OUT = 1'b0;
+assign mipi_tx_dp03_RST = 1'b1;
+assign mipi_tx_ck1_HS_OE = 1'b0;
+assign mipi_tx_ck1_HS_OUT = 8'd0;
+assign mipi_tx_ck1_LP_N_OE = 1'b0;
+assign mipi_tx_ck1_LP_N_OUT = 1'b0;
+assign mipi_tx_ck1_LP_P_OE = 1'b0;
+assign mipi_tx_ck1_LP_P_OUT = 1'b0;
+assign mipi_tx_ck1_RST = 1'b1;
+assign mipi_tx_dp10_HS_OE = 1'b0;
+assign mipi_tx_dp10_HS_OUT = 8'd0;
+assign mipi_tx_dp10_LP_N_OE = 1'b0;
+assign mipi_tx_dp10_LP_N_OUT = 1'b0;
+assign mipi_tx_dp10_LP_P_OE = 1'b0;
+assign mipi_tx_dp10_LP_P_OUT = 1'b0;
+assign mipi_tx_dp10_RST = 1'b1;
+assign mipi_tx_dp11_HS_OE = 1'b0;
+assign mipi_tx_dp11_HS_OUT = 8'd0;
+assign mipi_tx_dp11_LP_N_OE = 1'b0;
+assign mipi_tx_dp11_LP_N_OUT = 1'b0;
+assign mipi_tx_dp11_LP_P_OE = 1'b0;
+assign mipi_tx_dp11_LP_P_OUT = 1'b0;
+assign mipi_tx_dp11_RST = 1'b1;
+assign mipi_tx_dp12_HS_OE = 1'b0;
+assign mipi_tx_dp12_HS_OUT = 8'd0;
+assign mipi_tx_dp12_LP_N_OE = 1'b0;
+assign mipi_tx_dp12_LP_N_OUT = 1'b0;
+assign mipi_tx_dp12_LP_P_OE = 1'b0;
+assign mipi_tx_dp12_LP_P_OUT = 1'b0;
+assign mipi_tx_dp12_RST = 1'b1;
+assign mipi_tx_dp13_HS_OE = 1'b0;
+assign mipi_tx_dp13_HS_OUT = 8'd0;
+assign mipi_tx_dp13_LP_N_OE = 1'b0;
+assign mipi_tx_dp13_LP_N_OUT = 1'b0;
+assign mipi_tx_dp13_LP_P_OE = 1'b0;
+assign mipi_tx_dp13_LP_P_OUT = 1'b0;
+assign mipi_tx_dp13_RST = 1'b1;
+`endif
 
 
 //================================================================================== 
@@ -1458,20 +1558,24 @@ dsi_tx_top # (
   reg rgb_hs_r;
   reg rgb_de_r;
   reg [23:0] rgb_datax1;
-always @( posedge hdmi_tx_slow_clk )
-begin
-    sel <= ~sel;
-end
 
 always @( posedge hdmi_tx_slow_clk )
 begin
-    rgb_vs_r <= wb0_vs_out     ;
-    rgb_hs_r <= wb0_hs_out     ;
-    rgb_de_r <= wb0_de_out     ;
-    if( sel ) begin 
-            rgb_datax1 <= wb0_data_out[47:24] ;
+    rgb_vs_r <= hdmi0_vs_out   ;
+    rgb_hs_r <= hdmi0_hs_out   ;
+    rgb_de_r <= hdmi0_de_out   ;
+    // Re-anchor the 2:1 pixel phase during every horizontal blanking period.
+    // This prevents a free-running selector from swapping the first/second
+    // pixel of a pair after reset or any source/display phase disturbance.
+    if( !hdmi0_de_out ) begin
+        sel <= 1'b0;
+        rgb_datax1 <= 24'd0;
+    end else if( sel ) begin
+        sel <= 1'b0;
+            rgb_datax1 <= hdmi0_data_out[47:24] ;
     end else begin
-        rgb_datax1 <= wb0_data_out[23:0] ;
+        sel <= 1'b1;
+        rgb_datax1 <= hdmi0_data_out[23:0] ;
     end
 end
   hdmi_top  hdmi_top_inst (
