@@ -34,6 +34,8 @@ output	wire								o_hs , //active high
 output	wire								o_vs , //active hgih
 output	wire								o_de , //active high
 output	wire	[O_VID_WIDTH-1:0] 			vout ,
+output  wire                                o_frame_stable,
+output  wire                                o_fifo_rd_underflow,
 input  wire               out_sync,
 
 input	wire 	[12:0]						H_FRONT_PORCH 	,
@@ -122,6 +124,7 @@ wire                                                 rd_start ;
 wire                                                frame_en ;
 wire                                                axi_clk_rst_n;
 wire                                                o_clk_rst_n;
+wire                                                fifo_rd_underflow;
 //=============================================================  
 //RTL                                                     
 //=============================================================  
@@ -325,6 +328,7 @@ data_tx #(
 	/*i*/.fifo_wr_en	        (tx_valid		    ),
 	/*o*/.fifo_wr_almost_full	(tx_almost_full	),
 	/*o*/.fifo_rd_period      (fifo_rd_period ),
+	/*o*/.fifo_rd_underflow   (fifo_rd_underflow),
 	/*o*/.vout		            (vout		        ),
 	/*o*/.o_hs		            (o_hs		        ),
 	/*o*/.o_vs		            (o_vs		        ),
@@ -332,5 +336,7 @@ data_tx #(
 	
 	);
 
+assign o_frame_stable = frame_stable;
+assign o_fifo_rd_underflow = fifo_rd_underflow;
 
 endmodule

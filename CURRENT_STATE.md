@@ -35,6 +35,16 @@
   - 下一门：先由用户按 debug session 的 A0 操作卡完成当前隔离副本 GUI 资源审计，并确认 myCobot 的实际 COM 端口；在收到前，不改 XML/top/SDC、不跑联合 PNR、不接 J52 或机械臂。
   - 失效条件：协议真源/固件版本改变、B1/B3 相关回归失败、GUI 证实资源不同、端口身份或现场电气证据与本条不符。
 
+- 日期：2026-07-15，来源 Agent：libaoxun688 交接 / Codex 本地集成复核（单摄 M2 Hard SoC 候选）
+  - 适用范围：仅隔离候选工程 `competition_project_single_camera/` 与其来源联合实验副本；不替代 `final_project/` 正式主线，也不表示 CPU、OSD、UART2 或机械臂闭环。
+  - 合入结论：固定提交 `dev/libaoxun688@e129885` 在既有 Hard SoC 候选基线上加入 framebuffer 稳定/欠读诊断、只读 `feature_stats_tap`、CPU Host 侧特征适配/分类/F1 事务与配套契约、测试和操作文档。FPGA 仍只输出 ROI/统计特征与硬件通道，颜色、形状、尺寸分类和逐轮事务继续由板上 CPU 承担；当前 feature tap 的正式采集保持禁用，未把分类状态机放回 RTL。
+  - 已有证据边界：队友联合实验记录显示 Efinity 2025.2 Map、PNR、bitstream 与 J48/ch0 HDMI 视频回归通过，最差 Setup/Hold 为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`；匹配 bitstream SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`。这些证据证明来源联合工程的 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`，不自动证明本地集成提交已重新构建或重新上板。
+  - CPU 检查点：片上 RAM UART0 Hello ELF 的来源实验地址审计已完成，入口和唯一 LOAD 段位于 `0xF9000000` 的 16KB 片上 RAM；USER2 JTAG 实际取指、UART0 完整横幅和单字符回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。不得据此连接 UART2/J52 或机械臂。
+  - 调试边界：CPU JTAG 固定使用 FPGA `USER2`，`USER1` 保留给视频工程；只允许 Debug in RAM，不允许 Flash erase/program 或外部 DDR 初始化。任何地址、USER TAP、PLL/DDR/GPIO/JTAG 资源或时钟复位事实变化均需重新通过 Codex Gate。
+  - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-26 至 M2-32、`competition_project_single_camera/docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md`、`competition_project_single_camera/docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`、`competition_project_single_camera/docs/review_packets/m2_single_camera_soc_branch_merge_handoff_20260715.md`、`competition_project_single_camera/integration/single_camera_feature_contract.md`。
+  - 下一门：先对本地集成提交完成静态/Host/RTL 验证并重新运行 Efinity Map/PNR/STA/CDC；之后才可烧录匹配 bitstream 回归 J48/ch0 视频。板卡可用时再以 USER2、片上 RAM 和已确认 UART0 端口验证 Hello/回显；任一门失败立即停止扩展。
+  - 失效条件：本地合并后的 `mem_test.xml`、`.peri.xml`、`constrain.sdc`、`top.v`、Hard SoC IP/BSP、时钟复位、USER TAP、UART0 引脚或板级现象与交接证据不一致。
+
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
   - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
   - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。

@@ -40,6 +40,7 @@
         <efx:design_file name="src/debayer/raw_to_rgb.v" version="default" library="default"/>
         <efx:design_file name="src/debayer/line_buffer.v" version="default" library="default"/>
         <efx:design_file name="src/debayer/rgb_gain.v" version="default" library="default"/>
+        <efx:design_file name="src/feature_stats/feature_stats_tap.v" version="default" library="default"/>
         <efx:design_file name="src/framebuffer/elt_dcfifo_v10.v" version="default" library="default"/>
         <efx:design_file name="src/axi_mux/Axi_Mux.v" version="default" library="default"/>
         <efx:design_file name="src/axi_interconnect/rtl/axi_interconnect.v" version="default" library="default"/>

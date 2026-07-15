@@ -648,3 +648,636 @@ git status --short --branch
 - 写入范围：仅 D 盘 `src/top.v`。未写入 `constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、传感器 I2C ROM、其他 RTL、`outflow/`、`work_*` 或 bitstream。
 - 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
 - 用户执行请求：使用 D 盘工程完整重跑 Map、PNR、bitstream 并烧录；旧 bitstream SHA-256 `0A69113CB3AAC7EB1DF0E6FDFF9964C98FDF9B8E59CE48848C093FB1AA7BE8CC` 不包含本次 HDMI 相位和固定点白平衡修改。
+
+### [M0-30] 五色白平衡验收、下游色条排除与 framebuffer 诊断修复
+
+- 触发：用户回传 M0-28 新版五色静止截图，并补充“FPGA 本地产生的标准色条没有重影”。
+- 对应构建证据：
+  - Timing 报告：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt`，生成时间 `2026-07-14 22:07:32`。
+  - bitstream：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`，生成时间 `2026-07-14 22:07:50`。
+  - WNS `+1.731 ns`，WHS `+0.026 ns`；`i_sysclk_div2 -> hdmi_tx_slow_clk` setup slack `+4.507 ns`、hold slack `+0.121 ns`；CDC 为 `No Synchronizer warnings to report`。
+- 五色量化：红约 `(89,41,57)`，黄约 `(125,112,86)`，白约 `(156,154,151)`，蓝约 `(56,60,85)`，黑约 `(24,17,29)`。白块通道已接近平衡，五色主通道关系正确，固定点白平衡和约 `2.98x` 模拟增益在本轮冻结，不再继续调系数。
+- 关键边界：同一 HDMI/TMDS/线缆/采集卡链路的 FPGA 本地标准色条无重影，因此水平重影不在 HDMI 编码器、TMDS 物理输出、线缆、采集卡或显示器。排查范围收缩到真实摄像头数据路径的 `摄像头/CSI -> RAW 打包 -> DDR/framebuffer -> Debayer`。
+- CBM 状态：按新 `AGENTS.md` 请求查询 `D-cicc_cbm-main`，服务返回 `project not found or not indexed / No projects indexed yet`。本轮停止依赖图谱，改用候选工程真实 RTL 和真实构建报告做最小范围核查；未重建图谱。
+- 发现的确定性 RTL 缺陷：`src/framebuffer/frame_info_det.v` 原先在帧结束时执行 `frame_len_d0 <= frame_end_r0`，把 1 bit 帧结束脉冲写入 24 bit 帧长度历史，导致 `frame_stable` 比较基本失去实际帧长度检测能力。坏帧、短帧或长度波动可能仍被错误标记为稳定并进入 DDR/framebuffer。
+- 修改文件：
+  - `src/framebuffer/frame_info_det.v`
+  - `src/framebuffer/frame_buffer.v`
+  - `src/top.v`
+- 帧长度门修复：
+  - `frame_len_d0` 改为锁存真实 `frame_pix_num`。
+  - 仅在连续两个非零帧长度相等时置 `frame_stable=1`。
+  - `total_frame_bytes` 复位为 0，并统一使用非阻塞赋值。
+- 只读可观测性：`frame_buffer` 导出 `o_frame_stable` 和既有 `data_tx.fifo_rd_underflow`；ch0 映射为 LED20/F3=`frame_stable`、LED21/F2=`fifo_rd_underflow` 锁存。LED21 一旦出现欠流保持点亮，直到重新配置/复位。
+- DDR 前诊断源：
+  - SW4/V19 为低有效诊断输入。松开保持真实摄像头画面；按住时仅将 ch0 RAW8 payload 替换为四像素同值的灰度棋盘。
+  - CSI 的 VS/DE 帧控制、DDR/framebuffer、Debayer、固定点白平衡、HDMI/TMDS 全部仍参与，因此它不同于已知干净的 HDMI 下游标准色条。
+  - 若按住 SW4 的 RAW 棋盘也重影，根因在 DDR/framebuffer 或其后至 Debayer；若 RAW 棋盘干净而真实画面重影，根因在摄像头/CSI/RAW 数据侧。
+- 保持不变：传感器 ROM、曝光、模拟/数字增益、Bayer 相位、白平衡系数、HDMI 相位修复、SDC、`mem_test.xml`、`.peri.xml` 和 IP settings。公开 Rockchip 驱动显示模式寄存器应在停流时配置后再启流，但为保持本轮变量隔离，尚未修改当前 Demo 的启流顺序。
+- 静态验证：`git diff --check` 通过；2 个 `frame_buffer` 实例均连接新增端口；LED2/LED3 各只有一个驱动；传感器 ROM 仍为 165 项连续索引且 SHA-256 与 D 盘上一版一致。本机无 `iverilog`、`verilator`、`vlog`、`yosys` 或 Verible，未运行 RTL 编译/仿真。
+- 结果：`SOURCE PATCHED / STATIC CHECK PASS / MAP-PNR-BOARD NOT VERIFIED`。
+- 下一步门禁：同步三处 RTL 后完整重跑 Map/PNR/bitstream。烧录后先松开 SW4 截取真实五色画面并记录 LED20/LED21，再按住 SW4 截取 RAW 棋盘并再次记录 LED20/LED21；同时回传 WNS/WHS 与 CDC。
+
+### [M0-31] M0-30 D 盘同步与诊断版发布核查
+
+- 同步方向：`competition_project_single_camera/` -> `D:\TJ375N529_SC431HAI2LCD_Demo_V3/`。
+- D 盘写入文件与 SHA-256：
+  - `src/framebuffer/frame_info_det.v`：同步前 `BFC24B363E28F18807D5CF3967E4CBC6935A3FFB8327C14FB35685318C2A7766`；同步后正式工程/D 盘一致为 `24806B61653C57C4BCAA218B0417AD7C257FE723CF4A21502A376F93F3229154`。
+  - `src/framebuffer/frame_buffer.v`：同步前 `C5BC80D22F721A03168FFD14B625F1D4B49F1DE2E25E03DAC9B2E20383E740A6`；同步后正式工程/D 盘一致为 `8C4C8D7A5DF3C9198ADFE85006B2A24BA4A5D8163A68960D90BC2A8C1120EB7A`。
+  - `src/top.v`：同步前 `7A8111B36CE05F51B402BBB9424F53A6728B634F60E81EBE01DD8F279E89DD85`；同步后正式工程/D 盘一致为 `5F30CED8F6392ACCCEFD23FADEE918400E57A736E5CC2E405A48693B3D8C45C1`。
+- 未写入：传感器 I2C ROM、`constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、`outflow/`、`work_*` 和 bitstream。
+- 操作说明：
+  - SW4 松开：真实 J48/ch0 五色画面。
+  - SW4 按住：DDR 前灰度 RAW 棋盘诊断画面；必须持续按住拍照，松开自动恢复真实画面。
+  - LED20/F3 亮：ch0 连续两帧实际像素数一致；灭：帧长度门未稳定。
+  - LED21/F2 亮：本次上电后曾发生 framebuffer 输出 FIFO 欠流；该状态锁存到重新配置/复位。
+- 结果：`SOURCE SYNC PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
+- 用户执行请求：完整重跑 D 盘工程并烧录；回传 Timing/CDC、SW4 松开与按住的两张 Windows 直接截图、LED20/LED21 在两种状态下的亮灭。旧 2026-07-14 22:07 bitstream 不包含本次修改。
+
+### [M0-30] 帧长度门修复、framebuffer 欠流观测与 RAW 棋盘诊断版
+
+- 触发：用户确认 FPGA 本地产生的标准色条没有重影，真实摄像头画面仍存在水平重影。
+- 诊断边界：同一 HDMI/TMDS/线缆/采集卡链路的 FPGA 本地标准色条干净，因此重影范围收缩为 `摄像头/CSI -> RAW 打包 -> DDR/framebuffer -> Debayer`；不得继续把 HDMI 下游作为首要根因。
+- 确定性缺陷：`src/framebuffer/frame_info_det.v` 原来把 1 bit `frame_end_r0` 脉冲写入 24 bit `frame_len_d0`，导致 `frame_stable` 基本失去真实帧长度检查能力。
+- 修改：
+  - `frame_len_d0` 改为锁存 `frame_pix_num`，仅连续两个非零帧长度一致时置 `frame_stable=1`。
+  - `total_frame_bytes` 复位为 0，并使用非阻塞赋值。
+  - `frame_buffer.v` 导出 `o_frame_stable` 和既有 `data_tx.fifo_rd_underflow`。
+  - LED20/F3 映射 ch0 帧长度稳定；LED21/F2 锁存 framebuffer 输出 FIFO 欠流。
+  - SW4/V19 按住时曾使用 DDR 前 RAW 灰度棋盘；松开保持真实 J48/ch0 画面。
+- 结果：`SOURCE PATCHED / STATIC CHECK PASS / BOARD NOT VERIFIED AT THIS CHECKPOINT`。
+
+### [M0-31] 2026-07-15 13:42 构建与 RAW 棋盘现场反馈
+
+- 构建证据：
+  - `D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.timing.rpt`：`2026-07-15 13:42:24`。
+  - `D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`：`2026-07-15 13:42:41`，SHA-256 `F5EE45227D33B4C83CD3D6C03580A8D2554E77822A5C34591F223C0E887917A0`。
+  - 最小 setup slack `+1.480 ns`，最小 hold slack `+0.026 ns`；`i_sysclk_div2 -> hdmi_tx_slow_clk` setup/hold 为 `+4.989/+0.092 ns`。
+  - CDC：`No Synchronizer warnings to report`。
+- 上板截图：
+  - `屏幕截图 2026-07-15 134418.png`：真实摄像头画面，存在整体偏紫。
+  - `屏幕截图 2026-07-15 134430.png`：按住 SW4 的 RAW 棋盘，出现橙蓝细条且整体偏紫。
+- 量化：真实画面左右中性亮区均表现为 R/B 高于 G；RAW 棋盘全图均值约 `(160,134,179)`。
+- 判定：本次 RAW 棋盘不是可靠的中性参考。棋盘跨 Bayer 邻域会被 Debayer 插值成彩色边缘，且诊断数据仍经过 `R=1.75x/G=1x/B=2x` 显示白平衡，因此不能仅凭橙蓝棋盘判定 DDR/Debayer 损坏。
+- NOT VERIFIED：LED20/LED21 现场亮灭未反馈；真实摄像头重影根因仍未关闭。
+- 结果：`TIMING PASS / CDC PASS / DIAGNOSTIC PATTERN INVALID FOR ISOLATION / PURPLE CAST CONFIRMED`。
+
+### [M0-32] 候选工程恢复、中性 RAW 诊断与轻度减紫
+
+- 触发：候选工程在工作期间回到 M0-29 源码，D 盘仍保留已构建的 M0-30/M0-31 诊断版；用户明确批准以 D 盘诊断版为准反向恢复并继续修改。
+- 恢复：将 D 盘已构建版的帧长度修复、framebuffer 观测端口、LED20/LED21 和 SW4 诊断边界恢复到候选工程。
+- 诊断修正：
+  - 删除棋盘 X/Y 计数器，SW4 按住时向 DDR 前写入固定 `32'h80808080`，使四个 RAW 样本全部为中灰。
+  - SW4 诊断模式绕过相机专用 HDMI 固定白平衡；CSI 的 VS/DE、DDR/framebuffer、Debayer、2:1 HDMI 拆分和 TMDS 仍全部参与。
+  - 预期诊断画面为近似均匀中性灰。若仍出现稳定条带、重影或局部异常，才可继续归因到 DDR/framebuffer、Debayer 或后续像素编排。
+- 真实画面轻度减紫：仅调整 HDMI 显示支路固定点系数，由 `R=1.75x/G=1x/B=2.0x` 改为 `R=1.625x/G=1x/B=1.875x`；不改变传感器 ROM、曝光、模拟/数字增益、CSI、RAW、DDR、Debayer 或识别数据边界。
+- 算术核查：全部 8 bit 输入范围内 R/B 的 10 bit 中间结果无溢出和减法下溢；`git diff --check` 通过；两个 framebuffer 实例新增端口均完整；LED20/LED21 各只有一个驱动。
+- D 盘同步：
+  - `src/top.v`：候选工程/D 盘 SHA-256 `744D5B96E45C6A1ABCAEEC908C2C2CB8B8C8B8DA5F7181A39E2F47A3CA9D32C8`。
+  - `src/framebuffer/frame_buffer.v`：候选工程/D 盘 SHA-256 `8C4C8D7A5DF3C9198ADFE85006B2A24BA4A5D8163A68960D90BC2A8C1120EB7A`。
+  - `src/framebuffer/frame_info_det.v`：候选工程/D 盘 SHA-256 `24806B61653C57C4BCAA218B0417AD7C257FE723CF4A21502A376F93F3229154`。
+- 未修改：`constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP settings、传感器 I2C ROM、`outflow/`、`work_*` 和 bitstream。
+- 结果：`SOURCE RESTORED AND SYNCED / STATIC CHECK PASS / NEW MAP-PNR-BITSTREAM-BOARD NOT VERIFIED`。
+- 下一步门禁：从 D 盘工程完整重跑 Map/PNR/bitstream 并烧录；回传 WNS/WHS、CDC、SW4 松开真实画面、SW4 按住中性灰画面，以及 LED20/LED21 亮灭。
+
+### [M0-33] 中灰 RAW 诊断通过，关闭 DDR/framebuffer/Debayer 重影怀疑
+
+- 触发：用户完成 M0-32 的完整构建、烧录和板级拍摄，反馈 LED20 亮、LED21 不亮，并回传真实摄像头与按住 SW4 的中灰画面。
+- 匹配构建证据：
+  - `D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.bit`：`2026-07-15 14:06:11`，SHA-256 `2DAB0FE864EAB4EE1DCC566BC5E7CE93E50A4AD94309D7032C949367B8E84D41`。
+  - Timing：最小 setup slack `+1.611 ns`，最小 hold slack `+0.026 ns`；`i_sysclk_div2 -> hdmi_tx_slow_clk` setup/hold 为 `+3.538/+0.162 ns`。
+  - CDC：`No Synchronizer warnings to report`。
+- 上板判定：
+  - LED20/F3 亮：连续非零帧长度稳定。
+  - LED21/F2 不亮：本次上电后没有观测到 framebuffer 输出 FIFO 欠流。
+  - 按住 SW4 的 `32'h80808080` 中灰画面均匀、无条带、无重影、无紫偏；它仍经过 CSI 帧时序、DDR/framebuffer、Debayer、HDMI 2:1 拆分和 TMDS。
+- 结论：`DDR/framebuffer -> Debayer -> HDMI` 段在当前时序、当前位流和均匀输入下通过；不再把它们作为真实场景重影的首要根因。真实画面残余的软边/拖影优先转查摄像头镜头焦距、自动/长曝光引起的运动模糊、传感器 RAW 有效载荷或 CSI 前端。
+- 未修改文件：本 Gate 仅记录板级证据，不修改 RTL、SDC、工程 XML、IP、I2C ROM 或 bitstream。
+- 结果：`TIMING PASS / CDC PASS / FRAME STABLE / NO FRAMEBUFFER UNDERFLOW / DOWNSTREAM DATA-PATH PASS`。
+
+### [M2-01] 官方 Hard SoC 例程与视频资源冲突审计
+
+- 触发：用户暂停摄像头光学优化，批准开始 F1 CPU 最小集成。
+- 目标：先推进板上 CPU UART Hello，不改已通过 J48/ch0 到 HDMI 板级诊断的视频链。
+- 审计来源：
+  - 官方 TJ375C529 eMMC 例程 `赛方提供材料/例程/RISC-V例程/02_eMMC Test/ti375c529_emmc_v1.1_cn/`。
+  - 官方例程提供 Hard SoC、生成 BSP `soc.h`、默认 linker 和 standalone `uartEchoDemo`；这些是生成方法和 UART 启动参考，不是可直接复制到视频工程的源码。
+  - 当前候选工程 `mem_test.peri.xml` 的 `soc_info` 为空，视频已经使用 `PLL_BL0/PLL_BL1/PLL_BL2/PLL_TR0` 与 `JTAG_USER1`。
+- 审计结论：官方 Hard SoC 系统 PLL 只能使用 `PLL_BL0/PLL_BL1/PLL_BL2`，当前视频已占满三者；并且旧 SoC 生成会与视频 `clk_25m/GPIOT_P_50`、`ddr_clk_ref/GPIOL_25` 形成重复 GPIO 风险。不得直接合并 `.peri.xml`、手改生成 RTL 或硬抄官方示例 `soc.h`。
+- 交付：新增 `docs/review_packets/m2_hard_soc_resource_replanning_operator_packet_20260715.md`，冻结 Interface Designer 的受控重规划顺序、必须回传的生成物和 fail-closed 条件。
+- 未修改：视频 RTL、`mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、IP、传感器 I2C ROM、D盘工程、bitstream 和 CPU 应用源码。
+- 结果：`OFFICIAL FLOW AUDITED / SOC INSERTION BLOCKED PENDING GUI RESOURCE REPLAN / VIDEO BASELINE PRESERVED`。
+- 下一步门禁：用户在 Interface Designer 生成最小 Hard SoC 并回传同次 `.peri.xml`、生成 `soc.h`、linker、wrapper、资源截图及警告；Codex 审核通过后才写 UART Hello 并进行 Map/PNR。
+
+### [M2-02] Interface Designer 实物资源截图完成，Hard SoC 直接接入关闭
+
+- 触发：用户回传当前 D盘 `mem_test` Interface Designer 的 PLL、JTAG 与三路时钟 GPIO 截图。
+- 已验证资源：
+  - `PLL_TR0`=`MIPI_TX_PLL`，使用 `clk_25m/GPIOT_P_50`。
+  - `PLL_BL0`=`lpddr4_pll`，使用 `ddr_clk_ref/GPIOL_25`。
+  - `PLL_BL1`=`pll_inst1`，使用 `clk_74p25m/GPIOL_32`。
+  - `PLL_BL2`=`pll_inst4`，使用核心时钟 `i_fb_clk`/`mipi_clk`。
+  - `JTAG_USER1`=`jtag_inst1`。
+  - 三路外部时钟 GPIO 均为已分配 PLL 输入，包封装引脚分别为 L17、V3、U4。
+- 结论：Hard SoC 合法系统 PLL 集合 `PLL_BL0/PLL_BL1/PLL_BL2` 与当前活跃视频 PLL 集合完全重合；JTAG 可理论切到 USER2，但不能解决系统 PLL 冲突。直接 SoC 接入、手改 XML/生成 RTL、复制官方 `soc.h` 均关闭。
+- 交付：新增 `docs/review_packets/m2_hard_soc_video_resource_conflict_report_20260715.md`，记录证据、禁止项与候选路线 A（保持视频、先推进 CPU 软件）/B（独立 GUI 重规划实验）。
+- 未修改：视频 RTL、工程 XML、SDC、IP、传感器 ROM、D盘源码与 bitstream。
+- 结果：`RESOURCE CONFLICT CONFIRMED / DIRECT HARD SOC INSERTION NO-GO / DECISION REQUIRED`。
+
+### [M2-03] 候选 A：F1 单摄 CPU 纯软件核心 Host 回归
+
+- 触发：Hard SoC 直接接入因 PLL 资源冲突关闭；用户批准先保持视频工程不动，推进 CPU 纯软件核心。
+- 目标：在没有 SoC、APB、UART、GPIO、OSD wire ABI 或机械臂传输依赖的条件下，固化 F1 的单摄识别判定和逐轮事务语义。
+- 实际动作：
+  - 新增 `cpu/include/single_camera_f1.h`、`cpu/src/single_camera_f1.c`、Host 测试及其 PowerShell 入口。
+  - 固化 `PLACE` 与独立 `ABANDON` 小闭环；下一次有效 `PLACE` 开始下一轮，无 `REMOVE` 状态。
+  - 同一 `PLACE` 序号在采集中视为去抖重复事件，不会创建第二轮；每轮最终结果仅锁存一次。
+  - 覆盖颜色、正方体形状、尺寸关系、未标定尺寸、超时、弃置和连续 20 轮的主机回归。
+  - 修复测试中的 C 临时对象取址、轮次期望与测试脚本 CPU 根路径；修复实现中重复 `PLACE` 的判定顺序。
+- 修改文件：
+  - `cpu/include/single_camera_f1.h`
+  - `cpu/src/single_camera_f1.c`
+  - `cpu/tests/test_single_camera_f1.c`
+  - `cpu/tests/run_single_camera_f1_host.ps1`
+  - `cpu/README.md`
+  - 本工作日志。
+- D 盘写入：无。该轮仅为独立 CPU 纯软件核心，未改动视频、Efinity、SoC 工程输入或 bitstream。
+- 命令与结果：
+
+```powershell
+$env:Path = 'C:\Users\20306\Desktop\MinGW\bin;' + $env:Path
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_f1_host.ps1
+git diff --check
+```
+
+  - `single_camera_f1: 87/87 passed`
+  - `git diff --check` 通过。
+- 结果：`HOST VERIFIED`。
+- NOT VERIFIED：Hard SoC 生成、板上 CPU 启动、按键 GPIO、UART 目标输入/结果输出、CPU 与 FPGA 的寄存器/CDC/OSD 契约、视觉特征输入、机械臂传输和实际动作均未实现或验证；`ARM_ENABLED=0` 时命中只产生 `EXECUTE_ARM_DISABLED` 语义，绝不发出机械臂请求。
+- 下一步门禁：仅在不改动已验证视频链路的前提下，审计并选择可复用的 `final_project` CPU 分类器和参数框架；禁止迁移旧双摄 `board_io`、旧 APB 地址、`REMOVE` 状态机或第二套轮次状态机。
+
+### [M2-04] 候选 A：选择性迁移为单摄 CPU 分类适配层
+
+- 触发：M2-03 已完成 F1 事务语义回归，需要为未来 FPGA 特征输入预留可测试的单摄分类入口。
+- 审计结论：`final_project/cpu/app/src/vision_classifier.c` 依赖 `board_io.h` 的双摄 `feature_snapshot_t`，并将尺寸绑定到 `cam1 height_px`，不能原样迁移；`task_matcher.c` 自带抓取坐标和独立轮次锁，不能与唯一 `PLACE` 状态机并存；`param_table` 的双槽/NVM 依赖旧配置，暂不迁移。
+- 实际动作：新增单摄 `sc_features_t` 和 `sc_classify_features()`，输入仅含颜色面积、前景面积、ROI 亮度和 bbox 尺寸，输出既有 `sc_observation_t`。红/蓝/黄面积优先判色，缺少显著色面积时以 ROI 平均亮度尝试白/黑；以填充率优先识别正方体。尺寸固定为 0；圆柱/锥体结果仅是未标定启发式，F1 只依赖 `CUBE/NON_CUBE`。
+- 修改文件：`cpu/include/single_camera_classifier.h`、`cpu/src/single_camera_classifier.c`、`cpu/tests/test_single_camera_classifier.c`、`cpu/tests/run_single_camera_classifier_host.ps1`、`cpu/README.md` 和本工作日志。
+- D 盘写入：无。未改动视频 RTL、工程 XML、约束、IP、SoC 生成物或 bitstream。
+- 验证：`single_camera_f1: 87/87 passed`；`single_camera_classifier: 18/18 passed`；`git diff --check` 通过；新分类器静态扫描未发现 `board_io`、APB、CAM1、UART 或 GPIO 平台依赖。
+- 结果：`HOST VERIFIED`。
+- NOT VERIFIED：默认阈值不是当前摄像头实测标定值；当前 FPGA 视频工程尚未提供这些 ROI 特征；五色真实画面、白/黑判色、正方体/非正方体及圆柱/锥体现场准确率均未验证；未接入 SoC、按键、UART、OSD 或机械臂。
+- 下一步门禁：先定义并审查最小单摄 FPGA 到 CPU 特征契约及其 CDC/寄存器实现方案；在合法 Hard SoC 资源生成前，该契约只能作为文档和 Host mock，禁止手填 APB 地址或修改已验证视频链路。
+
+### [M2-05] 候选 A：单摄 FEATURE_SNAPSHOT 契约与 fail-closed Host 适配
+
+- 触发：M2-04 分类器已有无地址输入结构，需要冻结未来 FPGA 特征源的最小语义，避免沿用 `final_project` 的双摄和候选 APB 地址。
+- 源码审计：当前 ch0 画面实际路径为 `frame_buffer -> debayer_top_2to1 -> rgb0_data_rgb -> HDMI`；建议 feature tap 在 `src/top.v` 的 Debayer 后 `i_sysclk_div2` 域，以 `rgb_vs/rgb_hs/rgb_de` 和每拍两个 RGB 像素统计。现有工程未实现 ROI、颜色面积、前景面积、bbox、特征快照或 CPU 可读接口。
+- 实际动作：新增 `integration/single_camera_feature_contract.md`，作为唯一特征契约，冻结旁路 tap、双像素展开、ROI/背景/颜色 mask 语义、字段宽度、帧原子性、`frame_id` ACK 和 CDC fail-closed 规则。特征源固定为 Debayer 后、HDMI 显示专用白平衡之前的 `rgb0_data_rgb`；旁路不得回压或改变 framebuffer、Debayer、HDMI。
+- Host 适配：新增 `single_camera_feature_adapter`，只允许 `FRAME_STABLE`、`ROI_VALID`、`STATS_VALID`、`SOURCE_CH0` 同时成立，且拒绝诊断、溢出和 snapshot overrun 后才调用分类器。
+- 修改文件：`integration/single_camera_feature_contract.md`、`integration/README.md`、`cpu/include/single_camera_feature_adapter.h`、`cpu/src/single_camera_feature_adapter.c`、`cpu/tests/test_single_camera_feature_adapter.c`、`cpu/tests/run_single_camera_feature_adapter_host.ps1`、`cpu/README.md` 和本工作日志。
+- D 盘写入：无。未修改视频 RTL、工程 XML、约束、IP 或 bitstream；已核验 D 盘与候选工程的三个已验证视频源哈希仍一致。
+- 验证：`single_camera_f1: 87/87 passed`；`single_camera_classifier: 18/18 passed`；`single_camera_feature_adapter: 17/17 passed`；契约与适配器的 7 个 flag 名称一致；`git diff --check` 通过。
+- 结果：`HOST CONTRACT VERIFIED`。
+- NOT VERIFIED：FPGA feature tap、统计 RTL、ROI/背景/颜色阈值标定、snapshot CDC、APB、SoC、CPU 启动、UART、OSD 和真实五色识别均未实现或验证。知识图谱 CLI 当前只返回旧 `D-cicc_cbm_link` 而非仓库声明的主图谱，故本轮以真实源码为准。
+- 下一步门禁：等待用户批准 feature tap 小 Gate 后，先写独立 RTL testbench，再新增旁路统计模块和受控顶层连接；任何 RTL 接入均需完整 Map/PNR/STA/CDC 与 HDMI 回归，且仍不得修改 SoC 资源或机械臂链路。
+
+### [M2-06] Feature Tap 小 Gate：禁用采集的 ch0 旁路统计 RTL
+
+- 触发：用户批准 feature tap 小 Gate。
+- 目标：将单摄特征统计器以只读旁路方式纳入真实 Efinity 工程，先验证它不会使 J48/ch0 到 HDMI 画面回归；本 Gate 不开放 CPU 读取或特征采集。
+- 实际动作：
+  - 新增 `src/feature_stats/feature_stats_tap.v` 与独立 `tests/rtl/feature_stats_tap_tb.v`。模块按契约处理 Debayer 后每拍两像素 RGB，支持 ROI、红/蓝/黄面积、前景面积、亮度、bbox、帧锁存、ACK 和 fail-closed flags。
+  - 静态审查中修复双像素坐标推进、颜色比较位宽、亮度/背景差累加位宽和小位宽 overflow 测试边界。
+  - 在 `src/top.v` 从 ch0 `rgb0_data_rgb`、`rgb_vs/rgb_de`、`ch0_frame_stable` 和 `raw_diag_en` 接入旁路实例；所有视频主链输出保持原连线。
+  - `i_capture_enable` 固定为 `1'b0`，ROI/背景/颜色参数均为安全占位常量，输出全部接到 `_unused` 信号，ACK 固定关闭。因此当前 bitstream 不会发布特征快照，也不能触发任何 CPU、OSD、UART 或机械臂行为。
+  - 将 RTL 加入 `mem_test.xml` 设计文件列表；未改动 framebuffer、Debayer、HDMI、`constrain.sdc`、`.peri.xml`、IP 或传感器 I2C ROM。
+- 修改文件：`src/feature_stats/feature_stats_tap.v`、`tests/rtl/feature_stats_tap_tb.v`、`src/top.v`、`mem_test.xml`、`docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md` 和本工作日志。
+- D 盘写入：已同步并 SHA-256 核验 `src/top.v`=`746BAD51743E46DBCD2D89DBFF8CED3A89F00999DF0B5312B62A2D00B1C5D343`、`src/feature_stats/feature_stats_tap.v`=`F2E132C6BBA1934AAF7B0E2D8E306990890E21ADBC7B03F45BF2A05F194FE6FC`、`mem_test.xml`=`F0D01C43D483176F7754952606CF8502F1850766ACB12EFE14CFB8E9BD26F3ED`。
+- 静态验证：工程 XML 引用存在、模块端口存在、顶层 `i_capture_enable=1'b0`、候选工程/D 盘同步后哈希一致、`git diff --check` 通过。当前环境未检测到 `iverilog`、`verilator`、`vlog` 或 `vsim`，故独立 RTL testbench 为 `NOT RUN`；用户负责完整 Efinity Map/PNR/bitstream/烧录。
+- 结果：`SOURCE SYNC PASS / RTL SIM NOT RUN / MAP-PNR-STA-CDC-BOARD NOT VERIFIED`。
+- 旧 bitstream：D 盘 `outflow/mem_test.bit` 仍为 2026-07-15 14:06:11、SHA-256 `2DAB0FE864EAB4EE1DCC566BC5E7CE93E50A4AD94309D7032C949367B8E84D41`，不包含本 Gate 修改，不得作为验收证据。
+- 下一步门禁：用户按 `docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md` 完整构建、烧录并回传资源/Setup/Hold/CDC/新 bitstream 身份和 J48/ch0 HDMI 回归；通过后再讨论是否在独立下一 Gate 开启 feature capture 与合法 SoC 资源重规划。
+
+### [M2-06a] Efinity GUI 覆盖设计清单导致 feature tap Map 失败，已恢复
+
+- 触发：用户在 D 盘 Efinity Map 收到 `VERI-1063`：`top.v` 实例化 `feature_stats_tap` 时找不到模块。
+- 证据：`D:\TJ375N529_SC431HAI2LCD_Demo_V3\outflow\mem_test.err.log` 记录 2026-07-15 15:18:56 的失败；失败后 D 盘 `mem_test.xml` 时间更新为 15:18:57，实际已不含 `src/feature_stats/feature_stats_tap.v`，而 `src/feature_stats/feature_stats_tap.v` 文件仍存在且与候选工程哈希一致。
+- 根因：Efinity 在打开工程状态下以 GUI 缓存的旧 design-file 列表重写了 `mem_test.xml`，将手工同步的新增 RTL 条目移除；不是模块代码缺失或视频链路错误。
+- 恢复动作：用户确认关闭 Efinity 及 Map/PNR/bitstream 进程后，将候选工程 `mem_test.xml` 单文件重新同步到 D 盘。同步后 D 盘 `mem_test.xml` SHA-256 为 `F0D01C43D483176F7754952606CF8502F1850766ACB12EFE14CFB8E9BD26F3ED`，第 43 行包含 feature tap 条目；D 盘 RTL SHA-256 为 `F2E132C6BBA1934AAF7B0E2D8E306990890E21ADBC7B03F45BF2A05F194FE6FC`。
+- 结果：`PROJECT FILE RECOVERED / MAP NOT RERUN`。
+- 下一步门禁：从关闭状态重新打开 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\mem_test.xml` 后，先确认 Design Files 列表可见 `src/feature_stats/feature_stats_tap.v`，再完整运行 Map；若 GUI 再次保存后丢失该条目，停止构建并回传 GUI Design Files 截图与新的 `mem_test.xml`。
+
+### [M2-06b] Feature tap Verilog-2000 字面量语法失败，已修复
+
+- 触发：恢复 design-file 条目后，Efinity 报告 `feature_stats_tap.v` 第 267、303、305、308、313 行 `VERI-1137`，并连带出现 `else` 上下文、flag 重复声明和 flag 非 task 错误。
+- 根因：新增 RTL 误用了 C 语言无符号整数字面量 `0u`。Efinity 工程使用 `verilog_2k`，不接受 `u` 后缀；第一个 `0u` 破坏解析后导致其余错误级联，模块并非真的重复声明。
+- 修复：将 5 处 `0u` / `!= 0u` 改为与参数宽度一致的标准 Verilog `{COUNT_WIDTH{1'b0}}` 比较；未修改模块接口、统计语义或视频连接。
+- 验证：候选与 D 盘 RTL 均无 `[0-9]u`；`git diff --check` 与三套 CPU Host 回归通过。D 盘修复后 `src/feature_stats/feature_stats_tap.v` SHA-256=`10A5D6D6DFE1148ECC4561F24C4F5E41436E43FBD105130A21885A35B072A465`。
+- 结果：`SOURCE SYNC PASS / EFINITY MAP NOT RERUN`。
+- 下一步门禁：重新运行 Map；先确认 `VERI-1137` 与 `VERI-1063` 均消失，再继续 PNR/bitstream。若出现新的 module 内语法错误，停止在 Map 阶段并回传新的 `mem_test.err.log`。
+
+### [M2-06c] 禁用 Feature Tap 的完整构建与 J48/ch0 HDMI 回归
+
+- 触发：修复 `feature_stats_tap.v` 的 Verilog-2000 字面量错误后，用户重新完成 D 盘完整构建、烧录并确认摄像头画面未回退。
+- 目标：证明统计 RTL 的禁用旁路实例可被 Efinity 综合、布局布线和生成 bitstream，且不破坏现有 J48/ch0 到 HDMI 画面链路。
+- 输入基线：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`；Feature capture 仍固定关闭，未接 CPU/SoC/APB/UART/OSD/机械臂。
+- 实际动作：
+  - 核查 D 盘最新 Map/PNR/timing/CDC/bitstream 的时间链；新 `mem_test.bit` 时间为 2026-07-15 15:32:07。
+  - 核查 Map 资源为 `EFX_LUT4=10887`、`EFX_FF=9434`、`EFX_RAM10=163`、`EFX_DPRAM10=4`。
+  - 核查 Setup 最小 slack 为 `+1.766ns`，Hold 最小 slack 为 `+0.026ns`；CDC 报告为 `No Synchronizer warnings to report.`。
+  - 计算 bitstream SHA-256：`45427C12AFE874C6032614B3D241EFD3BCBABFF395970D4D80FFFE8165F78535`。
+  - 用户上板回传 J48/ch0 HDMI 正常摄像头画面，确认没有视频回退；此前同一路径已回传 LED20/F3 亮、LED21/F2 灭。
+  - 复核候选工程与 D 盘 `src/top.v` SHA-256 同为 `746BAD51743E46DBCD2D89DBFF8CED3A89F00999DF0B5312B62A2D00B1C5D343`，`src/feature_stats/feature_stats_tap.v` 同为 `10A5D6D6DFE1148ECC4561F24C4F5E41436E43FBD105130A21885A35B072A465`。
+- 修改文件：`docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md`、本工作日志；无 RTL、约束、`.peri.xml`、IP 或 D 盘源码写入。
+- D 盘写入：无。本条只读取和记录用户已生成的 D 盘构建产物；D 盘源码与候选工程关键 RTL 哈希一致。
+- 结果：`PASS`，禁用 feature tap 的源码、完整 Efinity 构建和板级 HDMI 回归均通过。
+- NOT VERIFIED：独立 RTL testbench 仍未运行；未记录新的 10 分钟连续画面观察；`i_capture_enable=1'b0`，故特征快照、ROI 标定、CPU/SoC、APB、UART、OSD、按键和机械臂均未实现或验证。
+- 下一步门禁：CPU 上板只允许进入独立的 Interface Designer Hard SoC 资源重规划实验。不得手改 `mem_test.peri.xml`、生成 SoC RTL、`soc.h`、约束或现有视频 PLL；先生成最小 UART0-only SoC artifact bundle，再由 Codex 审查。
+
+### [M2-07] Hard SoC GUI 实验前的工程外备份
+
+- 触发：用户要求执行资源重规划操作包的第一步。
+- 目标：在 Efinity Interface Designer 操作前，保留当前 D 盘已验证视频工程的四个关键输入文件，确保资源重规划失败时可按原样恢复。
+- 输入基线：`D:\TJ375N529_SC431HAI2LCD_Demo_V3`；Efinity 进程仍在运行，本次不关闭、不保存、不修改该工程。
+- 实际动作：将 `mem_test.peri.xml`、`mem_test.xml`、`constrain.sdc`、`src\top.v` 复制到工程目录之外的 `C:\Users\20306\Desktop\赛题资料\CICC_backups\TJ375N529_SC431HAI2LCD_Demo_V3\20260715_154846\`，并逐文件复算 SHA-256 确认备份与源文件一致。
+- 修改文件：本工作日志、备份目录中的 `BACKUP_MANIFEST.md`；未修改候选工程 RTL、D 盘工程、约束、IP、生成物或 bitstream。
+- D 盘写入：无。只读取 D 盘源文件。
+- 结果：`PASS`。备份清单记录四个相对路径、源文件时间、字节数及 SHA-256；四项均 hash match。
+- 下一步门禁：用户可在 Interface Designer 中进行资源可行性判断，但在生成后、Map/PNR 前必须回传生成物和资源截图供 Codex 审查。
+
+### [M2-08] Interface Designer 现有 PLL/JTAG 资源截图留证
+
+- 触发：完成工程外备份后，用户按操作包在未改动状态下回传 Interface Designer 资源截图。
+- 目标：确认当前视频工程对 Hard SoC 所需 PLL/JTAG 资源的实际占用，避免仅凭历史配置推断。
+- 实际证据：
+  - `MIPI_TX_PLL` 使用 `PLL_TR0`，外部参考为 `clk_25m/GPIOT_P_50`，25MHz。
+  - `lpddr4_pll` 使用 `PLL_BL0`，外部参考为 `ddr_clk_ref/GPIOL_25`，100MHz；该 PLL 是 DDR 相关时钟。
+  - `pll_inst1` 使用 `PLL_BL1`，外部参考为 `clk_74p25m/GPIOL_32`，74.25MHz；该 PLL 是现有系统/HDMI 时钟依赖。
+  - `pll_inst4` 使用 `PLL_BL2`，核心参考为 `i_fb_clk`，25MHz；该 PLL 是 MIPI 字节时钟依赖。
+  - `jtag_inst1` 使用 `JTAG_USER1`。
+  - 左侧树显示 `Quad-Core RISC-V (0)`，当前工程尚未创建 Hard SoC。
+- 修改文件：本工作日志；未修改 D 盘工程、视频 RTL、`.peri.xml`、约束、IP 或生成物。
+- D 盘写入：无。
+- 结果：`PASS`，资源冲突的现场证据与已有审计结论一致；目前没有空闲的 Hard SoC 合法系统 PLL。
+- NOT VERIFIED：尚未展开每个 `PLL Resource` 下拉列表，不能仅凭当前截图断言 Interface Designer 不存在任何可用的 GUI 合法重规划组合。
+- 下一步门禁：仅展开 `PLL_BL0`、`PLL_BL1`、`PLL_BL2` 对应实例的 `PLL Resource` 下拉列表查看候选项；不得选择、应用、保存或生成。若不存在不破坏在用视频 PLL 的候选项，则关闭本轮 SoC 上板路径并回到 CPU Host/特征标定工作。
+
+### [M2-09] PLL 资源下拉候选项只读审查
+
+- 触发：用户分别展开 `lpddr4_pll`、`pll_inst1`、`pll_inst4` 的 `PLL Resource` 下拉列表并回传截图，未选择任何新项。
+- 实际证据：三个下拉框均显示同一通用资源池：`PLL_BL0/1/2`、`PLL_BR0/1/2`、`PLL_TL0/1/2`、`PLL_TR0/1/2` 及 `None`。当前选择仍分别是 `PLL_BL0`、`PLL_BL1`、`PLL_BL2`。
+- 判定：此列表只证明 Interface Designer 可以显示全器件 PLL 名称，不能证明任一替代资源可承载当前 PLL 的参考时钟输入、输出频率、GCLK 分发、DDR/MIPI 专用连接或物理区域约束。因此不得据此把任何视频 PLL 迁移到 `PLL_BR*`、`PLL_TL*` 或 `PLL_TR*`。
+- 修改文件：本工作日志；未修改 D 盘工程、视频 RTL、`.peri.xml`、约束、IP 或生成物。
+- D 盘写入：无。
+- 结果：`READ-ONLY INSPECTION PASS / REPLANNING FEASIBILITY NOT VERIFIED`。
+- 下一步门禁：关闭下拉框且不保存当前工程。后续只能在完整工程副本中，通过 Interface Designer 实际选择候选资源并运行其设计校验来判断是否合法；校验或生成出现 DDR、MIPI、HDMI、时钟或 GPIO 资源错误即停止，不触碰当前已验证工程。
+
+### [M2-10] Hard SoC PLL 重规划实验工程副本
+
+- 触发：用户已关闭 Efinity，允许建立独立副本验证 PLL 资源重规划可行性。
+- 目标：隔离 Hard SoC GUI 试验，确保原 D 盘工程仍是可直接烧录的 J48/ch0 HDMI 回退基线。
+- 前置检查：确认无 `efinity`、`efx_run`、`efx_map`、`efx_pnr`、`efx_pt` 或 `efx_pgm` 进程。
+- 实际动作：完整复制 `D:\TJ375N529_SC431HAI2LCD_Demo_V3` 到 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_soc_replan_20260715_160020`。源和副本总文件字节数均为 `211229338`；关键文件逐项 SHA-256 一致。
+- 修改文件：本工作日志、实验副本内 `EXPERIMENT_MANIFEST.md`；不修改原工程、候选工程 RTL、约束、`.peri.xml`、IP 或 bitstream。
+- D 盘原工程写入：无。仅新建同级实验副本目录。
+- 结果：`PASS`。原工程与实验副本均保留，实验副本的基线和允许范围已写入清单。
+- 下一步门禁：仅打开实验副本 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_soc_replan_20260715_160020\mem_test.xml`，在 Interface Designer 中尝试一个候选 PLL 迁移并运行其设计校验；不得在原工程中操作，不得 Map/PNR/烧录，任何错误均停在副本并回传。
+
+### [M2-11] 实验副本 `PLL_BR1` 迁移校验失败，关闭 PLL 重规划路线
+
+- 触发：用户在实验副本中将视频 `pll_inst1` 从 `PLL_BL1` 临时切换为 `PLL_BR1` 并执行 Interface Designer 设计校验。
+- 实际证据：Interface Designer 的副本路径显示为 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_soc_replan_20260715_160020`；校验报错 `pll_rule_refclk`：`pll_inst1` 的参考时钟被关联至未定义的 `GPIOB_P_39/GPIOB_PN_39` 外部时钟输入。`clk_74p25m` 同时出现 `gpio_rule_alt_conn` warning，说明原有 `pll_clkin` 连接已不再被有效 PLL 使用。
+- 判定：`PLL_BR1` 不能在保持 `clk_74p25m/GPIOL_32` 参考时钟和 HDMI 系统时钟链路的条件下替代 `PLL_BL1`。该路径会破坏当前视频时钟连接，不能用于为 Hard SoC 释放 `PLL_BL1`。
+- 修改文件：本工作日志；GUI 修改仅存在于实验副本的内存状态，未允许保存、生成、Map、PNR、bitstream 或烧录。
+- D 盘原工程写入：无。原工程 `D:\TJ375N529_SC431HAI2LCD_Demo_V3` 仍是未经本实验改写的可烧录基线。
+- 结果：`FAIL AS EXPECTED / PLL_BR1 MIGRATION NO-GO / HARD SOC PLL REPLAN PATH CLOSED`。
+- 下一步门禁：用户将实验副本 `pll_inst1` 改回 `PLL_BL1` 后关闭 Efinity且不保存；不得继续试探其他 PLL。后续工作回到不依赖板上 SoC 的 CPU Host 逻辑、feature tap 采集启用前准备和真实场景阈值标定。
+
+### [M2-12] DSI 资源释放假设审计，确认 `PLL_BL2` 不可释放
+
+- 触发：`PLL_BR1` 替换 `PLL_BL1` 失败后，审计是否能因项目不使用 MIPI DSI 而释放 `PLL_BL2` 给 Hard SoC。
+- 实际证据：
+  - `src/top.v` 的 DSI 业务模块确实由 `` `ifdef MIPI_DSI_OUT_EN `` 包围，当前 HDMI-only 配置不启用该模块。
+  - 但 `pll_inst4/PLL_BL2` 的输出并不只服务 DSI：它生成 `mipi_clk`、`i_sysclk_div2`、`hdmi_tx_slow_clk`、`hdmi_tx_fast_clk`。
+  - `mipi_clk` 是两路 `soft_mipi_rx_top` 的输入；`i_sysclk_div2` 是视频处理与 feature tap 时钟；`hdmi_tx_slow_clk/hdmi_tx_fast_clk` 是 HDMI 发射时钟。
+  - `PLL_TR0/MIPI_TX_PLL` 才输出 DSI PHY 相关 `mipi_dphy_tx_*` 时钟，但 Hard SoC 合法系统 PLL 不接受 `PLL_TR0`。
+- 判定：去除未启用的 DSI 业务逻辑或 `PLL_TR0` 不能释放任何 Hard SoC 可用的 `PLL_BL*`；删除或迁移 `PLL_BL2` 会同时破坏 MIPI CSI、视频处理和 HDMI。该路线关闭。
+- 修改文件：本工作日志；未修改 D 盘原工程、实验副本、RTL、`.peri.xml`、约束、IP 或 bitstream。
+- D 盘原工程写入：无。
+- 结果：`READ-ONLY AUDIT PASS / PLL_BL2 RELEASE NO-GO / HARD SOC INSERTION REMAINS BLOCKED`。
+- 下一步门禁：恢复并关闭实验副本且不保存。M2 的板上 Hard SoC 路线暂停；优先推进不依赖 SoC 的视觉可观测性与阈值标定准备，待获得官方支持的共享 PLL/Hard SoC 视频参考设计或另行批准系统级视频时钟重构后再重开 SoC 议题。
+
+### [M2-13] 更正 CPU 接入路径：以 Hard SoC 接管 `PLL_BL1`
+
+- 触发：用户指出 CPU 是正式闭环的硬要求，要求明确最终接入方法；因此重新逐信号审计现有 `PLL_BL1` 的实际下游用途和官方 Hard SoC 参考工程。
+- 更正结论：此前“所有 `PLL_BL*` 均不可释放”的表述过度保守。`PLL_BL2` 的确不可释放，因为它驱动 MIPI CSI、视频处理和 HDMI；但当前 `pll_inst1/PLL_BL1` 的两个时钟输出 `pll_inst1_CLKOUT0`、`CLK_5M` 在 `src/` 内没有下游消费者。顶层只实际使用其锁定信号 `sys_pll_lock` 参与 `arst_n`。
+- 正式接入方向：在独立 CPU+视频联合工程中，由 Interface Designer 删除旧 `pll_inst1`，释放 `PLL_BL1`；随后创建最小 Hard SoC，选择 `PLL_BL1`、使用现有 74.25MHz `clk_74p25m/GPIOL_32` 作为其合法 GUI 参考时钟，使用 `JTAG_USER2`，仅开 UART0。由同一次生成物提供新的系统 PLL lock、SoC wrapper、`soc.h`、BSP 和 linker；顶层仅在拿到真实生成端口后，将旧 `sys_pll_lock` 复位依赖改接到生成的 SoC system-PLL lock。
+- 官方交叉证据：TJ375C529 官方 Hard SoC 工程显示 SoC 系统/内存时钟由 Interface Designer 选择的 `PLL_BL*` 提供，SoC `SYS_CLK_SOURCE`/`MEM_CLK_SOURCE` 由同次生成定义；不得复用其固定 `soc.h`、地址、UART GPIO 或 wrapper。
+- 禁止项：不得把 `PLL_BL1` 迁到 `PLL_BR1`；不得移动 `PLL_BL0` 或 `PLL_BL2`；不得手改 `.peri.xml`、生成 RTL、`soc.h` 或约束；不得先写 CPU MMIO 地址或机械臂链路。
+- 修改文件：本工作日志；未修改 D 盘原工程、实验副本、RTL、`.peri.xml`、约束、IP 或 bitstream。
+- D 盘原工程写入：无。
+- 结果：`CPU INTEGRATION PATH IDENTIFIED / GENERATION AND BOARD PROOF NOT VERIFIED`。
+- 下一步门禁：用户恢复并关闭当前实验副本且不保存；另建 CPU+视频联合实验副本，从原工程开始，在 GUI 中删除旧 `pll_inst1` 后创建最小 Hard SoC 占用 `PLL_BL1`。生成后立刻停止并回传生成物，由 Codex 审查端口、PLL、UART 和 BSP，再允许改顶层复位适配与进行 Map/PNR。
+
+### [M2-14] CPU+视频联合 SoC 实验工程副本
+
+- 触发：用户关闭前一轮 `PLL_BR1` 迁移失败的实验副本，允许按修正后的 `PLL_BL1` 接管路线创建新的隔离实验环境。
+- 目标：从未经 PLL 迁移的原工程副本开始，验证 Hard SoC 能否在 Interface Designer 中合法接管 `PLL_BL1`，同时不改动 DDR、MIPI CSI 和 HDMI 的 `PLL_BL0/PLL_BL2`。
+- 前置检查：确认无 `efinity`、`efx_run`、`efx_map`、`efx_pnr`、`efx_pt` 或 `efx_pgm` 进程；再次固定原工程四个关键文件的 SHA-256。
+- 实际动作：完整复制 `D:\TJ375N529_SC431HAI2LCD_Demo_V3` 到 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500`。源和副本总文件字节数均为 `211229338`；`mem_test.peri.xml`、`mem_test.xml`、`constrain.sdc`、`src\top.v` 均逐项 SHA-256 一致。
+- 修改文件：本工作日志、联合实验副本内 `EXPERIMENT_MANIFEST.md`；未修改原工程、候选工程 RTL、约束、`.peri.xml`、IP 或 bitstream。
+- D 盘原工程写入：无。仅新建同级联合实验副本目录。
+- 结果：`PASS`。联合实验的起点是当前已验证视频工程，而不是前一轮失败实验的脏状态。
+- 下一步门禁：仅打开联合实验副本 `mem_test.xml`；在 Interface Designer 中删除旧 `pll_inst1` 后创建最小 Hard SoC 使用 `PLL_BL1`、`JTAG_USER2`、UART0-only。生成后立刻停止，禁止 Map/PNR/烧录，回传生成物审查。
+
+### [M2-15] 停止手工裸 SoC/PLL 拼装，切换到官方 IP Manager 生成流
+
+- 触发：用户在联合实验副本中手工创建 `qcrv32_inst1/SOC_0` 和新的 `PLL_BL1`，截图显示新 PLL 默认引用 `External Clock 0 / GPIOB_P_05`、仅有 `CLKOUT0`，SoC 的系统/内存时钟实例与引脚尚为空。
+- 证据与判定：
+  - Efinity 2025.2 自带 `hlp-id-ti-riscv.html` 明确说明：使用 IP Manager 生成 Interface Designer blocks 后，不得再在 Interface Designer 修改其设置，否则会破坏设计。
+  - Titanium Hard RISC-V 文档明确规定：`PLL_BL1 CLKOUT2` 才能驱动系统时钟，`PLL_BL1 CLKOUT1` 才能驱动内存时钟；当前手工新 PLL 只有 `CLKOUT0`，不满足硬核物理接口。
+  - 手工添加 Interface Designer 的裸 SoC 块不会自动建立与当前配置匹配的 Hard SoC IP wrapper、外围 RTL、BSP、`soc.h` 和 linker，无法满足正式 CPU 软件平台真源要求。
+  - 既有隔离生成证据 `C:\fpga_soc_isolated\tj375_soc_a2_20260712` 已证明官方 IP Manager 流可生成 wrapper、外围 RTL、BSP 和 `soc.h`；新联合工程应基于该生成方法重新生成，但参数必须改为本工程的 `PLL_BL1` 和 74.25MHz 参考输入，不能复制旧地址或旧生成物。
+- 当前 GUI 状态：所有修改仍未保存到磁盘；联合副本 `mem_test.peri.xml` SHA-256 仍为原始 `507D0ABC16A8AB076C06D0550303760FF15897388233DACD8161AD000E2B0768`。
+- 修改文件：本工作日志；未修改原 D 盘工程、候选工程 RTL、约束、IP 或 bitstream。
+- 结果：`MANUAL RAW SOC/PLL FLOW STOPPED / OFFICIAL IP MANAGER FLOW REQUIRED`。
+- 下一步门禁：关闭联合实验副本且不保存当前 GUI 改动。随后在联合副本中通过 IP Manager 新建最小 Hard SoC IP，参数目标为 `PLL_BL1`、74.25MHz 参考、整数 PLL 模式、UART0、JTAG USER2、无 UART2/机械臂；IP Manager 生成完成后再打开 Interface Designer 审查自动生成的 SoC/PLL/GPIO/JTAG 资源，禁止手工重配生成块。
+
+### [M2-16] Hard SoC IP Manager 最小配置逐页审查（生成前）
+
+- 触发：用户在 CPU+视频联合实验副本中通过 `Tools -> Open IP Catalog` 打开 Efinity 2025.2 IP Catalog，并选择 `Sapphire High Performance SoC`（内部 IP 名 `efx_hard_soc`，版本 `1.22.0`）。
+- 本机 IP 真源：`D:\Efinity\2025.2\ipm\ip\efx_hard_soc`；目标器件页为 `TITANIUM / 529`。IP 固定模块名为 `EfxSapphireHpSoc_slb`，GUI 中只读；后续顶层实例名可另行命名，不能手改生成模块名。
+- HRB 已确认配置：`FPGA USER TAP`，资源改为 `JTAG_USER2`；保留硬核固定 AXI4 接口；不启用 Co-Debug、AXI4 Slave、custom instruction、AXI pipeline、write-buffer bypass 或 OCR application。
+- SLB-i 最小配置：保留 peripheral interconnect、Interface Designer peripheral GPIO block 和 UART0；关闭官方开发套件预定义管脚、UART1/2、SPI0/1/2、I2C0/1/2、GPIO0/1 和 watchdog。`Required SoC interrupt ports` 应为 `1`。
+- SLB-ii 最小配置：APB3 0-4、SD Host Controller 和 Triple-speed Ethernet MAC 全部关闭；视觉 APB 留到 UART Hello Gate 通过后再加入。
+- PLL 资源审查：默认 `PLL_BL0` 和 `PLL_TR0` 均与现有视频工程冲突，禁止使用。IP Manager 的系统 PLL 与 Peripheral PLL 自动 Interface Designer 生成均须关闭；系统时钟入口仍选择 `PLL_BL1/Clock 1`，由现有 `pll_inst1` 在生成后经单独审查改为 Hard SoC 所需的 `CLKOUT1=297MHz` memory clock、`CLKOUT2=594MHz` system clock。该组合沿用 74.25MHz 参考及现有 594MHz 整数 VCO，不使用 fractional PLL 或 spread spectrum。
+- Peripheral clock 契约：生成参数设为 `200MHz`，后续 wrapper 的 `io_peripheralClk` 复用现有稳定 `axi0_ACLK=200MHz`；不新增 Peripheral PLL。IP Manager 隐藏的系统 PLL feedback 默认值为 100MHz，无法与 74.25MHz 参考保持纯整数关系，因此不得让 IP Manager 自动生成系统 PLL。
+- LPDDR4 边界：下一页必须关闭自动加入新的 LPDDR4 controller；当前视频工程已有 `DDR_0/lpddr4_pll`，首个 UART Hello 固件仅使用 Hard SoC 片上 RAM，不允许生成第二套 DDR 控制器或改动现有视频 DDR 链路。
+- 当前磁盘状态：仅更新本工作日志；Hard SoC 尚未点击 `Generate`，联合实验副本尚无获准的生成物，未运行 Map/PNR，未烧录。
+- 结果：`PRE-GENERATION REVIEW IN PROGRESS / NOT YET GENERATED / NOT BOARD VERIFIED`。
+- 下一步门禁：用户按上述 PLL 字段配置并回传页面；随后审查 LPDDR4、Embedded software、Deliverables、Summary。只有 Summary 逐项通过后才允许点击一次 `Generate`，生成后必须立即停止并由 Codex 审查所有生成物和资源冲突。
+
+### [M2-17] 首次 Hard SoC 生成被 DDR AXI1 硬规则阻止
+
+- 触发：用户在联合实验副本中确认 Summary 后首次点击 `Generate`；生成范围仅为 `Peripheral_Generator`、`Source`、`PT_Configuration`、`Peripheral_Post_Script`、`Embedded_SW`，未包含 Example Design 或 Testbench。
+- 失败原文：`Rule:ddr_rule_axi_1_qcrv32, Msg:DDR_0 AXI 1 Interface cannot be used when QCRV32 is configured`，随后 `Hard IP Build Execution: Failure` 与 `Generate status: Error`。
+- 根因：现有 `ddr_inst1/DDR_0` 同时启用了 AXI target0 与 AXI target1；器件在配置 Hard SoC/QCRV32 后会占用 DDR_0 的 AXI1 硬连接，因此 AXI1 不能继续导出为普通 FPGA fabric 接口。
+- 视频依赖审计：两个 `frame_buffer` 先分别形成 AXI master，再经写/读 `axi_interconnect` 汇聚，最终仅连接顶层 `axi0_*`。全 `src/` 中 `axi1_*` 只出现在 `src/top.v` 的接口声明和 `assign axi1_ARESETn = ddr_cfg_ok`，没有 framebuffer 或其他读写消费者。
+- 最小修复：仅在联合实验副本的 Interface Designer 中关闭 `ddr_inst1 -> AXI 1`，保留 AXI0、DDR 配置端口、现有 LPDDR4 参数与视频 PLL。成功生成并审查生成端口后，再删除 `src/top.v` 中遗留的 AXI1 端口与复位赋值；不得把视频流量迁移到其他 DDR 端口，也不得改 framebuffer 数据链路。
+- 失败后磁盘核查：`mem_test.peri.xml` SHA-256 仍为 `507D0ABC16A8AB076C06D0550303760FF15897388233DACD8161AD000E2B0768`，`soc_info` 仍为空；`ip/` 未出现 Hard SoC 目录，`embedded_sw/` 未生成 BSP。失败未形成可用生成物。
+- 结果：`EXPECTED HARD-RULE FAILURE / ROOT CAUSE IDENTIFIED / VIDEO AXI0 PATH UNAFFECTED`。
+- 下一步门禁：先关闭失败对话框和 IP Configuration，不再次 Generate；在联合实验副本 Interface Designer 中只关闭 DDR AXI1并运行设计校验，回传 DDR 配置与校验结果截图。校验通过后才重新打开 IP Catalog，复核/重填最小 Hard SoC 配置并再次生成。
+
+### [M2-18] 联合实验副本关闭 DDR AXI1并通过 Interface Designer 校验
+
+- 实际操作：用户仅在联合实验副本 `ddr_inst1/DDR_0 -> AXI 1` 页取消 `Enable Target 1`；AXI0、DDR 基础参数、PLL、GPIO、视频 RTL 均未修改。
+- 磁盘证据：联合实验副本 `mem_test.peri.xml` 的 `axi_target1` 已变为 `is_axi_enable="false"`，该 AXI1 块下的导出 pin name 由 `axi1_*` 正常清空；AXI0、DDR 参数、PLL、GPIO、MIPI/HDMI 块无差异。该文件 SHA-256 由基线 `507D0ABC...` 变为 `168C965C5155E28F4255A681B13EC39F0673C786E3B76F18977347CC32973E7B`。
+- 校验结果：Interface Designer `Check design...done. 4 issue/s.`，4 项均为 warning，无 error。规则分别是既有 `lvds_rule_tx_distance`、`mipi_ln_rule_rx_distance`、两项 `mipi_ln_rule_tx_distance`。
+- warning 复核：原 D 盘可烧录视频基线 `outflow/mem_test.pt.rpt` 第 853-856 行已有完全相同的 4 条 warning（同实例、同规则、同描述对象）；本次 AXI1 关闭没有新增 HSIO/MIPI/LVDS 警告。
+- 判定：`DDR AXI1 DISABLE VALIDATION PASS / NO NEW INTERFACE WARNINGS`。这些既有物理距离 warning 仍保留为板级已知风险，不因本次复核而从项目中删除。
+- 下一步门禁：保存 Interface Designer 修改后，Codex 核查 XML 最小差分；再重新打开 Hard SoC IP 配置，复核 `PLL assignments=0`、`DDR assignment=0`、`JTAG_USER2`、UART0-only 和 peripheral 200MHz，并进行第二次 Generate。仍禁止 Map/PNR/烧录。
+
+### [M2-19] 最小 Hard SoC 第二次生成成功及生成物审计
+
+- 触发：关闭 `DDR_0 AXI 1` 并通过 Interface Designer 校验后，用户按已审核参数重新生成 `Sapphire High Performance SoC`，Efinity 返回生成成功。
+- 实验范围：仅 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500`；未修改原 D 盘烧录基线 `D:\TJ375N529_SC431HAI2LCD_Demo_V3`，未同步到候选正式工程，未运行 Map/PNR，未生成或烧录新的联合 bitstream。
+- 生成结果：
+  - IP：`efx_hard_soc 1.22.0`，固定模块名 `EfxSapphireHpSoc_slb`。
+  - 生成目录：`ip\EfxSapphireHpSoc_slb`，共 12 个文件、828653 字节。
+  - BSP：`embedded_sw\efx_hard_soc`，共 480 个文件、7276936 字节。
+  - 生成时间链：核心 IP、wrapper、`settings.json`、BSP 和 `soc.h` 均在 2026-07-15 20:14 同批生成。
+- 生成参数复核：`UART0-only`、`PERI_FREQ=200MHz`、`JTAG_USER2`、系统/内存源均为 `Clock 1`；IP Manager 未自动加入 System PLL、Peripheral PLL 或第二套 LPDDR4 controller。`DDR_0 AXI0` 保持启用，`AXI1` 保持关闭。
+- BSP 真源：`UART0=0xE8010000`，`SYSTEM_CLINT_HZ=200000000`，`SYSTEM_RAM_A=0xF9000000`、大小 16KB。生成的 `default.ld` 仍为 `ORIGIN=0x00001000, LENGTH=324K`，不指向这块 16KB 片上 RAM；首个 UART Hello 必须另建应用专用 linker，禁止修改生成 linker。
+- 关键文件 SHA-256：
+  - `EfxSapphireHpSoc_slb.v`：`0A67C38D7E352CD2E4833E43D2815B81BECDF426FA7610A316C1A3CC6CEE2CC5`
+  - `EfxSapphireHpSoc_wrapper.v`：`C63628B93453A054B74F53EAE268441F400B7D749E10239D537053021A0AC428`
+  - `settings.json`：`80A4BF306641C5B26F8B27677E38AAD97E50992F426B8B89778033F73399478F`
+  - `soc.h`：`87A09A739226C2A46DF33F6F995758D1BF81DD33AE8DE3E41EE0B18143833629`
+  - `mem_test.peri.xml`：`3837ABCD92824F5E8ADE28EFF7F7DC4203F0C390A274739997B6CAF488F3C1E2`
+- 审计发现与当前阻塞：
+  - `PLL_BL1/pll_inst1` 仍是旧视频工程配置，只导出 `pll_inst1_CLKOUT0` 和 `CLK_5M`；缺少 Hard SoC 指定的 `CLKOUT1` memory clock 与合规的 `CLKOUT2` system clock。
+  - UART0 的 `system_uart_0_io_rxd/txd` 均为 `gpio_def=""`，尚未分配开发板物理引脚。
+  - `src/top.v` 尚未实例化生成 wrapper，仍有已经关闭的 `axi1_*` 遗留顶层接口，SoC reset/PLL lock、`io_peripheralClk`、未使用 AXI A 接口和 DDR 配置状态机隔离均未完成。
+- 结果：`HARD SOC IP/BSP GENERATION PASS / TOP-LEVEL AND CLOCK INTEGRATION NOT VERIFIED / MAP-PNR-FLASH NO-GO`。本门只证明官方生成流已经打通，不能描述为 CPU 已上板或摄像头与 CPU 已联合运行。
+- 下一步门禁：先在联合实验副本执行生成后的完整 `Validate Design` 并确认无 error；随后仅在 GUI 中配置并校验 `PLL_BL1` 的 Hard SoC 合法输出（74.25MHz 参考、整数模式、`CLKOUT1=297MHz`、`CLKOUT2=594MHz`）。取得校验结果和最终导出端口后，Codex 才能修改联合副本 `top.v`。在此之前继续禁止 Map/PNR/烧录，且不得修改生成的 `.peri.xml`、wrapper、`settings.json`、`soc.h` 或生成 linker。
+
+### [M2-20] Hard SoC 生成后的首次完整 Interface Designer 校验
+
+- 用户回传 Message Viewer 截图，校验结果为 4 个 error、4 个 warning。
+- 4 个 error：
+  - `io_gpio_sw_n / gpio_rule_resource`：Resource name is empty。
+  - `system_uart_0_io_rxd / gpio_rule_resource`：Resource name is empty。
+  - `system_uart_0_io_txd / gpio_rule_resource`：Resource name is empty。
+  - `qcrv32_inst1 / qcrv32_rule_mem_clk_resource`：`PLL(PLL_BL1).CLKOUT1` driving QCRV32 memory clock is not configured。
+- 4 个 warning：`lvds_rule_tx_distance`、`mipi_ln_rule_rx_distance`、两项 `mipi_ln_rule_tx_distance`，与原可烧录视频基线的 4 项已知 warning 相同；本次未出现新增视频链路 warning。
+- 官方 TJ375C529 RISC-V 例程管脚审计：UART0 RX=`GPIOR_165`、TX=`GPIOR_145`，当前联合实验工程中均未被其他 GPIO 占用，可作为后续 UART0 候选管脚；官方 reset `io_gpio_sw_n=GPIOL_52` 不能直接照搬，因为本视频工程已将 `GPIOL_52` 分配给 `i_sw[0]`，且 `i_sw[0]` 同时复位现有系统、DDR、MIPI TX 和 byte-clock PLL。
+- 判定：`VALIDATION EXECUTED / EXPECTED INTEGRATION ERRORS CONFIRMED / MAP-PNR-FLASH NO-GO`。先修复 `PLL_BL1 CLKOUT1/CLKOUT2`，再统一设计视频与 SoC 的复位入口；不得把两个逻辑 GPIO 重复分配到 `GPIOL_52`。
+- 下一步门禁：三个未分配 GPIO 暂不填写。先打开 `pll_inst1/PLL_BL1` 完整 GUI 配置页，保留 74.25MHz 外部参考、整数模式和 `sys_pll_lock`，由 Codex根据实际字段指导增加 Hard SoC memory/system clock；配置前后均不得 Map/PNR/烧录。
+
+### [M2-21] `PLL_BL1` 首次补齐 Hard SoC 输出及 memory clock 上限纠偏
+
+- 用户通过 PLL Clock Calculator 保留 74.25MHz 外部参考、Integer/Local Feedback、`sys_pll_rstn` 和 `sys_pll_lock`，新增 `CLKOUT1=soc_memory_clk`，并将 `CLKOUT2` 改为 `soc_system_clk`；首次填写分别为 297MHz 和 594MHz。
+- 再次 Check Design 后，原 `PLL_BL1.CLKOUT1 is not configured` error 已消失，证明 Hard SoC system/memory 固定输出编号和资源连接正确。
+- 新出现 `qcrv32_rule_mem_clk_resource` warning：`The memory clock frequency exceeds the maximum specification of 250MHz.`。该 warning 属于硬核频率规格，禁止忽略。
+- 纠偏：此前工作日志和操作指导中的 `CLKOUT1=297MHz` 方案不合规，现予以废止。当前自动计算组合的内部频率为 2376MHz，保留 `CLKOUT2=594MHz` 时，`CLKOUT1=237.6MHz`（整数除 10）是低于 250MHz 上限且最接近上限的合规候选；仍须再次 Check Design 验证。
+- 当前校验剩余：3 个未分配 GPIO error、原有 4 个 MIPI/LVDS warning、1 个超频 warning。未运行 Map/PNR，未烧录。
+- 下一步门禁：重新打开 `pll_inst1 -> Automated Clock Calculation`，仅把 Clock 1 从 297MHz 改为 237.6MHz；Clock 0=74.25MHz、Clock 2=594MHz、反馈、相位、reset/lock 均保持不变。Finish 后再次 Check Design，必须确认超频 warning 消失，才进入 GPIO/复位整合。
+
+### [M2-22] Hard SoC PLL 校验通过及最小 GPIO 资源规划
+
+- 用户将 `PLL_BL1 CLKOUT1/soc_memory_clk` 从 297MHz 修正为 237.6MHz，保留 `CLKOUT2/soc_system_clk=594MHz`、`CLKOUT0=74.25MHz`、Integer/Local Feedback、0°相位、`sys_pll_rstn` 和 `sys_pll_lock`。
+- Check Design 结果：QCRV32 memory clock 超频 warning 已消失；当前只剩 3 个未分配 GPIO error 和与原视频基线相同的 4 个 MIPI/LVDS warning。判定 `HARD SOC PLL INTERFACE VALIDATION PASS`，但顶层、时序、PNR、bitstream 和板级运行仍未验证。
+- GPIO 规划审计：
+  - UART0 RX 采用官方 TJ375C529 RISC-V 例程资源 `GPIOR_165`，封装脚 E9，3.3V；当前视频工程空闲。
+  - UART0 TX 采用官方 TJ375C529 RISC-V 例程资源 `GPIOR_145`，封装脚 E10，3.3V；当前视频工程空闲。
+  - `io_gpio_sw_n` 不复用官方例程的 `GPIOL_52/U19`，因为该脚已是视频工程 `i_sw[0]`，负责现有四路 PLL 复位。第一版改用空闲轻触键 SW2/U17，对应 `GPIOL_79`、3.3V、按下为低，作为独立 SoC reset，避免按 CPU reset 时重置 DDR/MIPI/HDMI。
+- 电平边界：三个生成 GPIO 当前默认显示 1.8V，必须在 Interface Designer 中改为 `3.3 V LVCMOS`；不得将 3.3V 板载按键或 UART 通道配置为 1.8V。
+- 下一步门禁：只在联合实验副本为三个 GPIO 填写上述 resource 与 3.3V I/O standard，随后再次 Check Design。若出现 resource conflict、bank voltage、HSIO distance 或任何新增 warning/error，立即停止并回传；仍禁止 Map/PNR/烧录。
+
+### [M2-23] 三个 SoC GPIO 在 Resource Assigner 中完成临时分配
+
+- 用户回传 Resource Assigner 的 Instance View：`io_gpio_sw_n=U17/GPIOL_79`、`system_uart_0_io_rxd=E9/GPIOR_165`、`system_uart_0_io_txd=E10/GPIOR_145`，三项均与 M2-22 规划一致，未覆盖 `i_sw[0]/U19/GPIOL_52` 或其他现有视频 GPIO。
+- `io_gpio_sw_n` Base 页已截图确认 `input + 3.3 V LVCMOS`；RX/TX 的 I/O Standard 尚缺截图或校验结果确认。
+- 当前 GUI 修改尚未保存，因此磁盘 `mem_test.peri.xml` 仍保留三个空 `gpio_def` 和生成器默认 1.8V，SHA-256 仍为 `90A837032907690FC8F8D53D6457267CE464851ADC80EEE14E85EA1BF4494365`；该现象不表示 GUI 分配失败。
+- 结果：`RESOURCE ASSIGNMENT IN GUI PASS / UART I/O STANDARD AND DESIGN CHECK PENDING / MAP-PNR-FLASH NO-GO`。
+- 下一步门禁：分别选中 UART0 RX/TX，保持 RX=input、TX=output并将两者 Base 页改为 `3.3 V LVCMOS`，其他属性不改；随后 Check Design。必须先取得 0 error 或仅有已知 warning 的验证结果，才允许保存联合实验副本。
+
+### [M2-24] Hard SoC 时钟与 GPIO 的 Interface Designer 校验通过
+
+- 用户确认 UART0 RX=`GPIOR_165/E9/input/3.3 V LVCMOS`，UART0 TX=`GPIOR_145/E10/output/3.3 V LVCMOS`，TX drive strength 保持 4mA；独立 SoC reset 为 `io_gpio_sw_n=GPIOL_79/U17/input/3.3 V LVCMOS`。
+- Check Design 结果为 0 error、4 warning。QCRV32 system/memory clock、PLL non-fractional、GPIO resource、电平、DDR AXI1、JTAG 和 Hard SoC 资源规则均未再报错。
+- 剩余 4 项为原可烧录视频基线中已存在且实例/规则相同的物理距离 warning：`tm ds_data2/lvds_rule_tx_distance`、`mipi_rx_dp01/mipi_ln_rule_rx_distance`、`mipi_tx_ck0/mipi_ln_rule_tx_distance`、`mipi_tx_dp12/mipi_ln_rule_tx_distance`。本次不将其删除或泛化为可忽略，只判定 Hard SoC 接入没有新增 Interface Designer issue；后续仍必须以 PNR、时序、CDC 和 J48/ch0 HDMI 板级回归复核。
+- 结果：`INTERFACE DESIGN VALIDATION PASS / SAVE AND DISK AUDIT PENDING / TOP-LEVEL MAP-PNR-FLASH NO-GO`。
+- 下一步门禁：仅保存 CPU+视频联合实验副本的 Interface Designer 修改并关闭 Efinity。关闭后由 Codex 审计落盘 `.peri.xml` 最小差分、真实生成端口、PLL/DDR/GPIO/JTAG 配置，再修改联合副本 `src/top.v`；原 D 盘烧录基线和候选正式工程暂不改动。
+
+### [M2-25] Interface PASS 落盘审计、工程外 checkpoint 与 peripheral clock 补充门
+
+- 用户保存并关闭 Interface Designer 后，后台残留 `efinity.exe` PID 32320；按门禁停止写入，用户结束进程后继续。健康检查通过，只有与本任务无关的 `pymycobot` 未安装 warning。
+- 落盘审计确认：`io_gpio_sw_n=GPIOL_79/3.3V`、UART0 RX=`GPIOR_165/3.3V`、TX=`GPIOR_145/3.3V`；`PLL_BL1 CLKOUT1=soc_memory_clk/237.6MHz`、`CLKOUT2=soc_system_clk/594MHz`；DDR AXI1关闭；QCRV32/JTAG_USER2/Clock 1 配置与截图一致。`mem_test.xml` 已自动登记 Hard SoC IP 和 include path。
+- 在工程外建立 checkpoint：`C:\Users\20306\Desktop\赛题资料\CICC_backups\TJ375N529_cpu_video_joint\20260715_211500_interface_pass`，保存 `mem_test.peri.xml`、`mem_test.xml`、`constrain.sdc`、`src/top.v`、Hard SoC `settings.json` 和生成 RTL；哈希见该目录 `BACKUP_MANIFEST.md`。
+- 顶层前置审计发现：QCRV32 的硬接口 pin name 仍为 `io_peripheralClk`，而本方案复用的现有稳定 200MHz 时钟是 `axi0_ACLK`。Hard SoC 数据手册确认 `IO_PERIPHERALCLK` 是硬核输入并为外设与 AXI slave 接口提供时钟；不能只在 RTL wrapper 侧改名而让硬核 pin 保持另一个悬空顶层端口。
+- 结果：`INTERFACE PASS CHECKPOINT SAVED / PERIPHERAL CLOCK PIN NAME CORRECTION REQUIRED / TOP EDIT DEFERRED`。
+- 下一步门禁：重新打开联合实验副本，在 `qcrv32_inst1 -> Clock/Control` 中只将 `Periphery Controller Clock Pin Name` 从 `io_peripheralClk` 改为 `axi0_ACLK`，不反相、不改 system/memory clock/reset。Check Design 必须仍为 0 error且不新增 warning；保存关闭并审计落盘后，才修改 `src/top.v`。
+
+### [M2-26] Hard SoC 顶层适配与失效约束最小清理
+
+- 时间：2026-07-15 21:36（Asia/Shanghai）。
+- 触发：用户确认 Efinity 已关闭，批准继续联合实验副本的 Hard SoC 顶层适配。
+- 适用工程：仅 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500`。
+- 前置门：
+  - 使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\agent_handoff_health_check.ps1` 完成只读健康检查；结果 PASS，唯一 warning 为本机未安装 `pymycobot`，与本轮 SoC/视频 RTL 无关。
+  - 读取并遵守 `.agents/skills/fpga_vision/SKILL.md` 与 `.agents/skills/cpu_mycobot/SKILL.md`；本轮不涉及 CPU 识别软件或机械臂动作。
+  - Codebase Memory 服务当前没有加载 `D-cicc_cbm-main`，因此按仓库规则退回真实 `top.v`、`mem_test.peri.xml`、生成 wrapper、template、`mem_test.isf` 和官方初赛例程核查。
+- 修改前备份：
+  - Interface PASS checkpoint：`C:\Users\20306\Desktop\赛题资料\CICC_backups\TJ375N529_cpu_video_joint\20260715_211500_interface_pass`。
+  - 顶层修改前备份：`C:\Users\20306\Desktop\赛题资料\CICC_backups\TJ375N529_cpu_video_joint\20260715_212500_top_pre_soc_adapter\src\top.v`。
+- `src/top.v` 实际修改：
+  - 删除已失效 `CLK_5M`、`pll_inst1_CLKOUT0`、旧 `jtag_inst2_*` 和全部已关闭的 `axi1_*` 顶层端口；删除遗留 `assign axi1_ARESETn = ddr_cfg_ok`。
+  - 新增 `soc_memory_clk`、`soc_system_clk`、QCRV32 reset、UART0、USER2 JTAG、完整 AXI-A、`axiAInterrupt` 和 `userInterruptA-H` 顶层硬接口。
+  - 实例化生成模块 `EfxSapphireHpSoc_slb`，其 63 个端口全部且仅连接一次；未修改生成 wrapper。
+  - `io_peripheralClk` 接现有 `axi0_ACLK=200MHz`；`pll_peripheral_locked` 接 `ddr_pll_lock`，`pll_system_locked` 接 `sys_pll_lock`。
+  - wrapper 的 `cfg_done` 只读接现有 `ddr_inst_CFG_DONE`；wrapper 的 `cfg_start/cfg_sel/cfg_reset` 接独立 unused wire。现有视频状态机继续唯一驱动 `ddr_inst_CFG_START/RST/SEL`，关闭双驱动风险。
+  - UART0 中断接 `userInterruptA`；未使用 `userInterruptB-H` 明确拉低。`io_peripheralReset`、`io_systemReset` 保持 QCRV32 硬核输出到 fabric 的方向，不互相环回。
+  - 摄像头、framebuffer、AXI0、Debayer、feature tap、白平衡和 HDMI 像素链未修改。
+- `constrain.sdc` 实际修改：
+  - 删除 81 处已关闭 `axi1_*` 约束、4 处 `CLK_5M` 引用、3 处旧 `pll_inst1_CLKOUT0` 引用。
+  - 新增 `soc_system_clk` 1.684ns（594MHz）与 `soc_memory_clk` 4.209ns（237.6MHz）时钟定义。
+  - 保留现有 CSI recovered-clock 异步约束、AXI0、MIPI、HDMI及项目后加约束；未机械重生成或覆盖整份文件。
+- 静态验证：
+  - wrapper/instance 端口：`63/63`，missing=0、extra=0、duplicate=0。
+  - `top.v` 与 `constrain.sdc` 中 `axi1_`、`CLK_5M`、`pll_inst1_CLKOUT0`、`jtag_inst2_` 残留均为 0。
+  - 关键 `.peri.xml` 硬接口方向核对通过；与修改前 `top.v` 的 `git diff --no-index` 仅出现顶层端口、SoC实例、中断拉低和 AXI1 复位删除，视频处理主体无差分。
+  - 本机无 `iverilog`、`verilator`、`vlog`；按门禁未运行 `efx_map`、PNR、bitstream 或烧录。
+- 当前哈希：
+  - 联合副本 `src/top.v`：`E79CB53A9960455B3B033AC2C329E90FCF81F3299BD36AA5C34DA221F6CB6834`。
+  - 联合副本 `constrain.sdc`：`3C0A58F318A3981984D7C544F26F9844FE85E27E680BDFA4C17B0988D0360994`。
+  - 联合副本 `mem_test.peri.xml` 未手改，仍为 `5B530FD3F7FCDAEE1F6429482DE275C1014CB40988662A57926768E7A38B424D`。
+- 未修改/未同步证明：
+  - 原烧录基线 `D:\TJ375N529_SC431HAI2LCD_Demo_V3\src\top.v` 仍为 `746BAD51743E46DBCD2D89DBFF8CED3A89F00999DF0B5312B62A2D00B1C5D343`。
+  - 原烧录基线 `constrain.sdc` 仍为 `B6E30866ED09CADCA083FCE4D7A2D831A90E3C0E689CBB4D3B97369874AE316D`。
+  - 未同步 `competition_project_single_camera` RTL/SDC；该目录本轮只更新本工作日志。
+- 已知风险：生成 IP 的内部 LPDDR4-init `cfg_count` 没有显式复位，这是官方生成 RTL 现状；禁止手改生成物。若后续 CPU 无法解除 reset，需结合官方例程、Map warning 和板级 UART/JTAG现象做最小诊断。
+- 结果：`TOP-LEVEL STATIC ADAPTER PASS / MAP-PNR-BOARD NOT VERIFIED`。本结果不表示 CPU 已启动、UART 已输出、视频与 CPU 已联合上板或时序已签核。
+- 下一步人工门：用户在联合实验副本运行 Efinity 综合/Map；回传完整 error/warning。Map 通过后再运行 PNR，并记录 Setup/Hold、CDC、4项既有 MIPI/LVDS warning和新增 warning；通过后才生成联合 bitstream，首先回归 J48/ch0 HDMI，确认摄像头画面不退化，再进行 SW2 reset、UART0 Hello/JTAG 验证。通过之前不得覆盖原 D 盘烧录基线或同步正式候选 RTL。
+
+### [M2-27] 首次联合 Map PASS 与 Debugger USER2 冲突修复
+
+- 时间：2026-07-15 21:46（Asia/Shanghai）。
+- 用户执行：在联合实验副本运行 Efinity automated flow。综合/Map 本体完成，随后 Debugger Step 3 `Instantiate Jtag` 失败。
+- Map 真实结果：
+  - `EFX_MAP` 完成，用时 `38.5929642s`。
+  - 资源：`EFX_ADD=2065`、`EFX_LUT4=11204`、`EFX_FF=9957`、`EFX_RAM10=165`、`EFX_DPRAM10=4`。
+  - 2026-07-15 21:39:54 本轮 `mem_test.err.log` 没有新增 RTL/elaboration error；旧日志中历史 `feature_stats_tap` error 不属于本轮。
+  - post-synthesis netlist 报告 118 条 warning，尚未逐项关闭，不得整体写成可忽略。
+- Debugger 失败原文：`Jtag resource = JTAG_USER2 has been occupied`，`efx_pt_jtag_util.py --action add --jtag_user JTAG_USER2` 返回 exit code 3。
+- 根因审计：
+  - 原视频工程 `jtag_inst1` 已占用 `JTAG_USER1`。
+  - Hard SoC 的 `soc_jtag_inst1` 已占用 `JTAG_USER2`，用于 QCRV32 USER TAP。
+  - `mem_test.xml` 仍设置 `debugger.auto_instantiation=on`，旧 `debug_profile.wizard.json` 也指定 `USER2`，导致综合后 Debugger 再次申请已被 CPU 占用的 USER2。
+  - USER1/USER2 均已有合法用途，不能把 CPU 移到 USER1，也不能让 Debugger覆盖 USER2。
+- 修改前工程外备份：`C:\Users\20306\Desktop\赛题资料\CICC_backups\TJ375N529_cpu_video_joint\20260715_214613_pre_disable_autodebug`；备份 `mem_test.xml` SHA-256 为 `21AC8C2E161E86F3021CEDD54BC113DD193B6278BF4188D3A5D87588EE1AEFA7`，清单见同目录 `BACKUP_MANIFEST.md`。
+- 实际修复：仅将联合实验副本 `mem_test.xml` 的 `<efx:param name="auto_instantiation" value="on" .../>` 改为 `value="off"`。保留 debugger profile 文件但自动流程不再插入 Debugger JTAG。
+- 修复验证：
+  - XML 解析 PASS，`AUTO_INSTANTIATION=off`。
+  - 与备份的差分只有该单字段 `on -> off`。
+  - 新 `mem_test.xml` SHA-256：`394685F36E7B0A6301C9E9C03A195357B7DE10CC058DBBECA566901E1FC8CDC6`。
+  - `mem_test.peri.xml` 仍为 `5B530FD3F7FCDAEE1F6429482DE275C1014CB40988662A57926768E7A38B424D`。
+  - `src/top.v` 仍为 `E79CB53A9960455B3B033AC2C329E90FCF81F3299BD36AA5C34DA221F6CB6834`。
+  - `constrain.sdc` 仍为 `3C0A58F318A3981984D7C544F26F9844FE85E27E680BDFA4C17B0988D0360994`。
+- 未修改边界：未改 `mem_test.peri.xml`、Hard SoC生成 IP、USER1/USER2资源、视频 RTL、时钟复位、约束或原 D 盘烧录基线；未同步正式候选工程。
+- 结果：`MAP PASS / DEBUGGER RESOURCE CONFLICT ROOT-CAUSED AND CONFIG FIXED / PNR NOT VERIFIED`。
+- 下一步人工门：重新打开联合实验副本并运行正常 automated flow。预期不再出现 `Start Debugger Step Instantiate Jtag`；必须继续取得 PNR、Setup/Hold、CDC和warning结果。若流程仍进入 Debugger Step 3或出现新的 error，立即停止并回传完整尾部日志；暂不烧录。
+
+### [M2-28] 联合 PNR/bitstream PASS 与 J48/ch0 HDMI 板级回归
+
+- 时间：2026-07-15 22:03（Asia/Shanghai）。
+- 用户执行：关闭 Debugger自动实例化后重新运行联合实验工程 automated flow，生成新 bitstream，并在板上烧录后回传 J48/ch0 HDMI 实拍。
+- 构建结果：
+  - Map、placement、routing、STA和bitstream generation均完成。
+  - `outflow/mem_test.bit` 时间为 2026-07-15 21:50:58，SHA-256：`AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`。
+  - `outflow/mem_test.hex` 时间为 2026-07-15 21:51:02；bitstream generator 正常结束。
+- 最终时序：
+  - 最差 Setup Slack：`+1.742ns`，路径位于生成的 Hard SoC UART/AXI peripheral wrapper，时钟为 `axi0_ACLK=200MHz`。
+  - 最差 Hold Slack：`+0.018ns`，时钟为 `axi0_ACLK=200MHz`。
+  - 所有 Clock Relationship Summary 中列出的 Setup/Hold slack 均为非负；本次没有时序违例。
+  - STA报告未列出 `soc_system_clk`/`soc_memory_clk` 的 fabric数据路径，因为它们直接驱动 QCRV32硬核；Interface/Periphery最终报告已确认 `soc_system_clk=594MHz`、`soc_memory_clk=237.6MHz`。
+- CDC：`outflow/mem_test.cdc.rpt` 明确为 `No Synchronizer warnings to report.`。
+- Interface/Periphery：QCRV32 `SOC_0` 已进入最终报告；只保留与原视频基线相同的4项 `mipi_ln_rule_*_distance` / `lvds_rule_tx_distance` warning。本条只记录其为既有项，不将其从风险清单删除。
+- 板级视频证据：
+  - 用户实拍：`C:\Users\20306\AppData\Local\Temp\codex-clipboard-79d27dce-11c1-47e0-baf7-ebf840424b3f.png`，SHA-256：`412CEE704039DF063CBCFBFBE56003A37BF1EFFD1C13C39CB8A81A7C946D9659`。
+  - 画面中五个不同颜色方块均可见，J48/ch0 HDMI有真实摄像头输出，未出现黑屏、花屏、整帧冻结或颜色通道完全错位。
+  - 成像仍存在暗部、轻微偏色、右侧拖影与白色高光过曝；这些属于此前成像质量问题，当前只判定视频链路未因 Hard SoC 接入回退，不判定识别精度或图像质量已经达标。
+- 结果：`M0 VIDEO REGRESSION PASS + HARD SOC PNR/BITSTREAM PASS / CPU EXECUTION NOT YET VERIFIED`。
+- CPU下一门审计：生成 BSP 的片上 RAM 为 `SYSTEM_RAM_A=0xF9000000/16KB`，UART0为 `0xE8010000/115200`。首个 UART Hello 必须使用生成的 `default_i.ld`（片上 RAM），不能使用指向 `0x00001000/324KB` 的 `default.ld`；不得修改生成 linker。当前仍未生成/加载 Hello ELF，未证明 CPU 已取指、JTAG可调试或UART有输出。
+- 下一步门禁：关闭 Efinity 后，在联合实验副本旁创建独立最小 UART Hello 应用，复用生成 BSP和 `default_i.ld`，先做构建与 ELF/段地址审计；用户再通过 QCRV32 USER2 JTAG加载到片上 RAM并观察 UART0。此阶段不接机械臂、不迁移识别主循环、不同步原烧录基线。
+
+### [M2-29] QCRV32 片上 RAM UART0 Hello 构建闭环
+
+- 时间：2026-07-15，用户确认Efinity关闭后执行。
+- 适用范围：仅CPU取指与UART0收发验证；不访问视觉特征、OSD、外部DDR、UART2或myCobot。
+- 工具链：Efinity RISC-V IDE 2025.2自带 `riscv-none-embed-gcc 8.3.0` 与 GNU Make 4.2.1。
+- 官方生成物审计：
+  - `soc.h`：片上RAM `0xF9000000/16KB`，UART0 `0xE8010000`，peripheral/CLINT频率200MHz。
+  - 生成的 `default_i.ld` 指向片上RAM，适合本次Hello；`default.ld` 指向旧 `0x00001000/324KB`，禁止使用。
+  - 官方 `start.S` 在 `-DSMP` 下只允许hart0进入`main`，其余hart等待，因此保留`-DSMP`避免四核重复打印。
+- 新建独立应用：`D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500\cpu_bringup\uart_hello_onchip`。
+- 文件：
+  - `src/main.c`：只配置UART0为115200 8N1，打印唯一横幅并轮询回显。
+  - `makefile`：固定生成BSP、`default_i.ld`、`-DSMP -Wall -Wextra -Werror`。
+  - `build.ps1`：固定2025.2工具链，构建后自动审计唯一LOAD段、片上RAM边界和未解析符号。
+  - `README.md`：中文构建与上板边界。
+- 首次构建结果：严格`-Werror`因官方生成`bsp.h`包含的`semihosting.h/print.h/uart.h/clint.h`自身注释与未使用静态函数warning失败；Hello业务代码没有报错。未通过关闭`-Werror`规避。
+- 最小修复：Hello只包含生成的干净地址真源`soc.h`，局部实现官方UART寄存器语义；未修改任何生成BSP头文件、driver或linker。
+- 最终构建：PASS。
+  - ELF：`build/uart_hello_onchip.elf`，SHA-256 `30A499F5EA2E91AF531FA3991EEB8F2CC9757847E27977EE8238060ADF7A2757`。
+  - Entry：`0xF9000000`。
+  - 唯一LOAD段：`0xF9000000..0xF9000A2F`，MemSiz `0xA30=2608B`，占16KB的15.92%。
+  - `ELF_LOAD_AUDIT=PASS`，没有未解析符号；`_sp=0xF9000A30`。
+  - HEX SHA-256：`8F4AF6178128CB72CD84DB5B0F048B1A35B7939DC045A08EB461F51E052616F4`。
+  - BIN SHA-256：`C4C499DECD9349770C1703C2056825C25D02147FA95656CBA4A7EE80D6A76647`。
+- UART候选：只读枚举为COM9/COM10/COM13，均为FTDI `VID:PID=0403:6011`不同通道；尚未从资料锁定E9/E10对应的唯一COM，禁止猜测后向机械臂通道发送数据。
+- 用户操作说明：`competition_project_single_camera/docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`。
+- 结果：`UART HELLO ELF BUILD/ADDRESS AUDIT PASS / USER2 JTAG LOAD AND UART BOARD OUTPUT NOT VERIFIED`。
+- 下一步门禁：用户在Efinity RISC-V IDE中新建TJ375/QCRV32硬件Debug配置，ELF选择上述文件，JTAG必须是FPGA USER2，只下载到RAM、不写Flash；每到Target/JTAG关键页先截图确认。看到完整横幅并成功回显一个字符后，才允许记录CPU执行与UART0 PASS。
+
+### [M2-30] 关机后恢复检查与 CPU Hello 续跑入口
+
+- 时间：2026-07-15（Asia/Shanghai），用户要求从暂停点继续。
+- 交接健康检查：运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\agent_handoff_health_check.ps1`，结果 PASS；唯一 warning 为本机未安装 `pymycobot`，与本轮 CPU/UART0 测试无关，不安装、不连接机械臂。
+- 联合 bitstream 复核：`D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500\outflow\mem_test.bit` SHA-256 仍为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`，与已通过 J48/ch0 HDMI 回归的联合位流一致。
+- Hello ELF 复核：`D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500\cpu_bringup\uart_hello_onchip\build\uart_hello_onchip.elf` SHA-256 仍为 `30A499F5EA2E91AF531FA3991EEB8F2CC9757847E27977EE8238060ADF7A2757`，与已通过片上 RAM 地址审计的 ELF 一致。
+- 恢复时只读枚举结果：未发现 COM 端口；未发现 Efinity/RISC-V IDE/OpenOCD 进程。该现象与关机后板卡或 JTAG-IF USB 尚未重新连接/上电一致，但尚未做物理确认，不据此诊断硬件故障。
+- 未修改边界：未修改联合副本、原 D 盘烧录基线、正式候选 RTL/SDC/XML、生成 BSP/linker、bitstream 或 ELF；未同步联合副本到正式候选工程。
+- 结果：`RECOVERY HEALTH CHECK PASS / BITSTREAM+ELF HASH MATCH / BOARD UART PORTS NOT ENUMERATED`。
+- 下一步门禁：重新连接并上电开发板/JTAG-IF USB，确认 COM 端口重新出现后，在 Efinity RISC-V IDE 中建立 TJ375/QCRV32 硬件 Debug 配置；只通过 FPGA `USER2` 将上述 ELF 下载到片上 RAM `0xF9000000`。禁止 USER1、Flash erase/program、外部 DDR 初始化和机械臂连接。每到 Target/JTAG 关键页面先截图确认。
+
+### [M2-31] 板卡不在场后的离线 softTap/FTDI 审计
+
+- 时间：2026-07-15（Asia/Shanghai）。
+- 用户现场边界：用户明确开发板当前不在身边。因此停止 CPU Hello 板级操作，不把无 COM 端口误判为硬件故障，不越过 `CPU EXECUTION + UART0` 验收门。
+- 进程处理：终止正在运行的官方资料检索并关闭本轮启动的 Efinity RISC-V IDE；复核结果为 `IDE_CLOSED`。未启动 OpenOCD、GDB或串口发送。
+- UART 引脚复核：联合副本 `mem_test.peri.xml` 中 `system_uart_0_io_rxd=GPIOR_165`、`system_uart_0_io_txd=GPIOR_145`、3.3V LVCMOS；官方 TJ375 RISC-V工程使用相同 GPIO 方向组合。该项只证明 SoC UART0 GPIO 选择与官方方法一致，不证明板级串口已通。
+- FTDI 历史枚举：Windows 注册表只读记录为子接口 A=`COM9`、C=`COM10`、D=`COM13`，均属于同一 FTDI `VID:PID=0403:6011`；B没有 COM记录。尚无原理图证据把 A/C/D 中某个端口唯一对应到 E9/E10，因此仍执行“先监听横幅，确认后才发单字符”的规则。
+- OpenOCD审计：
+  - 联合 BSP `external.cfg` 使用 FTDI `VID:PID=0403:6011` channel 0。
+  - 联合 BSP `debug_softTap.cfg` 为4核QCRV32创建 USER TAP调试目标，work area为 `0xF9000000`，启动时仅halt目标。
+  - 同一生成配置仍保留模板旧值 `instr_addr=0x00001000`；不得让该值覆盖已审计 ELF 的 `_start=0xF9000000`。
+- 官方 launch审计：TJ375官方 `uartEchoDemo_softTap.launch` 使用 `Debug in RAM`、加载ELF和symbols、OpenOCD `external.cfg + debug_softTap.cfg`、停在`main`；未包含Flash program/erase命令。但它绑定旧Eclipse项目和旧绝对路径，未原样复制，也未在无板状态下伪造联合 `.launch`。
+- 文档更新：本次同步更新 `CURRENT_STATE.md` 和 `docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`，明确板卡阻塞、softTap配置事实、`0x00001000`停止条件和FTDI证据边界。
+- 未修改边界：未修改联合副本的 FPGA/SoC/CPU 源码、生成BSP/OpenOCD配置、工程XML、SDC、bitstream或ELF；未修改原D盘烧录基线；未同步正式候选RTL；未连接机械臂。
+- 结果：`OFFLINE DEBUG FLOW AUDITED / BOARD GATE PAUSED / CPU EXECUTION + UART0 NOT VERIFIED`。
+- 下一步门禁：开发板可用后先重新枚举端口并确认联合 bitstream仍在板上；启动RISC-V IDE后逐页确认当前BSP、QCRV32、USER2、Debug in RAM、ELF入口`0xF9000000`。看到完整横幅后才确定UART0 COM并发送一个ASCII字符做回显。通过前不迁移识别主循环，不同步联合改动到正式候选工程。
+
+### [M2-32] 个人分支上传与队友合并交接说明
+
+- 时间：2026-07-15（Asia/Shanghai）。
+- 用户目标：准备把联合实验成果整理到个人分支，并输出一份供队友合并使用的中文说明。
+- 审查结论：联合副本可以作为 `WIP/联合SoC候选版` 迁入 `competition_project_single_camera/` 并上传个人分支；CPU Hello尚未通过USER2 JTAG和UART0板级验证，因此不得标记为正式闭环或替代 `final_project/`。
+- 分支建议：旧 `dev/libaoxun688` 相对当前 `main` 已落后较多，建议从最新 `main` 新建 `dev/libaoxun688-single-camera-soc-wip`，不要在当前共享脏工作树中盲目切换或清理。
+- 差分审计：候选工程与联合副本的 `feature_stats_tap.v`、`frame_buffer.v`、`frame_info_det.v` 哈希已经一致；待迁移的系统层为 `mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、Hard SoC IP/BSP以及UART0 Hello可复现源码。
+- 上传边界：提交源码、工程真源、必要生成IP、最小BSP依赖、测试和文档；禁止提交 `outflow/work_*`、bit/hex/elf/bin、数据库、报告日志、`.metadata`、IP pickle缓存、`.mcp.json`和工程外备份。
+- 新增交接：`docs/review_packets/m2_single_camera_soc_branch_merge_handoff_20260715.md`。文档包含分支策略、白名单/黑名单、四个系统文件冲突规则、合并前检查、Gate A-D验证顺序、停止条件、回退方式和PR描述模板。
+- 系统文件门：`mem_test.peri.xml` 禁止逐行拼接；`mem_test.xml` 必须同时保留feature tap、Hard SoC登记和`auto_instantiation=off`；`top.v`禁止ours/theirs盲选；SDC必须与顶层和periphery同批审查。
+- 未执行：本条只生成合并交接文档，尚未把联合副本覆盖到候选工程，尚未新建/切换/提交/推送分支，也未运行新的Efinity构建或上板操作。
+- 结果：`TEAM MERGE HANDOFF WRITTEN / WIP UPLOAD BOUNDARY FROZEN / MIGRATION AND COMMIT NOT YET EXECUTED`。
+- 下一步：按交接文档建立新个人分支并执行白名单迁移；迁移后先做Git差分和工程完整性审查，再决定是否提交。CPU Hello上板门仍保持 `NOT VERIFIED`。
