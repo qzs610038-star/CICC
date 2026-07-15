@@ -2,7 +2,7 @@
   CPU 端 6 大模块开发计划（识别侧 + 固定点抓取授权）
   项目: 第十届集创赛 · TJ375N529 FPGA + myCobot 280
   平台: QCRV32 RISC-V 软核 · baremetal C · riscv-none-embed-gcc 8.3.0
-  更新: 2026-07-14（整合队友 CPU 安全补测与 Fable 16-bit 事件契约；板级闭环仍待验证）
+  更新: 2026-07-15（整合 wsc 统一语义层与跨编译器门；板级闭环仍待验证）
 ================================================================================
 
 先看这里：2026-07-12 决赛真实状态（不是代码完成度）
@@ -55,6 +55,11 @@
                           8 项 Host 聚合 5758/5758（见下方“B 线 8 项 Host 回归复跑”块）/
                           main 与板级事件未接入
   [6] main              ⚠️ 已有 matcher 锁定/错误锁存占位 / 未接 round_controller、arm_controller / 未上板
+  [7] cpu_result_semantics ✅ 统一结果/理由展示语义层（2026-07-14 Gate 通过版：
+                          纯语义头/适配头拆分、理由码细分、任务模式相关 SIZE 转换、
+                          (action+reason+is_target) 完整合法组合校验、矛盾组合安全兜底；
+                          实现完成，Gate 通过，待后续接入）/ 转换层，不含 APB/寄存器映射 /
+                          未接 main、OSD、板级
 
   注：本文件中的“代码完成”只表示当前 C 源码与已归档测试记录；不表示已生成
       `soc.h`、已锁定 APB 地址、已完成 FPGA CDC/OSD、已生成 bitstream 或已上板。
@@ -93,6 +98,106 @@
       不连接或驱动真实机械臂，且使用原生 assert、无可直接相加的断言总数，故未纳入 5758/5758。
     - 旧 795/795、863/863、944/944 仅保留在历史 Review Packet / Git 历史中，不再作为当前 B 线基线。
     - competition_host_flow / a13 的 size 关系仍为 deferred（20 轮流程通过，尺寸判定未在本集合内强验）。
+
+================================================================================
+  [7] cpu_result_semantics —  统一 CPU 结果/理由展示语义层
+      （2026-07-14 新增；同日 Gate 通过版重构）
+================================================================================
+  状态: ✅ 转换层代码 + 独立 Host 测试完成（Gate 通过版）；实现完成，
+        Gate 通过，待后续接入。未接 main / OSD / APB，无板级证据。
+  文件（拆分后）:
+    - app/include/cpu_result_semantics.h          纯语义类型 + 文本接口（仅 <stdint.h>）
+    - app/include/cpu_result_semantics_adapters.h 上游枚举/结构 → 统一语义的转换接口
+    - app/src/cpu_result_semantics.c              纯文本接口实现（无 board_io 依赖）
+    - app/src/cpu_result_semantics_adapters.c     转换 + 组合校验实现
+  测试:
+    - tests/test_cpu_result_semantics.c           主 Host 测试
+    - tests/test_cpu_semantics_pure.c             纯语义头独立编译证明（compile-only）
+    - tests/run_cpu_result_semantics_host.ps1     运行脚本（含纯头独立编译门）
+
+  目的:
+    - 仓库并存两套内部理由枚举：task_matcher.h/round_controller 的
+      reason_code_t/REASON_*，与 competition_tasks.h 的 competition_reason_t/COMP_REASON_*。
+    - 官方细则要求每轮明确输出识别/判断/执行或不执行及理由；后续 OSD/APB 不应
+      直接理解两套内部枚举。本模块提供唯一的寄存器无关展示语义层。
+
+  Gate 通过版关键变更（相对首版）:
+    1. 头文件拆分：纯语义头只依赖 <stdint.h>，可独立编译，不含 board_io.h 的
+       APB 占位 #warning；上游转换接口移入 adapters 头。run 脚本新增“纯头在
+       无 APB 占位宏、不加 -Wno-error=cpp 下严格 compile-only”作为独立性硬门。
+    2. 理由码细分：SIZE_MISMATCH → SIZE_DIFF_NOT_10MM / SIZE_DIFF_OVER_5MM；
+       OBSERVATION_UNAVAILABLE → OBSERVATION_UNKNOWN / OBSERVATION_UNSTABLE /
+       SIZE_UNAVAILABLE；ROUND_TIMEOUT → ACQUIRE_STABILITY_TIMEOUT / ROUND_TIMEOUT。
+    3. competition 侧 COMP_REASON_SIZE_RELATION_MISMATCH 结合任务模式细分：
+       Task3→SIZE_DIFF_NOT_10MM，Task4→SIZE_DIFF_OVER_5MM，其他/无上下文→INVALID_INTERNAL。
+       为此 cpu_reason_from_competition() 增加 competition_task_mode_t 入参。
+    4. 全部公开枚举显式赋值：NONE=0，INVALID_INTERNAL=255（_Static_assert 固定）。
+       并注明这些类型仅用于 CPU 内部语义，不是 APB/OSD wire ABI，禁止直接序列化。
+    5. cpu_display_from_round_output() 改为校验 (action+reason+is_target) 完整组合：
+       仅接受 A/B/C/D 四类合法组合，其余矛盾/非法组合统一安全兜底
+       （valid=1, is_target=0, decision=ERROR, execution=FAULT, reason=INVALID_INTERNAL），
+       绝不输出 REQUESTED 或正常 SKIPPED。阻止/故障分支进一步精确校验 is_target：
+       ARM_NOT_READY / ARM_FAULT 只接受 is_target=1，OPERATOR_ABANDON /
+       STABILITY_TIMEOUT / OBSERVATION_UNKNOWN / TARGET_INVALID 只接受 is_target=0，
+       不匹配即判矛盾并安全兜底（不再透传 is_target）。
+    6. 文本接口非法值一律返回 "INVALID_INTERNAL"（decision/execution 不再返回 "NONE"）。
+
+  统一枚举（显式赋值）:
+    - cpu_reason_t(0..14,255): NONE / TARGET_MATCH / COLOR_MISMATCH / SHAPE_MISMATCH /
+      SIZE_DIFF_NOT_10MM / SIZE_DIFF_OVER_5MM / OBSERVATION_UNKNOWN /
+      OBSERVATION_UNSTABLE / SIZE_UNAVAILABLE / INVALID_TARGET / OPERATOR_ABANDON /
+      ARM_NOT_READY / ARM_FAULT / ACQUIRE_STABILITY_TIMEOUT / ROUND_TIMEOUT /
+      INVALID_INTERNAL(255)。
+    - cpu_decision_t: NONE(0) / EXECUTE(1) / SKIP(2) / ERROR(3)。
+    - cpu_execution_t: NONE(0) / REQUESTED(1) / SKIPPED_NON_TARGET(2) /
+      BLOCKED(3) / FAULT(4)。
+
+  合法 (action + reason + is_target) 组合（is_target 精确匹配 round_controller 输出）:
+    A. GRAB + TARGET_MATCH + is_target=1 → EXECUTE / REQUESTED / TARGET_MATCH
+    B. SKIP + {COLOR|SHAPE|SIZE_NOT_EQ_10MM|SIZE_OUTSIDE_5MM} + is_target=0
+       → SKIP / SKIPPED_NON_TARGET / 细分理由
+    C. NONE + 阻止理由，且 is_target 必须与理由语义一致：
+       - ARM_NOT_READY + is_target=1（保留识别到的目标证据）
+       - OPERATOR_ABANDON / STABILITY_TIMEOUT / OBSERVATION_UNKNOWN /
+         TARGET_INVALID + is_target=0
+       → NONE / BLOCKED / 细分理由
+    D. NONE + ARM_FAULT + is_target=1 → NONE / FAULT / ARM_FAULT
+    其余（含阻止/故障理由配错误 is_target）→ 安全错误兜底（见上）。上述组合精确
+    匹配 round_controller 已知输出集合（非超集）：真实轮次全部命中，任何理由配
+    错误 is_target 一律判为矛盾，Gate 通过，待后续接入。
+
+  转换:
+    - cpu_reason_from_reason_code() / cpu_reason_from_competition(reason, mode)：
+      显式 switch 映射；未知/越界值一律 → INVALID_INTERNAL（无数组索引，不越界，
+      绝不默认解释成目标）。
+    - cpu_display_from_round_output()：round_controller_output_t → cpu_display_result_t。
+      out=NULL 或 result_valid=0 → 安全空结果；display=NULL → 安全 no-op。
+    - cpu_reason_text/decision_text/execution_text：OSD/日志用文本，含非法值兜底。
+
+  验证（2026-07-14 复跑；本机 repo mingw64 gcc 14.2.0 + Efinity RISC-V GCC 8.3.0）:
+    - test_cpu_result_semantics（-Wall -Wextra -Werror -Wno-error=cpp，只放行 board_io.h
+      soc.h 占位 warning）：374/374 PASS。覆盖两套枚举全部合法值 + 非法/越界 +
+      SIZE_RELATION 任务模式细分（Task3/Task4/无上下文）+ 合法组合矩阵 A/B/C/D +
+      阻止/故障理由 is_target 极性矩阵（每个理由同时覆盖合法与相反 is_target，
+      合法侧 BLOCKED/FAULT、相反侧安全失败）+ 矛盾/非法组合矩阵 15 例（断言
+      ERROR/FAULT/INVALID_INTERNAL，绝不 REQUESTED/SKIPPED）+ result_valid=0 垃圾字段 +
+      NULL 输入/输出 + 文本兜底 + 真实 round_controller 端到端投影（含 SKIP /
+      arm-disabled / arm-enabled / arm-fault / acquire 超时 / operator abandon）。
+    - 纯语义头独立编译门：test_cpu_semantics_pure.c + cpu_result_semantics.c 在
+      无 APB 占位宏、不加 -Wno-error=cpp 的严格 compile-only 下通过（无 board_io/APB 占位
+      warning 输出），证明纯头独立于 board_io/APB。
+    - round_controller 回归重跑 4979/4979 PASS（未改 round_controller.c/.h，无回退）。
+    - cpu_result_semantics.c（rv32imac/ilp32，无占位 warning）与
+      cpu_result_semantics_adapters.c（占位宏 + 仅 board_io 占位 warning）均通过
+      Efinity RISC-V GCC 8.3.0 compile-only（-c，exit 0）。
+    - MSVC /W4 /WX 本机不可用（未安装），run 脚本保留 MSVC 主路径 + mingw64 兜底。
+
+  未闭环边界:
+    - 未接入 main.c、OSD 渲染或 APB 打包；本轮只建转换层。
+    - 未定义任何 APB 地址/寄存器位布局；硬件映射留给后续适配层。统一枚举非 wire ABI。
+    - 未新增 REASON_ARM_TIMEOUT，未改 round_controller 既有理由语义；主动故障与
+      机械臂等待超时在本层仍同映射 ARM_FAULT→FAULT，是否拆分留待 Codex 决定。
+    - 无真实摄像头 / 机械臂 / 板级证据。
 
 ================================================================================
   2026-07-12 Claude 下一步执行包（先做 Host 层，不碰硬件）
@@ -884,5 +989,64 @@
     - trap/interrupt handler 当前仍是 halt 占位。
     - 首版固件按全轮询模型设计；timer/UART 中断服务不是当前能力。
     - 若后续为了机械臂 UART 或周期调度启用中断，必须单独提交 Review Packet。
+
+================================================================================
+  [8] main_loop_adapter — ARM_DISABLED Host/mock 主循环适配器
+      （2026-07-14 Gate APPROVE）
+================================================================================
+  状态: ✅ 代码完成 + Host 测试通过（Gate APPROVE）；未接 APB/OSD wire ABI、UART2、真实机械臂、
+        板级闭环。Gate 通过，待后续接入。
+  文件:
+    - app/include/main_loop_adapter.h         候选 ARM_DISABLED 单步适配器接口（G4 事件源/时基前仅 Host 覆盖）
+    - app/src/main_loop_adapter.c             适配器实现（事件注入 + 观测注入 + ARM_DISABLED 安全门 + 返回值语义）
+
+  三个 P1 修复（相对首版 main.c 内联代码）:
+    P1-1: 抽出 main_loop_arm_disabled_step() 为独立函数，Host 测试直接链接同一份 .c。
+          2026-07-15 融合后，正式 main.c 保留 arm_runtime structural bridge；在 G4
+          取得受审事件源/单调时基前不调用该 adapter，禁止恢复旧 UART/CLINT 注入。
+    P1-2: 只在 event==REMOVE_CONFIRM && ACK_ACCEPTED 时返回 1（ABANDON 不冒充 REMOVE）；
+          SESSION_RESET 返回 -1 触发全部重新初始化。
+    P1-3: SKIP reason 不再硬编码 COLOR_MISMATCH。task_matcher_evaluate() 内部
+          _return_match() 保存完整 task_match_result_t（action/is_target/reason/mode），
+          main.c 通过 task_matcher_get_last_match() 获取真实 reason（color/shape/size 四类）。
+
+  返回语义:
+    1  → REMOVE_CONFIRM 被接受 → 调用方执行 task_matcher_next_round()
+    -1 → SESSION_RESET 被接受   → 调用方执行 round_controller_init + matcher_round_reset()
+    0  → 正常 tick（含 ABANDON 被接受也不触发解锁）
+
+  验证（2026-07-14 复跑；本机 repo mingw64 gcc 14.2.0）:
+    - test_main_loop_arm_disabled（-Wall -Wextra -Werror -Wno-error=cpp）：
+      **117/117 PASS**（16 测试，含 T1-T4 真实 SKIP reason、T5 task_matcher 真值、
+      T6 ARM_NOT_READY、T7 ABANDON 不触发解锁、T8 REMOVE 唯一触发解锁、
+      T9 SESSION_RESET 触发重初始化、T10 acquire 超时、
+      T11-T14 event_seq 重复/倒退/回绕/delta=32768、T15 5 轮序列、T16 NULL 安全）
+    - test_cpu_result_semantics（同门）：**374/374 PASS**（回退无）
+    - round_controller MinGW gcc 回归（同门）：**4979/4979 PASS**（回退无）
+    - test_task_matcher（同门）：**154/154 PASS**（回退无）
+    - RISC-V compile-only（Efinity riscv-none-embed-gcc 8.3.0，rv32imac/ilp32，-c）：
+      main.c exit 0、main_loop_adapter.c exit 0、task_matcher.c exit 0、
+      cpu_result_semantics.c exit 0（仅既有 board_io.h:26 soc.h/APB 占位 warning，
+      由 -Wno-error=cpp 放行）
+    - git diff --check：pass
+
+  未闭环边界:
+    - 未接入 OSD/APB wire ABI；未定义任何 APB 地址/寄存器位布局
+    - 未接 arm_controller_request_*、UART2、myCobot transport
+    - 不连接或驱动真实机械臂
+    - 无板级证据
+    - MSVC /W4 /WX 本机不可用（未实跑主路径；run 脚本保留 MSVC + mingw64 兜底）
+
+================================================================================
+  明日优先事项（2026-07-14 收尾记录）
+================================================================================
+  1. 明天继续保持 ARM_DISABLED（arm_enabled=0，不连接或驱动机械臂）。
+  2. 先准备 APB/OSD 结果打包设计（cpu_display_result_t → APB/OSD 寄存器字段语义映射），
+     作为下一步接入前的独立设计 Review Packet。
+  3. 在 soc.h/APB/OSD 联合 Review Packet 到位前：
+     - 不定义 APB/OSD wire ABI
+     - 不接 UART2
+     - 不连接或驱动机械臂
+  4. 上述门禁通过后，再进入 ARM_DISABLED → ARM_ENABLED 过渡的最小接入编码。
 
 ================================================================================

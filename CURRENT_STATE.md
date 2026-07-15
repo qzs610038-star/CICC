@@ -27,9 +27,33 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
+  - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
+  - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。
+  - 接入结论：同步 main 后丢失的状态口径已纠正。正式 `main.c` 现在消费 `cpu_display_from_round_output()`，以统一语义层校验 action/reason/is_target 并对矛盾组合 fail closed；`main_loop_adapter.c` 已进入 competition 目标构建清单，但在 G4 取得受审事件源和单调时基前不由正式 main 调用。禁止恢复 wsc 旧版未受审 UART 单字符事件和直接 CLINT 假设。
+  - 目标构建：Efinity RISC-V GCC 8.3.0 对 `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS，制品继续标记 `NOT_FOR_FLASH`，UART2/real transport 继续被排除；构建器同时修复 Windows PowerShell 原生 stderr 被提前升级为异常、导致完整 gcc 诊断丢失的问题，warning allowlist 与退出码门保持不变。
+  - 环境差异记录：wsc 原环境报告 MinGW GCC 14.2.0 下 `374/374`、`117/117` PASS；Codex 修复前在 MSVC `/W4 /WX` 因 C4456 于断言执行前失败。该差异由警告策略不对称暴露了真实测试可移植性问题，不构成 CPU 功能逻辑失败。Codex 本机无 PATH gcc、也无仓库 `tools/mingw64/bin/gcc.exe`，带 `-Wshadow` 的 GCC 复验仍需 wsc 在其环境执行。
+  - 替代旧结论：替代下方 2026-07-14 条目中“main.c 与 Host 测试链接同一 main_loop_adapter 实现”和“MSVC 本机不可用”的旧口径；旧 Host 结果保留为 wsc 原环境证据，不再描述当前正式 main 接入状态。
+  - 证据路径：`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/build_tools/build_arm_profile.ps1`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/docs/review_packets/wsc_cpu_mycobot_integration_acceptance_20260715.md`。
+  - 下一门：由 wsc 在同一集成 commit 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
+  - 失效条件：集成 commit、语义枚举、main/adapter 接法、构建源码清单、编译器 flags 或目标工具链发生变化，或任一回归失败。
+
+- 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑与独立复核）
+  - 适用范围：PC 端 180°候选五点路径真机初步验证，以及它与板上 CPU G4–G11 路线的边界；不表示官方 180°/最大臂展验收、板上 UART2 或比赛抓放已经闭环。
+  - 分支基线：本地 `main` 已通过 fast-forward 与 `origin/main@39e8a92` 对齐，并从该提交创建 `codex/mycobot-experiment-main-sync-20260714`。原有 `.claude/settings.local.json` 与 `.agents/handoff/`、`.agents/shared/` 仅作为本机状态原样保留，不纳入本分支提交。
+  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变。PC 端真机 A 路线候选路径初步验证为 `PASS_WITH_RISKS`：最新 `auto_run_20260714_204908.log` 在 `COM9` 完成 5/5 连续流程、0 轮人工扶正，日志未记录异常；但这不是官方目标位或板上闭环验收。候选点内部坐标方位差为 177.72°，pick/drop 平面半径约 223.5/223.0 mm；没有外部 180°基准或“臂展最大处”证据。
+  - **已知风险点（板上移植前必须解决）**：
+    1. **drop_hover 长距离过渡固件系统性不收敛**：最新 5/5 轮 step 6 固件均返回 0（未收敛或超时），靠“读实际角度 → max_diff=2.02° ≤ 3° → 软通过”兜底才没熔断。板上 RISC-V 移植时必须实现 `get_angles` 读回 + 3° 容差判断；读回不稳定时该点位不可放行动作。
+    2. **夹爪完全开环，无任何到位反馈**：最新 5 轮 × 每轮 3 次夹爪动作共 15 次 `[GRIP_UNVERIFIED]`，0.8s 是纯定时经验值。板上移植时 0x66/0x67 无 ACK，必须用 0x69 轮询停止 + 0x65 读位置窗口确认；位置读回仍不能单独证明夹持力或未滑落。
+    3. **外部几何与结构风险未关闭**：点位 JSON 无 `external_reference`；内部 177.72°不能替代台面外部量角，约 223 mm 半径未确认是“臂展最大处”。E3 被跳过，本次重复成功只证明当次条件下可运行，不能反推底座刚性风险已关闭。
+  - **E3/E4 状态（2026-07-14 用户决策 + Codex 复核）**：现场因硬件条件跳过 E3 后完成 PC 真机候选路径验证，E4 记为 `PASS_WITH_RISKS`，E3 仍为 `NOT_VERIFIED`。本结果允许明日推进 G4 正式 SoC/PNR、G5 断臂板上模拟和 D2 UART2 无臂回环；不得直接放行真实机械臂接线或动作。
+  - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
+  - 证据路径：`final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`、`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、本机忽略日志 `mycobot_pc_tests/audit_logs/auto_run_20260714_204908.log`（SHA-256 `EB89B99A...F9F475`）、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`。
+  - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
+
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
   - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
-  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
+  - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已通过合并提交 `81657c4` 进入 `origin/main@39e8a92`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。
   - 检查点结果：MSVC `/W4 /WX` 的 disabled/simulated runtime Host 回归均 PASS；严格 QEMU 两后端 PASS，`scratchpad.lds` 已与 `_start` 统一，逐步编译/链接均检查退出码，1 秒无限循环固件超时注入 PASS。RISC-V `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS；disabled bring-up 现包含固定交错 20 轮零请求自检，未通过放宽 `round_controller_tick` 门规避。`-BoardBuild` 现在在创建输出目录前 fail closed；manifest v2 记录规范构建入口、输入/制品 SHA-256、完整 flags、warning policy，Makefile 仅是该 PowerShell 构建器的薄包装。
   - Gate 状态：G0 PASS；G1 PASS（仅 G0–G3 的 standalone/NOT_FOR_FLASH 构建隔离）；G2 PASS（**structural bridge only**：无受审事件源、无真实时基，legacy matcher 不再冒充逐轮机械臂事务）；G3 PASS（纯软件证据）。G4、正式 SoC/PNR/部署、烧录、J52 和真实机械臂继续 NO-GO。
   - 集成边界：上述代码/脚本已进入 `main` 的软件基线，但只证明 G0–G3 的 Host/QEMU/NOT_FOR_FLASH 软件门；本轮未修改 FPGA、未烧录、未连接 J52/机械臂、未产生 UART2 或动作帧，不能据此宣称 G4 或板级闭环。
@@ -61,6 +85,45 @@
   - FPGA 构建：Efinity 2025.2 production/default map PASS，资源为 `EFX_ADD=2081`、`EFX_LUT4=11939`、`EFX_FF=10492`、`EFX_RAM10=250`、`EFX_DPRAM10=8`；`mem_test.warn.log` 137 行，不能标记为可忽略。PNR 仍 FAIL：2288 个 IO 无 placement，随后 `!available_io_sites.empty(): outpad` 断言失败；无可验收 bitstream/STA。显式 `COMPETITION_DEBUG_SYNTHETIC=1` 的 debug map 也 PASS，资源回到 ADD 1827、LUT4 10339、FF 7991、RAM10 154，warning 日志 138 行；它只证明合成源入口可显式打开，不能代替 production 或真实视频验收。
   - 证据路径：`final_project/docs/review_packets/cpu_branch_merge_adaptation_20260714.md`、`final_project/cpu/CPU_MODULE_PLAN.txt`、`final_project/cpu/app/src/round_controller.c`、`final_project/cpu/tests/test_round_controller.c`、`final_project/cpu/tests/test_task_matcher.c`、`final_project/fpga/rtl/top/top.v`。
   - 下一步门禁：先修复 Interface Designer/periphery 与顶层 IO 导出边界并重跑 PNR/STA；正式 `soc.h`、APB/CDC/OSD、UART2 D2 回环和真实机械臂 T0 未关闭前，保持 `ARM_DISABLED`，不得连接或驱动机械臂。
+- 日期：2026-07-14，来源 Agent：Claude（Fable 5，cpu_result_semantics 统一语义层 Codex Gate 通过后归档）
+  - 适用范围：`cpu_result_semantics` 统一结果/理由展示语义层（纯语义头 + 适配头拆分、上游枚举→统一语义转换、round_controller_output→cpu_display_result 合法组合精确校验）；不适用于 main.c、OSD/APB wire ABI、板级、UART2、真实机械臂闭环。
+  - 最新结论：cpu_result_semantics 统一语义层已通过 Codex Gate 复审，当前为 Gate 通过版。核心实现：(1) 纯语义头 `cpu_result_semantics.h` 仅依赖 `<stdint.h>`，可独立编译，不含 board_io.h 的 APB 占位 warning；(2) 适配头 `cpu_result_semantics_adapters.h` 提供上游枚举/结构→统一语义的三条转换路径；(3) `cpu_display_from_round_output()` 精确校验 `(action + reason + is_target)` 完整组合，仅接受 A/B/C/D 四类合法组合，阻止/故障分支严格校验 is_target（ARM_NOT_READY/ARM_FAULT 只接受 is_target=1，其余阻止理由只接受 is_target=0），不匹配组合一律安全兜底 ERROR/FAULT/INVALID_INTERNAL，绝不 REQUESTED/正常 SKIP；(4) 全部公开枚举显式赋值，NONE=0，INVALID_INTERNAL=255（`_Static_assert` 固定），并注明仅用于 CPU 内部语义，非 APB/OSD wire ABI，禁止直接序列化。
+  - 替代了哪个旧结论：替代 cpu_result_semantics 首版（未拆分头文件、未精确校验 is_target、理由码未细分、白名单为"超集"的旧口径）；将 CPU_MODULE_PLAN.txt [7] 模块状态从"实现完成，等待 Codex Gate 复审"更新为"Gate 通过，待后续接入"。
+  - 验证（2026-07-14 复跑）：
+    - test_cpu_result_semantics（repo mingw64 gcc 14.2.0，`-Wall -Wextra -Werror -Wno-error=cpp`）：**374/374 PASS**，含纯语义头独立编译门（无 APB 占位宏、不加 `-Wno-error=cpp`，纯 TU 无 board_io warning 输出）。
+    - round_controller MinGW gcc 回归（同门）：**4979/4979 PASS**（round_controller.c/.h 未改，无回退）。
+    - RISC-V compile-only（Efinity riscv-none-embed-gcc 8.3.0，rv32imac/ilp32，`-c`）：cpu_result_semantics.c exit 0，obj 5092，无 warning；cpu_result_semantics_adapters.c exit 0，obj 4292，仅既有 board_io.h:26 soc.h/APB 占位 warning。
+    - `git diff --check`：pass。
+  - 仅有的 warning：既有 `board_io.h:26` 的 soc.h/APB 占位 `#warning`，出现在 adapters TU / round_controller TU（经 vision_classifier.h 传递），由既有 `-Wno-error=cpp` 放行。纯语义头 TU 在严格门下无 warning。其余 warning=0。
+  - 证据路径：`final_project/cpu/app/include/cpu_result_semantics.h`、`final_project/cpu/app/include/cpu_result_semantics_adapters.h`、`final_project/cpu/app/src/cpu_result_semantics.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/tests/test_cpu_result_semantics.c`、`final_project/cpu/tests/test_cpu_semantics_pure.c`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 未完成边界：
+    - 未接入 main.c。
+    - 未接 OSD/APB wire ABI；未定义任何 APB 地址/寄存器位布局；硬件映射留给后续适配层。
+    - 未做板级、UART2、真实机械臂闭环。
+    - 未连接或驱动机械臂。
+    - 本机无 MSVC，`/W4 /WX` 主路径未实跑（run 脚本保留 MSVC 主路径 + mingw64 兜底）。
+    - 主动 ARM_FAULT 与机械臂等待超时在本层仍同映射 ARM_FAULT→FAULT（未拆分，待后续接入时决定）。
+  - 失效条件：cpu_result_semantics 接口/枚举语义变更、main.c/APB/OSD 接入后行为改变，或后续回归重跑失败。
+
+- 日期：2026-07-14，来源 Agent：Claude（Fable 5，ARM_DISABLED Host/mock main loop adapter Gate APPROVE；当前接入状态由 2026-07-15 条目覆盖）
+  - 适用范围：`main_loop_adapter` ARM_DISABLED 候选适配器（含 `main_loop_adapter.c/.h`、`task_matcher` 的 `_return_match()`/`get_last_match()` 真值 reason）；不适用于当前正式 main 接入、APB/OSD wire ABI、UART2、真实机械臂或板级闭环。
+  - 最新结论：ARM_DISABLED Host/mock 候选适配器已完成并通过其原环境 Gate。三个 P1 在候选实现内关闭：(P1-1) `main_loop_arm_disabled_step()` 抽出为独立函数并由 Host 测试直接链接；(P1-2) `attempted_event` 精确保存，只在 `REMOVE_CONFIRM+ACCEPTED` 时返回 1（ABANDON 不冒充 REMOVE），`SESSION_RESET+ACCEPTED` 返回 -1；(P1-3) `task_matcher_evaluate()` 的 `_return_match()` 保存完整 `task_match_result_t`（含真实 color/shape/size reason）。当前正式 main 仅接入统一结果语义投影，adapter 待 G4 事件源/时基后再接。
+  - 验证（2026-07-14 复跑；本机 repo mingw64 gcc 14.2.0，`-Wall -Wextra -Werror -Wno-error=cpp`）：
+    - test_main_loop_arm_disabled：**117/117 PASS**（16 测试）
+    - test_cpu_result_semantics：**374/374 PASS**（回退无）
+    - round_controller MinGW gcc 回归：**4979/4979 PASS**（回退无）
+    - test_task_matcher：**154/154 PASS**（回退无）
+    - RISC-V compile-only（Efinity riscv-none-embed-gcc 8.3.0，rv32imac/ilp32，`-c`）：main.c exit 0、main_loop_adapter.c exit 0、task_matcher.c exit 0、cpu_result_semantics.c exit 0（仅既有 board_io.h:26 soc.h/APB 占位 warning，由 `-Wno-error=cpp` 放行）
+    - `git diff --check`：pass
+  - 仅有的 warning：既有 `board_io.h:26` 的 soc.h/APB 占位 `#warning`，经 `-Wno-error=cpp` 放行。其余 warning=0。
+  - 证据路径：`final_project/cpu/app/include/main_loop_adapter.h`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/task_matcher.c`、`final_project/cpu/app/include/task_matcher.h`、`final_project/cpu/tests/test_main_loop_arm_disabled.c`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/cpu/CPU_MODULE_PLAN.txt`。
+  - 明确定义"未闭环"（非"已接入/已连接"）：
+    - 未接入 OSD/APB wire ABI；未定义任何 APB 地址/寄存器位布局
+    - 未接 arm_controller_request_*、UART2、myCobot transport
+    - 不连接或驱动真实机械臂
+    - 无板级证据
+    - MSVC `/W4 /WX` 本机不可用（未实跑主路径；run 脚本保留 MSVC + mingw64 兜底）
+  - 失效条件：main_loop_adapter 接口/返回语义变更、APB/OSD 接入后行为改变、ARM_ENABLED 过渡后 arm_enabled=1 路径重写，或后续回归重跑失败。
 
 - 日期：2026-07-13，来源：用户提供 / Codex 官方资料交叉核查
   - 适用范围：TJ375N529 开发板 UART2/J52 到 myCobot 280 的板端接口真源；不表示正式 SDC/SoC/UART 驱动、真实接线、只读通信或机械臂动作已通过。
