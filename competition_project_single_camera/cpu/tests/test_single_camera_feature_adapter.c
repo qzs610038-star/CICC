@@ -64,10 +64,10 @@ static void test_required_flags_and_empty_roi_rejected(void)
     sc_feature_snapshot_t snapshot = valid_red_cube();
     sc_observation_t observation;
 
-    snapshot.source_flags &= (uint8_t)~SC_FEATURE_FLAG_SOURCE_CH0;
+    snapshot.source_flags &= (uint8_t)(0xFFu ^ SC_FEATURE_FLAG_SOURCE_CH0);
     CHECK(sc_feature_snapshot_to_observation(&snapshot, 0, &observation) == -1);
     snapshot = valid_red_cube();
-    snapshot.source_flags &= (uint8_t)~SC_FEATURE_FLAG_FRAME_STABLE;
+    snapshot.source_flags &= (uint8_t)(0xFFu ^ SC_FEATURE_FLAG_FRAME_STABLE);
     CHECK(sc_feature_snapshot_to_observation(&snapshot, 0, &observation) == -1);
     snapshot = valid_red_cube();
     snapshot.features.roi_pixel_count = 0u;

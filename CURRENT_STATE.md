@@ -35,14 +35,15 @@
   - 下一门：先由用户按 debug session 的 A0 操作卡完成当前隔离副本 GUI 资源审计，并确认 myCobot 的实际 COM 端口；在收到前，不改 XML/top/SDC、不跑联合 PNR、不接 J52 或机械臂。
   - 失效条件：协议真源/固件版本改变、B1/B3 相关回归失败、GUI 证实资源不同、端口身份或现场电气证据与本条不符。
 
-- 日期：2026-07-15，来源 Agent：libaoxun688 交接 / Codex 本地集成复核（单摄 M2 Hard SoC 候选）
+- 日期：2026-07-15，来源 Agent：libaoxun688 交接 / Codex 本地集成复核（单摄 M2 feature/CPU Host 候选，Hard SoC 真源同步 HOLD）
   - 适用范围：仅隔离候选工程 `competition_project_single_camera/` 与其来源联合实验副本；不替代 `final_project/` 正式主线，也不表示 CPU、OSD、UART2 或机械臂闭环。
-  - 合入结论：固定提交 `dev/libaoxun688@e129885` 在既有 Hard SoC 候选基线上加入 framebuffer 稳定/欠读诊断、只读 `feature_stats_tap`、CPU Host 侧特征适配/分类/F1 事务与配套契约、测试和操作文档。FPGA 仍只输出 ROI/统计特征与硬件通道，颜色、形状、尺寸分类和逐轮事务继续由板上 CPU 承担；当前 feature tap 的正式采集保持禁用，未把分类状态机放回 RTL。
-  - 已有证据边界：队友联合实验记录显示 Efinity 2025.2 Map、PNR、bitstream 与 J48/ch0 HDMI 视频回归通过，最差 Setup/Hold 为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`；匹配 bitstream SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`。这些证据证明来源联合工程的 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`，不自动证明本地集成提交已重新构建或重新上板。
+  - 合入结论：固定提交 `dev/libaoxun688@e129885` 实际加入 framebuffer 稳定/欠读诊断、只读 `feature_stats_tap`、CPU Host 侧特征适配/分类/F1 事务与配套契约、测试和操作文档。FPGA 仍只输出 ROI/统计特征与硬件通道，颜色、形状、尺寸分类和逐轮事务继续由板上 CPU 承担；当前 feature tap 的正式采集保持禁用，未把分类状态机放回 RTL。
+  - **Codex 阻塞复核**：提交标题和交接文档描述 Hard SoC 集成，但固定提交没有同步交接要求的系统真源：`mem_test.xml` 未登记 `EfxSapphireHpSoc_slb` 且 `debugger.auto_instantiation=on`；候选树不存在 `ip/EfxSapphireHpSoc_slb/settings.json` 与 `cpu_bringup/uart_hello_onchip/build.ps1`；`.peri.xml` 未找到交接指定的 UART0/SoC 资源标记；`constrain.sdc` 仍有有效 `axi1_*`、`CLK_5M`、`pll_inst1_CLKOUT0` 约束。依照交接文件自身的停止条件，完整 Hard SoC 系统真源同步为 `HOLD`，不得把本地合并写成 Hard SoC 已接入候选工程。
+  - 已有证据边界：队友联合实验记录显示外部联合副本的 Efinity 2025.2 Map、PNR、bitstream 与 J48/ch0 HDMI 视频回归通过，最差 Setup/Hold 为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`；匹配 bitstream SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`。这些证据只证明来源联合副本的 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`，不证明当前仓库候选工程包含匹配系统真源，也不证明本地集成提交已重新构建或上板。
   - CPU 检查点：片上 RAM UART0 Hello ELF 的来源实验地址审计已完成，入口和唯一 LOAD 段位于 `0xF9000000` 的 16KB 片上 RAM；USER2 JTAG 实际取指、UART0 完整横幅和单字符回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。不得据此连接 UART2/J52 或机械臂。
   - 调试边界：CPU JTAG 固定使用 FPGA `USER2`，`USER1` 保留给视频工程；只允许 Debug in RAM，不允许 Flash erase/program 或外部 DDR 初始化。任何地址、USER TAP、PLL/DDR/GPIO/JTAG 资源或时钟复位事实变化均需重新通过 Codex Gate。
   - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-26 至 M2-32、`competition_project_single_camera/docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md`、`competition_project_single_camera/docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`、`competition_project_single_camera/docs/review_packets/m2_single_camera_soc_branch_merge_handoff_20260715.md`、`competition_project_single_camera/integration/single_camera_feature_contract.md`。
-  - 下一门：先对本地集成提交完成静态/Host/RTL 验证并重新运行 Efinity Map/PNR/STA/CDC；之后才可烧录匹配 bitstream 回归 J48/ch0 视频。板卡可用时再以 USER2、片上 RAM 和已确认 UART0 端口验证 Hello/回显；任一门失败立即停止扩展。
+  - 下一门：先由 FPGA/SoC 负责人从同一通过的 Interface Designer/Hard SoC 生成批次同步完整 `.peri.xml`、SDC、IP 可复现输入、BSP/Hello fail-closed 入口，并关闭 `auto_instantiation`；完成 Check Design 与 Codex 系统文件复核后，才可对本地候选重新运行 Efinity Map/PNR/STA/CDC。之后才可烧录匹配 bitstream 回归 J48/ch0 视频；板卡可用时再验证 USER2/片上 RAM/UART0 Hello 与回显。
   - 失效条件：本地合并后的 `mem_test.xml`、`.peri.xml`、`constrain.sdc`、`top.v`、Hard SoC IP/BSP、时钟复位、USER TAP、UART0 引脚或板级现象与交接证据不一致。
 
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）

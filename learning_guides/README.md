@@ -38,6 +38,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_fpga_vision_front.md)：DSI 解耦、真实时钟 CDC 约束与显示校正证据边界（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_cpu_arm_control.md)：显示支路与 CPU 识别真源分离、APB 接入待办（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-15_merge_dev_libaoxun688/guide_system_integration.md)：固定 SHA、证据保质期与候选路线升格门（面向角色 C）。
+  * [daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/)：7 月 15 日在个人备份之上本地整合单摄 M2 feature/CPU Host 候选与 CPU→OSD 结果打包设计门，并发现 Hard SoC 系统真源未随固定提交同步后生成的三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_fpga_vision_front.md)：被动特征旁路、framebuffer 可观测性与 Hard SoC 真源缺口（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_cpu_arm_control.md)：结果语义、原子提交、CDC 与 Wire ABI 未定边界（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_system_integration.md)：固定 SHA、语义解冲突与机械臂安全门（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 
