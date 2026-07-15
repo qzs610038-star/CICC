@@ -11,13 +11,18 @@ extern "C" {
 #define MYCOBOT_FRAME_FOOTER      0xFAu
 #define MYCOBOT_FRAME_OVERHEAD    5u
 #define MYCOBOT_MAX_PAYLOAD       64u
+#define MYCOBOT_PROTOCOL_LEN_MIN  0x02u
+#define MYCOBOT_PROTOCOL_LEN_MAX  0x10u
 
 #define MYCOBOT_CMD_GET_ANGLES         0x20u
 #define MYCOBOT_CMD_SEND_ANGLES        0x22u
 #define MYCOBOT_CMD_GET_COORDS         0x23u
+#define MYCOBOT_CMD_STOP               0x29u
+#define MYCOBOT_CMD_IS_MOVING          0x2Bu
 #define MYCOBOT_CMD_GET_GRIPPER_VALUE  0x65u
 #define MYCOBOT_CMD_SET_GRIPPER_STATE  0x66u
 #define MYCOBOT_CMD_SET_GRIPPER_VALUE  0x67u
+#define MYCOBOT_CMD_IS_GRIPPER_MOVING  0x69u
 
 #define MYCOBOT_JOINT_COUNT            6u
 #define MYCOBOT_SPEED_MIN              1u
@@ -46,7 +51,8 @@ typedef struct {
 typedef enum {
     MYCOBOT_HELPER_OK = 0,
     MYCOBOT_HELPER_INVALID_ARG,
-    MYCOBOT_HELPER_BAD_LENGTH
+    MYCOBOT_HELPER_BAD_LENGTH,
+    MYCOBOT_HELPER_OUT_OF_RANGE
 } mycobot_helper_status_t;
 
 uint8_t mycobot_build_frame_ex(uint8_t command,
@@ -64,6 +70,15 @@ mycobot_parse_status_t mycobot_parse_frame(const uint8_t *buf,
                                            uint16_t buf_len,
                                            mycobot_frame_t *frame,
                                            uint16_t *consumed_len);
+
+uint8_t mycobot_wire_len_is_valid(uint8_t wire_len);
+uint8_t mycobot_command_expected_response_payload_len(uint8_t command,
+                                                      uint8_t *payload_len_out);
+uint8_t mycobot_command_has_reply(uint8_t command);
+uint8_t mycobot_joint_angles_within_limits(const int16_t joint_deg_x10[MYCOBOT_JOINT_COUNT]);
+mycobot_helper_status_t mycobot_validate_response_payload(uint8_t command,
+                                                           const uint8_t *payload,
+                                                           uint8_t payload_len);
 
 uint8_t mycobot_encode_send_angles_payload(const int16_t joint_deg_x10[MYCOBOT_JOINT_COUNT],
                                            uint16_t speed,

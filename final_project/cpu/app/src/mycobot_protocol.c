@@ -1,5 +1,13 @@
 #include "mycobot_protocol.h"
 
+static const int16_t g_joint_min_deg_x10[MYCOBOT_JOINT_COUNT] = {
+    -1680, -1350, -1500, -1450, -1650, -1800
+};
+
+static const int16_t g_joint_max_deg_x10[MYCOBOT_JOINT_COUNT] = {
+    1680, 1350, 1500, 1450, 1650, 1800
+};
+
 uint8_t mycobot_build_frame_ex(uint8_t command,
                                const uint8_t *payload,
                                uint8_t payload_len,
@@ -105,6 +113,94 @@ mycobot_parse_status_t mycobot_parse_frame(const uint8_t *buf,
     return MYCOBOT_PARSE_OK;
 }
 
+uint8_t mycobot_wire_len_is_valid(uint8_t wire_len)
+{
+    return (uint8_t)(wire_len >= MYCOBOT_PROTOCOL_LEN_MIN &&
+                     wire_len <= MYCOBOT_PROTOCOL_LEN_MAX);
+}
+
+uint8_t mycobot_command_expected_response_payload_len(uint8_t command,
+                                                      uint8_t *payload_len_out)
+{
+    uint8_t payload_len;
+
+    switch (command) {
+    case MYCOBOT_CMD_GET_ANGLES:
+        payload_len = 12u;
+        break;
+    case MYCOBOT_CMD_GET_GRIPPER_VALUE:
+    case MYCOBOT_CMD_IS_MOVING:
+    case MYCOBOT_CMD_IS_GRIPPER_MOVING:
+        payload_len = 1u;
+        break;
+    default:
+        return 0u;
+    }
+
+    if (payload_len_out) {
+        *payload_len_out = payload_len;
+    }
+    return 1u;
+}
+
+uint8_t mycobot_command_has_reply(uint8_t command)
+{
+    return mycobot_command_expected_response_payload_len(command, 0);
+}
+
+uint8_t mycobot_joint_angles_within_limits(const int16_t joint_deg_x10[MYCOBOT_JOINT_COUNT])
+{
+    uint8_t i;
+
+    if (!joint_deg_x10) {
+        return 0u;
+    }
+
+    for (i = 0u; i < MYCOBOT_JOINT_COUNT; ++i) {
+        if (joint_deg_x10[i] < g_joint_min_deg_x10[i] ||
+            joint_deg_x10[i] > g_joint_max_deg_x10[i]) {
+            return 0u;
+        }
+    }
+
+    return 1u;
+}
+
+mycobot_helper_status_t mycobot_validate_response_payload(uint8_t command,
+                                                           const uint8_t *payload,
+                                                           uint8_t payload_len)
+{
+    int16_t angles[MYCOBOT_JOINT_COUNT];
+    mycobot_helper_status_t decoded;
+    uint8_t expected_len;
+
+    if (!payload) {
+        return MYCOBOT_HELPER_INVALID_ARG;
+    }
+
+    if (!mycobot_command_expected_response_payload_len(command, &expected_len) ||
+        payload_len != expected_len) {
+        return MYCOBOT_HELPER_BAD_LENGTH;
+    }
+
+    if (command == MYCOBOT_CMD_GET_ANGLES) {
+        decoded = mycobot_decode_get_angles_response(payload, payload_len, angles);
+        if (decoded != MYCOBOT_HELPER_OK) {
+            return decoded;
+        }
+        return mycobot_joint_angles_within_limits(angles) ?
+            MYCOBOT_HELPER_OK : MYCOBOT_HELPER_OUT_OF_RANGE;
+    }
+
+    if ((command == MYCOBOT_CMD_GET_GRIPPER_VALUE && payload[0] > MYCOBOT_GRIPPER_VALUE_MAX) ||
+        ((command == MYCOBOT_CMD_IS_MOVING || command == MYCOBOT_CMD_IS_GRIPPER_MOVING) &&
+         payload[0] > 1u)) {
+        return MYCOBOT_HELPER_OUT_OF_RANGE;
+    }
+
+    return MYCOBOT_HELPER_OK;
+}
+
 uint8_t mycobot_encode_send_angles_payload(const int16_t joint_deg_x10[MYCOBOT_JOINT_COUNT],
                                            uint16_t speed,
                                            uint8_t *payload_out,
@@ -126,14 +222,12 @@ uint8_t mycobot_encode_send_angles_payload(const int16_t joint_deg_x10[MYCOBOT_J
         return 0;
     }
 
-    for (i = 0; i < 6; ++i) {
+    if (!mycobot_joint_angles_within_limits(joint_deg_x10)) {
+        return 0;
+    }
+
+    for (i = 0; i < MYCOBOT_JOINT_COUNT; ++i) {
         angle100 = (int32_t)joint_deg_x10[i] * 10;
-        if (angle100 > 32767) {
-            angle100 = 32767;
-        }
-        if (angle100 < -32768) {
-            angle100 = -32768;
-        }
         u = (uint16_t)(int16_t)angle100;
         payload_out[i * 2u] = (uint8_t)(u >> 8);
         payload_out[i * 2u + 1u] = (uint8_t)(u & 0xFFu);

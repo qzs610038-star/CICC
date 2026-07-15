@@ -27,6 +27,14 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）
+  - 适用范围：`mycobot_arm_board_control_advancement_plan_20260715.md` §13 的阶段 0、B1–B3 与 A0；不表示 G4 SoC/PNR、烧录、J52 回环、真实臂只读或动作已经完成。
+  - 最新结论：B1–B3 的纯软件子检查点已完成。新增 `mycobot_transaction` 提供 750 ms single-flight、expected-command/精确 payload length、超时、迟到/重复与错误计数；协议层补齐 0x29/0x2B/0x69、官方 LEN 窗口和 J1..J6 绝对范围，越界 `SEND_ANGLES` 编码被拒绝而非饱和。GET_ANGLES 精确请求/响应、LEN 边界和错误向量已进入 QEMU 断言。B2 差分测试补齐 N-poll、DONE 后下一请求、fault/cancel 后 re-init；不新增重复的 transport 枚举。用户确认 COM10 为 myCobot 后，阶段 0 脚本以 1 Mbps 调用唯一允许 API `MyCobot280.get_system_version()`并成功返回 `7.3`；运行记录为 `motion_or_firmware_api_called=false`，设备侧已刷文件 hash 仍不可回读。B1 源已用 Efinity `rv32imac/ilp32` 工具链 `-Werror -fsyntax-only` 通过，但当前构建器仍被刻意限制为 `NOT_FOR_FLASH` 且硬性排除 UART2/真实 transport，故尚无可烧录 ELF。A0 当前工程的 PLL/JTAG 资源与旧 GUI 冲突审计一致，但旧隔离树已不存在，当前工程的 GUI 合法组合尚无本批次证据；因此 A0/G4 继续未关闭。
+  - 验证：`run_mycobot_arm_skeleton_host.ps1` exit 0（Efinity RISC-V QEMU asserts executed PASS）；`run_arm_runtime_host.ps1` exit 0（disabled/simulated PASS）；显式 Efinity 工具链的 `run_arm_runtime_qemu.ps1` exit 0（两后端 QEMU PASS + 1 秒 timeout probe PASS）；`riscv-none-embed-gcc -march=rv32imac -mabi=ilp32 ... -Werror -fsyntax-only mycobot_protocol.c mycobot_transaction.c` exit 0；相关 banner 源改动后的 `arm_bringup/disabled` 目标 RISC-V 构建 exit 0，ELF 内已核验嵌入 manifest build ID，但仍为 `NOT_FOR_FLASH`；`python -m py_compile final_project\\tools\\mycobot_firmware_version_readonly.py` exit 0；`git diff --check` exit 0（仅 CRLF 预警）。
+  - 证据路径：`final_project/docs/debug_sessions/evidence/mycobot_stage0_readonly_20260715_090247.json`、`final_project/docs/review_packets/mycobot_b1_b3_protocol_transaction_review_20260715.md`、`final_project/docs/review_packets/mycobot_g4_evidence_contract_review_20260715.md`、`final_project/docs/debug_sessions/mycobot_goal_execution_20260715.md`、`final_project/cpu/app/src/mycobot_transaction.c`、`final_project/tools/mycobot_firmware_version_readonly.py`、`final_project/tools/verify_mycobot_g4_batch.py`。后者已通过正反向自测，且只验证未来 G4 批次的一致性；没有实际 G4 manifest 时不得写作 G4 PASS。
+  - 下一门：先由用户按 debug session 的 A0 操作卡完成当前隔离副本 GUI 资源审计，并确认 myCobot 的实际 COM 端口；在收到前，不改 XML/top/SDC、不跑联合 PNR、不接 J52 或机械臂。
+  - 失效条件：协议真源/固件版本改变、B1/B3 相关回归失败、GUI 证实资源不同、端口身份或现场电气证据与本条不符。
+
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
   - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
   - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。

@@ -9,6 +9,13 @@
 #define ARM_PROFILE_COMPETITION  1
 #define ARM_PROFILE_ARM_BRINGUP  2
 
+/* A board-capable builder must replace this with a recorded batch ID.  The
+ * default makes an accidental standalone build visibly non-deployable in the
+ * UART0 banner rather than looking like a traceable G4 artifact. */
+#ifndef ARM_BUILD_ID
+#define ARM_BUILD_ID "UNPROVISIONED_NOT_FOR_FLASH"
+#endif
+
 #define ARM_BACKEND_DISABLED     1
 #define ARM_BACKEND_SIMULATED    2
 #define ARM_BACKEND_READONLY     3

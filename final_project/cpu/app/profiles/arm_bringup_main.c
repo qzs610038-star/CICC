@@ -341,7 +341,9 @@ int main(void)
     int failed = 0;
 
     bsp_init();
-    uart_puts("\r\n[ARM_BRINGUP] profile=arm_bringup backend=");
+    uart_puts("\r\n[ARM_BRINGUP] CPU HELLO build=");
+    uart_puts(ARM_BUILD_ID);
+    uart_puts(" profile=arm_bringup backend=");
 #if ARM_BACKEND == ARM_BACKEND_SIMULATED
     uart_puts("simulated NOT_FOR_FLASH\r\n");
     failed |= run_case("happy", ARM_SIM_SCENARIO_HAPPY, 1u, ARM_ERR_NONE);

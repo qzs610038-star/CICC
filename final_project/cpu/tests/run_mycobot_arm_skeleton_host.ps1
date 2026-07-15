@@ -40,6 +40,7 @@ function Run-Native {
     $testSrc = Join-Path $testsDir 'test_mycobot_arm_skeleton.c'
     $protoSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_protocol.c'
     $transportSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_transport.c'
+    $transactionSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_transaction.c'
     $ctrlSrc = Join-Path $repoRoot 'final_project\cpu\app\src\arm_controller.c'
     $positionsSrc = Join-Path $paramsDir 'arm_positions.c'
     $outExe = Join-Path $buildDir 'test_mycobot_arm_skeleton_host.exe'
@@ -52,14 +53,14 @@ function Run-Native {
         $compileArgs = @(
             '/nologo', '/W4', '/O0', '/MD',
             '/EHsc', '/std:c11', ('/I' + $includeDir), ('/I' + $paramsDir),
-            $testSrc, $protoSrc, $transportSrc, $ctrlSrc, $positionsSrc,
+            $testSrc, $protoSrc, $transportSrc, $transactionSrc, $ctrlSrc, $positionsSrc,
             ('/Fe:' + $outExe)
         )
     } else {
         $compileArgs = @(
             '-std=c11', '-O0', '-g', '-Wall', '-Wextra',
             $includeArg, $paramsIncludeArg, $testSrc, $protoSrc,
-            $transportSrc, $ctrlSrc, $positionsSrc,
+            $transportSrc, $transactionSrc, $ctrlSrc, $positionsSrc,
             '-o', $outExe
         )
     }
@@ -95,6 +96,7 @@ function Run-QemuFallback {
     $testSrc = Join-Path $testsDir 'test_mycobot_arm_skeleton.c'
     $protoSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_protocol.c'
     $transportSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_transport.c'
+    $transactionSrc = Join-Path $repoRoot 'final_project\cpu\app\src\mycobot_transaction.c'
     $ctrlSrc = Join-Path $repoRoot 'final_project\cpu\app\src\arm_controller.c'
     $positionsSrc = Join-Path $paramsDir 'arm_positions.c'
 
@@ -136,6 +138,7 @@ function Run-QemuFallback {
     $testObj = Join-Path $buildDir 'test_mycobot_arm_skeleton_rv32.o'
     $protoObj = Join-Path $buildDir 'mycobot_protocol_rv32.o'
     $transportObj = Join-Path $buildDir 'mycobot_transport_rv32.o'
+    $transactionObj = Join-Path $buildDir 'mycobot_transaction_rv32.o'
     $ctrlObj = Join-Path $buildDir 'arm_controller_rv32.o'
     $positionsObj = Join-Path $buildDir 'arm_positions_rv32.o'
     $shimC = Join-Path $buildDir 'qemu_exit_shim.c'
@@ -228,6 +231,10 @@ semihost_exit_block:
         if ($LASTEXITCODE -ne 0) { $buildFailed = 'RISC-V transport compile failed.' }
     }
     if (-not $buildFailed) {
+        & $riscvGcc @ccArgs -c $transactionSrc -o $transactionObj
+        if ($LASTEXITCODE -ne 0) { $buildFailed = 'RISC-V transaction compile failed.' }
+    }
+    if (-not $buildFailed) {
         & $riscvGcc @ccArgs -c $ctrlSrc -o $ctrlObj
         if ($LASTEXITCODE -ne 0) { $buildFailed = 'RISC-V controller compile failed.' }
     }
@@ -240,7 +247,7 @@ semihost_exit_block:
         if ($LASTEXITCODE -ne 0) { $buildFailed = 'RISC-V shim compile failed.' }
     }
     if (-not $buildFailed) {
-        & $riscvGcc @ccArgs -nostartfiles $exitStartup $testObj $protoObj $transportObj $ctrlObj $positionsObj $shimObj -T $ldScript -o $elf
+        & $riscvGcc @ccArgs -nostartfiles $exitStartup $testObj $protoObj $transportObj $transactionObj $ctrlObj $positionsObj $shimObj -T $ldScript -o $elf
         if ($LASTEXITCODE -ne 0) { $buildFailed = 'RISC-V link failed.' }
     }
     if ($buildFailed) {

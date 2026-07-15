@@ -6,6 +6,7 @@
 #include "arm_positions.h"
 #include "mycobot_protocol.h"
 #include "mycobot_transport.h"
+#include "mycobot_transaction.h"
 
 typedef struct {
     int16_t target[ARM_CONTROLLER_JOINTS];
@@ -149,6 +150,126 @@ static void test_frame_build_and_parse(void)
     out[0] = 0x00u;
     assert(mycobot_parse_frame(out, n, &frame, &consumed) ==
            MYCOBOT_PARSE_BAD_HEADER);
+}
+
+static void test_protocol_truth_table_and_joint_limits(void)
+{
+    int16_t angles[MYCOBOT_JOINT_COUNT] = {0, 0, 0, 0, 0, 0};
+    uint8_t payload_len = 0u;
+    uint8_t joint;
+    const int16_t min_limits[MYCOBOT_JOINT_COUNT] = {
+        -1680, -1350, -1500, -1450, -1650, -1800
+    };
+    const int16_t max_limits[MYCOBOT_JOINT_COUNT] = {
+        1680, 1350, 1500, 1450, 1650, 1800
+    };
+
+    assert(mycobot_wire_len_is_valid(0x02u) == 1u);
+    assert(mycobot_wire_len_is_valid(0x10u) == 1u);
+    assert(mycobot_wire_len_is_valid(0x01u) == 0u);
+    assert(mycobot_wire_len_is_valid(0x11u) == 0u);
+
+    assert(mycobot_command_expected_response_payload_len(MYCOBOT_CMD_GET_ANGLES,
+                                                          &payload_len) == 1u);
+    assert(payload_len == 12u);
+    assert(mycobot_command_expected_response_payload_len(MYCOBOT_CMD_GET_GRIPPER_VALUE,
+                                                          &payload_len) == 1u);
+    assert(payload_len == 1u);
+    assert(mycobot_command_expected_response_payload_len(MYCOBOT_CMD_IS_MOVING,
+                                                          &payload_len) == 1u);
+    assert(payload_len == 1u);
+    assert(mycobot_command_expected_response_payload_len(MYCOBOT_CMD_IS_GRIPPER_MOVING,
+                                                          &payload_len) == 1u);
+    assert(payload_len == 1u);
+    assert(mycobot_command_has_reply(MYCOBOT_CMD_STOP) == 0u);
+    assert(mycobot_command_has_reply(MYCOBOT_CMD_SEND_ANGLES) == 0u);
+    assert(mycobot_command_has_reply(MYCOBOT_CMD_SET_GRIPPER_STATE) == 0u);
+    assert(mycobot_command_has_reply(MYCOBOT_CMD_SET_GRIPPER_VALUE) == 0u);
+
+    for (joint = 0u; joint < MYCOBOT_JOINT_COUNT; ++joint) {
+        angles[joint] = min_limits[joint];
+        assert(mycobot_joint_angles_within_limits(angles) == 1u);
+        angles[joint] = max_limits[joint];
+        assert(mycobot_joint_angles_within_limits(angles) == 1u);
+        angles[joint] = (int16_t)(max_limits[joint] + 1);
+        assert(mycobot_joint_angles_within_limits(angles) == 0u);
+        angles[joint] = 0;
+    }
+}
+
+static void test_get_angles_official_vectors_and_transaction(void)
+{
+    const uint8_t expected_request[] = {0xFEu, 0xFEu, 0x02u, 0x20u, 0xFAu};
+    uint8_t request[MYCOBOT_FRAME_OVERHEAD];
+    uint8_t response[17];
+    uint8_t valid_payload[12] = {
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u
+    };
+    uint8_t n;
+    uint16_t consumed = 0u;
+    mycobot_frame_t frame;
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+
+    n = mycobot_build_frame_ex(MYCOBOT_CMD_GET_ANGLES, 0, 0u,
+                               request, sizeof(request));
+    assert(n == sizeof(expected_request));
+    assert(memcmp(request, expected_request, sizeof(expected_request)) == 0);
+
+    n = mycobot_build_frame_ex(MYCOBOT_CMD_GET_ANGLES, valid_payload,
+                               sizeof(valid_payload), response, sizeof(response));
+    assert(n == sizeof(response));
+    assert(response[2] == 0x0Eu);
+    assert(mycobot_parse_frame(response, n, &frame, &consumed) == MYCOBOT_PARSE_OK);
+    assert(consumed == n);
+    assert(frame.command == MYCOBOT_CMD_GET_ANGLES);
+    assert(frame.payload_len == 12u);
+    assert(mycobot_validate_response_payload(frame.command, frame.payload,
+                                             frame.payload_len) == MYCOBOT_HELPER_OK);
+
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 100u) == 1u);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 101u) == 0u);
+
+    frame.command = MYCOBOT_CMD_GET_GRIPPER_VALUE;
+    frame.payload_len = 12u;
+    memset(frame.payload, 0, 12u);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 102u) ==
+           MYCOBOT_TRANSACTION_BAD_COMMAND);
+
+    frame.command = MYCOBOT_CMD_GET_ANGLES;
+    frame.payload_len = 11u;
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 103u) ==
+           MYCOBOT_TRANSACTION_BAD_LENGTH);
+
+    frame.payload_len = 12u;
+    memset(frame.payload, 0, 12u);
+    frame.payload[0] = 0x41u;
+    frame.payload[1] = 0xFAu; /* J1 = 1690 deg_x10, outside +1680. */
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 104u) ==
+           MYCOBOT_TRANSACTION_BAD_DOMAIN);
+
+    memset(frame.payload, 0, 12u);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 105u) ==
+           MYCOBOT_TRANSACTION_ACCEPTED);
+    assert(mycobot_transaction_active(&transaction) == 0u);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 106u) ==
+           MYCOBOT_TRANSACTION_IDLE);
+
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 200u) == 1u);
+    assert(mycobot_transaction_expire(&transaction, 950u) == 1u);
+    assert(mycobot_transaction_active(&transaction) == 0u);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->accepted == 1u);
+    assert(counters->bad_command == 1u);
+    assert(counters->bad_length == 1u);
+    assert(counters->bad_domain == 1u);
+    assert(counters->late_or_duplicate == 1u);
+    assert(counters->timeout == 1u);
+    assert(counters->single_flight_reject == 1u);
 }
 
 static void test_plan_validation(void)
@@ -525,7 +646,7 @@ static void test_angles_roundtrip(void)
     int16_t decoded[6];
 
     original[0] = 1230;  original[1] = -456;  original[2] = 789;
-    original[3] = -100;  original[4] = 0;     original[5] = 9999;
+    original[3] = -100;  original[4] = 0;     original[5] = 1799;
 
     assert(mycobot_encode_send_angles_payload(original, 50, buf, sizeof(buf)) == 13u);
     assert(mycobot_decode_get_angles_response(buf, 12, decoded) == MYCOBOT_HELPER_OK);
@@ -536,7 +657,9 @@ static void test_angles_roundtrip(void)
     assert(decoded[2] == 789);    /*  7890 / 10 */
     assert(decoded[3] == -100);   /* -1000 / 10 */
     assert(decoded[4] == 0);      /*     0 / 10 */
-    assert(decoded[5] == 3276);   /* 32767 / 10 (99990 clamped to INT16_MAX) */
+    assert(decoded[5] == 1799);
+    original[5] = 1801;
+    assert(mycobot_encode_send_angles_payload(original, 50, buf, sizeof(buf)) == 0u);
 }
 
 static void test_encode_gripper_payloads(void)
@@ -774,6 +897,8 @@ static void test_transport_tx_abort_and_invalid(void)
 int main(void)
 {
     test_frame_build_and_parse();
+    test_protocol_truth_table_and_joint_limits();
+    test_get_angles_official_vectors_and_transaction();
     test_plan_validation();
     test_default_arm_positions_plan();
     test_controller_happy_path();

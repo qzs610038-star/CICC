@@ -48,8 +48,16 @@ $build = Join-Path $env:TEMP ('codex-arm-runtime-qemu-' + [guid]::NewGuid().ToSt
 New-Item -ItemType Directory -Path $build | Out-Null
 
 function Invoke-RiscvTool([string]$Label, [string[]]$Arguments) {
-    $output = @(& $gcc @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    # Capture native stderr before the script-wide Stop preference can turn an
+    # allowlisted compiler warning into a terminating NativeCommandError.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $gcc @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $warningLines = @($output | ForEach-Object { [string]$_ } |
         Where-Object { $_ -match '(?i)\bwarning:' })
     $unexpectedWarnings = @($warningLines | Where-Object {
@@ -71,10 +79,16 @@ function Invoke-QemuWithDeadline([string]$Elf, [int]$DeadlineSeconds) {
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
-    foreach ($argument in @('-M', 'spike', '-nographic', '-semihosting-config',
-                             'enable=on,target=native', '-bios', 'none',
-                             '-kernel', $Elf)) {
-        [void]$psi.ArgumentList.Add($argument)
+    if ($null -ne $psi.ArgumentList) {
+        foreach ($argument in @('-M', 'spike', '-nographic', '-semihosting-config',
+                                 'enable=on,target=native', '-bios', 'none',
+                                 '-kernel', $Elf)) {
+            [void]$psi.ArgumentList.Add($argument)
+        }
+    } else {
+        # Windows PowerShell 5 exposes no usable ArgumentList collection.
+        $escapedElf = $Elf.Replace('"', '\"')
+        $psi.Arguments = '-M spike -nographic -semihosting-config "enable=on,target=native" -bios none -kernel "' + $escapedElf + '"'
     }
 
     $process = [System.Diagnostics.Process]::new()
@@ -83,7 +97,13 @@ function Invoke-QemuWithDeadline([string]$Elf, [int]$DeadlineSeconds) {
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     if (-not $process.WaitForExit($DeadlineSeconds * 1000)) {
-        try { $process.Kill($true) } catch { }
+        try {
+            if ($PSVersionTable.PSVersion.Major -ge 7) {
+                $process.Kill($true)
+            } else {
+                $process.Kill()
+            }
+        } catch { }
         $process.WaitForExit()
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
