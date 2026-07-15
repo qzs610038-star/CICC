@@ -1038,15 +1038,62 @@
     - MSVC /W4 /WX 本机不可用（未实跑主路径；run 脚本保留 MSVC + mingw64 兜底）
 
 ================================================================================
-  明日优先事项（2026-07-14 收尾记录）
+  明日优先事项（2026-07-15 更新）
 ================================================================================
-  1. 明天继续保持 ARM_DISABLED（arm_enabled=0，不连接或驱动机械臂）。
-  2. 先准备 APB/OSD 结果打包设计（cpu_display_result_t → APB/OSD 寄存器字段语义映射），
-     作为下一步接入前的独立设计 Review Packet。
-  3. 在 soc.h/APB/OSD 联合 Review Packet 到位前：
+  1. ✅ `cpu_display_result_t → APB/OSD` 结果打包设计 Review Packet
+     （`final_project/docs/review_packets/cpu_apb_osd_result_packing_design_20260715.md`）
+     已于 2026-07-15 通过 Codex2 最终审查（APPROVED BY CODEX2 — DESIGN PACKET ONLY）。
+     该尾项仅为设计门完成——正式 `soc.h`、wire ABI、APB/CDC RTL、OSD 实现、
+     `main.c` 接入和板级闭环仍未完成。
+  2. 独立复位恢复协议（§6.3.B）和 bundled-data 稳定周期仍须 FPGA/SoC 联合
+     Review Packet 定版；未定版前禁止实现正式 CDC RTL。
+  3. 继续保持 ARM_DISABLED（arm_enabled=0，不连接或驱动机械臂）。
+  4. 不接 UART2、J52 或机械臂。
+  5. 在 soc.h/APB/OSD 联合 Review Packet 到位前：
      - 不定义 APB/OSD wire ABI
-     - 不接 UART2
-     - 不连接或驱动机械臂
-  4. 上述门禁通过后，再进入 ARM_DISABLED → ARM_ENABLED 过渡的最小接入编码。
+     - 不实现 APB/CDC RTL
+     - 不接入 main.c OSD 结果打包路径
+
+================================================================================
+  2026-07-15 停工记录（Codex1 汇总）
+================================================================================
+  今日完成:
+  1. CPU→APB/OSD 结果打包逻辑设计包通过 Codex2 审查；批准范围仅限设计契约。
+  2. CPU Host B 线 8 项从当前源码新鲜构建并通过：5758/5758；额外语义与
+     ARM_DISABLED 测试 491/491。Host 结果不代表 APB、OSD、SoC 或板级通过。
+  3. 保持 ARM_DISABLED；未接 UART2、J52 或机械臂，未产生机械臂动作。
+  4. 无板条件下完成单摄候选工程 M0 命令行排障：修正 DSI 初始化文件的工程
+     相对路径后 Map PASS。PNR、STA、CDC、bitstream、烧录和上板均未执行。
+  5. M0 Map PASS 后的 warning 口径已冻结：当前运行段 223 个 VERI/VDB warning
+     事件（15 类）、785 个 EFX-0256、47 个 VERI-2561 INFO；工具的
+     `Found 587 warnings` 汇总不得与上述分类重复相加。
+
+  保守完成度（仅用于排期，不是验收结论）:
+    - CPU→APB/OSD 逻辑设计门：100%
+    - CPU Host 逻辑与安全门：约 75%
+    - CPU→SoC/APB/OSD/板级完整闭环：约 30%
+    - M0 板级验证：0%（无板，PENDING BOARD）
+
+  停工时门禁:
+    - PNR Gate = HOLD。Map PASS 不代表 PNR、时序、CDC、bitstream 或 M0 PASS。
+    - §6.3.B 独立复位恢复协议、bundled-data 稳定周期和 §9 FPGA/SoC 接口事实
+      未定版，继续阻塞正式 CDC RTL、wire ABI 和 main.c OSD 接入。
+    - EFX-0256 接口归属仍未闭合：AXI1 target1（698）、DSI ch0（70）、
+      JTAG TDO（2）、led[3:2]（2）及 axi0 边带（10）均不得标记为可忽略。
+    - ch1 LCD reset 存在 `P1_lcd_rstp` 隐式网与 `P1_o_lcd_rstn` 顶层端口的
+      命名/极性契约问题；必须独立确认，不能随 DSI ch0 一并裁剪。
+
+  2026-07-16 恢复入口:
+  1. 先由 Claude 只修正文档计划：删除 LED 常灭极性的无证据结论，将 JTAG2
+     定位改为 top/生成来源追踪，拆分 ch0 GPIO 与 ch1 reset，并保持 axi0 边带 TBD。
+  2. Claude 只读调查 Interface Designer 和原始 Demo；不得生成 periphery、不得
+     手改 `.peri.xml`/SDC、不得运行 PNR。
+  3. Codex2 审查只读证据后，再分别决定 LED、AXI1、DSI ch0、JTAG、ch1 reset
+     的最小修改门；不同接口不合并实施。
+  4. 有 FPGA 板后再按 M0 执行包完成烧录、3 次冷启动和 10 分钟连续运行。
+
+  停工结论:
+    - 今晚不再启动新一轮 Claude/Codex2 工作，避免留下半轮接口调查。
+    - 工作区不提交 Git；保留现有证据和修改，明日从上述只读调查恢复。
 
 ================================================================================
