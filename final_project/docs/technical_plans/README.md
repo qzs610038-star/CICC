@@ -14,6 +14,7 @@
 - [预处理 APB/CDC 接口草案](../../integration/preprocess_apb_cdc_contract_draft_20260711.md)：冻结特征快照、配置提交和 CPU-to-OSD 的交接语义；不分配地址、不修改 RTL。
 - [Priority 3 myCobot 板上 CPU 迁移设计](priority3_mycobot_cpu_migration_design.md)：机械臂控制从 PC 调试流程迁移到板上 CPU 的设计约束。
 - [myCobot 板上调试执行计划](mycobot_board_debug_execution_plan_20260712.md)与[操作员 SOP](mycobot_board_bringup_operator_sop_20260712.md)：当前统一基线为 `codex/team-integration-20260713@510caca`；只允许 Host/QEMU、D1 CPU/APB 和 D2 无臂 UART 回环/监听，真实动作 NO-GO。
+- [myCobot 机械臂上板控制推进方案](mycobot_arm_board_control_advancement_plan_20260715.md)：状态：待 Codex 审核。按 G4→G11 顺序分层解锁，先做阶段 B（纯软件完善：协议真值表、模拟故障注入、回环测试套件），再做阶段 A（G4 攻坚：审查工程、修 PNR/outpad、闭合 SoC/BSP/PNR/部署链）。本方案不解除任何硬件或机械臂安全门槛。
 - [Type-C UART1 视频调试方案](typec_uart1_video_debug_plan.md)：Type-C 调试观测链路的规划和接口边界。
 
 ## 使用规则

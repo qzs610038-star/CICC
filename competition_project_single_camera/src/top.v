@@ -902,8 +902,42 @@ wire [PACK_BIT-1:0] rx_out_data1;
   wire ch0_vs;
   wire ch0_hs;
   wire ch0_de;
+  wire ch0_frame_stable;
+  wire ch0_fifo_rd_underflow;
+  reg  ch0_fifo_rd_underflow_seen = 1'b0;
   wire [15:0] ch0_bayer_2pix;
   assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
+
+  // SW4/V19 is active low. While held, replace only the RAW payload with a
+  // grayscale checkerboard; CSI timing and the full DDR-to-HDMI path remain.
+  (* async_reg = "true" *) reg [1:0] raw_diag_sw_sync = 2'b11;
+  reg        raw_diag_de_r = 1'b0;
+  reg [9:0]  raw_diag_x = 10'd0;
+  reg [10:0] raw_diag_y = 11'd0;
+  always @(posedge i_sysclk_div2 or negedge pixel_data_en) begin
+      if (!pixel_data_en) begin
+          raw_diag_sw_sync <= 2'b11;
+          raw_diag_de_r <= 1'b0;
+          raw_diag_x <= 10'd0;
+          raw_diag_y <= 11'd0;
+      end else begin
+          raw_diag_sw_sync <= {raw_diag_sw_sync[0], i_sw[1]};
+          raw_diag_de_r <= rx_out_de;
+          if (rx_out_vs && !rx_out_vs_r)
+              raw_diag_y <= 11'd0;
+          else if (raw_diag_de_r && !rx_out_de)
+              raw_diag_y <= raw_diag_y + 1'b1;
+          if (rx_out_de)
+              raw_diag_x <= raw_diag_x + 1'b1;
+          else
+              raw_diag_x <= 10'd0;
+      end
+  end
+  wire raw_diag_en = ~raw_diag_sw_sync[1];
+  wire [7:0] raw_diag_level = raw_diag_x[5] ^ raw_diag_y[5] ? 8'he0 : 8'h20;
+  wire [31:0] ch0_camera_raw8 = {rx_out_data[39:32], rx_out_data[29:22],
+                                  rx_out_data[19:12], rx_out_data[9:2]};
+  wire [31:0] ch0_framebuffer_vin = raw_diag_en ? {4{raw_diag_level}} : ch0_camera_raw8;
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -927,7 +961,7 @@ frame_buffer #(
 /*i*/.i_clk			(i_sysclk_div2      ),
 /*i*/.i_vs			(rx_out_vs	),
 /*i*/.i_de			(rx_out_de 	),
-/*i*/.vin 			({rx_out_data[39:32],rx_out_data[29:22],rx_out_data[19:12],rx_out_data[9:2]}	),
+/*i*/.vin 			(ch0_framebuffer_vin),
 
     .o_clk  (i_sysclk_div2) ,
     // .o_hs   (fb_ch0_hs) ,
@@ -939,6 +973,8 @@ frame_buffer #(
 /*i*/.o_vs    		(ch0_vs		),			
 /*i*/.o_de    		(ch0_de		),			
 /*i*/.vout    		({ch0_g,ch0_b}	),//ch0_r,
+/*o*/.o_frame_stable(ch0_frame_stable),
+/*o*/.o_fifo_rd_underflow(ch0_fifo_rd_underflow),
 
     .H_FRONT_PORCH 	(HFP/2	    ),
     .H_SYNC 		(HSP/2	    ),	
@@ -987,6 +1023,16 @@ frame_buffer #(
 .bvalid     (axi_m_bvalid	  [1*1-1      : 0]				),//(m0_axi_bvalid    ),//(AXI_MUX_EN ? : axi0_BVALID   ),
 .bready     (axi_m_bready	  [1*1-1      : 0]				)//(m0_axi_bready    ) //(AXI_MUX_EN ? : axi0_BREADY   )
 );
+
+always @(posedge i_sysclk_div2 or negedge pixel_data_en) begin
+    if (!pixel_data_en)
+        ch0_fifo_rd_underflow_seen <= 1'b0;
+    else if (ch0_fifo_rd_underflow)
+        ch0_fifo_rd_underflow_seen <= 1'b1;
+end
+
+assign led[2] = ch0_frame_stable;             // LED20/F3: consecutive frame lengths match
+assign led[3] = ch0_fifo_rd_underflow_seen;   // LED21/F2: latched framebuffer output underflow
 
 
 
@@ -1056,6 +1102,8 @@ wire [7:0]  ch1_b;
 wire ch1_vs;
 wire ch1_hs;
 wire ch1_de;
+wire ch1_frame_stable_unused;
+wire ch1_fifo_rd_underflow_unused;
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
@@ -1086,6 +1134,8 @@ frame_buffer #(
 /*i*/.o_vs    		(ch1_vs	    ),			
 /*i*/.o_de    		(ch1_de	    ),			
 /*i*/.vout    		({ch1_g,ch1_b}	),//ch0_r,
+/*o*/.o_frame_stable(ch1_frame_stable_unused),
+/*o*/.o_fifo_rd_underflow(ch1_fifo_rd_underflow_unused),
 
    .H_FRONT_PORCH 	(HFP/2	    ),
     .H_SYNC 		(HSP/2	    ),	
@@ -1322,8 +1372,61 @@ end
 wire [47:0] rgb0_data_rgb = {rgb_datax2[31:24], rgb_datax2[39:32], rgb_datax2[47:40],
                              rgb_datax2[7:0],   rgb_datax2[15:8],   rgb_datax2[23:16]};
 
-// Display-only fixed-point white balance, derived from the stationary white
-// reference block. R uses 1.75x, G uses 1x, and B uses 2x with saturation.
+// M2 feature-tap gate: observe ch0 RGB without driving the video path.
+// Capture remains disabled until a legal SoC/APB/CDC interface exists.
+wire        ch0_feature_snapshot_valid_unused;
+wire [15:0] ch0_feature_frame_id_unused;
+wire [15:0] ch0_feature_config_seq_unused;
+wire [20:0] ch0_feature_red_area_unused;
+wire [20:0] ch0_feature_blue_area_unused;
+wire [20:0] ch0_feature_yellow_area_unused;
+wire [20:0] ch0_feature_foreground_area_unused;
+wire [20:0] ch0_feature_roi_pixel_count_unused;
+wire [30:0] ch0_feature_sum_luma_unused;
+wire [10:0] ch0_feature_bbox_width_unused;
+wire [10:0] ch0_feature_bbox_height_unused;
+wire [7:0]  ch0_feature_source_flags_unused;
+
+feature_stats_tap u_ch0_feature_stats_tap (
+    .i_clk                 (i_sysclk_div2),
+    .i_rst_n               (pixel_data_en),
+    .i_capture_enable      (1'b0),
+    .i_frame_stable        (ch0_frame_stable),
+    .i_diag_active         (raw_diag_en),
+    .i_vs                  (rgb_vs),
+    .i_de                  (rgb_de),
+    .i_rgb_data            (rgb0_data_rgb),
+    .i_roi_x0              (11'd0),
+    .i_roi_x1              (11'd1919),
+    .i_roi_y0              (11'd0),
+    .i_roi_y1              (11'd1079),
+    .i_bg_r                (8'd0),
+    .i_bg_g                (8'd0),
+    .i_bg_b                (8'd0),
+    .i_foreground_delta    (10'd1023),
+    .i_red_min             (8'd255),
+    .i_blue_min            (8'd255),
+    .i_yellow_min          (8'd255),
+    .i_color_delta          (8'd0),
+    .i_config_seq          (16'd0),
+    .i_ack_valid           (1'b0),
+    .i_ack_frame_id        (16'd0),
+    .o_snapshot_valid      (ch0_feature_snapshot_valid_unused),
+    .o_frame_id            (ch0_feature_frame_id_unused),
+    .o_config_seq          (ch0_feature_config_seq_unused),
+    .o_red_area            (ch0_feature_red_area_unused),
+    .o_blue_area           (ch0_feature_blue_area_unused),
+    .o_yellow_area         (ch0_feature_yellow_area_unused),
+    .o_foreground_area     (ch0_feature_foreground_area_unused),
+    .o_roi_pixel_count     (ch0_feature_roi_pixel_count_unused),
+    .o_sum_luma            (ch0_feature_sum_luma_unused),
+    .o_bbox_width          (ch0_feature_bbox_width_unused),
+    .o_bbox_height         (ch0_feature_bbox_height_unused),
+    .o_source_flags        (ch0_feature_source_flags_unused)
+);
+
+// Display-only fixed-point white balance. The 2026-07-15 neutral references
+// showed a mild purple cast, so use R=1.625x, G=1x, B=1.875x with saturation.
 function [7:0] hdmi_sat_u10_to_u8;
     input [9:0] value;
     begin
@@ -1333,12 +1436,14 @@ endfunction
 
 wire [9:0] hdmi_p0_r_scaled = {2'b0, rgb0_data_rgb[47:40]} +
                                ({2'b0, rgb0_data_rgb[47:40]} >> 1) +
-                               ({2'b0, rgb0_data_rgb[47:40]} >> 2);
-wire [9:0] hdmi_p0_b_scaled = {2'b0, rgb0_data_rgb[31:24]} << 1;
+                               ({2'b0, rgb0_data_rgb[47:40]} >> 3);
+wire [9:0] hdmi_p0_b_scaled = ({2'b0, rgb0_data_rgb[31:24]} << 1) -
+                               ({2'b0, rgb0_data_rgb[31:24]} >> 3);
 wire [9:0] hdmi_p1_r_scaled = {2'b0, rgb0_data_rgb[23:16]} +
                                ({2'b0, rgb0_data_rgb[23:16]} >> 1) +
-                               ({2'b0, rgb0_data_rgb[23:16]} >> 2);
-wire [9:0] hdmi_p1_b_scaled = {2'b0, rgb0_data_rgb[7:0]} << 1;
+                               ({2'b0, rgb0_data_rgb[23:16]} >> 3);
+wire [9:0] hdmi_p1_b_scaled = ({2'b0, rgb0_data_rgb[7:0]} << 1) -
+                               ({2'b0, rgb0_data_rgb[7:0]} >> 3);
 wire [47:0] rgb0_data_wb = {
     hdmi_sat_u10_to_u8(hdmi_p0_r_scaled), rgb0_data_rgb[39:32], hdmi_sat_u10_to_u8(hdmi_p0_b_scaled),
     hdmi_sat_u10_to_u8(hdmi_p1_r_scaled), rgb0_data_rgb[15:8],  hdmi_sat_u10_to_u8(hdmi_p1_b_scaled)
@@ -1346,7 +1451,9 @@ wire [47:0] rgb0_data_wb = {
 wire            hdmi0_hs_out   = rgb_hs;
 wire            hdmi0_vs_out   = rgb_vs;
 wire            hdmi0_de_out   = rgb_de;
-wire [47:0]     hdmi0_data_out = HDMI_FIXED_WB_EN ? rgb0_data_wb : rgb0_data_rgb;
+// The RAW diagnostic is an electrical/data-path reference, so do not tint it
+// with the camera-specific display white-balance coefficients.
+wire [47:0]     hdmi0_data_out = (HDMI_FIXED_WB_EN && !raw_diag_en) ? rgb0_data_wb : rgb0_data_rgb;
 
 //============================================================================= 
 //mipi dsi

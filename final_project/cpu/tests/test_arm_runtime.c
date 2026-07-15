@@ -244,6 +244,54 @@ static void test_simulated_busy_and_twenty_rounds(void)
     assert(arm_runtime_set_sim_scenario(&runtime, ARM_SIM_SCENARIO_HAPPY) == 0);
     run_twenty_round_session(&runtime, 7u);
 }
+
+static void test_simulated_settle_cancel_reinit_and_next_request(void)
+{
+    arm_controller_plan_t plan = make_fast_plan();
+    arm_runtime_t runtime;
+    arm_runtime_status_t status;
+    uint16_t send_count;
+    uint16_t read_count;
+    uint16_t gripper_count;
+    uint16_t retry_speed;
+
+    /* Configurable N-poll convergence must remain bounded and complete. */
+    plan.move_timeout_ms = 500u;
+    plan.home_timeout_ms = 500u;
+    arm_runtime_init(&runtime, &plan);
+    assert(arm_runtime_set_sim_scenario(&runtime, ARM_SIM_SCENARIO_HAPPY) == 0);
+    arm_sim_transport_set_settle_reads(&runtime.sim, 2u);
+    assert(arm_runtime_accept_request(&runtime) == 0);
+    status = run_to_terminal(&runtime);
+    assert(status.arm_done == 1u);
+    arm_runtime_get_sim_counters(&runtime, &send_count, &read_count,
+                                 &gripper_count, &retry_speed);
+    assert(read_count > 2u);
+
+    /* DONE is not a dead end: the next distinct transaction can start. */
+    assert(arm_runtime_accept_request(&runtime) == 0);
+    status = run_to_terminal(&runtime);
+    assert(status.arm_done == 1u);
+    assert(runtime.status.accepted_requests == 2u);
+
+    /* A fault remains fail-closed until re-initialization. */
+    arm_runtime_init(&runtime, &plan);
+    assert(arm_runtime_set_sim_scenario(&runtime, ARM_SIM_SCENARIO_RETRY_FAILURE) == 0);
+    assert(arm_runtime_accept_request(&runtime) == 0);
+    status = run_to_terminal(&runtime);
+    assert(status.arm_fault == 1u);
+    arm_runtime_cancel(&runtime, ARM_ERR_PROTOCOL_TIMEOUT);
+    arm_runtime_get_status(&runtime, &status);
+    assert(status.arm_fault == 1u);
+    assert(status.error == ARM_ERR_PROTOCOL_TIMEOUT);
+
+    arm_runtime_init(&runtime, &plan);
+    assert(arm_runtime_set_sim_scenario(&runtime, ARM_SIM_SCENARIO_HAPPY) == 0);
+    assert(arm_runtime_accept_request(&runtime) == 0);
+    status = run_to_terminal(&runtime);
+    assert(status.arm_done == 1u);
+    assert(status.arm_fault == 0u);
+}
 #endif
 
 int main(void)
@@ -253,6 +301,7 @@ int main(void)
 #elif ARM_BACKEND == ARM_BACKEND_SIMULATED
     test_simulated_cases();
     test_simulated_busy_and_twenty_rounds();
+    test_simulated_settle_cancel_reinit_and_next_request();
 #else
 #error "test_arm_runtime only supports G0-G3 backends"
 #endif

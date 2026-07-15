@@ -167,6 +167,7 @@ $cflags = @(
     '-Werror', '-Wno-error=cpp',
     ("-I" + (Join-Path $appDir 'include')), ("-I" + $paramsDir),
     ("-DAPP_PROFILE=" + $profileDefine), ("-DARM_BACKEND=" + $backendDefine),
+    ('-DARM_BUILD_ID=\"' + $buildId + '\"'),
     '-DAPB_VISION_BASE_PLACEHOLDER=0xF0000000u'
 )
 $ldflags = @(

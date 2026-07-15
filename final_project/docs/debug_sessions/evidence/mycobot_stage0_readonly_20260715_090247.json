@@ -1,0 +1,30 @@
+{
+  "schema": "mycobot-stage0-readonly-v1",
+  "timestamp_utc": "2026-07-15T09:02:47.981744+00:00",
+  "mode": "STAGE0_READ_ONLY",
+  "operator_confirmed_port_identity": true,
+  "python": "C:\\Program Files\\Python313\\python.exe",
+  "pymycobot_version": "4.0.5",
+  "port": {
+    "device": "COM10",
+    "description": "USB-SERIAL CH340 (COM10)",
+    "hwid": "USB VID:PID=1A86:7523 SER= LOCATION=1-9",
+    "vid": 6790,
+    "pid": 29987,
+    "serial_number": ""
+  },
+  "baudrate": 1000000,
+  "timeout_seconds": 0.75,
+  "permitted_api": "MyCobot280.get_system_version",
+  "motion_or_firmware_api_called": false,
+  "system_version": 7.3,
+  "query_status": "OK",
+  "script": {
+    "path": "final_project/tools/mycobot_firmware_version_readonly.py",
+    "sha256": "490B7B8A1CBB5CFA4181919B9FC236C84653F3D5FBDEFC364A233D8D04E5B740"
+  },
+  "limitations": [
+    "The device cannot report a flashed firmware-file hash through this query; that evidence remains NOT_AVAILABLE.",
+    "This record proves only the Stage-0 version query. It does not prove A0/G4, J52 wiring, FPGA voltage compatibility, UART2 traffic, or any motion gate."
+  ]
+}
