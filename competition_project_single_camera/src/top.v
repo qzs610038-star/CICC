@@ -1372,8 +1372,61 @@ end
 wire [47:0] rgb0_data_rgb = {rgb_datax2[31:24], rgb_datax2[39:32], rgb_datax2[47:40],
                              rgb_datax2[7:0],   rgb_datax2[15:8],   rgb_datax2[23:16]};
 
-// Display-only fixed-point white balance, derived from the stationary white
-// reference block. R uses 1.75x, G uses 1x, and B uses 2x with saturation.
+// M2 feature-tap gate: observe ch0 RGB without driving the video path.
+// Capture remains disabled until a legal SoC/APB/CDC interface exists.
+wire        ch0_feature_snapshot_valid_unused;
+wire [15:0] ch0_feature_frame_id_unused;
+wire [15:0] ch0_feature_config_seq_unused;
+wire [20:0] ch0_feature_red_area_unused;
+wire [20:0] ch0_feature_blue_area_unused;
+wire [20:0] ch0_feature_yellow_area_unused;
+wire [20:0] ch0_feature_foreground_area_unused;
+wire [20:0] ch0_feature_roi_pixel_count_unused;
+wire [30:0] ch0_feature_sum_luma_unused;
+wire [10:0] ch0_feature_bbox_width_unused;
+wire [10:0] ch0_feature_bbox_height_unused;
+wire [7:0]  ch0_feature_source_flags_unused;
+
+feature_stats_tap u_ch0_feature_stats_tap (
+    .i_clk                 (i_sysclk_div2),
+    .i_rst_n               (pixel_data_en),
+    .i_capture_enable      (1'b0),
+    .i_frame_stable        (ch0_frame_stable),
+    .i_diag_active         (raw_diag_en),
+    .i_vs                  (rgb_vs),
+    .i_de                  (rgb_de),
+    .i_rgb_data            (rgb0_data_rgb),
+    .i_roi_x0              (11'd0),
+    .i_roi_x1              (11'd1919),
+    .i_roi_y0              (11'd0),
+    .i_roi_y1              (11'd1079),
+    .i_bg_r                (8'd0),
+    .i_bg_g                (8'd0),
+    .i_bg_b                (8'd0),
+    .i_foreground_delta    (10'd1023),
+    .i_red_min             (8'd255),
+    .i_blue_min            (8'd255),
+    .i_yellow_min          (8'd255),
+    .i_color_delta          (8'd0),
+    .i_config_seq          (16'd0),
+    .i_ack_valid           (1'b0),
+    .i_ack_frame_id        (16'd0),
+    .o_snapshot_valid      (ch0_feature_snapshot_valid_unused),
+    .o_frame_id            (ch0_feature_frame_id_unused),
+    .o_config_seq          (ch0_feature_config_seq_unused),
+    .o_red_area            (ch0_feature_red_area_unused),
+    .o_blue_area           (ch0_feature_blue_area_unused),
+    .o_yellow_area         (ch0_feature_yellow_area_unused),
+    .o_foreground_area     (ch0_feature_foreground_area_unused),
+    .o_roi_pixel_count     (ch0_feature_roi_pixel_count_unused),
+    .o_sum_luma            (ch0_feature_sum_luma_unused),
+    .o_bbox_width          (ch0_feature_bbox_width_unused),
+    .o_bbox_height         (ch0_feature_bbox_height_unused),
+    .o_source_flags        (ch0_feature_source_flags_unused)
+);
+
+// Display-only fixed-point white balance. The 2026-07-15 neutral references
+// showed a mild purple cast, so use R=1.625x, G=1x, B=1.875x with saturation.
 function [7:0] hdmi_sat_u10_to_u8;
     input [9:0] value;
     begin
@@ -1383,12 +1436,14 @@ endfunction
 
 wire [9:0] hdmi_p0_r_scaled = {2'b0, rgb0_data_rgb[47:40]} +
                                ({2'b0, rgb0_data_rgb[47:40]} >> 1) +
-                               ({2'b0, rgb0_data_rgb[47:40]} >> 2);
-wire [9:0] hdmi_p0_b_scaled = {2'b0, rgb0_data_rgb[31:24]} << 1;
+                               ({2'b0, rgb0_data_rgb[47:40]} >> 3);
+wire [9:0] hdmi_p0_b_scaled = ({2'b0, rgb0_data_rgb[31:24]} << 1) -
+                               ({2'b0, rgb0_data_rgb[31:24]} >> 3);
 wire [9:0] hdmi_p1_r_scaled = {2'b0, rgb0_data_rgb[23:16]} +
                                ({2'b0, rgb0_data_rgb[23:16]} >> 1) +
-                               ({2'b0, rgb0_data_rgb[23:16]} >> 2);
-wire [9:0] hdmi_p1_b_scaled = {2'b0, rgb0_data_rgb[7:0]} << 1;
+                               ({2'b0, rgb0_data_rgb[23:16]} >> 3);
+wire [9:0] hdmi_p1_b_scaled = ({2'b0, rgb0_data_rgb[7:0]} << 1) -
+                               ({2'b0, rgb0_data_rgb[7:0]} >> 3);
 wire [47:0] rgb0_data_wb = {
     hdmi_sat_u10_to_u8(hdmi_p0_r_scaled), rgb0_data_rgb[39:32], hdmi_sat_u10_to_u8(hdmi_p0_b_scaled),
     hdmi_sat_u10_to_u8(hdmi_p1_r_scaled), rgb0_data_rgb[15:8],  hdmi_sat_u10_to_u8(hdmi_p1_b_scaled)
@@ -1396,7 +1451,9 @@ wire [47:0] rgb0_data_wb = {
 wire            hdmi0_hs_out   = rgb_hs;
 wire            hdmi0_vs_out   = rgb_vs;
 wire            hdmi0_de_out   = rgb_de;
-wire [47:0]     hdmi0_data_out = HDMI_FIXED_WB_EN ? rgb0_data_wb : rgb0_data_rgb;
+// The RAW diagnostic is an electrical/data-path reference, so do not tint it
+// with the camera-specific display white-balance coefficients.
+wire [47:0]     hdmi0_data_out = (HDMI_FIXED_WB_EN && !raw_diag_en) ? rgb0_data_wb : rgb0_data_rgb;
 
 //============================================================================= 
 //mipi dsi

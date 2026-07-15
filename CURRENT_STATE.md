@@ -27,6 +27,41 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-15，来源 Agent：Codex（单摄联合 Hard SoC 与 CPU Hello 检查点）
+  - 适用范围：仅 `D:\TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500` 联合实验副本；不替代原 D 盘烧录基线，也不表示正式候选工程已同步或 CPU/识别/机械臂已闭环。
+  - 最新结论：联合工程 Hard SoC、Map、PNR、bitstream 和 J48/ch0 HDMI 视频回归已通过。匹配 bitstream SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`；最终 Setup/Hold 最差为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`。板级证据只证明 Hard SoC 接入没有破坏既有摄像头画面，不证明成像质量或识别精度达标。
+  - CPU 检查点：片上 RAM UART0 Hello ELF 已构建并通过地址审计，SHA-256 为 `30A499F5EA2E91AF531FA3991EEB8F2CC9757847E27977EE8238060ADF7A2757`，入口和唯一 LOAD 段均位于 `0xF9000000` 的 16KB 片上 RAM；尚未通过 USER2 JTAG 下载运行，UART 横幅和回显均为 `NOT VERIFIED`。
+  - 当前阻塞：用户明确开发板不在身边，因此板级 `CPU EXECUTION + UART0` 门暂停。关机后恢复检查未枚举到 COM 端口不能记为硬件故障；Efinity RISC-V IDE 已关闭。机械臂保持不参与。
+  - 调试边界：CPU JTAG 继续固定使用 FPGA `USER2`，`USER1` 保留给视频工程；只允许 Debug in RAM，不允许 Flash erase/program 或外部 DDR 初始化。生成的 `debug_softTap.cfg` 虽将 OpenOCD work area 设为 `0xF9000000`，但仍保留旧 `instr_addr=0x00001000`，因此实际 ELF 入口和 PC 必须以审计过的 `0xF9000000` 为准，不得仅凭配置文件名判断地址正确。
+  - 工程身份：原烧录基线 `D:\TJ375N529_SC431HAI2LCD_Demo_V3` 未修改；`competition_project_single_camera/` 仍只保存源码、契约、测试和日志，联合实验改动尚未同步。必须在 Hello 横幅和单字符回显通过、且 HDMI 再次确认正常后，才讨论同步正式候选工程和迁移识别主循环。
+  - 证据路径：`competition_project_single_camera/WORK_LOG.md` 的 M2-26 至 M2-31、`competition_project_single_camera/docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`、联合副本 `outflow/mem_test.bit` 与 `cpu_bringup/uart_hello_onchip/build/uart_hello_onchip.elf`。
+  - 下一门：板卡可用时重新枚举 FTDI/COM，先只监听；在 RISC-V IDE 中使用联合 BSP 的 `external.cfg + debug_softTap.cfg` 连接 USER2，将 ELF 下载到片上 RAM并停在 `main`，Resume 后取得完整 UART0 横幅，再向已确认的 UART0 端口发送一个 ASCII 字符验证回显。任一地址、USER TAP 或 Flash 选项不符立即停止。
+  - 失效条件：联合 bitstream/ELF 哈希、SoC periphery、`top.v`、SDC、BSP/linker、USER TAP、UART0 引脚或板级现象发生变化。
+
+- 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
+  - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
+  - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。
+  - 接入结论：同步 main 后丢失的状态口径已纠正。正式 `main.c` 现在消费 `cpu_display_from_round_output()`，以统一语义层校验 action/reason/is_target 并对矛盾组合 fail closed；`main_loop_adapter.c` 已进入 competition 目标构建清单，但在 G4 取得受审事件源和单调时基前不由正式 main 调用。禁止恢复 wsc 旧版未受审 UART 单字符事件和直接 CLINT 假设。
+  - 目标构建：Efinity RISC-V GCC 8.3.0 对 `competition/arm_bringup × disabled/simulated` 四组合均 BUILD/ELF PASS，制品继续标记 `NOT_FOR_FLASH`，UART2/real transport 继续被排除；构建器同时修复 Windows PowerShell 原生 stderr 被提前升级为异常、导致完整 gcc 诊断丢失的问题，warning allowlist 与退出码门保持不变。
+  - 环境差异记录：wsc 原环境报告 MinGW GCC 14.2.0 下 `374/374`、`117/117` PASS；Codex 修复前在 MSVC `/W4 /WX` 因 C4456 于断言执行前失败。该差异由警告策略不对称暴露了真实测试可移植性问题，不构成 CPU 功能逻辑失败。Codex 本机无 PATH gcc、也无仓库 `tools/mingw64/bin/gcc.exe`，带 `-Wshadow` 的 GCC 复验仍需 wsc 在其环境执行。
+  - 替代旧结论：替代下方 2026-07-14 条目中“main.c 与 Host 测试链接同一 main_loop_adapter 实现”和“MSVC 本机不可用”的旧口径；旧 Host 结果保留为 wsc 原环境证据，不再描述当前正式 main 接入状态。
+  - 证据路径：`final_project/cpu/app/src/main.c`、`final_project/cpu/app/src/main_loop_adapter.c`、`final_project/cpu/app/src/cpu_result_semantics_adapters.c`、`final_project/cpu/build_tools/build_arm_profile.ps1`、`final_project/cpu/tests/run_cpu_result_semantics_host.ps1`、`final_project/cpu/tests/run_main_loop_arm_disabled_host.ps1`、`final_project/docs/review_packets/wsc_cpu_mycobot_integration_acceptance_20260715.md`。
+  - 下一门：由 wsc 在同一集成 commit 上执行 MinGW `-Wshadow` 两项 Host 回归和 Efinity 四组合构建，回传编译器版本、完整命令、退出码与 manifest；Codex 再核对结果后才允许向 main 提交 CPU 集成 PR。真实接线/烧录/动作继续 NO-GO。
+  - 失效条件：集成 commit、语义枚举、main/adapter 接法、构建源码清单、编译器 flags 或目标工具链发生变化，或任一回归失败。
+
+- 日期：2026-07-14，来源 Agent：Codex（最新云端 `main` 同步后的 myCobot 实验续跑与独立复核）
+  - 适用范围：PC 端 180°候选五点路径真机初步验证，以及它与板上 CPU G4–G11 路线的边界；不表示官方 180°/最大臂展验收、板上 UART2 或比赛抓放已经闭环。
+  - 分支基线：本地 `main` 已通过 fast-forward 与 `origin/main@39e8a92` 对齐，并从该提交创建 `codex/mycobot-experiment-main-sync-20260714`。原有 `.claude/settings.local.json` 与 `.agents/handoff/`、`.agents/shared/` 仅作为本机状态原样保留，不纳入本分支提交。
+  - 最新结论：保留 `mycobot_pc_tests/archive/teach_replay_pick_success_baseline_20260714_153337.py` 不变。PC 端真机 A 路线候选路径初步验证为 `PASS_WITH_RISKS`：最新 `auto_run_20260714_204908.log` 在 `COM9` 完成 5/5 连续流程、0 轮人工扶正，日志未记录异常；但这不是官方目标位或板上闭环验收。候选点内部坐标方位差为 177.72°，pick/drop 平面半径约 223.5/223.0 mm；没有外部 180°基准或“臂展最大处”证据。
+  - **已知风险点（板上移植前必须解决）**：
+    1. **drop_hover 长距离过渡固件系统性不收敛**：最新 5/5 轮 step 6 固件均返回 0（未收敛或超时），靠“读实际角度 → max_diff=2.02° ≤ 3° → 软通过”兜底才没熔断。板上 RISC-V 移植时必须实现 `get_angles` 读回 + 3° 容差判断；读回不稳定时该点位不可放行动作。
+    2. **夹爪完全开环，无任何到位反馈**：最新 5 轮 × 每轮 3 次夹爪动作共 15 次 `[GRIP_UNVERIFIED]`，0.8s 是纯定时经验值。板上移植时 0x66/0x67 无 ACK，必须用 0x69 轮询停止 + 0x65 读位置窗口确认；位置读回仍不能单独证明夹持力或未滑落。
+    3. **外部几何与结构风险未关闭**：点位 JSON 无 `external_reference`；内部 177.72°不能替代台面外部量角，约 223 mm 半径未确认是“臂展最大处”。E3 被跳过，本次重复成功只证明当次条件下可运行，不能反推底座刚性风险已关闭。
+  - **E3/E4 状态（2026-07-14 用户决策 + Codex 复核）**：现场因硬件条件跳过 E3 后完成 PC 真机候选路径验证，E4 记为 `PASS_WITH_RISKS`，E3 仍为 `NOT_VERIFIED`。本结果允许明日推进 G4 正式 SoC/PNR、G5 断臂板上模拟和 D2 UART2 无臂回环；不得直接放行真实机械臂接线或动作。
+  - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
+  - 证据路径：`final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`、`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、本机忽略日志 `mycobot_pc_tests/audit_logs/auto_run_20260714_204908.log`（SHA-256 `EB89B99A...F9F475`）、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`。
+  - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
+
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
   - 适用范围：机械臂代码上板前的构建隔离、板上无臂模拟入口、Host/QEMU/RISC-V 制品门与主循环安全语义；不表示正式 SoC、bitstream、烧录、J52 或机械臂已经完成。
   - 最新结论：`mycobot_cpu_board_bringup_implementation_plan_20260714.md` 继续作为详细执行入口。`codex/mycobot-g0-g3-bringup-20260714@b48973b` 的 G1.5–G3.5 工作已合入本地 `main`：默认 disabled，独立 `arm_bringup` 与正式 `competition` 两入口均只生成 `NOT_FOR_FLASH` 制品；真实 UART2/myCobot transport 仍被源码、flags、nm、map 和反汇编门排除。

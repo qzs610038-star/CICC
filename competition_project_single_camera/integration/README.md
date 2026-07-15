@@ -14,3 +14,6 @@ round_controller
 ```
 
 所有正式地址、UART、GPIO、IRQ、时钟和复位必须来自新Demo同一次Efinity SoC生成物。不得复制`final_project`的候选MMIO地址。
+
+`single_camera_feature_contract.md` 冻结 `FEATURE_SNAPSHOT` 的字段、帧原子性和
+CDC/ACK 规则。它不定义地址，且不表示 FPGA 统计、SoC、APB 或 OSD 已实现。
