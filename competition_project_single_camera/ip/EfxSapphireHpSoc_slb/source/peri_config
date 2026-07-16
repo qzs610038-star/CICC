@@ -1,3 +1,4 @@
+--uart name=system_uart_0_io,address=0x10000,interruptId=0
+--apbSlave name=io_apbSlave_0,address=0x100000,size=4096
 --peripheralFrequency 200000000
 --PeripheralClock true
---uart name=system_uart_0_io,address=0x10000,interruptId=0

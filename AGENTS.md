@@ -132,7 +132,7 @@ Verilog/SystemVerilog 代码应沿用现有风格：文件名使用 snake_case�
 
 ### 长期分支合并治理（必读）
 
-跨成员分支合并前，必须先阅读根目录 [`BRANCH_MERGE_GOVERNANCE.md`](BRANCH_MERGE_GOVERNANCE.md)。该文件定义 `@qzs610038-star`、`@libaoxun688` 与 `@wsc6090-CPU` 的领域优先级、固定 SHA 审查、WSC 大小写 ref 处理、硬件配置原子性、机械臂安全边界及证据批次失效规则；它不得覆盖本节优先级阶梯、官方细则、`CURRENT_STATE.md` 或真实证据。
+跨成员分支合并前，必须先阅读 [`docs/merge_governance/BRANCH_MERGE_GOVERNANCE.md`](docs/merge_governance/BRANCH_MERGE_GOVERNANCE.md) 与 [`docs/merge_governance/MERGE_REGISTER.md`](docs/merge_governance/MERGE_REGISTER.md)。前者定义 `@qzs610038-star`、`@libaoxun688` 与 `@wsc6090-CPU` 的领域优先级、固定 SHA 审查、WSC 大小写 ref 处理、硬件配置原子性、机械臂安全边界及证据批次失效规则；后者索引每次 `main` 合并的纳入、舍弃和结论。两者不得覆盖本节优先级阶梯、官方细则、`CURRENT_STATE.md` 或真实证据。
 
 真实源码、工程 XML、构建日志和上板现象始终是最终事实来源；上述文件只记录对它们的最新结论和证据位置。
 

@@ -7,7 +7,7 @@
 - [`final_project/`](final_project/README.md)：当前正式协作主线，保留 FPGA、CPU、机械臂、接口契约、测试和历史验证证据。
 - [`competition_project_single_camera/`](competition_project_single_camera/README.md)：基于已跑通 J48/ch0 摄像头 Demo 的隔离单摄候选工程。初始 M0 白名单复制完成，随后已有一项白平衡增量；当前仍等待新构建、匹配 bitstream、烧录和板级复现，未替代正式主线。
 - [`CURRENT_STATE.md`](CURRENT_STATE.md)：当前完成度、阻塞、路线覆盖项和下一步的权威索引。
-- [`BRANCH_MERGE_GOVERNANCE.md`](BRANCH_MERGE_GOVERNANCE.md)：跨成员分支的长期合并职责、固定 SHA 审查、证据失效与机械臂安全治理。
+- [`docs/merge_governance/`](docs/merge_governance/README.md)：跨成员分支的长期合并职责、固定 SHA 审查、证据失效、机械臂安全治理与每次 `main` 合并记录。
 
 ## 项目成员
 

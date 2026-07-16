@@ -27,6 +27,12 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-17，来源 Agent：Codex（本地 `main` 合并 `@libaoxun688` Hard SoC 真源）
+  - 合并范围：纳入 `dev/libaoxun688-hard-soc-source-sync-20260716@14b924866f9df8a27e65f9719c285d23b3b8fa7e` 的 Hard SoC 原子源码集：IP/生成 wrapper/BSP、`mem_test.xml`、`mem_test.peri.xml`、`src/top.v`、APB0 `REG_MAGIC` RTL 与 testbench。CPU 侧新增地址定义为 `IO_APB_SLAVE_0_INPUT=0xE8100000`。
+  - 当前裁定：源码与 XML 的静态一致性已核对；本机 Efinity RISC-V 工具链未配置，未重跑 Hello 构建；Efinity Map/PNR/STA/CDC、bitstream/ELF 身份、JTAG、USER2、CPU 取指、UART0 和 APB 实读均为本合并后 `NOT VERIFIED`。不得继承合并前任一 bitstream、ELF 或板级结论。
+  - 舍弃范围：未纳入来源分支对 `CURRENT_STATE.md`、`WORK_LOG.md` 和板级交接/配置文档的改写，因为随分支未提供可复查的原始构建/板测记录，且其中部分当前 PASS 叙述与本仓库新构建 Gate 不一致；保留其 SHA 和逐项理由于 `docs/merge_governance/records/2026-07-17_main_merge_libaoxun_hard_soc_source_sync.md`。
+  - 下一门：由 `@libaoxun688` 的已配置 Efinity 环境从当前 `main` 重建并提交脱敏证据（Map/PNR/STA/CDC、bitstream/ELF hash 与 warning）；随后仅依 `USER2` + 片上 RAM + UART0 115200 的隔离顺序做板级复核。继续禁止 USER1、Flash、外部 DDR、UART2/J52 和机械臂。
+
 - 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）
   - 适用范围：`mycobot_arm_board_control_advancement_plan_20260715.md` §13 的阶段 0、B1–B3 与 A0；不表示 G4 SoC/PNR、烧录、J52 回环、真实臂只读或动作已经完成。
   - 最新结论：B1–B3 的纯软件子检查点已完成。新增 `mycobot_transaction` 提供 750 ms single-flight、expected-command/精确 payload length、超时、迟到/重复与错误计数；协议层补齐 0x29/0x2B/0x69、官方 LEN 窗口和 J1..J6 绝对范围，越界 `SEND_ANGLES` 编码被拒绝而非饱和。GET_ANGLES 精确请求/响应、LEN 边界和错误向量已进入 QEMU 断言。B2 差分测试补齐 N-poll、DONE 后下一请求、fault/cancel 后 re-init；不新增重复的 transport 枚举。用户确认 COM10 为 myCobot 后，阶段 0 脚本以 1 Mbps 调用唯一允许 API `MyCobot280.get_system_version()`并成功返回 `7.3`；运行记录为 `motion_or_firmware_api_called=false`，设备侧已刷文件 hash 仍不可回读。B1 源已用 Efinity `rv32imac/ilp32` 工具链 `-Werror -fsyntax-only` 通过，但当前构建器仍被刻意限制为 `NOT_FOR_FLASH` 且硬性排除 UART2/真实 transport，故尚无可烧录 ELF。A0 当前工程的 PLL/JTAG 资源与旧 GUI 冲突审计一致，但旧隔离树已不存在，当前工程的 GUI 合法组合尚无本批次证据；因此 A0/G4 继续未关闭。

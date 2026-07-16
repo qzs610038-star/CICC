@@ -107,5 +107,13 @@ EfxSapphireHpSoc_slb u_EfxSapphireHpSoc_slb
     .axiA_rlast ( axiA_rlast ),
     .axiA_rvalid ( axiA_rvalid ),
     .axiA_rready ( axiA_rready ),
-    .userInterruptA ( userInterruptA )
+    .userInterruptA ( userInterruptA ),
+    .io_apbSlave_0_PADDR ( io_apbSlave_0_PADDR ),
+    .io_apbSlave_0_PENABLE ( io_apbSlave_0_PENABLE ),
+    .io_apbSlave_0_PRDATA ( io_apbSlave_0_PRDATA ),
+    .io_apbSlave_0_PREADY ( io_apbSlave_0_PREADY ),
+    .io_apbSlave_0_PSEL ( io_apbSlave_0_PSEL ),
+    .io_apbSlave_0_PSLVERROR ( io_apbSlave_0_PSLVERROR ),
+    .io_apbSlave_0_PWDATA ( io_apbSlave_0_PWDATA ),
+    .io_apbSlave_0_PWRITE ( io_apbSlave_0_PWRITE )
 );

@@ -101,7 +101,15 @@ port (
     axiA_rlast : out std_logic;
     axiA_rvalid : out std_logic;
     axiA_rready : in std_logic;
-    userInterruptA : out std_logic
+    userInterruptA : out std_logic;
+    io_apbSlave_0_PADDR : out std_logic_vector(31 downto 0);
+    io_apbSlave_0_PENABLE : out std_logic;
+    io_apbSlave_0_PRDATA : in std_logic_vector(31 downto 0);
+    io_apbSlave_0_PREADY : in std_logic;
+    io_apbSlave_0_PSEL : out std_logic;
+    io_apbSlave_0_PSLVERROR : in std_logic;
+    io_apbSlave_0_PWDATA : out std_logic_vector(31 downto 0);
+    io_apbSlave_0_PWRITE : out std_logic
 );
 end component EfxSapphireHpSoc_slb;
 
@@ -171,7 +179,15 @@ port map (
     axiA_rlast => axiA_rlast,
     axiA_rvalid => axiA_rvalid,
     axiA_rready => axiA_rready,
-    userInterruptA => userInterruptA
+    userInterruptA => userInterruptA,
+    io_apbSlave_0_PADDR => io_apbSlave_0_PADDR,
+    io_apbSlave_0_PENABLE => io_apbSlave_0_PENABLE,
+    io_apbSlave_0_PRDATA => io_apbSlave_0_PRDATA,
+    io_apbSlave_0_PREADY => io_apbSlave_0_PREADY,
+    io_apbSlave_0_PSEL => io_apbSlave_0_PSEL,
+    io_apbSlave_0_PSLVERROR => io_apbSlave_0_PSLVERROR,
+    io_apbSlave_0_PWDATA => io_apbSlave_0_PWDATA,
+    io_apbSlave_0_PWRITE => io_apbSlave_0_PWRITE
 );
 
 ------------------------ End INSTANTIATION Template ---------

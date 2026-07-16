@@ -1,6 +1,7 @@
 module EfxSapphireHpSoc_wrapper (
-output		userInterruptC,
-output		userInterruptE,
+output		userInterruptG,
+output		userInterruptH,
+output		userInterruptB,
 output		jtagCtrl_tdi,
 input		jtagCtrl_tdo,
 output		jtagCtrl_enable,
@@ -15,14 +16,13 @@ input		ut_jtagCtrl_capture,
 input		ut_jtagCtrl_shift,
 input		ut_jtagCtrl_update,
 input		ut_jtagCtrl_reset,
-output		userInterruptD,
-output		userInterruptG,
-output		userInterruptB,
 output		system_uart_0_io_txd,
 input		system_uart_0_io_rxd,
 output		userInterruptA,
+output		userInterruptD,
+output		userInterruptE,
+output		userInterruptC,
 output		userInterruptF,
-output		userInterruptH,
 input [31:0]  axiA_awaddr,
 input [7:0]	  axiA_awlen,
 input [2:0]	  axiA_awsize,
@@ -71,6 +71,14 @@ input         pll_peripheral_locked,
 input         pll_system_locked
 );
 
+wire [11:0] io_apbSlave_0_PADDR;
+wire		io_apbSlave_0_PSEL;
+wire		io_apbSlave_0_PENABLE;
+wire		io_apbSlave_0_PREADY;
+wire		io_apbSlave_0_PWRITE;
+wire [31:0] io_apbSlave_0_PWDATA;
+wire [31:0] io_apbSlave_0_PRDATA;
+wire		io_apbSlave_0_PSLVERROR;
 
 
 assign userInterruptB = 1'b0;	//USER TO MODIFY
@@ -81,13 +89,22 @@ assign userInterruptF = 1'b0;	//USER TO MODIFY
 assign userInterruptG = 1'b0;	//USER TO MODIFY
 assign userInterruptH = 1'b0;	//USER TO MODIFY
 
+/**/
+/*	INFO: USER TO MODIFY CODES BELOW						*/
+/*	INFO: REFER EXAMPLE DESIGN FOR IMPLEMENTATION DETAILS	*/
+/**/
+assign io_apbSlave_0_PREADY = 1'b1;
+assign io_apbSlave_0_PRDATA = 32'd0;
+//io_apbSlave_0_PADDR;
+//io_apbSlave_0_PSEL;
+//io_apbSlave_0_PENABLE;
+//io_apbSlave_0_PWRITE;
+//io_apbSlave_0_PWDATA;
+//io_apbSlave_0_PSLVERROR;
 
 
 //axi4 bridge to various I/O
 EfxSapphireHpSoc_slb u_top_peripherals(
-.userInterruptA(userInterruptA),
-.system_uart_0_io_txd(system_uart_0_io_txd),
-.system_uart_0_io_rxd(system_uart_0_io_rxd),
 .jtagCtrl_tdi(jtagCtrl_tdi),
 .jtagCtrl_tdo(jtagCtrl_tdo),
 .jtagCtrl_enable(jtagCtrl_enable),
@@ -102,6 +119,17 @@ EfxSapphireHpSoc_slb u_top_peripherals(
 .ut_jtagCtrl_shift(ut_jtagCtrl_shift),
 .ut_jtagCtrl_update(ut_jtagCtrl_update),
 .ut_jtagCtrl_reset(ut_jtagCtrl_reset),
+.system_uart_0_io_txd(system_uart_0_io_txd),
+.system_uart_0_io_rxd(system_uart_0_io_rxd),
+.userInterruptA(userInterruptA),
+.io_apbSlave_0_PADDR(io_apbSlave_0_PADDR),
+.io_apbSlave_0_PSEL(io_apbSlave_0_PSEL),
+.io_apbSlave_0_PENABLE(io_apbSlave_0_PENABLE),
+.io_apbSlave_0_PREADY(io_apbSlave_0_PREADY),
+.io_apbSlave_0_PWRITE(io_apbSlave_0_PWRITE),
+.io_apbSlave_0_PWDATA(io_apbSlave_0_PWDATA),
+.io_apbSlave_0_PRDATA(io_apbSlave_0_PRDATA),
+.io_apbSlave_0_PSLVERROR(io_apbSlave_0_PSLVERROR),
 .axiA_awvalid(axiA_awvalid),
 .axiA_awready(axiA_awready),
 .axiA_awaddr(axiA_awaddr),

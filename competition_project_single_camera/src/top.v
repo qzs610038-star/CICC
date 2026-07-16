@@ -623,6 +623,23 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
 wire soc_cfg_start_unused;
 wire soc_cfg_sel_unused;
 wire soc_cfg_reset_unused;
+wire [31:0] apb0_paddr;
+wire        apb0_penable;
+wire [31:0] apb0_prdata;
+wire        apb0_pready;
+wire        apb0_psel;
+wire        apb0_pslverror;
+wire        apb0_pwrite;
+
+apb_reg_magic u_apb_reg_magic (
+    .paddr      (apb0_paddr[11:0]),
+    .penable    (apb0_penable),
+    .prdata     (apb0_prdata),
+    .pready     (apb0_pready),
+    .psel       (apb0_psel),
+    .pslverror  (apb0_pslverror),
+    .pwrite     (apb0_pwrite)
+);
 
 EfxSapphireHpSoc_slb u_EfxSapphireHpSoc_slb (
     .io_peripheralClk          (axi0_ACLK),
@@ -687,7 +704,15 @@ EfxSapphireHpSoc_slb u_EfxSapphireHpSoc_slb (
     .axiA_rlast                (axiA_rlast),
     .axiA_rvalid               (axiA_rvalid),
     .axiA_rready               (axiA_rready),
-    .userInterruptA            (userInterruptA)
+    .userInterruptA            (userInterruptA),
+    .io_apbSlave_0_PADDR       (apb0_paddr),
+    .io_apbSlave_0_PENABLE     (apb0_penable),
+    .io_apbSlave_0_PRDATA      (apb0_prdata),
+    .io_apbSlave_0_PREADY      (apb0_pready),
+    .io_apbSlave_0_PSEL        (apb0_psel),
+    .io_apbSlave_0_PSLVERROR   (apb0_pslverror),
+    .io_apbSlave_0_PWDATA      (),
+    .io_apbSlave_0_PWRITE      (apb0_pwrite)
 );
 
 assign userInterruptB = 1'b0;
