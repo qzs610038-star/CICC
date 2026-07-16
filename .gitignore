@@ -13,13 +13,16 @@ tmp_*.txt
 *.swp
 
 # Local machine configuration
+/.mcp.json
 final_project/tools/mcp/fpga_robot_mcp/configs/fpga_robot.local.json
 .venv/
 **/.venv/
 
 # Efinity outputs and generated databases
 **/outflow/
+**/outflow_*/
 **/work_syn/
+**/work_syn_*/
 **/work_pnr/
 **/work_pt/
 **/work_dbg/
