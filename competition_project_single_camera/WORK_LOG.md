@@ -318,6 +318,33 @@ git status --short --branch
 - NOT VERIFIED：Efinity Map/PNR/bitstream；烧录后蓝/红/白色画面的恢复程度；三次冷启动、10 分钟稳定性、原始 HDMI 抓帧；Bayer phase、镜头焦距和照明条件。
 - 下一步门禁：用户以 D 盘工程完成完整 Efinity flow 后，反馈 Map/PNR/bitstream、蓝/红/白物体画面和是否仍有真实拖影；仅在新画面仍明显偏色时再讨论 Bayer phase 或传感器寄存器，禁止盲目改动帧缓存/HDMI 链路。
 
+### [M0-10] dsi_tx_top.v 路径可移植性修复
+
+- 触发：M0 命令行 Map 因 `$readmemh` 无法打开 `/src/mipi_dsi/Panel_1080p_reg.mem` 而 FAIL（MULTI-FACTOR：HDL 可移植性缺陷 + 环境触发）。
+- 目标：将唯一生效的硬编码绝对路径改为受控工程相对路径，不改初始化内容或视频逻辑。
+- 修改文件：
+  - `src/mipi_dsi/dsi_tx_top.v`。
+- 实际修改：
+  - 第 144 行：`.INITIAL_CODE("/src/mipi_dsi/Panel_1080p_reg.mem")` → `.INITIAL_CODE("src/mipi_dsi/Panel_1080p_reg.mem")`（仅删除开头 `/`）。
+  - 未修改 `panel_config.v`、`true_dual_port_ram.v`、`mem_test.xml`、`constrain.sdc`、IP、mem 文件或任何其他 RTL。
+- 修改前 SHA-256：`789BD0EAF9C3AE4D2B5D01410A41E6FBEB3F1E406AF1D5F29ECAF2EE4924559D`
+- 修改后 SHA-256：`DDAF952AE26A599A988235FBE5EB2815AA9C8FDE66B7346EB359A24996F031D7`
+- `git diff`：确认仅一行变更，仅删除路径开头 `/`。
+- 旧 Map 失败日志归档至：`docs/debug_sessions/evidence/m0_map_fail_pre_path_fix_20260715/`（5 个文件，SHA-256 与 outflow 原文件一致）。
+- D 盘写入：无。
+- 结果：`MAP PASS / RECORD CORRECTION PENDING / PNR HOLD`。
+- Map 重测结果（2026-07-15）：PASS（退出码 0），旧 `$readmemh` 错误已消除。资源 ADD=4367/LUT4=19399/FF=11800/DSP48=4/RAM10=211/DPRAM10=4/SRL8=1。新运行段 warn.log：1042 非空行，223 VERI/VDB WARNING（15 类别），785 EFX-0256（详见 `m0_efx0256_interface_audit_20260715.md`），VERI-2561 INFO 47。整文件 warn.log：1177 行/1173 非空行。
+- 记录修正（2026-07-15，Codex2 指令）：warning 统计从 224/16 类修正为 223/15 类，删除虚假 OTHER=1；`Found 587 warnings` 不计入统计。Efinity 曾自动改写 `mem_test.xml`，已恢复到构建前精确 Git 字节状态。Delta manifest 已扩展列以区分 initial manifest SHA（`6385FD5A...`）、pre-fix SHA（`789BD0EA...`）和 post-fix SHA（`DDAF952A...`）。
+- 接口审计修正（2026-07-15，Codex2 第二轮）：
+  - AXI1 698 个：EXPECTED → TBD/BLOCKING（`is_axi_enable="true"`——活跃 DDR 目标）。
+  - MIPI DSI ch0 70 个：EXPECTED/DSI 整体未激活 → TBD/仅 ch0 未驱动（ch1 由 `dsi_tx_top_inst1` 驱动）。
+  - JTAG 2 个：新发现 `jtag_inst2` 不在 `mem_test.peri.xml` 中。
+  - LED 2 个：保持 UNEXPECTED（`top.v` 仅驱动 `led[1:0]`）。
+  - 删除"785 项无 DDR 主通道问题"。
+  - 新增 `m0_efx0256_interface_audit_20260715.md` 修正版 + `../review_packets/m0_pnr_interface_resolution_plan_20260715.md`。
+- NOT VERIFIED：PNR/STA/CDC/bitstream、板级。仅改变文件定位，不改变初始化内容或视频逻辑；板级闭环仍需完整构建。
+- 下一步门禁：Codex2 审查修正后的 EFX-0256 接口审计和 PNR 前接口归属解决方案。批准后方可进入 PNR。
+
 ### [主线合并复核] M0-09 增量登记与除零防护
 
 - 触发：将单摄候选分支合入本地 `main` 前进行约束、证据和 RTL 安全复核。

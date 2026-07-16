@@ -101,6 +101,136 @@
     - MSVC `/W4 /WX` 本机不可用（未实跑主路径；run 脚本保留 MSVC + mingw64 兜底）
   - 失效条件：main_loop_adapter 接口/返回语义变更、APB/OSD 接入后行为改变、ARM_ENABLED 过渡后 arm_enabled=1 路径重写，或后续回归重跑失败。
 
+- 日期：2026-07-15，来源 Agent：Claude（Fable 5，无 FPGA 板卡准备任务：Host 测试统计修正 + 静态接口审计 + M0 执行包）
+  - 适用范围：B 线列明 8 项 CPU Host 回归复跑、非 B 线额外项、RISC-V compile-only、静态接口审计、M0 板级执行包；不适用于正式 `soc.h`、APB/CDC/OSD、PNR、bitstream、板级闭环、UART2、J52 或机械臂动作。
+  - 最新结论：完成三项无 FPGA 条件下的准备工作。
+
+    **任务 1 — M0 板级执行包**：`final_project/docs/review_packets/m0_board_execution_packet_20260715.md` 已创建，包含 Efinity 版本/工程路径、Map→PNR→STA→bitstream 顺序、烧录 SHA-256 记录表、J48/ch0→HDMI 接线清单、冷启动 3 次记录表、10 分钟连续运行记录表、停止/回退规则。**所有板级检查项均标记为 PENDING BOARD，无 PASS 勾选。**
+
+    **任务 2 — 无板 CPU 验证（Host 测试）**：
+    编译器：repo mingw64 gcc 14.2.0，`-std=c99 -Wall -Wextra -Werror -Wno-error=cpp`。
+
+    **B 线列明 8 项**（按 CPU_MODULE_PLAN.txt 定义，同成员集合）：
+
+    | # | 测试 | 结果 | 断言数 |
+    |---|------|------|--------|
+    | 1 | vision_classifier (test_classifier) | ✅ PASS | 31/31 |
+    | 2 | task_matcher (test_task_matcher) | ✅ PASS | 154/154 |
+    | 3 | round_controller (test_round_controller) | ✅ PASS | 4979/4979 |
+    | 4 | competition_round_transaction (test_competition_rounds) | ✅ PASS | 135/135 |
+    | 5 | competition_contract (test_competition_contract) | ✅ PASS | 45/45 |
+    | 6 | competition_host_flow (test_competition_host_flow) | ✅ PASS | 164/164 |
+    | 7 | a13_fpga_snapshot_replay (test_a13_fpga_snapshot_replay) | ✅ PASS | 169/169 |
+    | 8 | param_table (test_param_table) | ✅ PASS | 81/81 |
+    | | **B 线 8 项合计** | **✅ 5758/5758** | |
+
+    注：a13 为**新鲜构建**（从当前源码重新编译），169/169 PASS。上一会话因使用陈旧预编译二进制报告 116/169（53 失败），根因为二进制与当前源码不同步。新鲜构建确认当前源码无回归。此测试仍为合成快照 Host 回放，不代表 APB/OSD/板级通过或正式硬件闭环。
+
+    **额外项**（仓库内存在但不在 B 线 8 项定义集合中）：
+
+    | 测试 | 结果 | 断言数 |
+    |------|------|--------|
+    | cpu_result_semantics (test_cpu_result_semantics) | ✅ PASS | 374/374 |
+    | main_loop_arm_disabled (test_main_loop_arm_disabled) | ✅ PASS | 117/117 |
+    | | **额外项合计** | **491/491** |
+
+    **B 线 8 项 + 额外项 = 6249/6249 PASS（Host 回归合计，非仓库全部 Host 测试总数）。**
+
+    另：`test_mycobot_arm_skeleton.c`（原生 assert，无可相加的断言数）和 `test_arm_runtime.c`（未运行）未纳入计数。
+
+    **RISC-V compile-only**：**SKIPPED** — Efinity RISC-V 交叉编译器（`riscv-none-embed-gcc` 8.3.0）未在本机找到（全盘搜索 `D:\Efinity\2025.2\` 无此可执行文件）。Efinity 2025.2 已安装（`D:\Efinity\2025.2\bin\efinity.exe` 和 `D:\Efinity\2025.2\bin\efx_run.bat` 均确认存在），但缺少交叉编译器，因此 RISC-V compile-only 继续 SKIPPED。CPU_MODULE_PLAN.txt 中 RISC-V compile-only 基线（rv32imac/ilp32、`-Wall -Wextra -Werror`）无法在本会话执行。
+
+    **仅有的 warning**：`board_io.h:26` 的 soc.h/APB 占位 `#warning`（每个经 board_io.h 传递的 TU 各一次），由 `-Wno-error=cpp` 放行。其余 warning=0。纯语义头独立编译门通过（无 `-Wno-error=cpp`、无 APB 占位宏，clean）。
+
+    未验证边界：正式 soc.h 未生成；APB/CDC/OSD RTL 未实现；PNR 阻塞；无 bitstream/烧录/上板；UART2/J52/机械臂未连接；所有 Host PASS 不得推断为板级闭环。
+
+    **任务 3 — 静态接口审计**：审计 `CPU_MODULE_PLAN.txt`、`CURRENT_STATE.md`、`register_map.md`、`board_io.h`、`cpu_result_semantics.h`、`main.c`。五项均确认：
+    1. 无占位地址被写成硬件事实（`register_map.md` 开篇声明候选布局，`board_io.h` 所有偏移标记建议/待确认）
+    2. ARM_DISABLED 全线有效（`arm_enabled=0`，`request_arm_grab` 永不为 1，OSD arm_state=IDLE）
+    3. 无 UART2/J52/机械臂动作
+    4. 设计包 §6.3.B（9 项）、§9（10 项）仍阻塞正式 CDC RTL
+    5. main.c 尚未被描述为板级闭环（G2 bridge tick、无 FPGA 事件合成、无直接 arm 请求）
+
+  - 替代了哪个旧结论：修正上一会话"B线8项核心合计 6070/6070"的错误口径——该数字错误地将额外项（cpu_result_semantics 374、main_loop_arm_disabled 117）混入 B 线 8 项，且未包含 a13。正确 B 线 8 项为 5758/5758。a13 的 116/169 来自陈旧二进制，新鲜构建 169/169。
+  - 证据路径：`final_project/cpu/CPU_MODULE_PLAN.txt`（B 线定义块）、`final_project/cpu/tests/test_classifier.c`、`test_param_table.c`、`test_task_matcher.c`、`test_round_controller.c`、`test_competition_rounds.c`、`test_competition_contract.c`、`test_competition_host_flow.c`、`test_a13_fpga_snapshot_replay.c`、`test_cpu_result_semantics.c`、`test_main_loop_arm_disabled.c`、`final_project/docs/review_packets/m0_board_execution_packet_20260715.md`。
+  - 验证：`git diff --check` PASS、`git status --short` 仅预期文件。
+  - 失效条件：后续源码改动导致 B 线 8 项回归失败，RISC-V 工具链安装后重跑交叉编译，或板级证据改变 Host 测试结论。
+  - 未提交 Git（按任务要求）。
+- 日期：2026-07-15，来源 Agent：Claude（Fable 5，M0 无板命令行构建）→ Codex2 审查修正
+  - 适用范围：单摄候选工程 `competition_project_single_camera/mem_test.xml` 的 Efinity 2025.2 命令行 Map 构建；不适用于 PNR、STA、CDC、bitstream、烧录、板级闭环、CPU APB/OSD 或机械臂。
+  - 最新结论：**Map FAIL — BUILD STOPPED。记录状态：APPROVED FAILURE RECORD — EVIDENCE ONLY。**
+  - 构建结果：
+    - **Map**：**FAIL**（退出码 1）。首个 fatal error：`[EFX-0010 VERI-ERROR] cannot open file '/src/mipi_dsi/Panel_1080p_reg.mem' (VERI-1012)`，位于 `true_dual_port_ram.v:52`。
+    - **PNR/STA/CDC/bitstream**：均未执行（Map 失败后按规则停止）。
+    - **M0 仍未通过**。板级仍 PENDING BOARD。
+  - 根因分类：**MULTI-FACTOR**。
+    - **因子 1 — HDL PORTABILITY DEFECT**：`dsi_tx_top.v:144` 显式覆盖 `.INITIAL_CODE("/src/mipi_dsi/Panel_1080p_reg.mem")`，以 `/` 开头的路径依赖外部磁盘根目录布局，不是可携带的工程相对路径。`panel_config.v:3` 默认值为 `"NT35596_1080p_reg.mem"`，`true_dual_port_ram.v:22` 默认值为 `"ram_init_file.mem"`，两个默认值均不是 `/src/...`，均被上游覆盖而未生效。Elaboration 日志（`mem_test.map.out:394-395`）确认实际生效参数为 `/src/mipi_dsi/Panel_1080p_reg.mem`。
+    - **因子 2 — PROJECT COPY/LAYOUT / ENVIRONMENT TRIGGER**：候选工程正确包含 `src/mipi_dsi/Panel_1080p_reg.mem`（SHA-256 已在 M0 manifest 确认），但没有复现原历史构建可能依赖的驱动器根目录 `/src` 布局，当前 Windows 命令行构建因此无法解析。
+    - 不是 `.mem` 文件漏复制、不是仓库路径含空格导致的首个错误、不是纯环境问题、不是本轮 Claude 新增缺陷。原始赛方/D 盘镜像中也存在同一根路径字符串。当前日志证明的是源码可移植性缺陷被当前布局触发。
+  - Warning 精确统计（以真实 `mem_test.warn.log` 为准）：
+    - 文本行数：**132**。warning 事件数：**126**。warning code 类别：**13**。EFX-WARNING：**0**。
+    - 精确分布：VERI-1330:50、VERI-1209:27、VERI-1927:16、VERI-2435:6、VDB-1002:5、VERI-1199:5、VERI-1190:5、VDB-1053:3、VERI-2457:3、VERI-1142:2、VERI-1173:2、VERI-1959:1、VDB-1013:1。
+    - `map.out` Analysis 阶段另有 **47 条 VERI-2561 INFO**（`undeclared symbol ... assumed default net`），不在 126 个 warning 事件内，但仍是后续必须审查的 RTL 风险。
+  - Warning 历史身份：这些 warning 来自当前 Demo 基线源码路径，尚未逐项处置。目前没有找到与本次构建匹配的历史 warning 事件清单，因此**不能证明 126 个事件与历史构建逐项相同，也不能证明无新增风险**。undeclared symbol/default net、位宽不匹配、截断、除零、无驱动网络、未连接端口、full_case、超宽移位等类别继续需要审查。CDC 尚未执行，不能从 Map warning 推断 CDC 安全。**不得把任何 warning 标记为可忽略。**
+  - IV/license：真实 Map 日志（`mem_test.warn.log`、`mem_test.map.out`、`mem_test.err.log`）中**没有** `cannot find correct IV value` 文字。该文字曾在未保存的控制台前置输出中观察到，但未进入本轮提供的 Map 日志，含义未确认。不得将其计入 `mem_test.warn.log`、不得写成 EFX-WARNING 事件、不得断言它是许可证错误或加密初始化向量错误。当前只能确认：Efinity 和 Map 进程能够启动并进入 elaboration，不能据此确认许可证整体可用。
+  - 源码身份：当前 `dsi_tx_top.v` SHA-256 为 `789BD0EAF9C3AE4D2B5D01410A41E6FBEB3F1E406AF1D5F29ECAF2EE4924559D`，初始 manifest 原始镜像字节 SHA 为 `6385FD5A560FFA0CC56AF8C32C8F0A2679020749EECC43EBCB386AF87E4AD3E4`。内容核查未发现功能语义差异，差异与 CRLF/LF 字节表示一致。当前 Git HEAD 与工作树语义内容一致。初始 manifest 是历史 CRLF 字节快照，不能再直接作为当前文件字节 SHA。
+  - outflow/junction：本轮 outflow 中仅发现五个同时间戳的 Map 日志；未发现 PNR、STA、CDC、bitstream、hex 或 programmer 产物。因未保存构建前目录清单，不能独立证明 outflow 在构建前不存在。本轮构建未使用 `D:\cicc_cbm_link`；Codex2 审查时该路径不存在。CURRENT_STATE.md 存在历史使用该 junction 的记录，不能外推为历史上从未存在。
+  - Codex2 最小修复建议（本轮未批准实施）：首选修复点为 `dsi_tx_top.v:144`，将唯一实际生效的根路径改成受控工程相对路径。不修改两个通用模块默认参数、不创建 `D:\src`、不复制 mem 文件到驱动器根目录、不用 ASCII 镜像伪造根目录布局。Codex2 本轮只要求修正失败记录，尚未批准路径修复实施。修正记录获批后，再单独进入路径修复 Gate。
+  - 替代了哪个旧结论：替代上一版 M0 构建记录中"PATH/ENVIRONMENT（非 HDL 缺陷）"的单一根因分类、`panel_config.v`/`true_dual_port_ram.v` 默认值本身就是 `/src/...` 的错误参数链描述、"133 行 / 132 条 VERI-WARNING / 1 条 EFX-WARNING"的错误 warning 统计、以及"全部 warning 均为 Demo 源码预存"的未验证历史身份断言。
+  - 证据路径：`competition_project_single_camera/docs/debug_sessions/m0_headless_build_20260715.md`（已修正）、`competition_project_single_camera/outflow/mem_test.map.out`、`competition_project_single_camera/outflow/mem_test.warn.log`、`competition_project_single_camera/outflow/mem_test.err.log`、`competition_project_single_camera/src/mipi_dsi/dsi_tx_top.v:144`、`competition_project_single_camera/src/mipi_dsi/panel_config.v:3,68`、`competition_project_single_camera/src/mipi_dsi/true_dual_port_ram.v:22,52`。
+  - 下一步门禁：失败记录已批准为 APPROVED FAILURE RECORD — EVIDENCE ONLY。路径修复已完成，Map 重测 PASS。当前 PNR HOLD，等待 Codex2 审查。详见 `competition_project_single_camera/docs/debug_sessions/m0_path_fix_map_retest_20260715.md` 和 `competition_project_single_camera/docs/debug_sessions/m0_efx0256_interface_audit_20260715.md`。
+
+- 日期：2026-07-15，来源 Agent：Claude（Fable 5，M0 路径修复 + Map 重测）→ Codex2 记录修正
+  - 适用范围：单摄候选工程 `competition_project_single_camera/mem_test.xml` 的路径修复后 Efinity 2025.2 命令行 Map 重测；不适用于 PNR、STA、CDC、bitstream、烧录、板级闭环、CPU APB/OSD 或机械臂。
+  - 最新结论：**MAP PASS / RECORD CORRECTION PENDING / PNR HOLD。旧 `$readmemh` 错误已消除。**
+  - 路径修复：
+    - 修改文件：`src/mipi_dsi/dsi_tx_top.v:144`。
+    - 修改内容：`.INITIAL_CODE("/src/mipi_dsi/Panel_1080p_reg.mem")` → `.INITIAL_CODE("src/mipi_dsi/Panel_1080p_reg.mem")`（仅删除开头 `/`）。
+    - 初始 manifest SHA-256：`6385FD5A560FFA0CC56AF8C32C8F0A2679020749EECC43EBCB386AF87E4AD3E4`。
+    - 修改前 SHA-256（pre-fix）：`789BD0EAF9C3AE4D2B5D01410A41E6FBEB3F1E406AF1D5F29ECAF2EE4924559D`。
+    - 修改后 SHA-256（post-fix）：`DDAF952AE26A599A988235FBE5EB2815AA9C8FDE66B7346EB359A24996F031D7`。
+    - `git diff` 确认仅此一行语义变更。
+    - 仅改变文件定位，不改变初始化内容或视频逻辑。
+  - Map 重测结果：
+    - **Map**：**PASS**（退出码 0）。综合耗时 64 秒。旧 `$readmemh` 错误已消除，`mem_test.err.log` 新运行段无任何 error。
+    - 资源：EFX_ADD=4367、EFX_LUT4=19399、EFX_FF=11800、EFX_DSP48=4、EFX_RAM10=211、EFX_DPRAM10=4、EFX_SRL8=1。
+    - Warning（整文件 warn.log：1177 行，1173 非空行；新运行段：1043 行，1042 非空行）：
+      - 223 VERI/VDB WARNING（15 类别），非 224（16 类别）。`Found 587 warnings in post-synthesis netlist` 仅为工具汇总语句，不计入 223 或 785。
+      - 785 EFX-0256（primary output port not driven），修正后分类（2026-07-15 第二轮）：axi1 698（TBD/BLOCKING——`is_axi_enable="true"`）、MIPI DSI ch0 70（TBD——仅 ch0 未驱动，ch1 由 `dsi_tx_top_inst1` 正常驱动）、axi0 10（EXPECTED，暂维持）、LCD/外设 3（TBD——与 DSI ch0 关联）、JTAG 2（TBD——`jtag_inst2` 不在 `mem_test.peri.xml` 中，仅 `jtag_inst1` 有声明）、LED 2（UNEXPECTED——`top.v` 仅驱动 `led[1:0]`）。修正版审计见 `m0_efx0256_interface_audit_20260715.md`，PNR 前方案见 `../review_packets/m0_pnr_interface_resolution_plan_20260715.md`。
+      - VERI-2561 INFO 仍为 47 条。
+    - 新增 VERI-WARNING 类别 VDB-8003（48）、VDB-8002（4）为综合阶段新出现。
+    - **PNR/STA/CDC/bitstream**：均未运行（按指令仅重跑 Map）。
+    - **M0 仍未通过**。板级仍 PENDING BOARD。
+  - Efinity XML 自动改写与恢复：Efinity 在 Map 运行期间自动改写了 `mem_test.xml`（`last_run_flow` bitstream→syn、`last_change` 时间戳更新、XML 自闭合标签空格格式化）。已按 Codex2 要求通过 `git checkout` 恢复到构建前精确 Git 字节状态。Map 证据全部由 `outflow/` 日志承载，不受 XML 恢复影响。
+  - 旧 Map 失败证据：已归档至 `docs/debug_sessions/evidence/m0_map_fail_pre_path_fix_20260715/`（5 个文件，SHA-256 已记录）。旧失败记录状态已更新为 APPROVED FAILURE RECORD — EVIDENCE ONLY。
+  - 追踪更新：`docs/baseline/m0_post_baseline_delta_20260714.csv`（M0-10 条目，已扩展列区分 initial/pre-fix/post-fix SHA）、`WORK_LOG.md`（M0-10 条目）、`docs/review_packets/m0_demo_baseline_review_packet_20260714.md`（§6bis）、`docs/debug_sessions/m0_efx0256_interface_audit_20260715.md`（EFX-0256 静态审计，2026-07-15 修正版）、`docs/review_packets/m0_pnr_interface_resolution_plan_20260715.md`（PNR 前接口归属解决方案）。
+  - 替代了哪个旧结论：替代上一版 CURRENT_STATE 中"Map FAIL — BUILD STOPPED"和"224 VERI-WARNING（16 类别）"的错误口径。
+  - 证据路径：`competition_project_single_camera/docs/debug_sessions/m0_path_fix_map_retest_20260715.md`、`competition_project_single_camera/docs/debug_sessions/m0_headless_build_20260715.md`（已批准失败记录）、`competition_project_single_camera/docs/debug_sessions/evidence/m0_map_fail_pre_path_fix_20260715/`（旧日志归档）、`competition_project_single_camera/docs/debug_sessions/m0_efx0256_interface_audit_20260715.md`、`competition_project_single_camera/outflow/mem_test.err.log`（新运行段零 error）、`competition_project_single_camera/outflow/mem_test.warn.log`、`competition_project_single_camera/outflow/mem_test.map.rpt`、`competition_project_single_camera/outflow/mem_test.map.out`。
+  - 下一步门禁：PNR HOLD。Codex2 必须审查修正后的 EFX-0256 接口审计和 PNR 前接口归属解决方案。重点审查项：axi1 698 个（`is_axi_enable="true"`，BLOCKING）、MIPI DSI ch0 70 个（非"整个 DSI 未激活"）、JTAG（jtag_inst2 不在 peri.xml 中）、LED（最小 tie-off 方案）。LED 修复与 AXI/JTAG/MIPI 配置变更分开门禁。禁止手改 `mem_test.peri.xml`。批准后方可进入 PNR。仍需完整 PNR/STA/CDC/bitstream 和板级验证。
+  - 失效条件：PNR 或后续阶段失败，或 Codex2 审查改变结论。
+  - 不改变 CPU APB/OSD 设计包已 APPROVE 的独立事实。
+
+
+- 日期：2026-07-15，来源 Agent：Claude（Fable 5，CPU→APB/OSD 结果打包设计 Review Packet 获 Codex2 APPROVE 后归档）
+  - 适用范围：CPU→APB/OSD 结果打包逻辑契约（`cpu_apb_osd_result_packing_design_20260715.md`）；不适用于正式 `soc.h`、wire ABI、APB/CDC RTL、OSD 实现、PNR、bitstream、板级闭环、UART2、J52 或机械臂动作。
+  - 最新结论：设计包经两轮整改后获 Codex2 APPROVE（APPROVED BY CODEX2 — DESIGN PACKET ONLY），最终无 P0/P1/P2/P3。批准范围仅限于设计 Review Packet 内的逻辑字段语义契约，不代表任何实现完成。
+  - 已冻结内容：
+    - 每轮识别、判断、执行/不执行和理由语义（基于官方细则 §二.3.3）；
+    - request-toggle/ACK-toggle 握手协议（10 步契约）；
+    - bundled-data 冻结规则；
+    - 单 outstanding commit；
+    - VSYNC 边界原子捕获；
+    - APB 域 `confirmed_result_sequence` 确认镜像；
+    - ARM_DISABLED 和 fail-safe 边界（RECOVERING 期间 7 项禁止）。
+  - 未完成边界：
+    - 独立复位恢复协议仍 TBD（§6.3.B 共 9 项阻塞事实）；
+    - 正式 `soc.h`、wire ABI、APB/CDC RTL、OSD 实现、`main.c` 接入、PNR、bitstream 和板级闭环均未完成；
+    - UART2、J52 和机械臂未连接；
+    - 所有 PROPOSED/TBD 和 FPGA/SoC 联合确认事项（§9，共 10 项）仍为待确认。
+  - 证据路径：`final_project/docs/review_packets/cpu_apb_osd_result_packing_design_20260715.md`。
+  - 下一步门禁：单摄 M0 板级复现和 FPGA/SoC 联合接口事实（soc.h、APB 基址、两域复位关系、toggle 基准初始化等）未关闭前，不允许实现正式 CDC RTL 或扩大机械臂范围。
+  - 失效条件：联合 Review Packet 定版后改变本设计包的接口假设，或 FPGA/SoC 联合确认关闭任一 §6.3.B/§9 阻塞项。
+
 - 日期：2026-07-13，来源：用户提供 / Codex 官方资料交叉核查
   - 适用范围：TJ375N529 开发板 UART2/J52 到 myCobot 280 的板端接口真源；不表示正式 SDC/SoC/UART 驱动、真实接线、只读通信或机械臂动作已通过。
   - 最新结论：官方开发板说明、PINOUT 和端口图已交叉确认 J52 为右侧 2.54mm 4Pin UART2；Pin1 GND，Pin2 `FPGA_UART2_RXD/C14/Input`，Pin3 `FPGA_UART2_TXD/F12/Output`，Pin4 `VCC(5V/3.3V)` 必须悬空；C14/F12 均位于 3.3V I/O 域。用户已对 `TJ375N529开发板端口说明图.jpg` 进行人工核验，确认接口位置、外形和四针标签顺序与文字一致。用户确认候选接法为 GND→GND、C14/RXD←机械臂 TX、F12/TXD→机械臂 RX，机械臂独立 12V5A。

@@ -123,6 +123,22 @@ PNR和bitstream生成完成。CDC报告为`No Synchronizer warnings to report`�
 
 这些证据齐全前，M0保持`PARTIAL / BOARD RECHECK PENDING`，不得进入M1裁剪。
 
+## 6bis. M0-10 路径可移植性修复（2026-07-15）
+
+- 触发：M0 命令行 Map 因 `$readmemh` 无法打开 `/src/mipi_dsi/Panel_1080p_reg.mem` 而 FAIL，根因为 `dsi_tx_top.v:144` 硬编码绝对路径，与当前 Windows 构建环境不兼容。
+- 修复内容：
+  - `dsi_tx_top.v:144`：`.INITIAL_CODE("/src/mipi_dsi/Panel_1080p_reg.mem")` → `.INITIAL_CODE("src/mipi_dsi/Panel_1080p_reg.mem")`（仅删除开头 `/`）。
+  - 仅改变文件定位；不改变初始化内容或视频逻辑。
+- 修改前 SHA-256：`789BD0EAF9C3AE4D2B5D01410A41E6FBEB3F1E406AF1D5F29ECAF2EE4924559D`
+- 修改后 SHA-256：`DDAF952AE26A599A988235FBE5EB2815AA9C8FDE66B7346EB359A24996F031D7`
+- 未修改文件：`panel_config.v`、`true_dual_port_ram.v`、`mem_test.xml`、`constrain.sdc`、IP `settings.json`、所有 `.mem` 文件、`top.v` 及所有其他 RTL。
+- 旧 Map 失败证据：归档于 `docs/debug_sessions/evidence/m0_map_fail_pre_path_fix_20260715/`。
+- 状态：`MAP PASS / RECORD CORRECTION PENDING / PNR HOLD` — Map 重测 PASS（退出码 0），旧 `$readmemh` 错误已消除。PNR/STA/CDC/bitstream 和板级仍待验证。
+- Map 重测数据：资源 ADD=4367/LUT4=19399/FF=11800/DSP48=4/RAM10=211/DPRAM10=4/SRL8=1。warn.log 整文件 1177 行/1173 非空行，新运行段 1042 非空行；223 VERI/VDB WARNING（15 类别）；785 EFX-0256；VERI-2561 INFO 47。
+- 记录修正（2026-07-15，Codex2）：warning 统计从 224/16 类修正为 223/15 类；`Found 587 warnings` 不计入。Efinity 曾自动改写 `mem_test.xml`（`last_run_flow` bitstream→syn），已恢复到构建前精确字节状态。Delta manifest 已扩展列。
+- 接口审计修正（2026-07-15，Codex2 第二轮）：AXI1 698 个 EXPECTED→TBD/BLOCKING（`is_axi_enable="true"`）、DSI 70 个"整个未激活"→"仅 ch0 未驱动"（ch1 由 `dsi_tx_top_inst1` 驱动）、JTAG jtag_inst2 不在 peri.xml 中。新增 PNR 前接口归属解决方案 `m0_pnr_interface_resolution_plan_20260715.md`。
+- 证据：`WORK_LOG.md` M0-10、`docs/baseline/m0_post_baseline_delta_20260714.csv`、`docs/debug_sessions/m0_path_fix_map_retest_20260715.md`、`docs/debug_sessions/m0_efx0256_interface_audit_20260715.md`（修正版）、`docs/review_packets/m0_pnr_interface_resolution_plan_20260715.md`。
+
 ## 7. 当前NOT VERIFIED
 
 - 仓库副本触发的新完整Efinity构建。
