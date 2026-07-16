@@ -1324,3 +1324,15 @@ git diff --check
 - 收尾：OpenOCD 正常 shutdown，无残留进程；COM10/COM13/COM17 仍枚举。
 - 未完成边界：仓库新构建 `1D697F...` 的 HDMI、USER2、CPU 和 UART0 仍为 `NOT VERIFIED`；feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 和 myCobot 均未进入本 Gate。
 - 下一步：先对 `1D697F...` 重走冷启动、JTAG SRAM 加载、HDMI、USER2、NDMRESET、片上 RAM Hello 与回显 Gate；通过前不进入 APB MAGIC、feature、OSD、UART2/J52 或机械臂。
+
+### [M2-36] 精确 main 新构建与 bitstream 元数据非确定性复核
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 构建身份：从 `origin/main@07373042d1f84cdc048fc42b5752d0cbeb52c471` 建立仓库外 ASCII 隔离 worktree；只生成本地忽略产物，未修改共享工作区、未提交 outflow/work、未连接或编程板卡。本机绝对路径不写入仓库文档。
+- 工具与流程：Efinity `2025.2.288.4.15`，`efx_run --prj --flow compile mem_test.xml`。Map、Interface、PNR和bitstream generation完成；post-synthesis netlist仍为118个warning，Interface仍为4个既有物理距离warning。
+- STA/CDC：最差 Setup/Hold `+1.742ns/+0.018ns`；CDC为`No Synchronizer warnings to report.`。
+- 当前 bitstream：仓库外 ASCII 隔离 worktree 的 `competition_project_single_camera/outflow/mem_test.bit`，全文件SHA-256 `6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4`，大小11843718 bytes；不写入工程配置，不提交产物。
+- 与来源 `AA1338...` 比较：两文件等长，只在原始文件偏移`109..403`有109个ASCII字节不同，偏移4096以后差异数为0。解码差异只包含`Generated`时间和`Project`路径；从偏移404起两文件SHA-256均为`5EC28465D266DC414AFD97F7D7851D796F439E5F4E48B23776D4345EDA732515`，从偏移4096起均为`466434755122603AB113B6C8CCC51F38E0556280F9141C00DE0D1DD218DC0627`。因此配置载荷逐字节一致，全文件SHA差异来自Efinity元数据。
+- 历史哈希边界：管理员先前记录的新构建全文件SHA `1D697F...`仍保留为历史批次，但其文件已无法在本机找到；不得用当前`6B6728...`冒充该全文件。功能身份应同时记录固定commit、Efinity版本、配置载荷哈希和当前全文件哈希。
+- 当前裁定：`MAIN@0737304 OFFLINE BUILD/PNR/STA/CDC/BITSTREAM PASS / PAYLOAD MATCH SOURCE PASS / CURRENT 6B6728 FILE BOARD LOAD NOT VERIFIED`。
+- 下一门：经用户审核后，仅将当前`6B6728...`通过JTAG临时加载到FPGA SRAM，回归HDMI，再执行USER2 + NDMRESET +片上RAM Hello/UART0回显。禁止Flash、USER1、外部DDR、UART2/J52和机械臂。

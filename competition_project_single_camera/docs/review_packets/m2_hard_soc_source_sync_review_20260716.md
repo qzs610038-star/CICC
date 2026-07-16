@@ -5,7 +5,7 @@
 > 源码提交：`2d4b3b7b3d0c59d88ece0669534ae38de02ed938`
 > 分支头（含 Review Packet / Work Log）：`0604d33f3fe76851e1dfe738403875b4a7d0721c`
 > 基线：`origin/main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde`
-> 当前裁定：系统真源补交与仓库新构建离线 Gate 已关闭；来源 `AA1338...` bitstream 的 `USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO / HDMI = PASS`，仓库新构建 `1D697F...` bitstream 的对应板级 Gate 仍为 `NOT VERIFIED`。feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot均未进入本Gate。
+> 当前裁定：系统真源补交与仓库新构建离线 Gate 已关闭；来源 `AA1338...` bitstream 的 `USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO / HDMI = PASS`。历史仓库新构建 `1D697F...` 文件已无法定位；当前精确 main 重建 `6B6728...` 的配置载荷与 `AA1338...` 逐字节一致，但当前文件尚未实际 JTAG 加载。feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot均未进入本Gate。
 
 ## 1. 唯一来源副本
 
@@ -235,13 +235,36 @@ Codex 在集成分支对同一仓库真源重新执行了离线验证；未复�
 
 路径兼容说明：Efinity map 在中文绝对路径下会报 `filesystem error: Cannot convert character sequence: Illegal byte sequence`；本次通过仓库既有 ASCII junction 对同一工作树重跑后全流程 PASS。该问题属于工具路径兼容，不是 RTL 失败，也不允许将本机绝对路径写入工程配置。
 
-## 10. 两批证据的最终裁定与下一门
+## 10. 三批证据的最终裁定与下一门
 
 | 批次 | bitstream SHA-256 | 离线构建 | HDMI | USER2/CPU | UART0横幅/回显 |
 |---|---|---|---|---|---|
 | 来源联合副本 | `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` | PASS | PASS | PASS | PASS |
-| 仓库真源新构建 | `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC` | PASS | `NOT VERIFIED` | `NOT VERIFIED` | `NOT VERIFIED` |
+| 历史仓库新构建（文件已丢失） | `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC` | PASS | `NOT VERIFIED` | `NOT VERIFIED` | `NOT VERIFIED` |
+| 当前精确 main 重建 | `6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4` | PASS，载荷与来源MATCH | `NOT VERIFIED` | `NOT VERIFIED` | `NOT VERIFIED` |
 
-下一门是对仓库新构建 `1D697F...` 重走：完全断电冷启动 -> JTAG SRAM临时加载 -> HDMI回归 -> `USER2` -> NDMRESET -> 四核halt -> Hello下载/校验到`0xF9000000` -> CPU0 resume -> UART0横幅和单字符回显。禁止Flash、`USER1`、外部DDR、UART2/J52和机械臂。
+下一门是对当前可用 `6B6728...` 重走：完全断电冷启动 -> JTAG SRAM临时加载 -> HDMI回归 -> `USER2` -> NDMRESET -> 四核halt -> Hello下载/校验到`0xF9000000` -> CPU0 resume -> UART0横幅和单字符回显。禁止Flash、`USER1`、外部DDR、UART2/J52和机械臂。
 
 只有新构建批次也通过后，才可另行审核 APB MAGIC；feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot继续为`NOT VERIFIED`。
+
+## 11. 精确 main 重建与规范化载荷身份
+
+精确 `origin/main@07373042d1f84cdc048fc42b5752d0cbeb52c471` 在 ASCII 隔离 worktree 使用 Efinity `2025.2.288.4.15` 重新完成 Map、Interface、PNR和bitstream generation：
+
+- 当前全文件SHA-256：`6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4`
+- 文件大小：11843718 bytes
+- 最差Setup/Hold：`+1.742ns/+0.018ns`
+- CDC：`No Synchronizer warnings to report.`
+- Interface warning：4个既有物理距离项
+- post-synthesis warning：118个
+
+当前文件与来源已板测`AA1338...`文件等长，仅原始偏移`109..403`的109个ASCII字节不同；解码后差异只包含Efinity写入的生成时间和工程路径。配置载荷身份：
+
+| 比较范围 | 当前 `6B6728...` | 来源 `AA1338...` | 结果 |
+|---|---|---|---|
+| 从偏移404至EOF | `5EC28465D266DC414AFD97F7D7851D796F439E5F4E48B23776D4345EDA732515` | `5EC28465D266DC414AFD97F7D7851D796F439E5F4E48B23776D4345EDA732515` | MATCH |
+| 从偏移4096至EOF | `466434755122603AB113B6C8CCC51F38E0556280F9141C00DE0D1DD218DC0627` | `466434755122603AB113B6C8CCC51F38E0556280F9141C00DE0D1DD218DC0627` | MATCH |
+
+因此全文件SHA不稳定来自bitstream头部元数据，配置载荷逐字节一致。历史管理员批次`1D697F...`的全文件记录仍保留，但文件已无法在本机定位；当前板级操作必须明确使用`6B6728...`，不能冒充`1D697F...`。
+
+当前`6B6728...`文件尚未实际JTAG加载。下一门为：完全断电冷启动 -> JTAG SRAM临时加载当前文件 -> HDMI回归 -> USER2 -> NDMRESET -> 四核halt -> Hello下载/校验到`0xF9000000` -> CPU0 resume -> UART0横幅和单字符回显。禁止Flash、USER1、外部DDR、UART2/J52和机械臂。
