@@ -79,6 +79,9 @@ __pycache__/
 *.log
 *.rpt
 
+# Local M2 board-debug captures: retain locally, share only curated Markdown summaries
+competition_project_single_camera/docs/debug_sessions/evidence/*.json
+
 # Large raw archives, installers, and training videos
 *.zip
 *.rar

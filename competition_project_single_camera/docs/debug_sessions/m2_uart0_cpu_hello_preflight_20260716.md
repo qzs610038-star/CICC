@@ -2,7 +2,7 @@
 
 > 日期：2026-07-16
 > 执行范围：`competition_project_single_camera/` 的隔离 CPU UART0 Hello 候选。
-> 当前裁定：`CONDITIONAL GO / PRE-FLIGHT HOLD`。离线制品批次已验证；板卡 FTDI/JTAG 串口未枚举，尚未执行任何板级配置、ELF 下载或串口收发。
+> 初始裁定：`CONDITIONAL GO / PRE-FLIGHT HOLD`。本记录中的离线与枚举前提已验证；后续状态以第 8 节为准。
 > 安全边界：本记录不关闭 `final_project/` 的 A0，不替代正式主线；机械臂、J52、UART2、USER1、Flash 和外部 DDR 全程未进入本批次。
 
 ## 1. 批次身份与来源
@@ -82,7 +82,21 @@ FTDI 枚举证据经复核后，才可另发“volatile USER2 配置 + `0xF90000
 
 `tools/capture_m2_ftdi_preflight.ps1` 已在当前无板卡状态自测，测试证据保存在忽略目录 `outflow_m2_cpuhello_20260716_1730/ftdi_preflight_selftest/`：
 
-- 默认采集器 exit 0，记录 `HOLD_NO_CONNECTED_FTDI`、`ftdi_0403_6011_connected_count=0`、`mycobot_ch340_ports=["COM10"]`；安全字段为 `serial_port_opened=false`、`uart_bytes_sent=0`、`programmer_invoked=false`、`flash_operation_invoked=false`。
+- 默认采集器 exit 0，记录 `HOLD_NO_CONNECTED_FTDI`、`ftdi_0403_6011_connected_count=0`、`ch340_1a86_7523_ports=["COM10"]`；安全字段为 `serial_port_opened=false`、`uart_bytes_sent=0`、`programmer_invoked=false`、`flash_operation_invoked=false`。VID:PID `1A86:7523` 只说明 CH340，不能脱离当次阶段 0 物理证据就把后续同 VID/PID 端口自动归属为 myCobot。
 - `-RequireFtdi` 的负向自测按设计返回 exit 2；外层断言 harness exit 0，并验证相同的 HOLD 与零副作用字段。因此，FTDI 未枚举时不能静默继续到配置阶段。
 
 这只验证采集器的 fail-closed 行为，不是 FTDI 已连接或 UART0 已可用的证据。
+
+## 7. 板卡归还后的 FTDI 复核
+
+- 当前本地 `main` 是 `118be9da1f3cdf63c34624e7ef9cf3b8f9171335`。其中 LBS/libaoxun688 合并 `041116c` 相对其第一父提交只更新 `.gitignore` 的本地 MCP/Efinity 输出忽略项，未改动候选工程的 USER2、UART0、BSP、XML、SDC 或 RTL 契约。
+- 初次实时采集的 `HOLD_NO_CONNECTED_FTDI` 是脚本匹配缺陷：Windows Ports 的 FTDI 子设备实例使用 `FTDIBUS\\VID_0403+PID_6011+...`，而旧模式只接受 `&`。原始 PnP 与 pyserial 已显示 COM3/COM7/COM8 的 VID:PID 均为 `0403:6011`；将匹配扩展为 `[&+]` 后，`m2_ftdi_live_verify_20260716_152234.json` 的采集器 exit 0，结果为 `FTDI_ENUMERATED`，三条通道均为 Started。
+- 本次全程 `serial_port_opened=false`、`uart_bytes_sent=0`、`programmer_invoked=false`、`flash_operation_invoked=false`。COM11 仍显示 CH340 `1A86:7523`，但用户已确认机械臂与当前电脑物理断开；VID/PID 无法独立确认归属，因此它被记录为未归属 CH340，且未打开。
+- 该项只关闭“FTDI 已连接且候选端口集合可见”的前置项；不证明哪一条是 UART0，不证明 USER2、CPU 取指、横幅或回显。
+- 下一步改由 `m2_uart0_cpu_hello_board_operator_card_20260716.md` 执行易失性配置、USER2 片上 RAM 下载与受控 UART0 证据采集。
+
+## 8. 状态更新：匹配 bitstream 已易失性配置
+
+- 操作员第二次 Efinity Programmer 截图实际使用操作员指定的专属 ASCII 暂存批次镜像，并记录 JTAG 完成和 `Device is in user mode!`。
+- Codex 对该 ASCII 文件与仓库批准制品新鲜重算的 SHA-256 均为 `2EA4AD287CCC6BFBF113E718B59EF6F5807222AFE1ECE3D55BD1E24D37FB8347`；因此“匹配 M2 bitstream 易失性配置”已关闭。此前误用的 `outflow/mem_test.bit`（`9515...A169`）保持为历史失败证据，不混入当前批次。
+- 下一步只能按 `m2_uart0_user2_ram_download_operator_card_20260716.md` 通过 `JTAG_USER2` 将固定 Hello ELF 下载到 `0xF9000000`。USER2、CPU 取指、UART0 和回显仍为 `NOT VERIFIED`。

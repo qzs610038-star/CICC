@@ -42,13 +42,13 @@ $ports = foreach ($block in $blocks) {
         status = Get-FieldValue -Block $block -Field 'Status'
         driver = Get-FieldValue -Block $block -Field 'Driver Name'
         com_port = if ($comMatch.Success) { "COM$($comMatch.Groups['number'].Value)" } else { $null }
-        is_ftdi_0403_6011 = ($block -match '(?i)VID_0403&PID_6011')
-        is_mycobot_ch340 = ($block -match '(?i)VID_1A86&PID_7523')
+        is_ftdi_0403_6011 = ($block -match '(?i)VID_0403[&+]PID_6011')
+        is_ch340_1a86_7523 = ($block -match '(?i)VID_1A86&PID_7523')
     }
 }
 
 $ftdiPorts = @($ports | Where-Object { $_.is_ftdi_0403_6011 })
-$ch340Ports = @($ports | Where-Object { $_.is_mycobot_ch340 })
+$ch340Ports = @($ports | Where-Object { $_.is_ch340_1a86_7523 })
 $head = (& git -C $repoRoot rev-parse HEAD).Trim()
 $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
@@ -70,7 +70,7 @@ $evidence = [ordered]@{
     user_tap_selected = $null
     ports = @($ports)
     ftdi_0403_6011_connected_count = $ftdiPorts.Count
-    mycobot_ch340_ports = @($ch340Ports | ForEach-Object { $_.com_port })
+    ch340_1a86_7523_ports = @($ch340Ports | ForEach-Object { $_.com_port })
     result = $result
     next_action = if ($ftdiPorts.Count -gt 0) {
         'Return this JSON and a Device Manager screenshot for port-differential review; do not configure FPGA yet.'
@@ -84,7 +84,7 @@ $evidence | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $evidencePath -En
 [PSCustomObject]@{
     result = $result
     ftdi_0403_6011_connected_count = $ftdiPorts.Count
-    mycobot_ch340_ports = @($ch340Ports | ForEach-Object { $_.com_port })
+    ch340_1a86_7523_ports = @($ch340Ports | ForEach-Object { $_.com_port })
     evidence_path = $evidencePath
 } | ConvertTo-Json -Depth 4
 
