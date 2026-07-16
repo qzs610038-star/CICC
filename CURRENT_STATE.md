@@ -27,6 +27,17 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-16，来源 Agent：Codex / 用户现场确认（单摄 Hard SoC USER2 + 片上 RAM + UART0 Hello 板级 Gate）
+  - 适用范围：仅隔离候选工程 `competition_project_single_camera/` 的最小 CPU Hello 板级启动门；不替代 `final_project/` 正式主线，也不表示 feature snapshot、CPU 分类、OSD、按键、UART2/J52 或机械臂闭环。
+  - 最新结论：匹配 bitstream `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` 已通过 JTAG 临时加载到 FPGA SRAM，未写 Flash；用户确认真实摄像头 HDMI 画面正常。FPGA BSCAN tunnel 使用 FTDI channel 1 和 `USER2` IR=9，识别到 4 个 RV32 hart（XLEN=32，`misa=0x4004112d`）。本地忽略产物 Hello ELF SHA-256 为 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口为 `0xF9000000`；OpenOCD 向片上 RAM 下载并校验 538 bytes 后，CPU0 从 `0xF9000000` 启动并运行至 UART 回显循环，采样 `pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`。COM10 在 `115200 8N1` 收到完整三行横幅，发送 ASCII `K` 后收到 `K` 回显。因此 `USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO = PASS`。
+  - 启动根因：仅 halt 后写 PC 会在首条取指触发 instruction access fault；RAM 下载/校验和数据端读取本身正常，`fence.i` 不能修复。按标准 RISC-V Debug Module 先对 `dmcontrol` 执行 `riscv dmi_write 0x10 0x00000003`，等待 100 ms，再执行 `riscv dmi_write 0x10 0x00000001`，等待 200 ms，即 NDMRESET assert/deassert，随后重新 halt 四核、下载/校验 ELF、设置 PC 并 resume，首条取指及 UART 均成功。后续上电启动不得省略 NDMRESET。
+  - 板级顺序与已知现象：带电直接重配曾出现 DDR 横带花屏；完全断电冷启动后再通过 JTAG SRAM 加载同一 bitstream，HDMI 恢复正常。推荐顺序为开发板完全断电 -> 冷启动 -> JTAG SRAM 临时加载匹配 bitstream -> USER2 连接 -> NDMRESET -> 四核 halt -> 片上 RAM 下载/校验 -> CPU0 设置 `pc=0xF9000000` 并 resume -> UART0 横幅/回显。断电会同时丢失 FPGA SRAM bitstream 和片上 RAM Hello，必须重走该顺序。
+  - 替代旧结论：覆盖下方 2026-07-15 单摄 M2 条目和 `WORK_LOG.md` M2-33 中 `CPU EXECUTION + UART0 NOT VERIFIED` 的旧状态；Hard SoC 真源、离线构建和本次最小板级 Gate 均已关闭。
+  - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-34、`competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`；板级原始 OpenOCD/UART 输出由本次 Codex 任务记录保存，未把含本机路径的临时日志或 ELF 纳入 Git。
+  - 继续禁止：未写 Flash，未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送任何 myCobot 帧。UART0 Hello PASS 不得推断 UART2/myCobot 可用。
+  - 下一门：先由管理员审核本次板级证据和文档差分；获批前不扩大到 feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 或机械臂。若之后扩大范围，必须另行提交对应 Review Packet 和板级验收边界。
+  - 失效条件：bitstream、ELF、Hard SoC/BSP、OpenOCD USER TAP、UART0 引脚/波特率、时钟复位或板卡冷启动现象发生变化；任一变化后从匹配哈希与冷启动顺序重新验证。
+
 - 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）
   - 适用范围：`mycobot_arm_board_control_advancement_plan_20260715.md` §13 的阶段 0、B1–B3 与 A0；不表示 G4 SoC/PNR、烧录、J52 回环、真实臂只读或动作已经完成。
   - 最新结论：B1–B3 的纯软件子检查点已完成。新增 `mycobot_transaction` 提供 750 ms single-flight、expected-command/精确 payload length、超时、迟到/重复与错误计数；协议层补齐 0x29/0x2B/0x69、官方 LEN 窗口和 J1..J6 绝对范围，越界 `SEND_ANGLES` 编码被拒绝而非饱和。GET_ANGLES 精确请求/响应、LEN 边界和错误向量已进入 QEMU 断言。B2 差分测试补齐 N-poll、DONE 后下一请求、fault/cancel 后 re-init；不新增重复的 transport 枚举。用户确认 COM10 为 myCobot 后，阶段 0 脚本以 1 Mbps 调用唯一允许 API `MyCobot280.get_system_version()`并成功返回 `7.3`；运行记录为 `motion_or_firmware_api_called=false`，设备侧已刷文件 hash 仍不可回读。B1 源已用 Efinity `rv32imac/ilp32` 工具链 `-Werror -fsyntax-only` 通过，但当前构建器仍被刻意限制为 `NOT_FOR_FLASH` 且硬性排除 UART2/真实 transport，故尚无可烧录 ELF。A0 当前工程的 PLL/JTAG 资源与旧 GUI 冲突审计一致，但旧隔离树已不存在，当前工程的 GUI 合法组合尚无本批次证据；因此 A0/G4 继续未关闭。

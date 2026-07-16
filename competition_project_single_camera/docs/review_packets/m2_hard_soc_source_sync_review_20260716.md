@@ -4,7 +4,7 @@
 > 分支：`dev/libaoxun688-hard-soc-source-sync-20260716`
 > 源码提交：`2d4b3b7b3d0c59d88ece0669534ae38de02ed938`
 > 基线：`origin/main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde`
-> 当前裁定：系统真源补交完成；CPU USER2 JTAG取指和UART0回显仍为 `NOT VERIFIED`。
+> 当前裁定：系统真源补交、离线构建和最小板级 Gate 均已关闭；`USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO / HDMI = PASS`。feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot仍未进入本Gate。
 
 ## 1. 唯一来源副本
 
@@ -144,12 +144,75 @@ embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld
 
 管理员要求提交的Efinity生成Verilog/模板保留其原始版权和免责声明头；这些是源文件组成部分，不是额外许可证文件。
 
-## 8. 尚未验证与下一门
+## 8. 板级 USER2 / 片上 RAM / UART0 Gate
 
-- USER2 JTAG实际连接：`NOT VERIFIED`
-- CPU从片上RAM实际取指：`NOT VERIFIED`
-- UART0完整Hello横幅：`NOT VERIFIED`
-- UART0单字符回显：`NOT VERIFIED`
-- CPU读取feature snapshot、OSD、按键、UART2、myCobot：均未进入本Gate
+### 8.1 身份与安全边界
 
-下一门仍是：使用匹配bitstream，选择FPGA `USER2`，只把Hello ELF下载到 `0xF9000000` 片上RAM；禁止USER1、Flash擦写和外部DDR初始化。CPU Hello通过前，不得宣称板上CPU闭环。
+- 板级日期：2026-07-16
+- bitstream SHA-256：`AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`
+- FPGA IDCODE：`0x006A0EF3`
+- Hello ELF SHA-256：`4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`
+- ELF入口：`0xF9000000`
+- JTAG：FTDI channel 1、FPGA BSCAN tunnel、`USER2` IR=9
+- UART0：COM10，`115200 8N1`
+
+bitstream仅通过JTAG临时加载到FPGA SRAM，Hello仅下载到片上RAM；未写Flash。测试未使用`USER1`，未初始化或访问外部DDR，未连接UART2/J52或机械臂，未发送myCobot帧。断电会丢失bitstream和Hello，必须重新加载，不能描述为持久烧录。
+
+### 8.2 NDMRESET 根因与固定启动顺序
+
+仅halt后写`pc=0xF9000000`会在第一条取指产生instruction access fault：
+
+```text
+pc=0x00000000
+mcause=1
+mepc=0xF9000000
+mtval=0xF9000000
+```
+
+RAM下载/校验、program-buffer数据端读取、Machine mode、`satp=0`和PMP检查正常，`fence.i`不能解决。按标准RISC-V Debug Module执行以下NDMRESET序列后，首条取指和UART输出恢复：
+
+```tcl
+riscv dmi_write 0x10 0x00000003
+sleep 100
+riscv dmi_write 0x10 0x00000001
+sleep 200
+```
+
+固定启动顺序为：开发板完全断电 -> 冷启动 -> JTAG SRAM加载匹配bitstream -> USER2连接 -> NDMRESET -> halt四核 -> 下载并校验Hello ELF -> CPU0设置`pc=0xF9000000` -> resume -> 捕获UART0横幅和回显。带电直接重配曾出现DDR横带花屏；完全断电冷启动后加载同一bitstream，用户确认真实摄像头HDMI画面恢复正常。
+
+### 8.3 实测结果
+
+- OpenOCD识别4个RV32 hart，XLEN=32，`misa=0x4004112d`
+- 向`0xF9000000`下载并校验538 bytes成功
+- 运行约8秒后：`pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`
+- COM10收到完整横幅：
+
+```text
+TJ375 CPU+VIDEO UART0 HELLO
+ONCHIP_RAM=0xF9000000 UART0=115200 8N1
+Type characters to verify echo.
+```
+
+- 发送ASCII `K`（hex `4B`）后收到`K`回显
+- OpenOCD正常shutdown，无残留进程
+- 用户确认测试后HDMI真实摄像头画面正常
+
+裁定：
+
+```text
+USER2 JTAG=PASS
+CPU EXECUTION=PASS
+UART0 HELLO=PASS
+UART0 ECHO=PASS
+HDMI=PASS
+```
+
+### 8.4 仍未验证与下一门
+
+- CPU读取feature snapshot：`NOT VERIFIED`
+- CPU分类主循环与逐轮事务：`NOT VERIFIED`
+- CPU到OSD回写、按键：`NOT VERIFIED`
+- UART2/J52：`NOT VERIFIED`
+- myCobot只读、协议或动作：`NOT VERIFIED`
+
+下一门必须另行审核。本次Hello PASS只关闭最小CPU启动和UART0基础链路，不证明UART2/myCobot可用，也不证明正式比赛识别、OSD或机械臂闭环。管理员批准扩大范围前，不连接J52或机械臂，不执行任何myCobot命令。
