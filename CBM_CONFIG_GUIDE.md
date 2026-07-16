@@ -21,7 +21,7 @@
 - artifact 元数据：`.codebase-memory/artifact.json`
 - artifact 合并策略：`.codebase-memory/.gitattributes`
 - 当前图谱项目：`D-cicc_cbm-main`；`D-cicc_cbm_link` 只作历史兼容查询。
-- artifact 记录：以 `.codebase-memory/artifact.json` 为准；本轮记录 `77c88d2d2c5cce20b6e2c623a93e5e6e4ff35432`、`7552 nodes / 16966 edges`、压缩文件 `2,090,995 bytes`。
+- artifact 记录：以 `.codebase-memory/artifact.json` 为准；本轮记录 `a473a5293e04457af407c574c08a4671774baa74`、`7560 nodes / 16960 edges`、压缩文件 `2,806,049 bytes`。
 - 运行时回归：可检索 `round_controller_init/tick`、`competition_round_txn_init`、`synthetic_2ppc_source`、单摄 `apb_reg_magic` 与 `dsi_tx_top`。
 - 重要审查仍须回到真实源码；图谱命中不等于 RTL 连线、时序、APB 地址或机械臂安全已验证。
 
@@ -30,10 +30,10 @@
 ```text
 project: D-cicc_cbm-main
 status: ready
-nodes/edges: 7552 / 16966
+nodes/edges: 7560 / 16960
 artifact_present: true
 artifact: .codebase-memory/graph.db.zst
-artifact_commit: 77c88d2d2c5cce20b6e2c623a93e5e6e4ff35432
+artifact_commit: a473a5293e04457af407c574c08a4671774baa74
 ```
 
 已确认排除目录包括：

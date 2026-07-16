@@ -29,7 +29,7 @@
 
 - 日期：2026-07-17，来源 Agent：Codex（合并后状态、技能、交接与共享图谱刷新）
   - 适用范围：包含 `f2ba66e` / `77c88d2` 代码合并的当前 `main` 团队恢复入口；不改变任何 FPGA/CPU/机械臂 Gate。
-  - 最新结论：共享 `D-cicc_cbm-main` artifact 已重建为 7552 nodes / 16966 edges，准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准；图谱已覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复。长期合并规则与两笔主线合并记录集中于 `docs/merge_governance/`，当前可执行交接见 `SESSION_HANDOFF.md`。
+  - 最新结论：共享 `D-cicc_cbm-main` artifact 已重建为 7560 nodes / 16960 edges，准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准；图谱已覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复。长期合并规则与两笔主线合并记录集中于 `docs/merge_governance/`，当前可执行交接见 `SESSION_HANDOFF.md`。
   - 当前阻塞：当前 SHA 的 Efinity Map/PNR/STA/CDC、bitstream/ELF、JTAG/USER2、CPU 取指、UART0 和 APB 实读仍为 `NOT VERIFIED`；myCobot 不得连接或动作。
   - 下一门：`@libaoxun688` 在其已配置 Efinity 环境从当前 `main` 重建并回传脱敏证据；其他 Agent 先同步 `main`、阅读 `AGENTS.md`、本文件和 `SESSION_HANDOFF.md`，不得从旧分支或旧制品续跑。
   - 证据路径：`.codebase-memory/artifact.json`、`docs/merge_governance/MERGE_REGISTER.md`、`SESSION_HANDOFF.md`、本文件下方两笔 2026-07-17 合并条目。

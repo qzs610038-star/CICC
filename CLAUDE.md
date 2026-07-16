@@ -68,7 +68,7 @@ list_projects / index_status
 
 图谱只负责定位和上下文压缩。涉及 RTL 连线、时钟复位、AXI/framebuffer、QCRV32、myCobot 实机安全或 warning 取舍时，必须以真实文件和验证日志为准。
 
-共享 artifact 已重建为 7552 nodes / 16966 edges，覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复；准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准。图谱查询无结果时仍必须直接读取上述候选工程文件；不得把“未索引”误写成“未提交”。
+共享 artifact 已重建为 7560 nodes / 16960 edges，覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复；准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准。图谱查询无结果时仍必须直接读取上述候选工程文件；不得把“未索引”误写成“未提交”。
 
 ## 权威层级与执行定位
 

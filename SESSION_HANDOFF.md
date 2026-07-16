@@ -29,7 +29,7 @@ git status --short --branch
 
 ## 图谱与同步
 
-- 共享图谱 `D-cicc_cbm-main` 已在 `main@77c88d2` 持久化为 7552 nodes / 16966 edges；artifact 为 `.codebase-memory/graph.db.zst`。
+- 共享图谱 `D-cicc_cbm-main` 已在 `a473a52` 后持久化为 7560 nodes / 16960 edges；artifact 为 `.codebase-memory/graph.db.zst`，准确基线以 artifact metadata 为准。
 - 当前图谱能定位 `competition_project_single_camera/src/apb_reg_magic.v`、`cpu_bringup/uart_hello_onchip/` 和单摄 `dsi_tx_top.v`。图谱仅用于定位，不替代 XML、RTL、日志和板测证据。
 
 ## 下一立即动作

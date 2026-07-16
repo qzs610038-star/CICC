@@ -39,6 +39,8 @@
 
 跨成员分支合并还必须更新 `docs/merge_governance/MERGE_REGISTER.md` 和对应 `records/` 条目；交接文件只引用已合并 SHA、当前 Gate 与下一立即动作，不把旧 outflow 或未复核板测结论升级为当前事实。
 
+2026-07-17 的后续文档/图谱刷新采用同一规则：共享 artifact 的代码基线、节点数和边数以 `.codebase-memory/artifact.json` 为准；刷新后重新运行新鲜度检查，直到没有 `FAIL`。
+
 ## 未落地项
 
 - 正式 SoC/APB 未生成前，不建立寄存器自动生成链，也不冻结建议偏移。
