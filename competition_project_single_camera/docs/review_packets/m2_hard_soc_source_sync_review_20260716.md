@@ -241,11 +241,9 @@ Codex 在集成分支对同一仓库真源重新执行了离线验证；未复�
 |---|---|---|---|---|---|
 | 来源联合副本 | `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` | PASS | PASS | PASS | PASS |
 | 历史仓库新构建（文件已丢失） | `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC` | PASS | `NOT VERIFIED` | `NOT VERIFIED` | `NOT VERIFIED` |
-| 当前精确 main 重建 | `6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4` | PASS，载荷与来源MATCH | `NOT VERIFIED` | `NOT VERIFIED` | `NOT VERIFIED` |
+| 当前精确 main 重建 | `6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4` | PASS，载荷与来源MATCH | PASS | PASS | PASS |
 
-下一门是对当前可用 `6B6728...` 重走：完全断电冷启动 -> JTAG SRAM临时加载 -> HDMI回归 -> `USER2` -> NDMRESET -> 四核halt -> Hello下载/校验到`0xF9000000` -> CPU0 resume -> UART0横幅和单字符回显。禁止Flash、`USER1`、外部DDR、UART2/J52和机械臂。
-
-只有新构建批次也通过后，才可另行审核 APB MAGIC；feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot继续为`NOT VERIFIED`。
+当前可用新构建的最小 CPU/UART0 Gate 已关闭。下一门仅为 APB `REG_MAGIC` 实读方案审核；feature snapshot、CPU分类主循环、OSD、按键、UART2/J52和myCobot继续为`NOT VERIFIED`。
 
 ## 11. 精确 main 重建与规范化载荷身份
 
@@ -267,4 +265,18 @@ Codex 在集成分支对同一仓库真源重新执行了离线验证；未复�
 
 因此全文件SHA不稳定来自bitstream头部元数据，配置载荷逐字节一致。历史管理员批次`1D697F...`的全文件记录仍保留，但文件已无法在本机定位；当前板级操作必须明确使用`6B6728...`，不能冒充`1D697F...`。
 
-当前`6B6728...`文件尚未实际JTAG加载。下一门为：完全断电冷启动 -> JTAG SRAM临时加载当前文件 -> HDMI回归 -> USER2 -> NDMRESET -> 四核halt -> Hello下载/校验到`0xF9000000` -> CPU0 resume -> UART0横幅和单字符回显。禁止Flash、USER1、外部DDR、UART2/J52和机械臂。
+### 11.1 当前文件板级 Gate
+
+当前`6B6728...`文件已通过 JTAG 临时加载 FPGA SRAM，用户确认完全断电冷启动后的真实摄像头 HDMI 画面正常。板级 CPU/UART0 结果：
+
+- FTDI channel 1、BSCAN `USER2` IR=9：识别4个RV32 hart，XLEN=32，`misa=0x4004112d`
+- Hello ELF：SHA-256 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口`0xF9000000`
+- 片上RAM：538 bytes `verify_image` PASS
+- 首条取指：CPU0从`0xF9000000`单步到`0xF9000004`
+- 运行采样：`pc/dpc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`
+- UART0：COM10收到完整三行横幅并回显ASCII `K`；COM13无输出
+- 收尾：OpenOCD exit 0、正常shutdown、无残留进程
+
+调试过程中，`RUN_SMP_APP` 聚合 target/resume 路径曾出现`pc=0`、`mcause=1`且UART无输出；同一bitstream、ELF和RAM内容改为非SMP逐hart控制，halt CPU1..3并仅resume CPU0后完整通过。后续最小启动固定采用独立hart控制，不使用SMP聚合resume。
+
+裁定：`6B6728... = HDMI / USER2 JTAG / ONCHIP RAM / CPU EXECUTION / UART0 HELLO / UART0 ECHO PASS`。未写Flash，未使用USER1，未访问外部DDR，未连接UART2/J52或机械臂。下一门仅为APB `REG_MAGIC`实读方案审核；获批前不扩大范围。

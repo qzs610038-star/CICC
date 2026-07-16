@@ -1336,3 +1336,16 @@ git diff --check
 - 历史哈希边界：管理员先前记录的新构建全文件SHA `1D697F...`仍保留为历史批次，但其文件已无法在本机找到；不得用当前`6B6728...`冒充该全文件。功能身份应同时记录固定commit、Efinity版本、配置载荷哈希和当前全文件哈希。
 - 当前裁定：`MAIN@0737304 OFFLINE BUILD/PNR/STA/CDC/BITSTREAM PASS / PAYLOAD MATCH SOURCE PASS / CURRENT 6B6728 FILE BOARD LOAD NOT VERIFIED`。
 - 下一门：经用户审核后，仅将当前`6B6728...`通过JTAG临时加载到FPGA SRAM，回归HDMI，再执行USER2 + NDMRESET +片上RAM Hello/UART0回显。禁止Flash、USER1、外部DDR、UART2/J52和机械臂。
+
+### [M2-37] 精确 main 重建 bitstream 的 USER2 / UART0 板级 Gate
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 证据批次：精确 `origin/main@07373042d1f84cdc048fc42b5752d0cbeb52c471` 重建 bitstream SHA-256 `6B672889BCAB2ED2F10CAFA279E13B67463F24B57A2964176F1C9D577D5CC2A4`；仅通过 JTAG 临时加载 FPGA SRAM，未写 Flash。用户在完全断电冷启动后确认真实摄像头 HDMI 画面正常。
+- 安全边界：仅使用 FTDI channel 1、FPGA BSCAN `USER2` IR=9 和片上 RAM `0xF9000000`；未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送 myCobot 帧。
+- Hello 身份：本地忽略 ELF SHA-256 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口 `0xF9000000`；片上 RAM 538 bytes `verify_image` PASS，未重新下载 ELF，未提交 ELF。
+- JTAG/CPU：识别 4 个 RV32 hart，XLEN=32，`misa=0x4004112d`，DMSTATUS 读值有效。NDMRESET 后 CPU0 从 `0xF9000000` 单步到 `0xF9000004`；独立 resume CPU0 后运行采样为 `pc/dpc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`。
+- 调试控制差分：OpenOCD `RUN_SMP_APP` 聚合 target/resume 路径曾得到 `pc=0`、`mcause=1`、UART 无输出；同一 bitstream、ELF 与 RAM 内容在非 SMP、逐 hart target 路径中，明确 halt CPU1..3、只设置并 resume CPU0 后通过。因此本轮失败属于调试控制路径差异，不能归因于 bitstream 载荷或片上 RAM；最小启动流程固定禁用 SMP 聚合 resume。
+- UART0：COM10 在 `115200 8N1` 收到完整三行横幅，发送 ASCII `K`（hex `4B`）后收到 `K` 回显；COM13 无输出。采集窗口内横幅出现两次，与前一次单步/复位诊断后的 UART 缓冲内容叠加一致，不影响完整横幅和回显验收。
+- 结果：当前 `6B6728...` 批次为 `HDMI PASS / USER2 JTAG PASS / ONCHIP RAM PASS / CPU EXECUTION PASS / UART0 HELLO PASS / UART0 ECHO PASS`。
+- 收尾：OpenOCD exit 0 并正常 shutdown，无残留进程；CPU 最终 halt。未提交 bitstream、ELF、hex/bin/map/rpt/log、outflow/work 或本机路径配置。
+- 下一门：最小 Hard SoC CPU/UART0 板级 Gate 已关闭。下一步仅提交 APB `REG_MAGIC` 实读方案供审核；批准前不访问 APB，不进入 feature snapshot、CPU 分类、OSD、按键、UART2/J52 或机械臂。
