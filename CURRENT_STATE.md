@@ -47,6 +47,14 @@
   - 下一门：在不连接机械臂的安全台面上，先记录新 bitstream 完整 SHA-256，再烧录匹配 bitstream 并回归 J48/ch0 视频；随后选择 FPGA `USER2`，仅下载 Hello ELF 到片上 RAM，采集 UART0 完整横幅与单字符回显。任何一步失败都停在当前层，不扩展到 UART2/myCobot。
   - 失效条件：`mem_test.xml`、`.peri.xml`、SDC、`top.v`、Hard SoC IP/BSP、时钟复位、USER TAP、UART0 引脚或构建/板级现象发生变化，或新的 Efinity fatal/时序/CDC 问题出现。
 
+- 日期：2026-07-16，来源 Agent：Codex（单摄 M2 UART0 Hello 新 bitstream 预飞行复建）
+  - 适用范围：仅 `competition_project_single_camera/` 的隔离 CPU UART0 Hello。该条不关闭 `final_project/` A0，不取代正式主线，不开放 UART2/J52/myCobot。
+  - 最新结论：在 `HEAD=origin/main=07373042d1f84cdc048fc42b5752d0cbeb52c471`，以恢复后的原始 `mem_test.xml` SHA-256 `F428549DF9F87DC9A6CF0464F8C5F5FD92DABD2102CA8850F7C9DE21A0BAA060` 新建了可用离线制品批次。日志记录 Map/Interface/PNR/bitstream generation 均 PASS；STA 最差 Setup/Hold `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`，Interface 4 个既有物理距离 warning、post-synthesis 118 个 warning 均已如实保留。当前 `mem_test.bit` SHA-256 是 `2EA4AD287CCC6BFBF113E718B59EF6F5807222AFE1ECE3D55BD1E24D37FB8347`，与旧 M2 的 `1D697F...AECC` 不同，必须作为新证据批次，不能混用 hash 或板级证据。Hello ELF SHA-256 `C99FD39DB437409A63A6061CD29698B5B60099B9E24A77B155B871E169BF5DA5`，2608 B / 16 KiB、唯一 LOAD `0xF9000000..0xF9000A30` 的审计通过。
+  - 板级前置项：只读串口与 connected Ports 枚举仍只见 COM4/COM5 蓝牙及 COM10 `CH340 1A86:7523`（myCobot），没有已连接 FTDI `0403:6011`。因此本路线为 `CONDITIONAL GO / PRE-FLIGHT HOLD`，尚不能配置 FPGA 或打开 UART0；COM10 明确禁止复用作候选板端口。
+  - 下一门：先按 `m2_uart0_cpu_hello_preflight_20260716.md` 的 FTDI 枚举操作卡取得插拔差分证据。新增只读采集器 `competition_project_single_camera/tools/capture_m2_ftdi_preflight.ps1` 已在无板状态自测：默认采集 exit 0 时输出 HOLD，`-RequireFtdi` 在无 FTDI 时 fail-closed 为 exit 2；全程断言不打开串口、不发 UART、不调用 Programmer/Flash。该操作卡仅枚举，不选择 USER1/USER2、不烧录 Flash、不发送 UART；证据复核后才可发 USER2 易失配置、片上 RAM Hello 下载和 115200 8N1 横幅/回显的独立操作卡。
+  - 证据路径：`competition_project_single_camera/docs/debug_sessions/m2_uart0_cpu_hello_preflight_20260716.md`、忽略目录 `competition_project_single_camera/outflow_m2_cpuhello_20260716_1730/` 中的 `build.log`、`mem_test.timing.rpt`、`mem_test.cdc.rpt`、`mem_test.bit` 与 `uart_hello_build.log`。
+  - 失效条件：任何构建输入或 Efinity 版本变化、bit/ELF hash 变化、FTDI/JTAG 映射与枚举结果变化，或出现新的 fatal、负 slack、CDC 问题或板级异常；失效后重新建立批次，不沿用本条身份。
+
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
   - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。
   - 最新结论：以 wsc 的 CPU 设计和其 MinGW/Efinity 环境结果为功能主门，同时关闭本机 MSVC 兼容门。两个测试的 `PASS()` 宏已将遮蔽业务变量的局部 `int d` 改为唯一名称；MSVC 19.42 `/std:c11 /W4 /WX` 实跑 `cpu_result_semantics 374/374`、`main_loop_arm_disabled 117/117` PASS。脚本改用显式参数/`VCVARS64_PATH`/`vswhere` 发现 VS，GCC 门补 `-Wshadow -Werror`，不得通过 `/wd4456` 或降低 `/WX` 规避。

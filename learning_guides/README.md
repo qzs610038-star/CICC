@@ -53,6 +53,7 @@
 
 * [competition_score_maximization_explanation_guide.md](competition_score_maximization_explanation_guide.md)：决赛最大化得分总控方案的大白话通俗解读与决策面板。
 * [mycobot_cpu_board_bringup_explanation_guide.md](mycobot_cpu_board_bringup_explanation_guide.md)：myCobot 机械臂上板主实施方案的大白话通俗解读与分级门禁指南。
+* [m2_preflight_and_risk_guide.md](m2_preflight_and_risk_guide.md)：单摄 M2 预飞行安全门与物理推进风险白话指南。
 
 ---
 
