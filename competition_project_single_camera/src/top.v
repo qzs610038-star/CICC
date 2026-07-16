@@ -56,9 +56,9 @@ parameter HDMI_FIXED_WB_EN      = 1'b1
   (* syn_peri_port = 0 *) input MIPI_TX_PLL_LOCKED,
   (* syn_peri_port = 0 *) input pll_byteclk_locked,
   (* syn_peri_port = 0 *) input hdmi_tx_fast_clk,
-  (* syn_peri_port = 0 *) input CLK_5M,
   (* syn_peri_port = 0 *) input i_sysclk_div2,
-  (* syn_peri_port = 0 *) input pll_inst1_CLKOUT0,
+  (* syn_peri_port = 0 *) input soc_memory_clk,
+  (* syn_peri_port = 0 *) input soc_system_clk,
   (* syn_peri_port = 0 *) input hdmi_tx_slow_clk,
   (* syn_peri_port = 0 *) input pll_inst2_CLKOUT0,
   (* syn_peri_port = 0 *) input axi0_ACLK,
@@ -79,39 +79,56 @@ parameter HDMI_FIXED_WB_EN      = 1'b1
   (* syn_peri_port = 0 *) input jtag_inst1_TDI,
   (* syn_peri_port = 0 *) input jtag_inst1_TMS,
   (* syn_peri_port = 0 *) input jtag_inst1_UPDATE,
-  (* syn_peri_port = 0 *) input jtag_inst2_CAPTURE,
-  (* syn_peri_port = 0 *) input jtag_inst2_DRCK,
-  (* syn_peri_port = 0 *) input jtag_inst2_RESET,
-  (* syn_peri_port = 0 *) input jtag_inst2_RUNTEST,
-  (* syn_peri_port = 0 *) input jtag_inst2_SEL,
-  (* syn_peri_port = 0 *) input jtag_inst2_SHIFT,
-  (* syn_peri_port = 0 *) input jtag_inst2_TCK,
-  (* syn_peri_port = 0 *) input jtag_inst2_TDI,
-  (* syn_peri_port = 0 *) input jtag_inst2_TMS,
-  (* syn_peri_port = 0 *) input jtag_inst2_UPDATE,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_capture,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_enable,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_reset,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_shift,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_tdi,
+  (* syn_peri_port = 0 *) input ut_jtagCtrl_update,
+  (* syn_peri_port = 0 *) input jtagCtrl_tck,
+  (* syn_peri_port = 0 *) input jtagCtrl_tdo,
+  (* syn_peri_port = 0 *) input io_peripheralReset,
+  (* syn_peri_port = 0 *) input io_systemReset,
+  (* syn_peri_port = 0 *) input io_gpio_sw_n,
+  (* syn_peri_port = 0 *) input system_uart_0_io_rxd,
   (* syn_peri_port = 0 *) input axi0_ARREADY,
-  (* syn_peri_port = 0 *) input axi1_ARREADY,
   (* syn_peri_port = 0 *) input axi0_AWREADY,
-  (* syn_peri_port = 0 *) input axi1_AWREADY,
   (* syn_peri_port = 0 *) input [5:0] axi0_BID,
-  (* syn_peri_port = 0 *) input [5:0] axi1_BID,
   (* syn_peri_port = 0 *) input [1:0] axi0_BRESP,
-  (* syn_peri_port = 0 *) input [1:0] axi1_BRESP,
   (* syn_peri_port = 0 *) input axi0_BVALID,
-  (* syn_peri_port = 0 *) input axi1_BVALID,
   (* syn_peri_port = 0 *) input ddr_inst_CFG_DONE,
   (* syn_peri_port = 0 *) input [511:0] axi0_RDATA,
-  (* syn_peri_port = 0 *) input [511:0] axi1_RDATA,
   (* syn_peri_port = 0 *) input [5:0] axi0_RID,
-  (* syn_peri_port = 0 *) input [5:0] axi1_RID,
   (* syn_peri_port = 0 *) input axi0_RLAST,
-  (* syn_peri_port = 0 *) input axi1_RLAST,
   (* syn_peri_port = 0 *) input [1:0] axi0_RRESP,
-  (* syn_peri_port = 0 *) input [1:0] axi1_RRESP,
   (* syn_peri_port = 0 *) input axi0_RVALID,
-  (* syn_peri_port = 0 *) input axi1_RVALID,
   (* syn_peri_port = 0 *) input axi0_WREADY,
-  (* syn_peri_port = 0 *) input axi1_WREADY,
+  (* syn_peri_port = 0 *) input [31:0] axiA_awaddr,
+  (* syn_peri_port = 0 *) input [7:0] axiA_awlen,
+  (* syn_peri_port = 0 *) input [2:0] axiA_awsize,
+  (* syn_peri_port = 0 *) input [1:0] axiA_awburst,
+  (* syn_peri_port = 0 *) input axiA_awlock,
+  (* syn_peri_port = 0 *) input [3:0] axiA_awcache,
+  (* syn_peri_port = 0 *) input [2:0] axiA_awprot,
+  (* syn_peri_port = 0 *) input [3:0] axiA_awqos,
+  (* syn_peri_port = 0 *) input [3:0] axiA_awregion,
+  (* syn_peri_port = 0 *) input axiA_awvalid,
+  (* syn_peri_port = 0 *) input [31:0] axiA_wdata,
+  (* syn_peri_port = 0 *) input [3:0] axiA_wstrb,
+  (* syn_peri_port = 0 *) input axiA_wvalid,
+  (* syn_peri_port = 0 *) input axiA_wlast,
+  (* syn_peri_port = 0 *) input axiA_bready,
+  (* syn_peri_port = 0 *) input [31:0] axiA_araddr,
+  (* syn_peri_port = 0 *) input [7:0] axiA_arlen,
+  (* syn_peri_port = 0 *) input [2:0] axiA_arsize,
+  (* syn_peri_port = 0 *) input [1:0] axiA_arburst,
+  (* syn_peri_port = 0 *) input axiA_arlock,
+  (* syn_peri_port = 0 *) input [3:0] axiA_arcache,
+  (* syn_peri_port = 0 *) input [2:0] axiA_arprot,
+  (* syn_peri_port = 0 *) input [3:0] axiA_arqos,
+  (* syn_peri_port = 0 *) input [3:0] axiA_arregion,
+  (* syn_peri_port = 0 *) input axiA_arvalid,
+  (* syn_peri_port = 0 *) input axiA_rready,
   (* syn_peri_port = 0 *) input S0_io_cam_scl_IN,
   (* syn_peri_port = 0 *) input S0_io_cam_sda_IN,
   (* syn_peri_port = 0 *) input S1_io_cam_scl_IN,
@@ -123,66 +140,64 @@ parameter HDMI_FIXED_WB_EN      = 1'b1
   (* syn_peri_port = 0 *) output MIPI_TX_PLL_RSTN,
   (* syn_peri_port = 0 *) output pll_byteclk_rstn,
   (* syn_peri_port = 0 *) output jtag_inst1_TDO,
-  (* syn_peri_port = 0 *) output jtag_inst2_TDO,
+  (* syn_peri_port = 0 *) output ut_jtagCtrl_tdo,
+  (* syn_peri_port = 0 *) output jtagCtrl_capture,
+  (* syn_peri_port = 0 *) output jtagCtrl_enable,
+  (* syn_peri_port = 0 *) output jtagCtrl_reset,
+  (* syn_peri_port = 0 *) output jtagCtrl_shift,
+  (* syn_peri_port = 0 *) output jtagCtrl_tdi,
+  (* syn_peri_port = 0 *) output jtagCtrl_update,
+  (* syn_peri_port = 0 *) output io_asyncReset,
+  (* syn_peri_port = 0 *) output system_uart_0_io_txd,
+  (* syn_peri_port = 0 *) output axiAInterrupt,
+  (* syn_peri_port = 0 *) output userInterruptA,
+  (* syn_peri_port = 0 *) output userInterruptB,
+  (* syn_peri_port = 0 *) output userInterruptC,
+  (* syn_peri_port = 0 *) output userInterruptD,
+  (* syn_peri_port = 0 *) output userInterruptE,
+  (* syn_peri_port = 0 *) output userInterruptF,
+  (* syn_peri_port = 0 *) output userInterruptG,
+  (* syn_peri_port = 0 *) output userInterruptH,
+  (* syn_peri_port = 0 *) output axiA_awready,
+  (* syn_peri_port = 0 *) output axiA_wready,
+  (* syn_peri_port = 0 *) output [1:0] axiA_bresp,
+  (* syn_peri_port = 0 *) output axiA_bvalid,
+  (* syn_peri_port = 0 *) output axiA_arready,
+  (* syn_peri_port = 0 *) output [31:0] axiA_rdata,
+  (* syn_peri_port = 0 *) output [1:0] axiA_rresp,
+  (* syn_peri_port = 0 *) output axiA_rlast,
+  (* syn_peri_port = 0 *) output axiA_rvalid,
   (* syn_peri_port = 0 *) output [32:0] axi0_ARADDR,
-  (* syn_peri_port = 0 *) output [32:0] axi1_ARADDR,
   (* syn_peri_port = 0 *) output axi0_ARAPCMD,
-  (* syn_peri_port = 0 *) output axi1_ARAPCMD,
   (* syn_peri_port = 0 *) output [1:0] axi0_ARBURST,
-  (* syn_peri_port = 0 *) output [1:0] axi1_ARBURST,
   (* syn_peri_port = 0 *) output [5:0] axi0_ARID,
-  (* syn_peri_port = 0 *) output [5:0] axi1_ARID,
   (* syn_peri_port = 0 *) output [7:0] axi0_ARLEN,
-  (* syn_peri_port = 0 *) output [7:0] axi1_ARLEN,
   (* syn_peri_port = 0 *) output axi0_ARLOCK,
-  (* syn_peri_port = 0 *) output axi1_ARLOCK,
   (* syn_peri_port = 0 *) output axi0_ARQOS,
-  (* syn_peri_port = 0 *) output axi1_ARQOS,
   (* syn_peri_port = 0 *) output [2:0] axi0_ARSIZE,
-  (* syn_peri_port = 0 *) output [2:0] axi1_ARSIZE,
   (* syn_peri_port = 0 *) output axi0_ARESETn,
-  (* syn_peri_port = 0 *) output axi1_ARESETn,
   (* syn_peri_port = 0 *) output axi0_ARVALID,
-  (* syn_peri_port = 0 *) output axi1_ARVALID,
   (* syn_peri_port = 0 *) output [32:0] axi0_AWADDR,
-  (* syn_peri_port = 0 *) output [32:0] axi1_AWADDR,
   (* syn_peri_port = 0 *) output axi0_AWALLSTRB,
-  (* syn_peri_port = 0 *) output axi1_AWALLSTRB,
   (* syn_peri_port = 0 *) output axi0_AWAPCMD,
-  (* syn_peri_port = 0 *) output axi1_AWAPCMD,
   (* syn_peri_port = 0 *) output [1:0] axi0_AWBURST,
-  (* syn_peri_port = 0 *) output [1:0] axi1_AWBURST,
   (* syn_peri_port = 0 *) output [3:0] axi0_AWCACHE,
-  (* syn_peri_port = 0 *) output [3:0] axi1_AWCACHE,
   (* syn_peri_port = 0 *) output axi0_AWCOBUF,
-  (* syn_peri_port = 0 *) output axi1_AWCOBUF,
   (* syn_peri_port = 0 *) output [5:0] axi0_AWID,
-  (* syn_peri_port = 0 *) output [5:0] axi1_AWID,
   (* syn_peri_port = 0 *) output [7:0] axi0_AWLEN,
-  (* syn_peri_port = 0 *) output [7:0] axi1_AWLEN,
   (* syn_peri_port = 0 *) output axi0_AWLOCK,
-  (* syn_peri_port = 0 *) output axi1_AWLOCK,
   (* syn_peri_port = 0 *) output axi0_AWQOS,
-  (* syn_peri_port = 0 *) output axi1_AWQOS,
   (* syn_peri_port = 0 *) output [2:0] axi0_AWSIZE,
-  (* syn_peri_port = 0 *) output [2:0] axi1_AWSIZE,
   (* syn_peri_port = 0 *) output axi0_AWVALID,
-  (* syn_peri_port = 0 *) output axi1_AWVALID,
   (* syn_peri_port = 0 *) output axi0_BREADY,
-  (* syn_peri_port = 0 *) output axi1_BREADY,
   (* syn_peri_port = 0 *) output ddr_inst_CFG_RST,
   (* syn_peri_port = 0 *) output ddr_inst_CFG_SEL,
   (* syn_peri_port = 0 *) output ddr_inst_CFG_START,
   (* syn_peri_port = 0 *) output axi0_RREADY,
-  (* syn_peri_port = 0 *) output axi1_RREADY,
   (* syn_peri_port = 0 *) output [511:0] axi0_WDATA,
-  (* syn_peri_port = 0 *) output [511:0] axi1_WDATA,
   (* syn_peri_port = 0 *) output axi0_WLAST,
-  (* syn_peri_port = 0 *) output axi1_WLAST,
   (* syn_peri_port = 0 *) output [63:0] axi0_WSTRB,
-  (* syn_peri_port = 0 *) output [63:0] axi1_WSTRB,
   (* syn_peri_port = 0 *) output axi0_WVALID,
-  (* syn_peri_port = 0 *) output axi1_WVALID,
   (* syn_peri_port = 0 *) output tmds_clk_TX_OE,
   (* syn_peri_port = 0 *) output [9:0] tmds_clk_TX_DATA,
   (* syn_peri_port = 0 *) output tmds_clk_TX_RST,
@@ -601,6 +616,87 @@ wire  [AXI_ID_WIDTH-1:0]   		m0_axi_awid      ;
   wire    [S_COUNT-1:0]          			axi_m_rready;// 
    reg [5:0] vs_cnt ;
    reg  out_sync;
+
+// QCRV32 fabric-side peripheral bridge. The video state machine remains the
+// only driver of DDR CFG_START/CFG_RST/CFG_SEL; the SoC bridge only observes
+// the shared CFG_DONE result so its internal reset can release safely.
+wire soc_cfg_start_unused;
+wire soc_cfg_sel_unused;
+wire soc_cfg_reset_unused;
+
+EfxSapphireHpSoc_slb u_EfxSapphireHpSoc_slb (
+    .io_peripheralClk          (axi0_ACLK),
+    .io_peripheralReset        (io_peripheralReset),
+    .io_asyncReset             (io_asyncReset),
+    .io_gpio_sw_n              (io_gpio_sw_n),
+    .pll_peripheral_locked     (ddr_pll_lock),
+    .pll_system_locked         (sys_pll_lock),
+    .jtagCtrl_capture          (jtagCtrl_capture),
+    .jtagCtrl_enable           (jtagCtrl_enable),
+    .jtagCtrl_reset            (jtagCtrl_reset),
+    .jtagCtrl_shift            (jtagCtrl_shift),
+    .jtagCtrl_tdi              (jtagCtrl_tdi),
+    .jtagCtrl_tdo              (jtagCtrl_tdo),
+    .jtagCtrl_update           (jtagCtrl_update),
+    .ut_jtagCtrl_capture       (ut_jtagCtrl_capture),
+    .ut_jtagCtrl_enable        (ut_jtagCtrl_enable),
+    .ut_jtagCtrl_reset         (ut_jtagCtrl_reset),
+    .ut_jtagCtrl_shift         (ut_jtagCtrl_shift),
+    .ut_jtagCtrl_tdi           (ut_jtagCtrl_tdi),
+    .ut_jtagCtrl_tdo           (ut_jtagCtrl_tdo),
+    .ut_jtagCtrl_update        (ut_jtagCtrl_update),
+    .system_uart_0_io_rxd      (system_uart_0_io_rxd),
+    .system_uart_0_io_txd      (system_uart_0_io_txd),
+    .cfg_done                  (ddr_inst_CFG_DONE),
+    .cfg_start                 (soc_cfg_start_unused),
+    .cfg_sel                   (soc_cfg_sel_unused),
+    .cfg_reset                 (soc_cfg_reset_unused),
+    .axiAInterrupt             (axiAInterrupt),
+    .axiA_awaddr               (axiA_awaddr),
+    .axiA_awlen                (axiA_awlen),
+    .axiA_awsize               (axiA_awsize),
+    .axiA_awburst              (axiA_awburst),
+    .axiA_awlock               (axiA_awlock),
+    .axiA_awcache              (axiA_awcache),
+    .axiA_awprot               (axiA_awprot),
+    .axiA_awqos                (axiA_awqos),
+    .axiA_awregion             (axiA_awregion),
+    .axiA_awvalid              (axiA_awvalid),
+    .axiA_awready              (axiA_awready),
+    .axiA_wdata                (axiA_wdata),
+    .axiA_wstrb                (axiA_wstrb),
+    .axiA_wvalid               (axiA_wvalid),
+    .axiA_wlast                (axiA_wlast),
+    .axiA_wready               (axiA_wready),
+    .axiA_bresp                (axiA_bresp),
+    .axiA_bvalid               (axiA_bvalid),
+    .axiA_bready               (axiA_bready),
+    .axiA_araddr               (axiA_araddr),
+    .axiA_arlen                (axiA_arlen),
+    .axiA_arsize               (axiA_arsize),
+    .axiA_arburst              (axiA_arburst),
+    .axiA_arlock               (axiA_arlock),
+    .axiA_arcache              (axiA_arcache),
+    .axiA_arprot               (axiA_arprot),
+    .axiA_arqos                (axiA_arqos),
+    .axiA_arregion             (axiA_arregion),
+    .axiA_arvalid              (axiA_arvalid),
+    .axiA_arready              (axiA_arready),
+    .axiA_rdata                (axiA_rdata),
+    .axiA_rresp                (axiA_rresp),
+    .axiA_rlast                (axiA_rlast),
+    .axiA_rvalid               (axiA_rvalid),
+    .axiA_rready               (axiA_rready),
+    .userInterruptA            (userInterruptA)
+);
+
+assign userInterruptB = 1'b0;
+assign userInterruptC = 1'b0;
+assign userInterruptD = 1'b0;
+assign userInterruptE = 1'b0;
+assign userInterruptF = 1'b0;
+assign userInterruptG = 1'b0;
+assign userInterruptH = 1'b0;
 //=========================================================================
 //signal define
 //=========================================================================
@@ -676,7 +772,6 @@ assign ddr_inst_CFG_RST    = (cfg_st == IDLE);
 assign ddr_inst_CFG_SEL      = 1'b0;
 
 assign axi0_ARESETn = ddr_cfg_ok;
-assign axi1_ARESETn = ddr_cfg_ok;
 wire sys_rst_n = ddr_cfg_ok;
 
 // Preserve the original post-configuration settling delay without depending
@@ -908,36 +1003,19 @@ wire [PACK_BIT-1:0] rx_out_data1;
   wire [15:0] ch0_bayer_2pix;
   assign ch0_bayer_2pix = CH0_BAYER_SWAP_PIXELS ? {ch0_b, ch0_g} : {ch0_g, ch0_b};
 
-  // SW4/V19 is active low. While held, replace only the RAW payload with a
-  // grayscale checkerboard; CSI timing and the full DDR-to-HDMI path remain.
+  // SW4/V19 is active low. While held, replace all four RAW samples with
+  // mid-gray. Camera timing and the complete DDR-to-HDMI path remain active.
   (* async_reg = "true" *) reg [1:0] raw_diag_sw_sync = 2'b11;
-  reg        raw_diag_de_r = 1'b0;
-  reg [9:0]  raw_diag_x = 10'd0;
-  reg [10:0] raw_diag_y = 11'd0;
   always @(posedge i_sysclk_div2 or negedge pixel_data_en) begin
-      if (!pixel_data_en) begin
+      if (!pixel_data_en)
           raw_diag_sw_sync <= 2'b11;
-          raw_diag_de_r <= 1'b0;
-          raw_diag_x <= 10'd0;
-          raw_diag_y <= 11'd0;
-      end else begin
+      else
           raw_diag_sw_sync <= {raw_diag_sw_sync[0], i_sw[1]};
-          raw_diag_de_r <= rx_out_de;
-          if (rx_out_vs && !rx_out_vs_r)
-              raw_diag_y <= 11'd0;
-          else if (raw_diag_de_r && !rx_out_de)
-              raw_diag_y <= raw_diag_y + 1'b1;
-          if (rx_out_de)
-              raw_diag_x <= raw_diag_x + 1'b1;
-          else
-              raw_diag_x <= 10'd0;
-      end
   end
   wire raw_diag_en = ~raw_diag_sw_sync[1];
-  wire [7:0] raw_diag_level = raw_diag_x[5] ^ raw_diag_y[5] ? 8'he0 : 8'h20;
   wire [31:0] ch0_camera_raw8 = {rx_out_data[39:32], rx_out_data[29:22],
                                   rx_out_data[19:12], rx_out_data[9:2]};
-  wire [31:0] ch0_framebuffer_vin = raw_diag_en ? {4{raw_diag_level}} : ch0_camera_raw8;
+  wire [31:0] ch0_framebuffer_vin = raw_diag_en ? 32'h80808080 : ch0_camera_raw8;
 frame_buffer #(
 .AXI_DATA_WIDTH ( AXI_DATA_WIDTH	),
 .I_VID_WIDTH    ( I_VID_WIDTH       ),
