@@ -1361,3 +1361,22 @@ git diff --check
 - 裁定：`CURRENT 6B6728 APB0/REG_MAGIC = ABSENT`。禁止对当前 bitstream 的 `0xE8100000` 做试探性读；这种访问既不能关闭 Gate，也可能触发未映射总线异常。
 - 下一门方案：在独立工程批次中用 Efinity IP Manager 启用 `PERI_APB_0` 并重新生成 wrapper/BSP；新增只读零等待 `REG_MAGIC` 从机，偏移 `0x000` 返回 `0x375A0001`，非法写入/偏移以 `PSLVERROR` fail closed；接入当前视频顶层后重新执行完整 Efinity 与板级回归。该方案需再次批准后才实施。
 - 继续禁止：不得手改生成 wrapper、不得拼接旧 A3 `.peri.xml`、不得访问 APB、不得写 Flash、不得使用 USER1/外部 DDR、不得进入 feature/OSD/UART2/J52/myCobot。
+
+### [M2-39] APB0 REG_MAGIC 隔离离线实现与全流程 Gate
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 输入基线：隔离分支 `codex/hard-soc-apb-magic-20260716`，基线提交 `db94aa4a38a02c2ea3a738cf9d209f193b4b7526`。原已板测 `6B6728...` bitstream、开发板和共享主工作区均未修改。
+- GUI 生成：用户在 Efinity 2025.2 IP Manager 中仅启用 Hard SoC APB3 interface 0，APB0 size 为 4 KiB，APB1-4 保持关闭；USER2、UART0、PLL、DDR、AXI 等配置保持原值。Generate PASS 后，在 Interface Designer 将生成器重置的 `Periphery Controller Clock Pin Name` 恢复为 `axi0_ACLK`；Check Design 为 `0 error / 4` 个既有 MIPI/LVDS 距离 warning。
+- 生成契约：`PERI_APB_0=1`，BSP 为 `IO_APB_SLAVE_0_INPUT=0xE8100000`、`IO_APB_SLAVE_0_INPUT_SIZE=4096`；wrapper 导出完整 APB0。未手改生成 wrapper，未从其他工程副本拼接文件。
+- RTL：新增 `src/apb_reg_magic.v` 并登记到 `mem_test.xml`，`src/top.v` 将 APB0 接入该从机。偏移 `0x000` 只读返回 `0x375A0001`，`PREADY=1`；写访问或其他偏移仅在 access phase 置 `PSLVERROR=1`。从机无寄存器状态和写副作用。
+- warning 收口：最初 Map 因只读从机声明但不使用 `PWDATA` 产生 32 条 `pwdata[x]` 冗余 warning；移除该端口并将 SoC `PWDATA` 输出显式留空后重跑 Map，这 32 条 warning 全部消失。官方生成 `EfxSapphireHpSoc_slb.v` 仍有 1 条 `io_apbSlave_0_PADDR` 实参 32 位、形参 12 位 warning；其外层端口、内部 4 KiB 窗口、BSP 地址和顶层 `[11:0]` 译码一致，裁定为生成边界的确定性低位截断，禁止手改生成 RTL。
+- Map：PASS；post-synthesis netlist 仍为 118 个 warning。资源为 `EFX_ADD=2065`、`EFX_LUT4=11385`、`EFX_FF=10104`、`EFX_RAM10=165`、`EFX_DPRAM10=4`。相对已板测 `6B6728...` 对应基线 `2065/11204/9957/165/4`，增量为 `LUT4 +181 / FF +147`，其余不变。
+- Interface/PNR：Interface PASS，4 个既有 warning 为 `mipi_rx_dp01`、`mipi_tx_ck0`、`mipi_tx_dp12`、`tmds_data2` 的距离项；PNR PASS。首次 PNR 因命令行环境中的反斜杠 Tcl 路径被错误转义而在 packing 后提前退出，按 Efinity `setup.bat` 约定将 `EFINITY_HOME` 改为正斜杠形式后，同一工程和约束重跑 PASS；该失败不属于 RTL/SDC/资源问题。
+- STA/CDC：最差 Setup/Hold `+1.321ns/+0.026ns`；CDC 原文 `No Synchronizer warnings to report.`；无 router hold fixing 需求。
+- bitstream generation：PGM PASS，仅生成文件，未执行 program/JTAG。新 `mem_test.bit` 大小 11847132 bytes，SHA-256 `138F435C7F2B6CA2EDA2605CABCBA1C44D3C0BD6E3A7AE1D54D244DA12277D15`；本地忽略，不提交。
+- CPU 回归：新 BSP 下 UART0 Hello 重建 PASS，2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段 `0xF9000000..0xF9000A30`，无未解析符号，`ELF_LOAD_AUDIT=PASS`；本地 ELF SHA-256 `67A1AE3CFB7D8388CD3C8D14906FBF6F4128EF2722AEC0A8BF145F27C6050B26`，未提交。
+- 仿真边界：`tests/apb_reg_magic/tb_apb_reg_magic.v` 已覆盖空闲/SETUP/合法读/非法写/非法偏移；本机无 Icarus、Verilator、ModelSim/Questa，testbench 为 `NOT RUN`，不得写成仿真 PASS。
+- 禁止项审计：未提交或计划提交 `outflow/`、`work_*`、bit、hex、ELF、map、rpt、log、许可证、本机路径或 runner 临时文件；未连接开发板、未访问 APB、未写 Flash、未使用 USER1、未初始化外部 DDR，未连接 UART2/J52 或机械臂。
+- 结果：`OFFLINE APB0/REG_MAGIC IMPLEMENTATION + MAP/INTERFACE/PNR/STA/CDC/BITSTREAM = PASS`；`NEW BITSTREAM BOARD / APB READ = NOT VERIFIED`。
+- Review Packet：`docs/review_packets/m2_hard_soc_apb_magic_offline_review_20260716.md`。
+- 下一步门禁：再次经用户审核后，只允许匹配新 bitstream 的冷启动 + JTAG SRAM 临时加载 + HDMI + USER2/片上 RAM UART0 回归，全部通过后再单次只读 `0xE8100000`。禁止 Flash、USER1、外部 DDR、UART2/J52、机械臂和 feature/OSD 扩展。
