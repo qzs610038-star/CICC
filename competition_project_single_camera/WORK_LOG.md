@@ -1296,3 +1296,16 @@ git diff --check
 - Review Packet：`docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`，记录唯一来源指纹、Efinity `2025.2.288.4.15`、Check Design `0 error/4 warning`、Map/PNR、Setup/Hold、CDC、bitstream、板级视频和25个文件SHA-256。
 - 验证边界：来源联合副本为 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`；USER2 JTAG实际取指、UART0完整横幅和回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。未连接机械臂，未合并main。
 - 下一步：提交本条日志和Review Packet，推送个人分支，等待管理员审核；不得自行合并main。
+
+### [M2-34] 管理员合并复核、状态收敛与新离线构建
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 合并范围：管理员锁定并合入 `dev/libaoxun688-hard-soc-source-sync-20260716@0604d33f3fe76851e1dfe738403875b4a7d0721c`；该分支相对基线 `main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde` 为 0 behind / 2 ahead，合并无冲突。
+- 真源裁定：补交的 25 个系统/IP/BSP/Hello 文件齐备，四个系统文件、Hard SoC wrapper、UART0 GPIO、USER1/USER2、AXI0/AXI1 与 DDR CFG 唯一驱动契约复核一致。2026-07-15 的“Hard SoC 系统真源缺失/HOLD”已被本条替代。
+- Hello 新构建：在合并工作树用 Efinity RISC-V GCC 8.3.0 重建 PASS；2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段至 `0xF9000A30`，`ELF_LOAD_AUDIT=PASS`。
+- FPGA 新构建：Efinity 2025.2 从同一合并工作树执行 Map/Interface/PNR/PGM 全流程 PASS；最差 Setup/Hold `+1.742ns/+0.018ns`；CDC 为 `No Synchronizer warnings to report.`；Interface Design Issues 为 4 个既有物理距离 warning，post-synthesis netlist 另有 118 个 warning。
+- 路径说明：Efinity map 直接使用中文绝对路径时因旧组件字符转换失败；改用仓库既有 ASCII junction 指向同一工作树后 PASS。未把该本机路径写入任何工程配置。
+- 新 bitstream：SHA-256 `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`；只保存在仓库外临时验证目录，未提交，且尚未上板。来源旧 bitstream `AA1338...` 的 J48/ch0 视频证据不继承到本次新 bitstream。
+- 文档收敛：更新 `CURRENT_STATE.md`、`AGENTS.md`、`CLAUDE.md`、`fpga_vision`/`cpu_mycobot` Skills、Review Packet，并生成 2026-07-16 A/B/C 三轨学习指南；不再要求队友重复补交已存在的 Hard SoC 真源。
+- 安全边界：未烧录、未连接机械臂、未运行任何动作。USER2 实际连接、片上 RAM 取指、UART0 115200 横幅与回显仍为 `NOT VERIFIED`。
+- 下一门：仅使用匹配的新 bitstream、FPGA `USER2` 与片上 RAM Hello 完成 UART0 横幅/回显；禁止 `USER1`、Flash、外部 DDR、UART2/J52 和机械臂。

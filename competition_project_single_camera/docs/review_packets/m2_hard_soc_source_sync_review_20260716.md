@@ -3,6 +3,7 @@
 > 日期：2026-07-16
 > 分支：`dev/libaoxun688-hard-soc-source-sync-20260716`
 > 源码提交：`2d4b3b7b3d0c59d88ece0669534ae38de02ed938`
+> 分支头（含 Review Packet / Work Log）：`0604d33f3fe76851e1dfe738403875b4a7d0721c`
 > 基线：`origin/main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde`
 > 当前裁定：系统真源补交完成；CPU USER2 JTAG取指和UART0回显仍为 `NOT VERIFIED`。
 
@@ -97,34 +98,36 @@ embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld
 
 | 文件 | 来源SHA-256 | 分支SHA-256 |
 |---|---|---|
-| `ip/EfxSapphireHpSoc_slb/settings.json` | `80A4BF306641C5B26F8B27677E38AAD97E50992F426B8B89778033F73399478F` | `A22F4A2254D78B879733512BC40A0D68D02598D43B89615D4F947CC44411785C` |
-| `cpu_bringup/uart_hello_onchip/build.ps1` | `CD4F8937E62C593FD3DA72F25D9EF1282F37F75D509E4C71FCCE804649F02CBB` | `0F89C19786DDCAAC9C97094B53880D545603F1E295C3B47353355E98C9695FF5` |
+| `ip/EfxSapphireHpSoc_slb/settings.json` | `80A4BF306641C5B26F8B27677E38AAD97E50992F426B8B89778033F73399478F` | `36BFB1FAC9B3B55A169EA409FE0716D9A845773734B00B5DA0ED4E9140D531E7` |
+| `cpu_bringup/uart_hello_onchip/build.ps1` | `CD4F8937E62C593FD3DA72F25D9EF1282F37F75D509E4C71FCCE804649F02CBB` | `CC675C2223F65EAAAB041C760BBBA232E26CEE4CFECB2FC73E9441E901CA7DB3` |
 | `cpu_bringup/uart_hello_onchip/README.md` | `E75E48B87321BE5497C66EB94C3BDB0DFEC197FB6DE04C66F40ABB7392FFB6D6` | `9B6F37B6376DC002BB4A8F2DBDF4DE3BB30C3F6FC705F0D2DACEF99345C27AED` |
 
 ## 6. 第一个提交文件SHA-256
+
+下表按本次 Codex 审核时 Windows checkout 的实际文件字节重新计算。Git 的 EOL 转换可能使另一平台 checkout 的字节 SHA 不同；跨机器身份以固定 commit + path 为主，哈希比较前必须先统一 EOL 约定。
 
 | 文件 | SHA-256 |
 |---|---|
 | `competition_project_single_camera/constrain.sdc` | `3C0A58F318A3981984D7C544F26F9844FE85E27E680BDFA4C17B0988D0360994` |
 | `competition_project_single_camera/cpu_bringup/uart_hello_onchip/README.md` | `9B6F37B6376DC002BB4A8F2DBDF4DE3BB30C3F6FC705F0D2DACEF99345C27AED` |
-| `competition_project_single_camera/cpu_bringup/uart_hello_onchip/build.ps1` | `0F89C19786DDCAAC9C97094B53880D545603F1E295C3B47353355E98C9695FF5` |
+| `competition_project_single_camera/cpu_bringup/uart_hello_onchip/build.ps1` | `CC675C2223F65EAAAB041C760BBBA232E26CEE4CFECB2FC73E9441E901CA7DB3` |
 | `competition_project_single_camera/cpu_bringup/uart_hello_onchip/makefile` | `58BDE219C569D62EEBDB7FC57D77074EAF7D3AB9FC59BAB41E8D2E52E9E9D2CE` |
 | `competition_project_single_camera/cpu_bringup/uart_hello_onchip/src/main.c` | `09A0C9451404AC5B85808F7E3124084BAC5EFB2F46B1FAA0C2B1905C8691F4E4` |
-| `competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.h` | `87A09A739226C2A46DF33F6F995758D1BF81DD33AE8DE3E41EE0B18143833629` |
+| `competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.h` | `2CD1FEB33BD3E2C41D27E99DC3632C03F1C4CC91300C9BE6FF40D39FFE91615E` |
 | `competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.mk` | `D3AD1C88A982CA77ADDF514906A5014441F5D248825904AA491F3FF7190271F7` |
-| `competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld` | `618FC75BB2D6D932E5FE27E3A7F8E263222095AC25A415F6814C59264D34D5D3` |
+| `competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld` | `21FF3E0B6B741BA12639045BF3CF4D85FB95C6C4FA869D5401BE6CBD3BB5ACC5` |
 | `competition_project_single_camera/embedded_sw/efx_hard_soc/software/standalone/common/bsp.mk` | `B1CD52810F86A11E65E08FBACF1E8E1EA22B4C1E51812602D8F1FB5B449DE082` |
 | `competition_project_single_camera/embedded_sw/efx_hard_soc/software/standalone/common/riscv64-unknown-elf.mk` | `776435752F4203DD575D5E09EAF8190CBBFDC9126F24B33E78543B09292D0521` |
 | `competition_project_single_camera/embedded_sw/efx_hard_soc/software/standalone/common/standalone.mk` | `05600B2CBE0FB0B9F2877123EDEB237956536B144F9F49DF21E5139F74C9747B` |
-| `competition_project_single_camera/embedded_sw/efx_hard_soc/software/standalone/common/start.S` | `1F766009DFADD1B2B7808433054E211CD78FF14EC1054AF85A8A61B6B413B462` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb.v` | `0A67C38D7E352CD2E4833E43D2815B81BECDF426FA7610A316C1A3CC6CEE2CC5` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb_define.vh` | `3A7E9026429C84B339B8A5379D7D137EA347DE76AD0FE90D5FFD8C03273214B0` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb_tmpl.v` | `20EC8803E290BD639C66EF0E8F623287943723F12FD2C242ADF7E99BEE107CE9` |
+| `competition_project_single_camera/embedded_sw/efx_hard_soc/software/standalone/common/start.S` | `4E3F410DF3F18CE659F770C2450134187F5FC7407171039947CE10B4A633FA4A` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb.v` | `90F65AAFF402137BBED4DD7C78496DA831E3DAD12CD06BEDA38A9F87BF8E0DC3` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb_define.vh` | `D9DAE6E1264492FA99BC0C44A717D9431D6C92B3A08019303765E548D8E96E95` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb_tmpl.v` | `714896DC45B939B12BDFC642B368F4CD15912364145918E1D3E1F4C50B760BE6` |
 | `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_slb_tmpl.vhd` | `CCF6F09F8CAC3BBC3EAAB06C704BF9F4A9F424FF9304DDD30A467586A3B817BC` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_wrapper.v` | `C63628B93453A054B74F53EAE268441F400B7D749E10239D537053021A0AC428` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/EfxSapphireHpSoc_wrapper.v` | `39E32FA75DE315D7F2C9969799208F63E284CD0A31AAA54BD03A70C809617DE4` |
 | `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/hard_ip_args.ini` | `4B43AFC3680AE96F62C438D23FA9C8657B5961FECB74D30EB867F9FEB76C68BC` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/ipm_pt_map.json` | `02D931CC2B56BEE555AF5E2CF50EAEC89E7E364645322815943FC95276F81B41` |
-| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json` | `A22F4A2254D78B879733512BC40A0D68D02598D43B89615D4F947CC44411785C` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/ipm_pt_map.json` | `302D87F3CD3A8B58AD4868181AD986797CC4FAEEDCC61434FB6210DEE1CB0F66` |
+| `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json` | `36BFB1FAC9B3B55A169EA409FE0716D9A845773734B00B5DA0ED4E9140D531E7` |
 | `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/source/Axi4PeripheralTop.v` | `47E9266AB97DDB4C50D524E5B62FA8032D6CD959553B1432423C2386A6C43DFC` |
 | `competition_project_single_camera/ip/EfxSapphireHpSoc_slb/source/peri_config` | `236A8DDF3D20B5861F9F9812C0F0E5EC962E6DB76A0A4EF5F6F4864A6DB1A040` |
 | `competition_project_single_camera/mem_test.peri.xml` | `5B530FD3F7FCDAEE1F6429482DE275C1014CB40988662A57926768E7A38B424D` |
@@ -153,3 +156,18 @@ embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld
 - CPU读取feature snapshot、OSD、按键、UART2、myCobot：均未进入本Gate
 
 下一门仍是：使用匹配bitstream，选择FPGA `USER2`，只把Hello ELF下载到 `0xF9000000` 片上RAM；禁止USER1、Flash擦写和外部DDR初始化。CPU Hello通过前，不得宣称板上CPU闭环。
+
+## 9. Codex 合并复核（2026-07-16）
+
+Codex 在集成分支对同一仓库真源重新执行了离线验证；未复用来源副本 outflow，也未烧录板卡：
+
+- UART0 Hello：Efinity RISC-V GCC 8.3.0 构建 PASS；2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段 `0xF9000000..0xF9000A30`，`ELF_LOAD_AUDIT=PASS`。
+- Efinity 2025.2 全流程：Map PASS、Interface PASS、PNR PASS、PGM/bitstream generation PASS。
+- STA：最差 Setup/Hold `+1.742ns/+0.018ns`。
+- CDC：`No Synchronizer warnings to report.`
+- Interface Design Issues：4 个既有物理距离 warning（`mipi_rx_dp01`、`mipi_tx_ck0`、`mipi_tx_dp12`、`tmds_data2`）。
+- Map/post-synthesis：另报告 118 个 warning；它们与上述 4 个 Interface warning 是不同集合，不能写作“全工程只有 4 个 warning”。本次未发现导致 Map/PNR/STA/CDC 失败的新增 fatal。
+- 新生成 `mem_test.bit` SHA-256：`1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`。
+- 新 bitstream 板级视频、USER2、CPU 取指和 UART0 回显：全部仍为 `NOT VERIFIED`。旧 `AA1338...` bitstream 的板级截图不能替代本次新 bitstream 的上板证据。
+
+路径兼容说明：Efinity map 在中文绝对路径下会报 `filesystem error: Cannot convert character sequence: Illegal byte sequence`；本次通过仓库既有 ASCII junction 对同一工作树重跑后全流程 PASS。该问题属于工具路径兼容，不是 RTL 失败，也不允许将本机绝对路径写入工程配置。

@@ -42,6 +42,10 @@
     * [guide_fpga_vision_front.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_fpga_vision_front.md)：被动特征旁路、framebuffer 可观测性与 Hard SoC 真源缺口（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_cpu_arm_control.md)：结果语义、原子提交、CDC 与 Wire ABI 未定边界（面向角色 B）。
     * [guide_system_integration.md](daily_sync/2026-07-15_merge_dev_libaoxun688_e129885_and_dev_wsc6090-CPU_c165144/guide_system_integration.md)：固定 SHA、语义解冲突与机械臂安全门（面向角色 C）。
+  * [daily_sync/2026-07-16_merge_dev_libaoxun688-hard-soc-source-sync-20260716/](daily_sync/2026-07-16_merge_dev_libaoxun688-hard-soc-source-sync-20260716/)：7 月 16 日合并单摄 Hard SoC 可复现真源、最小 BSP 与片上 RAM UART0 Hello，并将旧“源码缺失/HOLD”更新为“离线构建通过、板上执行待验证”后生成的三轨指南。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-16_merge_dev_libaoxun688-hard-soc-source-sync-20260716/guide_fpga_vision_front.md)：Hard SoC 真源、DDR 配置唯一驱动与证据批次边界（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-16_merge_dev_libaoxun688-hard-soc-source-sync-20260716/guide_cpu_arm_control.md)：片上 RAM ELF、fail-closed BSP 与 UART0 115200 隔离门（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-16_merge_dev_libaoxun688-hard-soc-source-sync-20260716/guide_system_integration.md)：快速合并、过时状态清理与硬件安全门（面向角色 C）。
 
 ## 📑 专项技术方案大白话解读
 
