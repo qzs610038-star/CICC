@@ -10,6 +10,7 @@
 - UART0：`0xE8010000`，115200 baud，8N1
 - 启动：保留 `-DSMP`，只有 hart 0 执行 `main`，其余核心安全等待
 - CPU JTAG：FPGA `JTAG_USER2`
+- 构建可复现：编译时传入显式 `BUILD_ID`，禁止 `__DATE__`/`__TIME__`
 
 禁止使用 `default.ld`。它指向旧的 `0x00001000` 外部存储地址，不适合本次片上 RAM Hello。
 
@@ -32,22 +33,32 @@ embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/linker/default_i.ld
 安装路径不写入仓库。选择以下任一种方式指定 Efinity RISC-V IDE 根目录：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean -ToolchainRoot <Efinity-RISC-V-IDE根目录>
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean -ToolchainRoot <Efinity-RISC-V-IDE根目录> -BuildId <标识符>
 ```
 
 或：
 
 ```powershell
 $env:EFINITY_RISCV_IDE = '<Efinity-RISC-V-IDE根目录>'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean -BuildId <标识符>
 ```
 
-如果工具链已经加入 `PATH`，也可以直接运行 `build.ps1`。脚本固定要求 Efinity 2025.2 RISC-V 工具名，并自动检查：
+`-BuildId` 为必填参数，只接受 `[A-Za-z0-9._-]+` 的 ASCII 字符（最长 64 字符），空值或非法字符会导致构建失败。示例：
 
-- ELF入口和唯一 LOAD 段必须从 `0xF9000000` 开始。
-- LOAD 段末端不得超过 `0xF9003FFF`。
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean -ToolchainRoot D:\Efinity\efinity-riscv-ide-2025.2 -BuildId g4a-0737304-r1
+```
+
+如果工具链已经加入 `PATH`，也可以不指定 `-ToolchainRoot`。脚本固定要求 Efinity 2025.2 RISC-V 工具名，并自动检查：
+
+- ELF入口必须精确为 `0xF9000000`，并通过 `nm` 确认 `_start` 位于同一地址。
+- 唯一 LOAD 段必须从 `0xF9000000` 开始且末端不得超过 `0xF9003FFF`。
 - ELF不得含未解析符号。
+- 在相同构建路径和环境下，相同 `BUILD_ID`、源码及工具链的连续两次 clean build 应产生完全一致的 ELF；当前构建包含 DWARF 路径信息，不承诺跨绝对路径或跨机器 bit-for-bit 一致。
+- 构建或审计失败时自动清理 ELF/HEX/BIN/ASM/map 等发布制品。
 - 输出 ELF、HEX、BIN、反汇编和内存占用。
+
+编译已启用 `-Wdate-time`（配合 `-Werror`），源码中禁止使用 `__DATE__`/`__TIME__`。
 
 如需重生 BSP，使用 Efinity `2025.2.288.4.15` 打开本工程，并以 `ip/EfxSapphireHpSoc_slb/settings.json` 重新生成 Hard SoC 的 Embedded Software。禁止使用其他工程的 `soc.h` 或 linker 覆盖本目录；重生后必须重新核对 `soc.h`、`default_i.ld` 和本 Review Packet 中记录的 SHA-256。
 
@@ -55,11 +66,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Clean
 
 ```text
 TJ375 CPU+VIDEO UART0 HELLO
-ONCHIP_RAM=0xF9000000 UART0=115200 8N1
+PROFILE=UART0_HELLO_ONCHIP BACKEND=NONE
+BUILD_ID=g4a-0737304-r1
 Type characters to verify echo.
 ```
 
-串口终端输入的字符应逐字节回显。该程序不访问特征寄存器、OSD、外部 DDR、UART2 或 myCobot。
+串口终端输入的字符应逐字节回显。空闲时周期性输出 `'.'` 作为 activity marker（非精确定时，不能替代独立 liveness 证明）。该程序不访问特征寄存器、OSD、外部 DDR、UART2 或 myCobot。
 
 ## 上板边界
 
