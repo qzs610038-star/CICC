@@ -280,3 +280,33 @@ Codex 在集成分支对同一仓库真源重新执行了离线验证；未复�
 调试过程中，`RUN_SMP_APP` 聚合 target/resume 路径曾出现`pc=0`、`mcause=1`且UART无输出；同一bitstream、ELF和RAM内容改为非SMP逐hart控制，halt CPU1..3并仅resume CPU0后完整通过。后续最小启动固定采用独立hart控制，不使用SMP聚合resume。
 
 裁定：`6B6728... = HDMI / USER2 JTAG / ONCHIP RAM / CPU EXECUTION / UART0 HELLO / UART0 ECHO PASS`。未写Flash，未使用USER1，未访问外部DDR，未连接UART2/J52或机械臂。下一门仅为APB `REG_MAGIC`实读方案审核；获批前不扩大范围。
+
+## 12. APB REG_MAGIC 存在性审核
+
+当前 `6B6728...` 对应真源不包含 APB0 `REG_MAGIC`，证据如下：
+
+- `settings.json` 与 `hard_ip_args.ini`：`PERI_APB_0..4=0`
+- `EfxSapphireHpSoc_slb.v`：无 APB `PADDR/PSEL/PENABLE/PWRITE/PWDATA/PRDATA/PREADY/PSLVERROR` 端口
+- `src/top.v`：SoC 实例无 APB 连线
+- `soc.h`：无 `IO_APB_SLAVE_0_INPUT`、无 `0xE8100000`
+- 当前单摄源码：无 `REG_MAGIC`、`0x375A0001` 或 `apb_magic_slave`
+
+`PERI_APB_0_SIZE=4096` 只是未启用接口的默认参数，不能作为接口存在证据。历史 A3 隔离工程文档中的 `0xE8100000`、`PADDR[11:0]` 和 `0x375A0001` 从未进入当前视频 Hard SoC 真源，不得跨工程拼接或继承。
+
+因此当前批次裁定为：
+
+```text
+CURRENT 6B6728 APB0=ABSENT
+CURRENT 6B6728 REG_MAGIC=ABSENT
+CPU MMIO READ 0xE8100000=PROHIBITED
+```
+
+下一次需单独批准的最小改造批次：
+
+1. 在隔离工程中通过 Efinity IP Manager 启用 `PERI_APB_0`，不手改生成 wrapper。
+2. 重新生成 Hard SoC wrapper、BSP 和 Interface Designer 真源，确认 BSP 给出正式 APB0 基址与 4 KiB 窗口。
+3. 新增只读零等待 `REG_MAGIC` 从机：偏移 `0x000` 返回 `0x375A0001`；非法写入或偏移返回 `PSLVERROR`，无副作用。
+4. 接入当前视频顶层并重新执行 Map、Interface、PNR、STA、CDC 和 bitstream generation，记录新增 warning 与完整哈希。
+5. 重新走完全断电冷启动、HDMI、USER2、片上 RAM UART0 Gate；这些回归通过后，才下载最小 CPU 固件实读 `REG_MAGIC` 并从 UART0 输出结果。
+
+本审核未访问 APB、未修改工程、未加载新位流。feature snapshot、分类、OSD、按键、UART2/J52和myCobot继续为`NOT VERIFIED`。

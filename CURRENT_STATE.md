@@ -35,7 +35,8 @@
   - 替代旧结论：覆盖本条先前对当前 `6B6728...` 的 `BOARD LOAD NOT VERIFIED`，以及下方单摄 M2 条目中对来源 `AA1338...` 的 `CPU EXECUTION + UART0 NOT VERIFIED`；历史文件已丢失的 `1D697F...` 仍保持独立 `NOT VERIFIED`，不得借用当前文件结果。
   - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-34 至 M2-37、`competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`；板级原始 OpenOCD/UART 输出由本次 Codex 任务记录保存，未把含本机路径的临时日志、ELF 或 bitstream 纳入 Git。
   - 继续禁止：未写 Flash，未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送任何 myCobot 帧。UART0 Hello PASS 不得推断 UART2/myCobot 可用。
-  - 下一门：当前最小 Hard SoC CPU/UART0 板级 Gate 已关闭。下一步仅可提交 APB `REG_MAGIC` 实读门方案供审核；获批前不执行 APB 访问，不进入 feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 或机械臂。
+  - APB 审核结论：当前 `6B6728...` 对应真源的 Hard SoC 配置明确为 `PERI_APB_0..4=0`；生成 wrapper 只导出 UART0、DDR CFG、JTAG 和 AXI-A 端口，未导出 APB `PADDR/PSEL/PENABLE/PWRITE/PRDATA/PREADY/PSLVERROR`；提交的 `soc.h` 也没有 `IO_APB_SLAVE_0_INPUT` 或 `0xE8100000`，顶层和源码中不存在 `REG_MAGIC=0x375A0001` 从机。因此当前 bitstream 不具备可读 APB0，禁止用 CPU 对 `0xE8100000` 做试探性访问。
+  - 下一门：需另行批准一个隔离工程改造批次：通过 Efinity IP Manager 启用 `PERI_APB_0`，重新生成 Hard SoC wrapper/BSP，在顶层接入只读零等待 `REG_MAGIC` 从机，并依次通过生成物审计、Map/Interface/PNR/STA/CDC、匹配 bitstream 冷启动、HDMI、USER2/UART0 回归后，才允许 CPU 实读。不得手改生成 wrapper，不得从旧 A3 隔离工程拼接 `.peri.xml`，不进入 feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 或机械臂。
   - 失效条件：bitstream、ELF、Hard SoC/BSP、OpenOCD USER TAP、UART0 引脚/波特率、时钟复位或板卡冷启动现象发生变化；任一变化后从匹配哈希与冷启动顺序重新验证。
 
 - 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）

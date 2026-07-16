@@ -1349,3 +1349,15 @@ git diff --check
 - 结果：当前 `6B6728...` 批次为 `HDMI PASS / USER2 JTAG PASS / ONCHIP RAM PASS / CPU EXECUTION PASS / UART0 HELLO PASS / UART0 ECHO PASS`。
 - 收尾：OpenOCD exit 0 并正常 shutdown，无残留进程；CPU 最终 halt。未提交 bitstream、ELF、hex/bin/map/rpt/log、outflow/work 或本机路径配置。
 - 下一门：最小 Hard SoC CPU/UART0 板级 Gate 已关闭。下一步仅提交 APB `REG_MAGIC` 实读方案供审核；批准前不访问 APB，不进入 feature snapshot、CPU 分类、OSD、按键、UART2/J52 或机械臂。
+
+### [M2-38] 当前 bitstream 的 APB REG_MAGIC 存在性审核
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 审核范围：仅确认当前 `6B6728...` 对应真源是否已经包含可由 CPU 读取的 APB0 `REG_MAGIC`；未访问开发板、未执行 CPU MMIO、未修改 RTL/XML/IP、未生成或加载新 bitstream。
+- Hard SoC 配置：`ip/EfxSapphireHpSoc_slb/settings.json` 与 `hard_ip_args.ini` 均明确 `PERI_APB_0..4=0`。`PERI_APB_0_SIZE=4096` 只是未启用接口的参数默认值，不能证明 APB0 已实例化。
+- 生成 wrapper：`EfxSapphireHpSoc_slb.v` 只导出 UART0、DDR CFG、JTAG、AXI-A 与中断端口；没有 APB `PADDR/PSEL/PENABLE/PWRITE/PWDATA/PRDATA/PREADY/PSLVERROR` 端口。`src/top.v` 的 SoC 实例同样没有 APB 连线。
+- BSP/RTL：提交的 `soc.h` 只有片上 RAM `0xF9000000`、UART0 `0xE8010000`、AXI-A `0xE8000000` 等地址，没有 `IO_APB_SLAVE_0_INPUT` 或 `0xE8100000`；仓库当前单摄源码没有 `REG_MAGIC`、`0x375A0001` 或 `apb_magic_slave`。
+- 历史 A3 边界：`final_project` 的 A3 文档曾在另一隔离工程裁定 `0xE8100000 + PADDR[11:0]` 与 `0x375A0001`，但明确记录其 SoC `.peri.xml`、从机与顶层未进入视频工程，不能拼接或继承到当前 Hard SoC 位流。
+- 裁定：`CURRENT 6B6728 APB0/REG_MAGIC = ABSENT`。禁止对当前 bitstream 的 `0xE8100000` 做试探性读；这种访问既不能关闭 Gate，也可能触发未映射总线异常。
+- 下一门方案：在独立工程批次中用 Efinity IP Manager 启用 `PERI_APB_0` 并重新生成 wrapper/BSP；新增只读零等待 `REG_MAGIC` 从机，偏移 `0x000` 返回 `0x375A0001`，非法写入/偏移以 `PSLVERROR` fail closed；接入当前视频顶层后重新执行完整 Efinity 与板级回归。该方案需再次批准后才实施。
+- 继续禁止：不得手改生成 wrapper、不得拼接旧 A3 `.peri.xml`、不得访问 APB、不得写 Flash、不得使用 USER1/外部 DDR、不得进入 feature/OSD/UART2/J52/myCobot。
