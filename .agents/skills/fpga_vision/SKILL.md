@@ -17,6 +17,7 @@ description: Handles FPGA top-level, RTL coding, video pipelines (CSI/DSI/OSD/RO
 6. **生成产物只读**：不直接改 `ipm/`、赛方补丁、原始压缩包、波形、`outflow/`。
 7. **初赛 demo 仅作经验库**：不直接迁移其中的识别 RTL、`DEMO_MODE`、临时脚本或硬编码路径。
 8. **目标不等于状态**：架构允许某模块存在，不代表该模块已接入、已综合、已烧录或已上板；完成度必须回查 `CURRENT_STATE.md` 和真实日志。
-9. **单摄 Hard SoC 真源已落库**：`competition_project_single_camera/` 已包含 `mem_test.xml`、`.peri.xml`、SDC、`top.v`、`ip/EfxSapphireHpSoc_slb/` 和最小 BSP/Hello；不要继续按 2026-07-15 的“源码缺失/HOLD”处理。当前离线 Map/Interface/PNR/STA/CDC 已通过，但新 bitstream 未板测，USER2/UART0 仍为 `NOT VERIFIED`。
-10. **证据批次不能混用**：来源副本旧 bitstream `AA1338...` 的 J48/ch0 视频证据只证明来源批次；任何新构建都必须记录自己的 bitstream 哈希，并在上板前保持“未板测”。Interface Check 的 4 个物理距离 warning 与 post-synthesis warning 是不同集合，报告时必须分开计数，不能写成“全工程只有 4 个 warning”。
-11. **下一板级门保持隔离**：只允许验证匹配 bitstream + `JTAG_USER2` + 片上 RAM UART0 Hello；不得借 CPU Hello 门修改视频 `USER1`、触发 Flash/外部 DDR、连接 UART2/J52 或机械臂。
+9. **单摄 Hard SoC 真源已落库且必须原子处理**：当前 `main` 的 `competition_project_single_camera/` 包含 `mem_test.xml`、`.peri.xml`、SDC、`top.v`、`apb_reg_magic.v`、`ip/EfxSapphireHpSoc_slb/`、最小 BSP/Hello 和 DSI 相对路径修复。不得按“源码缺失/HOLD”处理，也不得把其中 XML/IP/wrapper/BSP/顶层/APB 拆分为不同批次。
+10. **合并后证据已失效**：上述硬件输入变更后，旧 bitstream、ELF、Map/PNR/STA/CDC、slack、warning 和板级记录均不能继承。当前 `main` 的 Efinity/bitstream/USER2/UART0/APB 实读均为 `NOT VERIFIED`，必须从当前 SHA 重建并记录完整制品身份。
+11. **证据批次不能混用**：来源副本旧 bitstream `AA1338...` 的 J48/ch0 视频证据只证明来源批次；任何新构建都必须记录自己的 bitstream 哈希，并在上板前保持“未板测”。Interface Check 的物理距离 warning 与 post-synthesis warning 是不同集合，报告时必须分开计数，不能写成“全工程只有 N 个 warning”。
+12. **下一板级门保持隔离**：只允许验证当前 SHA 的匹配 bitstream + `JTAG_USER2` + 片上 RAM UART0 Hello；不得借 CPU Hello 门修改视频 `USER1`、触发 Flash/外部 DDR、连接 UART2/J52 或机械臂。

@@ -20,6 +20,6 @@ description: Handles SoC RISC-V CPU firmware, UART registers, myCobot 280 serial
 6. **动作类修改触发 Codex Gate**：涉及实际动作、夹爪、快速移动、FPGA-to-机械臂接线、CP210x 驱动安装或 `pymycobot` 控制脚本时，必须生成 Codex Review Packet。
 7. **唯一响应与防重复触发**：稳定识别结果只允许锁存一次本轮事务；同一物体不得因连续视频帧重复触发抓取。非目标物必须明确输出不动作及理由，目标物才可在安全门满足后请求控制器动作。
 8. **目标不等于状态**：host/mock 测试通过不等于 SoC、UART、OSD 或机械臂实机闭环；完成度必须回查 `CURRENT_STATE.md` 和对应板级证据。
-9. **当前 SoC 最小启动门**：`competition_project_single_camera/cpu_bringup/uart_hello_onchip/` 已能以提交的最小 BSP 构建，入口和唯一 LOAD 段位于 `0xF9000000` 的 16 KiB 片上 RAM；这只证明 ELF 版图审计，不证明 CPU 已执行。
+9. **当前 SoC 最小启动门**：`competition_project_single_camera/cpu_bringup/uart_hello_onchip/` 的最小 BSP/Hello 真源已随当前 Hard SoC/APB0 配置合入，入口和唯一 LOAD 段目标仍为 `0xF9000000` 的 16 KiB 片上 RAM；但本机尚未对合并后源码重新构建，因此 ELF 版图、CPU 执行和 UART0 均为 `NOT VERIFIED`。CPU 只能在 FPGA 当前 BSP/硬件 ABI 经重建确认后使用 `IO_APB_SLAVE_0_INPUT=0xE8100000`，不得提前发起试探性 MMIO。
 10. **板上验证顺序**：匹配新 bitstream -> FPGA `USER2` -> 仅下载片上 RAM -> UART0 115200 横幅 -> 单字符回显。禁止 `USER1`、Flash erase/program、外部 DDR 初始化。USER2/横幅/回显未通过前，不进入 feature snapshot、OSD、按键、UART2 或 myCobot。
 11. **机械隔离继续有效**：CPU Hello 阶段不得连接机械臂，不得发送任何 myCobot 帧；只有 CPU 执行和 UART0 基础链路形成独立证据后，才评审 UART2/J52 电气与只读协议门。

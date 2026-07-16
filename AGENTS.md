@@ -17,7 +17,7 @@
 ## Codebase Knowledge Graph
 本项目已初始化 codebase-memory-mcp 图谱。Agent 做代码发现时应先使用图谱缩小范围，再回到真实文件核查。
 
-- 默认项目：`D-cicc_cbm-main`（最后一次完整重建为 2026-07-14，6078 nodes；精确边数以 `.codebase-memory/artifact.json` 为准）。2026-07-16 新合入的单摄 Hard SoC/IP/BSP 尚未声明已进入该图谱；查询不到时直接核查真实文件，不得据此判定源码缺失。
+- 默认项目：`D-cicc_cbm-main`（当前共享 artifact 为 7552 nodes / 16966 edges；准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准）。图谱已覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复；查询不到时仍须直接核查真实文件，不得据此判定源码缺失。
 - 兼容别名：`D-cicc_cbm_link` 是旧缓存项目，仅用于历史查询；它缺少本次 `arm_runtime` 和单摄候选符号，不再作为当前图谱真源。
 - 默认入口：`D:\cicc_cbm_link` junction 指向本仓库真实路径。
 - 主图谱 artifact：`.codebase-memory/graph.db.zst`
@@ -47,12 +47,11 @@
 - 不得直接迁移初赛识别 RTL、`DEMO_MODE`、临时脚本、硬编码路径或旧 `outflow` 结论。
 - 初赛 README、Work_Log、修正方案、源码和构建日志存在版本差异；引用参数前必须以真实源码、最新构建日志和上板现象交叉确认。
 
-### 单摄 Hard SoC 当前安全门（2026-07-16）
+### 单摄 Hard SoC 当前安全门（2026-07-17）
 
-- 仓库真源已具备：`competition_project_single_camera/mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`ip/EfxSapphireHpSoc_slb/`、`embedded_sw/efx_hard_soc/` 与 `cpu_bringup/uart_hello_onchip/`。不得继续沿用“Hard SoC 源码未同步”的旧结论。
-- 当前离线门已通过：Efinity 2025.2 Map/Interface/PNR/bitstream、Setup/Hold `+1.742ns/+0.018ns`、CDC 无 synchronizer warning；UART0 Hello 为 2608 B，入口与唯一 LOAD 段位于 `0xF9000000` 片上 RAM。详细证据以 `CURRENT_STATE.md` 和 `competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md` 为准。
-- 当前板级门未通过：新构建 bitstream 未上板；`JTAG_USER2`、CPU 实际取指、UART0 115200 bps 横幅与回显均为 `NOT VERIFIED`。来源副本的历史 J48/ch0 视频和旧 bitstream 哈希不能冒充新构建板测结果。
-- 下一步只允许做隔离 CPU Hello：使用 FPGA `USER2`，仅下载到 `0xF9000000` 片上 RAM；禁止 `USER1`、Flash 擦写、外部 DDR 初始化、UART2/J52、机械臂接线或动作。Hello 通过后再单独申请扩大联调范围。
+- 仓库真源已具备并已按原子集合合入：`competition_project_single_camera/mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`src/apb_reg_magic.v`、`ip/EfxSapphireHpSoc_slb/`、`embedded_sw/efx_hard_soc/` 与 `cpu_bringup/uart_hello_onchip/`。BSP 当前定义 `IO_APB_SLAVE_0_INPUT=0xE8100000`；DSI 初始化路径已修复为工程内相对路径。不得继续沿用“Hard SoC 源码未同步”的旧结论。
+- 当前验证状态：上述 APB0/IP/XML/顶层与 DSI 路径变更后，本机仅完成 XML/静态一致性核对；当前 `main` 尚未重新运行 Efinity Map/PNR/STA/CDC、生成匹配 bitstream/ELF 或执行板级步骤。因此这些 Gate，以及 `JTAG_USER2`、CPU 实际取指、UART0 115200 bps 横幅/回显与 APB 实读，均为 `NOT VERIFIED`。旧 bitstream、ELF、slack、CDC 与板级记录不得继承。
+- 下一步只允许由已配置 Efinity 环境从当前 `main` 重建并提供脱敏 Map/PNR/STA/CDC、warning、bitstream/ELF hash；之后才可使用 FPGA `USER2`，仅下载到 `0xF9000000` 片上 RAM 验证 UART0 Hello。禁止 `USER1`、Flash 擦写、外部 DDR 初始化、UART2/J52、机械臂接线或动作。Hello 通过后再单独申请扩大联调范围。
 
 ## 官方分赛区决赛细则（核心目标与约束）
 

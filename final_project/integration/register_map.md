@@ -4,6 +4,8 @@
 >
 > 本表在 2026-07-13 与 `cpu/app/include/board_io.h` 当前偏移对齐，目的是消除文档和 Host 代码之间的旧草案冲突；它不是已经实现的硬件事实。实际基址必须来自最终 Efinity SoC 生成的 `soc.h`。帧快照、配置提交和 CPU-to-OSD 的 CDC 规则见 [preprocess_apb_cdc_contract_draft_20260711.md](preprocess_apb_cdc_contract_draft_20260711.md)。
 
+> 2026-07-17 同步边界：隔离单摄候选工程的当前 BSP 已出现 `IO_APB_SLAVE_0_INPUT=0xE8100000` 和只读 `apb_reg_magic` 源码；它仅是候选工程 Hard SoC 输入，尚未完成该 SHA 的 Efinity/板级重验，也不冻结本表、`board_io.h` 或 `final_project/` 的正式 APB ABI。
+
 ## 全局窗口
 
 | CPU 符号 | 偏移 | 方向 | 当前语义 |

@@ -23,7 +23,7 @@
 |---|---|---|
 | 硬边界 | `AGENTS.md` | 决赛主线、机械臂安全、Codex Gate、Git 规则。 |
 | 可变状态 | `CURRENT_STATE.md` | 活跃路线、历史参考、待定决策和证据索引。 |
-| 接力 | `HANDOFF_TEMPLATE.md` + 健康检查 | 默认接受高置信事实，允许只读握手和最小范围纠偏。 |
+| 接力 | `SESSION_HANDOFF.md` + 健康检查 | 当前可执行恢复入口；默认接受高置信事实，允许只读握手和最小范围纠偏。 |
 | 模块细则 | `.agents/skills/` | FPGA 与 CPU/myCobot 的专属约束。 |
 | 新鲜度 | `maintenance_manifest.json` + `tools/project_freshness_check.ps1` | 检查关键文件、链接、状态证据、图谱与 Git。 |
 
@@ -36,6 +36,8 @@
 | myCobot 协议或控制器 | `CURRENT_STATE.md`、迁移设计、测试/证据；实机动作另走 Codex Gate。 |
 | APB/CDC/寄存器地址 | `register_map.md`、接口契约、CPU 头文件、RTL 常量和 Review Packet；必须以生成 `soc.h` 为事实来源。 |
 | 合并、交接或大规模目录调整 | 运行新鲜度检查；若影响代码结构则刷新 CBM artifact。 |
+
+跨成员分支合并还必须更新 `docs/merge_governance/MERGE_REGISTER.md` 和对应 `records/` 条目；交接文件只引用已合并 SHA、当前 Gate 与下一立即动作，不把旧 outflow 或未复核板测结论升级为当前事实。
 
 ## 未落地项
 

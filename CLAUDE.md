@@ -16,7 +16,7 @@ Claude 开始任何任务前按以下顺序读取：
 
 ## 仓库性质
 
-本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`competition_project_single_camera/` 已具备 Hard SoC/IP/BSP/Hello 可复现真源并通过新的离线全构建，但新 bitstream、USER2 取指和 UART0 仍未板测，未过 Gate 前不得替代正式主线。`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
+本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`competition_project_single_camera/` 已具备 Hard SoC/IP/BSP/Hello 可复现真源，并已合入 APB0 与 DSI 路径修复，但该合并后的工程尚未重新完成 Efinity 或板级 Gate，未过 Gate 前不得替代正式主线。`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
 
 除非任务明确要求，否则以下内容按只读处理：
 
@@ -68,7 +68,7 @@ list_projects / index_status
 
 图谱只负责定位和上下文压缩。涉及 RTL 连线、时钟复位、AXI/framebuffer、QCRV32、myCobot 实机安全或 warning 取舍时，必须以真实文件和验证日志为准。
 
-2026-07-16 合入的单摄 Hard SoC/IP/BSP 可能晚于当前图谱 artifact。图谱查询无结果时必须直接读取上述候选工程文件；在图谱重建前，不得把“未索引”误写成“未提交”。
+共享 artifact 已重建为 7552 nodes / 16966 edges，覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复；准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准。图谱查询无结果时仍必须直接读取上述候选工程文件；不得把“未索引”误写成“未提交”。
 
 ## 权威层级与执行定位
 

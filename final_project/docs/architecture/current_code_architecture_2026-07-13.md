@@ -1,17 +1,17 @@
 # 当前代码架构与候选工程边界
 
-> 日期：2026-07-14
+> 日期：2026-07-17（原 2026-07-14 架构快照的合并后边界补充）
 >
 > 集成来源：`origin/main@d433bca` + `codex/mycobot-g0-g3-bringup-20260714@b48973b` + `dev/libaoxun688@edd5328`
 >
-> 本文是两条 2026-07-14 分支合并后的代码/证据快照。真实 RTL、CPU 源码、Efinity 工程 XML、构建日志和上板现象优先；最新路线与阻塞以根目录 `CURRENT_STATE.md` 为准。
+> 本文以 2026-07-14 分支合并快照为主体，并补充 2026-07-17 的 Hard SoC/APB0 与 DSI 路径合入边界。真实 RTL、CPU 源码、Efinity 工程 XML、构建日志和上板现象优先；最新路线与阻塞以根目录 `CURRENT_STATE.md` 为准。
 
 ## 工程身份
 
 - `final_project/`：当前正式协作主线，CPU、机械臂、接口契约和既有 FPGA 验证证据继续在此维护。
-- `competition_project_single_camera/`：隔离单摄候选工程。53 个 XML 设计引用和 2 个 IP 设置文件已做存在性复核，但修改后源码尚无新 Efinity flow、匹配 bitstream、烧录或板级复现，因此不替代正式主线。
+- `competition_project_single_camera/`：隔离单摄候选工程。当前已合入 Hard SoC/IP/BSP/APB0 `REG_MAGIC` 与 DSI 初始化路径修复；XML/IP/顶层/生成 BSP 必须按原子集合处理。合并后源码尚无当前 SHA 的 Efinity flow、匹配 bitstream、烧录或板级复现，因此不替代正式主线。
 - 候选工程初始 75/75 哈希是历史复制快照；`white_balance.v` 已有 M0-09 与主线合并增量，必须结合 delta manifest 阅读。
-- 当前 Codebase 图谱项目为 `D-cicc_cbm-main`（6078 nodes；精确边数见 artifact）；旧 `D-cicc_cbm_link` 缺少本次新增符号，只作历史兼容查询。
+- 当前 Codebase 图谱项目为 `D-cicc_cbm-main`（7552 nodes / 16966 edges；准确基线见 artifact）；旧 `D-cicc_cbm_link` 只作历史兼容查询。
 
 ## 系统职责边界
 

@@ -27,6 +27,13 @@
 
 ## 活跃状态与路线覆盖项
 
+- 日期：2026-07-17，来源 Agent：Codex（合并后状态、技能、交接与共享图谱刷新）
+  - 适用范围：包含 `f2ba66e` / `77c88d2` 代码合并的当前 `main` 团队恢复入口；不改变任何 FPGA/CPU/机械臂 Gate。
+  - 最新结论：共享 `D-cicc_cbm-main` artifact 已重建为 7552 nodes / 16966 edges，准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准；图谱已覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复。长期合并规则与两笔主线合并记录集中于 `docs/merge_governance/`，当前可执行交接见 `SESSION_HANDOFF.md`。
+  - 当前阻塞：当前 SHA 的 Efinity Map/PNR/STA/CDC、bitstream/ELF、JTAG/USER2、CPU 取指、UART0 和 APB 实读仍为 `NOT VERIFIED`；myCobot 不得连接或动作。
+  - 下一门：`@libaoxun688` 在其已配置 Efinity 环境从当前 `main` 重建并回传脱敏证据；其他 Agent 先同步 `main`、阅读 `AGENTS.md`、本文件和 `SESSION_HANDOFF.md`，不得从旧分支或旧制品续跑。
+  - 证据路径：`.codebase-memory/artifact.json`、`docs/merge_governance/MERGE_REGISTER.md`、`SESSION_HANDOFF.md`、本文件下方两笔 2026-07-17 合并条目。
+
 - 日期：2026-07-17，来源 Agent：Codex（本地 `main` 合并 `@libaoxun688` Hard SoC 真源）
   - 合并范围：纳入 `dev/libaoxun688-hard-soc-source-sync-20260716@14b924866f9df8a27e65f9719c285d23b3b8fa7e` 的 Hard SoC 原子源码集：IP/生成 wrapper/BSP、`mem_test.xml`、`mem_test.peri.xml`、`src/top.v`、APB0 `REG_MAGIC` RTL 与 testbench。CPU 侧新增地址定义为 `IO_APB_SLAVE_0_INPUT=0xE8100000`。
   - 当前裁定：源码与 XML 的静态一致性已核对；本机 Efinity RISC-V 工具链未配置，未重跑 Hello 构建；Efinity Map/PNR/STA/CDC、bitstream/ELF 身份、JTAG、USER2、CPU 取指、UART0 和 APB 实读均为本合并后 `NOT VERIFIED`。不得继承合并前任一 bitstream、ELF 或板级结论。
@@ -42,7 +49,7 @@
 - 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）
   - 适用范围：`mycobot_arm_board_control_advancement_plan_20260715.md` §13 的阶段 0、B1–B3 与 A0；不表示 G4 SoC/PNR、烧录、J52 回环、真实臂只读或动作已经完成。
   - 最新结论：B1–B3 的纯软件子检查点已完成。新增 `mycobot_transaction` 提供 750 ms single-flight、expected-command/精确 payload length、超时、迟到/重复与错误计数；协议层补齐 0x29/0x2B/0x69、官方 LEN 窗口和 J1..J6 绝对范围，越界 `SEND_ANGLES` 编码被拒绝而非饱和。GET_ANGLES 精确请求/响应、LEN 边界和错误向量已进入 QEMU 断言。B2 差分测试补齐 N-poll、DONE 后下一请求、fault/cancel 后 re-init；不新增重复的 transport 枚举。用户确认 COM10 为 myCobot 后，阶段 0 脚本以 1 Mbps 调用唯一允许 API `MyCobot280.get_system_version()`并成功返回 `7.3`；运行记录为 `motion_or_firmware_api_called=false`，设备侧已刷文件 hash 仍不可回读。B1 源已用 Efinity `rv32imac/ilp32` 工具链 `-Werror -fsyntax-only` 通过，但当前构建器仍被刻意限制为 `NOT_FOR_FLASH` 且硬性排除 UART2/真实 transport，故尚无可烧录 ELF。A0 当前工程的 PLL/JTAG 资源与旧 GUI 冲突审计一致，但旧隔离树已不存在，当前工程的 GUI 合法组合尚无本批次证据；因此 A0/G4 继续未关闭。
-  - 验证：`run_mycobot_arm_skeleton_host.ps1` exit 0（Efinity RISC-V QEMU asserts executed PASS）；`run_arm_runtime_host.ps1` exit 0（disabled/simulated PASS）；显式 Efinity 工具链的 `run_arm_runtime_qemu.ps1` exit 0（两后端 QEMU PASS + 1 秒 timeout probe PASS）；`riscv-none-embed-gcc -march=rv32imac -mabi=ilp32 ... -Werror -fsyntax-only mycobot_protocol.c mycobot_transaction.c` exit 0；相关 banner 源改动后的 `arm_bringup/disabled` 目标 RISC-V 构建 exit 0，ELF 内已核验嵌入 manifest build ID，但仍为 `NOT_FOR_FLASH`；`python -m py_compile final_project\\tools\\mycobot_firmware_version_readonly.py` exit 0；`git diff --check` exit 0（仅 CRLF 预警）。
+  - 验证：`final_project/cpu/tests/run_mycobot_arm_skeleton_host.ps1` exit 0（Efinity RISC-V QEMU asserts executed PASS）；`final_project/cpu/tests/run_arm_runtime_host.ps1` exit 0（disabled/simulated PASS）；显式 Efinity 工具链的 `final_project/cpu/tests/run_arm_runtime_qemu.ps1` exit 0（两后端 QEMU PASS + 1 秒 timeout probe PASS）；`riscv-none-embed-gcc -march=rv32imac -mabi=ilp32 ... -Werror -fsyntax-only mycobot_protocol.c mycobot_transaction.c` exit 0；相关 banner 源改动后的 `arm_bringup/disabled` 目标 RISC-V 构建 exit 0，ELF 内已核验嵌入 manifest build ID，但仍为 `NOT_FOR_FLASH`；`python -m py_compile final_project\\tools\\mycobot_firmware_version_readonly.py` exit 0；`git diff --check` exit 0（仅 CRLF 预警）。
   - 证据路径：`final_project/docs/debug_sessions/evidence/mycobot_stage0_readonly_20260715_090247.json`、`final_project/docs/review_packets/mycobot_b1_b3_protocol_transaction_review_20260715.md`、`final_project/docs/review_packets/mycobot_g4_evidence_contract_review_20260715.md`、`final_project/docs/debug_sessions/mycobot_goal_execution_20260715.md`、`final_project/cpu/app/src/mycobot_transaction.c`、`final_project/tools/mycobot_firmware_version_readonly.py`、`final_project/tools/verify_mycobot_g4_batch.py`。后者已通过正反向自测，且只验证未来 G4 批次的一致性；没有实际 G4 manifest 时不得写作 G4 PASS。
   - 下一门：先由用户按 debug session 的 A0 操作卡完成当前隔离副本 GUI 资源审计，并确认 myCobot 的实际 COM 端口；在收到前，不改 XML/top/SDC、不跑联合 PNR、不接 J52 或机械臂。
   - 失效条件：协议真源/固件版本改变、B1/B3 相关回归失败、GUI 证实资源不同、端口身份或现场电气证据与本条不符。
@@ -64,7 +71,7 @@
   - 最新结论：在 `HEAD=origin/main=07373042d1f84cdc048fc42b5752d0cbeb52c471`，以恢复后的原始 `mem_test.xml` SHA-256 `F428549DF9F87DC9A6CF0464F8C5F5FD92DABD2102CA8850F7C9DE21A0BAA060` 新建了可用离线制品批次。日志记录 Map/Interface/PNR/bitstream generation 均 PASS；STA 最差 Setup/Hold `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`，Interface 4 个既有物理距离 warning、post-synthesis 118 个 warning 均已如实保留。当前 `mem_test.bit` SHA-256 是 `2EA4AD287CCC6BFBF113E718B59EF6F5807222AFE1ECE3D55BD1E24D37FB8347`，与旧 M2 的 `1D697F...AECC` 不同，必须作为新证据批次，不能混用 hash 或板级证据。Hello ELF SHA-256 `C99FD39DB437409A63A6061CD29698B5B60099B9E24A77B155B871E169BF5DA5`，2608 B / 16 KiB、唯一 LOAD `0xF9000000..0xF9000A30` 的审计通过。
   - 板级前置项：只读串口与 connected Ports 枚举仍只见 COM4/COM5 蓝牙及 COM10 `CH340 1A86:7523`（myCobot），没有已连接 FTDI `0403:6011`。因此本路线为 `CONDITIONAL GO / PRE-FLIGHT HOLD`，尚不能配置 FPGA 或打开 UART0；COM10 明确禁止复用作候选板端口。
   - 下一门：先按 `m2_uart0_cpu_hello_preflight_20260716.md` 的 FTDI 枚举操作卡取得插拔差分证据。新增只读采集器 `competition_project_single_camera/tools/capture_m2_ftdi_preflight.ps1` 已在无板状态自测：默认采集 exit 0 时输出 HOLD，`-RequireFtdi` 在无 FTDI 时 fail-closed 为 exit 2；全程断言不打开串口、不发 UART、不调用 Programmer/Flash。该操作卡仅枚举，不选择 USER1/USER2、不烧录 Flash、不发送 UART；证据复核后才可发 USER2 易失配置、片上 RAM Hello 下载和 115200 8N1 横幅/回显的独立操作卡。
-  - 证据路径：`competition_project_single_camera/docs/debug_sessions/m2_uart0_cpu_hello_preflight_20260716.md`、忽略目录 `competition_project_single_camera/outflow_m2_cpuhello_20260716_1730/` 中的 `build.log`、`mem_test.timing.rpt`、`mem_test.cdc.rpt`、`mem_test.bit` 与 `uart_hello_build.log`。
+  - 证据路径：`competition_project_single_camera/docs/debug_sessions/m2_uart0_cpu_hello_preflight_20260716.md`、`competition_project_single_camera/outflow_m2_cpuhello_20260716_1730/`（该忽略目录的历史构建产物未入库，文件名与 hash 仅作历史批次说明，不能被当前 SHA 复用）。
   - 失效条件：任何构建输入或 Efinity 版本变化、bit/ELF hash 变化、FTDI/JTAG 映射与枚举结果变化，或出现新的 fatal、负 slack、CDC 问题或板级异常；失效后重新建立批次，不沿用本条身份。
 
 - 日期：2026-07-16，来源 Agent：Codex（单摄 M2 UART0 Hello 板卡归还后的 FTDI 前置项复核）
@@ -171,7 +178,7 @@
     3. **外部几何与结构风险未关闭**：点位 JSON 无 `external_reference`；内部 177.72°不能替代台面外部量角，约 223 mm 半径未确认是“臂展最大处”。E3 被跳过，本次重复成功只证明当次条件下可运行，不能反推底座刚性风险已关闭。
   - **E3/E4 状态（2026-07-14 用户决策 + Codex 复核）**：现场因硬件条件跳过 E3 后完成 PC 真机候选路径验证，E4 记为 `PASS_WITH_RISKS`，E3 仍为 `NOT_VERIFIED`。本结果允许明日推进 G4 正式 SoC/PNR、G5 断臂板上模拟和 D2 UART2 无臂回环；不得直接放行真实机械臂接线或动作。
   - 与主线关系：PC 证据只用于开发期点位与指令序列参考，不能跳过 G4 正式 SoC/PNR、G5 断臂板上模拟、G7 UART2 无臂回环、G8 只读和 G10 动作 Review Packet；`competition_project_single_camera/` 尚未完成 M0 板级复现，也不改变本条机械臂门禁。
-  - 证据路径：`final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`、`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、本机忽略日志 `mycobot_pc_tests/audit_logs/auto_run_20260714_204908.log`（SHA-256 `EB89B99A...F9F475`）、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`。
+  - 证据路径：`final_project/docs/review_packets/mycobot_180deg_initial_verification_evaluation_20260714.md`、`debug_records/mycobot_route_a_experiment_debug_record_20260714.md`、`mycobot_pc_tests/presets/teach_points_route_a_20260714_2000.json`、`final_project/docs/technical_plans/mycobot_pc_experiment_continuation_plan_20260714.md`；关联运行日志为本机忽略产物，未作为仓库证据路径。
   - 失效条件：机械臂安装/基座/物块/投放区再次变化，脚本或预设发生修改，或出现新的外部测量、串口、板上或动作证据；失效后从离线门和机械固定门重新开始。
 
 - 日期：2026-07-14，来源 Agent：Codex（myCobot G1.5–G3.5 纯软件关闭）
@@ -268,7 +275,7 @@
   - 适用范围：当前分支 `dev/wsc6090-CPU` 工作区、B 线当前纳入计数的 8 项 CPU Host 单测集合的聚合计数；仅 Host/Mock，不适用于 RISC-V 交叉、`soc.h`、APB、OSD、真实摄像头或机械臂。
   - 最新结论：用 `D:\CICC w\tools\mingw64\bin\gcc.exe`（14.2.0）逐项复跑，每项编译均加 `-Werror -Wno-error=cpp`（只放行 board_io.h:23 占位 warning，其它 warning 即编译失败），编译与运行退出码均 0，全部 PASS：vision_classifier 31/31、task_matcher 154/154、round_controller 175/175、competition_round_transaction 135/135、competition_contract 35/35、competition_host_flow 164/164（20 rounds）、a13_fpga_snapshot_replay 169/169（20 rounds；本次为 MinGW gcc 复跑，非评审记录里的 MSVC）。与旧 795/795 相同的 7 项成员刷新为 `863/863` PASS（唯一增量来自 task_matcher 146→154、round_controller 115→175，其余不变）。另 param_table 81/81 复跑通过，但本不在 795 成员内，作额外项记录；含 param_table 的 B 线列明 8 项 Host 回归集合为 `944/944` PASS。措辞订正：这里的“B 线列明 8 项”是 B 线当前纳入断言计数的集合，`944/944` 是该 8 项的断言合计，不等于仓库内全部 Host 测试的总断言数——仓库另有受版本控制的 `tests/test_mycobot_arm_skeleton.c` 与 `run_mycobot_arm_skeleton_host.ps1`，Codex 复跑编译/运行退出码均 0，但它属 Host/Mock、不连接或驱动真实机械臂，且使用原生 assert、无可直接相加的断言总数，故未纳入 `944/944`。
   - 替代了哪个旧结论：正式替代 `team_integration_merge_review_20260713.md` 的 `Host 合计 795/795` 快照——同成员刷新为 863/863；旧 795 不再作为当前 B 线 Host 基线，仅保留为历史快照。不替代任何板级、APB/CDC/OSD、真实特征、`main` 集成或机械臂未闭环的事实。
-  - 证据路径：`final_project/cpu/tests/`（test_classifier / test_param_table / test_task_matcher / test_round_controller / test_competition_rounds / test_competition_contract / test_competition_host_flow / test_a13_fpga_snapshot_replay；另 test_mycobot_arm_skeleton 见下）、`final_project/cpu/tests/run_competition_*_host.ps1`、`final_project/cpu/tests/run_a13_fpga_snapshot_replay.ps1`、`final_project/cpu/tests/test_mycobot_arm_skeleton.c` 与 `run_mycobot_arm_skeleton_host.ps1`（Host/Mock、原生 assert、未纳入 944）、`final_project/docs/review_packets/team_integration_merge_review_20260713.md`（旧 795 来源表）、`final_project/cpu/CPU_MODULE_PLAN.txt`（“B 线列明的 8 项 CPU Host 回归复跑”块）。
+  - 证据路径：`final_project/cpu/tests/`（受版本控制的 CPU Host runner、测试源码和 `final_project/cpu/tests/test_mycobot_arm_skeleton.c`；Host/Mock、原生 assert、未纳入 944）、`final_project/cpu/tests/run_a13_fpga_snapshot_replay.ps1`、`final_project/cpu/tests/run_mycobot_arm_skeleton_host.ps1`、`final_project/docs/review_packets/team_integration_merge_review_20260713.md`（旧 795 来源表）、`final_project/cpu/CPU_MODULE_PLAN.txt`（“B 线列明的 8 项 CPU Host 回归复跑”块）。
   - 失效条件：任一 CPU Host 源/测试改动、成员集合调整，或在正式 `soc.h`/APB/OSD/板级/机械臂接入后需改以板级证据为准。
 
 - 日期：2026-07-13，来源 Agent：Claude（B/CPU 支援：task_matcher 覆盖审查补齐）
@@ -312,7 +319,7 @@
 - 日期：2026-07-12，来源 Agent：Codex（A11 合成五色预处理隔离 Map）
   - 适用范围：摄像头无稳定数据流期间的 FPGA ROI/颜色面积/bbox/中心快照候选工程；不适用于 D 盘 HDMI 基线或正式比赛构建。
   - 最新结论：已创建 `C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga`。该副本以 D 盘五色 HDMI 基线为源，仅增加 6 个预处理 RTL 和 ch1 合成 tap；HDMI 仍用 RGB 合成流，预处理支路单独转换为 Debayer BGR 合同，避免黄/红蓝通道误读。Efinity map PASS，预处理模块已展开，最终 v2 资源为 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`、`EFX_RAM10=154`。
-  - 证据路径：`final_project/docs/debug_sessions/a11_synthetic_preprocess_isolated_map_20260712.md`、`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\outflow_a11_v2\mem_test.map.out`。
+  - 证据路径：`final_project/docs/debug_sessions/a11_synthetic_preprocess_isolated_map_20260712.md`；对应隔离构建原始 outflow 为本机未入库历史产物，本条仅作历史参考。
   - 下一步门禁：A11 已生成 USER2 Debugger 配置、PNR 通过且已有专用 `.dbg.vdb/.bit/.hex`。下一步仅允许手动 JTAG SRAM 下载 A11 `.bit`，再采集 11 个快照探针；不得使用旧 D 盘 bitstream，且不得接入 SoC/APB/CPU/OSD。
   - 验证：A11 已经 JTAG SRAM 下载并分别采集黄色、红色、蓝色合成帧；三帧的对应颜色面积均为 `102400`，其他两种彩色面积为 0。白色帧由 HDMI 同时观察确认，快照显示三种彩色面积为 0、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态为 0。该结论仅覆盖 A11 隔离 bitstream 和已采集的合成帧；当前探针不能独立区分白/黑。
   - 验证增量（20:37）：操作者在 `Run Immediate` 时同步确认 HDMI 为黑色；`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\la0_waveform.vcd`（最后写入 `2026-07-12 20:37:45`）显示红/蓝/黄面积均为 `0`、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态 `0`。黑色身份来自 HDMI 观察，当前 11 个探针不能独立区分黑/白；五种合成色的前景/几何快照验证至此完成。
@@ -321,7 +328,7 @@
 - 日期：2026-07-12，来源 Agent：Codex（A12 白黑统计快照探针）
   - 适用范围：A11 隔离合成视频的白/黑基础统计可观测性；不适用于 D 盘 HDMI 基线或正式比赛工程。
   - 最新结论：A12 在 `C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga` 的既有 `vision_preprocess_channel` 快照输出上，仅将 `sum_r/sum_g/sum_b/sum_y` 接至四根顶层 `mark_debug` 网络；无新分类 RTL、无像素路径改变。`efx_run --prj -f map` 输出 `outflow_a12`，map PASS，资源 `EFX_ADD=1827`、`EFX_LUT4=10339`、`EFX_FF=7991`，与 A11 v2 相同，map warning 数同为 134。
-  - 证据路径：`final_project/docs/debug_sessions/a12_white_black_snapshot_probe_execution_20260712.md`、`C:\fpga_soc_isolated\tj375_synthetic_preprocess_a11\fpga\efinity\outflow_a12\mem_test.map.out`。
+  - 证据路径：`final_project/docs/debug_sessions/a12_white_black_snapshot_probe_execution_20260712.md`；对应隔离构建原始 outflow 为本机未入库历史产物，本条仅作历史参考。
   - 下一步门禁：必须在 Efinity Debug Wizard 以 `USER2` 保留原 11 根探针并新增 4 根统计网，生成新的 A12 `.dbg.vdb` 后才允许 PNR、bitstream、JTAG SRAM 下载和白黑 VCD 采集；禁止手工编辑或伪造 `.dbg.vdb`。
   - NOT VERIFIED：A12 Debugger、PNR/时序/bitstream/JTAG 下载、白黑独立板级快照，以及真实摄像头/CPU/APB/OSD/尺寸/机械臂路径均未验证。
   - 验证增量（A12 板级）：15 探针 `USER2` Debugger、PNR/时序/bitstream/JTAG SRAM 下载已由操作者完成。`20:59:26` VCD 黑色快照为 RGB 三通道各 `119603200`、`sum_y=358809600`；`21:03:42` VCD 白色快照为 RGB 三通道各 `145715200`、`sum_y=437145600`。两帧均有彩色面积全 `0`、`fg_area=102400`、ROI 像素数 `1036800`、bbox `{380,320}..{699,639}`、中心 `{539,479}`、状态 `0`。白黑已由 FPGA 统计独立区分，不再依赖 HDMI 人工颜色确认。
@@ -344,7 +351,7 @@
 - 日期：2026-07-12，来源 Agent：Codex（A8 Efinity GUI PLL 审查隔离基线）
   - 适用范围：SoC/视频工程 PLL 资源可行性审查前的隔离工作目录。
   - 最新结论：已从 `D:\final_project\fpga` 单向创建 `C:\fpga_soc_isolated\tj375_video_soc_gui_a8\fpga`，排除 `outflow` 和 `work_*` 构建目录。`top.v`、`mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc` 的 SHA-256 与 D 盘源逐项一致；未写入 D 盘或仓库工程，尚未打开 GUI、修改 PLL/SoC 资源、PNR 或烧录。
-  - 证据路径：`final_project/docs/debug_sessions/a8_gui_isolation_baseline_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_gui_a8\A8_GUI_ISOLATION_BASELINE_20260712.md`。
+  - 证据路径：`final_project/docs/debug_sessions/a8_gui_isolation_baseline_20260712.md`；隔离 GUI 工作树记录未入库，本条不能作为当前工程配置证据。
   - 下一步门禁：仅在该副本中以 Efinity GUI 读取并记录现有 PLL/JTAG 的真实用途与下游连接；禁止手改 `.peri.xml`、删除 LPDDR4 PLL、运行 PNR 或烧录。任何资源重规划结论必须以 GUI 实际生成物和新的审查记录为准。
   - NOT VERIFIED：GUI 可行性、PLL 重规划、SoC 集成、工程级 map/PNR、bitstream 与板级行为均未验证。
 
@@ -378,7 +385,7 @@
   - 适用范围：A 队员 CPU/APB 最小闭环从隔离 A3 副本进入正式视频工程前的 Interface Designer 资源门禁。
   - 最新结论：**A2 最小硬核 SoC 不可直接合并到当前视频工程。**视频 `mem_test.peri.xml` 已占用 `PLL_BL0`、`PLL_BL1`、`PLL_BL2`、`PLL_TR0`、`JTAG_USER1`；A2 请求 `PLL_BL0`、`PLL_TR0`、`JTAG_USER1`。官方硬 SoC IP 的 `PLL_SOC_SYS_RESOURCE` 仅允许 `PLL_BL0/PLL_BL1/PLL_BL2`，且三者均已占用；虽可把 JTAG 改为 `JTAG_USER2`、把外设 PLL 改至其它合法资源，但系统 PLL 无未占用候选。A2 还会创建与视频 `clk_25m`/`ddr_clk_ref` 重叠的 `GPIOT_P_50`/`GPIOL_25` 时钟输入 GPIO。不得直接拼接 `.peri.xml`、手改生成 RTL 或重复声明同一 pad。
   - 替代旧结论：替代“A3 完成资源审查后即可将 `REG_MAGIC` 接入视频顶层”的下一步假设；A3 隔离 map 仍有效，但工程级接入被本条门禁阻塞。
-  - 证据路径：`final_project/docs/debug_sessions/a4_soc_video_resource_audit_20260712.md`、`final_project/docs/review_packets/a4_soc_video_resource_audit_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\A4_SOC_VIDEO_RESOURCE_AUDIT_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\fpga\efinity\mem_test.peri.xml`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\a2_soc_generated.peri.xml`、`D:\Efinity\2025.2\ipm\ip\efx_hard_soc\ipm\ip_component.xml`。
+  - 证据路径：`final_project/docs/debug_sessions/a4_soc_video_resource_audit_20260712.md`、`final_project/docs/review_packets/a4_soc_video_resource_audit_review_packet_20260712.md`；相关隔离工程 XML 与 IP Manager 原始文件未入库，本条只保留历史审计边界。
   - 下一步门禁：须由 Efinity GUI / Interface Designer 以视频工程为基准，先审查是否允许重新规划视频 `PLL_BL*` 与 DDR/MIPI/视频时钟依赖；仅在该架构决定获批准后，才可用官方 IP Manager 重新生成 SoC（JTAG 应使用 `JTAG_USER2`）并对实际产物做资源交集检查。
   - NOT VERIFIED：GUI 重规划可行性、时钟/复位、UART0/JTAG 引脚、工程级 map/PNR、bitstream、RISC-V 固件、CPU Hello 与 APB 实读均未验证；未修改 RTL/约束/工程 XML，未烧录或上板。
 
@@ -386,7 +393,7 @@
   - 适用范围：A 队员 CPU/APB 最小闭环的隔离工程验证；不适用于 C/D 主工程或烧录基线。
   - 最新结论：A3 已从 `D:\final_project\fpga` 建立独立副本，创建时 `top.v` 与 `mem_test.xml` 哈希一致。APB0 语义裁定为生成 BSP `IO_APB_SLAVE_0_INPUT=0xe8100000` 的 4 KiB 窗口，RTL 从机使用 `PADDR[11:0]`；隔离 `REG_MAGIC` 于偏移 `0x000` 返回 `0x375A0001`。生成 SoC 到 APB 从机的 Efinity map 退出码为 0，隔离 CPU `board_io.c` 在生成 `soc.h` 下预处理通过。
   - 替代旧结论：替代“APB0 32/12 位宽不一致而没有可执行地址处理方案”的阻塞描述；32 位主包装端口不再作为寄存器从机地址总线，窗口内偏移固定为低 12 位。
-  - 证据路径：`final_project/docs/debug_sessions/a3_apb_magic_isolated_20260712.md`、`final_project/docs/review_packets/a3_apb_magic_isolated_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\A3_APB_MAGIC_IMPLEMENTATION_RECORD_20260712.md`、`C:\fpga_soc_isolated\tj375_video_soc_a3_20260712\map_check\efx_map.log`。
+  - 证据路径：`final_project/docs/debug_sessions/a3_apb_magic_isolated_20260712.md`、`final_project/docs/review_packets/a3_apb_magic_isolated_review_packet_20260712.md`；隔离工程记录和 Map 日志未入库，本条不证明当前单摄 APB0 配置。
   - 未完成边界：未合并 SoC `.peri.xml` 到视频工程、未改视频 `top.v`/`mem_test.xml`/约束、未完成行为仿真或 RISC-V 交叉构建、未 PNR/烧录/板测/CPU Hello/APB 实读；未进入 `LIVE_FG_AREA`、CDC、OSD、UART2 或机械臂。
   - 下一步门禁：先审查 A3 SoC `.peri.xml` 与视频 Interface Designer 配置的资源、时钟、复位、JTAG 和 UART0 引脚兼容性；通过后才能在 A3 顶层接入 `REG_MAGIC` 并进行工程级 map。
   - 失效条件：Interface Designer 合并显示 PLL/JTAG/SoC 资源冲突、真实视频时钟复位不兼容，或板级 CPU/APB 证据改变候选地址/接口。
@@ -396,7 +403,7 @@
   - 最新结论：已在 `C:\fpga_soc_isolated\tj375_soc_a2_20260712` 生成 `TJ375N529` 最小硬核 SoC 配置、BSP 和外围 RTL。IP Manager 参数校验通过；官方后处理补齐后，Efinity `efx_map` 对隔离 wrapper/外围 RTL 退出码为 0。该隔离 BSP 的候选地址为 UART0 `0xe8010000`、APB0 `0xe8100000`，APB0 窗口为 4 KiB、频率为 200 MHz；尚未成为正式工程 ABI。
   - 替代旧结论：仅替代“完全没有可供审查的生成 SoC/soc.h 候选物”的前置缺口，不替代 `final_project` 当前“尚未集成 SoC、APB slave 或 results CDC”的事实。
   - 关键风险：生成 wrapper 出现 APB0 `PADDR` 的 `32 -> 12 -> 32` 位宽 warning，且默认仅 `PREADY=1`、`PRDATA=0`、`PSLVERROR` 未驱动；因此不能用于 `REG_MAGIC`、`LIVE_FG_AREA` 或任何正式寄存器访问。
-  - 证据路径：`final_project/docs/debug_sessions/a2_isolated_soc_generation_20260712.md`、`final_project/docs/review_packets/a2_isolated_soc_generation_review_packet_20260712.md`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\A2_SOC_GENERATION_RECORD_20260712.md`、`C:\fpga_soc_isolated\tj375_soc_a2_20260712\map_check\efx_map.log`。
+  - 证据路径：`final_project/docs/debug_sessions/a2_isolated_soc_generation_20260712.md`、`final_project/docs/review_packets/a2_isolated_soc_generation_review_packet_20260712.md`；隔离 SoC 生成记录和 Map 日志未入库，本条不证明当前 Hard SoC 输入。
   - 未完成边界：未创建视频工程隔离副本，未修改 C/D 的 `top.v`/`mem_test.xml`/`.peri.xml`/约束，未实现 APB 从机或 CDC，未构建 CPU 程序、未验证 CPU 启动/UART、未 PNR/烧录/上板，也未涉及 UART2 或机械臂。
   - 下一步门禁：审查包必须先裁定 APB 地址位宽和正式 SoC 接入方法；通过后才可在视频工程隔离副本实施 CPU Hello + APB `REG_MAGIC` 最小闭环。
   - 失效条件：重新生成的参数/工具版本改变端口或 BSP 地址，或者受控视频副本产生了新的 SoC/APB 实测证据。
