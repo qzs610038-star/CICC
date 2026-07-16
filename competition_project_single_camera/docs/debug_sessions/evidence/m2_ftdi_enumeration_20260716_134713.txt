@@ -1,0 +1,25 @@
+Microsoft PnP Utility
+
+Instance ID:                BTHENUM\{00001101-0000-1000-8000-00805f9b34fb}_LOCALMFG&0000\7&77c899&0&000000000000_00000000
+Device Description:         蓝牙链接的标准串行 (COM4)
+Class Name:                 Ports
+Class GUID:                 {4d36e978-e325-11ce-bfc1-08002be10318}
+Manufacturer Name:          Microsoft
+Status:                     Started
+Driver Name:                bthspp.inf
+
+Instance ID:                BTHENUM\{00001101-0000-1000-8000-00805f9b34fb}_VID&000105d6_PID&000a\7&77c899&0&93072FAC71D6_C00000000
+Device Description:         蓝牙链接的标准串行 (COM5)
+Class Name:                 Ports
+Class GUID:                 {4d36e978-e325-11ce-bfc1-08002be10318}
+Manufacturer Name:          Microsoft
+Status:                     Started
+Driver Name:                bthspp.inf
+
+Instance ID:                USB\VID_1A86&PID_7523\5&325499a7&0&9
+Device Description:         USB-SERIAL CH340 (COM10)
+Class Name:                 Ports
+Class GUID:                 {4d36e978-e325-11ce-bfc1-08002be10318}
+Manufacturer Name:          wch.cn
+Status:                     Started
+Driver Name:                oem107.inf
