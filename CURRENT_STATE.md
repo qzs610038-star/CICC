@@ -27,15 +27,15 @@
 
 ## 活跃状态与路线覆盖项
 
-- 日期：2026-07-16，来源 Agent：Codex / 用户现场确认（单摄 Hard SoC USER2 + 片上 RAM + UART0 Hello 板级 Gate）
+- 日期：2026-07-16，来源 Agent：Codex / 用户现场确认（来源 Hard SoC bitstream USER2 + 片上 RAM + UART0 Hello 板级 Gate）
   - 适用范围：仅隔离候选工程 `competition_project_single_camera/` 的最小 CPU Hello 板级启动门；不替代 `final_project/` 正式主线，也不表示 feature snapshot、CPU 分类、OSD、按键、UART2/J52 或机械臂闭环。
-  - 最新结论：匹配 bitstream `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` 已通过 JTAG 临时加载到 FPGA SRAM，未写 Flash；用户确认真实摄像头 HDMI 画面正常。FPGA BSCAN tunnel 使用 FTDI channel 1 和 `USER2` IR=9，识别到 4 个 RV32 hart（XLEN=32，`misa=0x4004112d`）。本地忽略产物 Hello ELF SHA-256 为 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口为 `0xF9000000`；OpenOCD 向片上 RAM 下载并校验 538 bytes 后，CPU0 从 `0xF9000000` 启动并运行至 UART 回显循环，采样 `pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`。COM10 在 `115200 8N1` 收到完整三行横幅，发送 ASCII `K` 后收到 `K` 回显。因此 `USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO = PASS`。
+  - 最新结论：来源联合副本 bitstream `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` 已通过 JTAG 临时加载到 FPGA SRAM，未写 Flash；用户确认真实摄像头 HDMI 画面正常。FPGA BSCAN tunnel 使用 FTDI channel 1 和 `USER2` IR=9，识别到 4 个 RV32 hart（XLEN=32，`misa=0x4004112d`）。本地忽略产物 Hello ELF SHA-256 为 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口为 `0xF9000000`；OpenOCD 向片上 RAM 下载并校验 538 bytes 后，CPU0 从 `0xF9000000` 启动并运行至 UART 回显循环，采样 `pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`。COM10 在 `115200 8N1` 收到完整三行横幅，发送 ASCII `K` 后收到 `K` 回显。因此来源 `AA1338...` 批次为 `USER2 JTAG / CPU EXECUTION / UART0 HELLO / UART0 ECHO / HDMI = PASS`。仓库真源新构建 bitstream `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC` 仅有离线构建证据，板级视频、USER2、CPU和UART0仍为 `NOT VERIFIED`。
   - 启动根因：仅 halt 后写 PC 会在首条取指触发 instruction access fault；RAM 下载/校验和数据端读取本身正常，`fence.i` 不能修复。按标准 RISC-V Debug Module 先对 `dmcontrol` 执行 `riscv dmi_write 0x10 0x00000003`，等待 100 ms，再执行 `riscv dmi_write 0x10 0x00000001`，等待 200 ms，即 NDMRESET assert/deassert，随后重新 halt 四核、下载/校验 ELF、设置 PC 并 resume，首条取指及 UART 均成功。后续上电启动不得省略 NDMRESET。
   - 板级顺序与已知现象：带电直接重配曾出现 DDR 横带花屏；完全断电冷启动后再通过 JTAG SRAM 加载同一 bitstream，HDMI 恢复正常。推荐顺序为开发板完全断电 -> 冷启动 -> JTAG SRAM 临时加载匹配 bitstream -> USER2 连接 -> NDMRESET -> 四核 halt -> 片上 RAM 下载/校验 -> CPU0 设置 `pc=0xF9000000` 并 resume -> UART0 横幅/回显。断电会同时丢失 FPGA SRAM bitstream 和片上 RAM Hello，必须重走该顺序。
-  - 替代旧结论：覆盖下方 2026-07-15 单摄 M2 条目和 `WORK_LOG.md` M2-33 中 `CPU EXECUTION + UART0 NOT VERIFIED` 的旧状态；Hard SoC 真源、离线构建和本次最小板级 Gate 均已关闭。
-  - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-34、`competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`；板级原始 OpenOCD/UART 输出由本次 Codex 任务记录保存，未把含本机路径的临时日志或 ELF 纳入 Git。
+  - 替代旧结论：覆盖下方 2026-07-15 单摄 M2 条目中对来源 `AA1338...` 批次的 `CPU EXECUTION + UART0 NOT VERIFIED`；不覆盖管理员合并复核对仓库新构建 `1D697F...` 的板级 `NOT VERIFIED`。
+  - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-34/M2-35、`competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`；板级原始 OpenOCD/UART 输出由本次 Codex 任务记录保存，未把含本机路径的临时日志或 ELF 纳入 Git。
   - 继续禁止：未写 Flash，未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送任何 myCobot 帧。UART0 Hello PASS 不得推断 UART2/myCobot 可用。
-  - 下一门：先由管理员审核本次板级证据和文档差分；获批前不扩大到 feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 或机械臂。若之后扩大范围，必须另行提交对应 Review Packet 和板级验收边界。
+  - 下一门：先对仓库新构建 `1D697F...` 重走完全断电冷启动、JTAG SRAM临时加载、HDMI、USER2、NDMRESET、片上 RAM Hello 和UART0回显 Gate。该批次通过前不进入 APB MAGIC、feature snapshot、CPU分类主循环、OSD、按键、UART2/J52或机械臂。
   - 失效条件：bitstream、ELF、Hard SoC/BSP、OpenOCD USER TAP、UART0 引脚/波特率、时钟复位或板卡冷启动现象发生变化；任一变化后从匹配哈希与冷启动顺序重新验证。
 
 - 日期：2026-07-15，来源 Agent：Codex（myCobot 上板 Goal：阶段 0/B1–B3/A0 首轮执行）
@@ -46,16 +46,17 @@
   - 下一门：先由用户按 debug session 的 A0 操作卡完成当前隔离副本 GUI 资源审计，并确认 myCobot 的实际 COM 端口；在收到前，不改 XML/top/SDC、不跑联合 PNR、不接 J52 或机械臂。
   - 失效条件：协议真源/固件版本改变、B1/B3 相关回归失败、GUI 证实资源不同、端口身份或现场电气证据与本条不符。
 
-- 日期：2026-07-15，来源 Agent：libaoxun688 交接 / Codex 本地集成复核（单摄 M2 feature/CPU Host 候选，Hard SoC 真源同步 HOLD）
-  - 适用范围：仅隔离候选工程 `competition_project_single_camera/` 与其来源联合实验副本；不替代 `final_project/` 正式主线，也不表示 CPU、OSD、UART2 或机械臂闭环。
-  - 合入结论：固定提交 `dev/libaoxun688@e129885` 实际加入 framebuffer 稳定/欠读诊断、只读 `feature_stats_tap`、CPU Host 侧特征适配/分类/F1 事务与配套契约、测试和操作文档。FPGA 仍只输出 ROI/统计特征与硬件通道，颜色、形状、尺寸分类和逐轮事务继续由板上 CPU 承担；当前 feature tap 的正式采集保持禁用，未把分类状态机放回 RTL。
-  - **Codex 阻塞复核**：提交标题和交接文档描述 Hard SoC 集成，但固定提交没有同步交接要求的系统真源：`mem_test.xml` 未登记 `EfxSapphireHpSoc_slb` 且 `debugger.auto_instantiation=on`；候选树不存在 `ip/EfxSapphireHpSoc_slb/settings.json` 与 `cpu_bringup/uart_hello_onchip/build.ps1`；`.peri.xml` 未找到交接指定的 UART0/SoC 资源标记；`constrain.sdc` 仍有有效 `axi1_*`、`CLK_5M`、`pll_inst1_CLKOUT0` 约束。依照交接文件自身的停止条件，完整 Hard SoC 系统真源同步为 `HOLD`，不得把本地合并写成 Hard SoC 已接入候选工程。
-  - 已有证据边界：队友联合实验记录显示外部联合副本的 Efinity 2025.2 Map、PNR、bitstream 与 J48/ch0 HDMI 视频回归通过，最差 Setup/Hold 为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`；匹配 bitstream SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`。这些证据只证明来源联合副本的 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`，不证明当前仓库候选工程包含匹配系统真源，也不证明本地集成提交已重新构建或上板。
-  - CPU 检查点：片上 RAM UART0 Hello ELF 的来源实验地址审计已完成，入口和唯一 LOAD 段位于 `0xF9000000` 的 16KB 片上 RAM；USER2 JTAG 实际取指、UART0 完整横幅和单字符回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。不得据此连接 UART2/J52 或机械臂。
-  - 调试边界：CPU JTAG 固定使用 FPGA `USER2`，`USER1` 保留给视频工程；只允许 Debug in RAM，不允许 Flash erase/program 或外部 DDR 初始化。任何地址、USER TAP、PLL/DDR/GPIO/JTAG 资源或时钟复位事实变化均需重新通过 Codex Gate。
-  - 证据路径：`competition_project_single_camera/WORK_LOG.md` M2-26 至 M2-32、`competition_project_single_camera/docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md`、`competition_project_single_camera/docs/debug_sessions/m2_uart0_onchip_hello_operator_guide_20260715.md`、`competition_project_single_camera/docs/review_packets/m2_single_camera_soc_branch_merge_handoff_20260715.md`、`competition_project_single_camera/docs/review_packets/m2_hard_soc_missing_files_submission_request_20260716.md`、`competition_project_single_camera/integration/single_camera_feature_contract.md`。
-  - 下一门：先由 FPGA/SoC 负责人从同一通过的 Interface Designer/Hard SoC 生成批次同步完整 `.peri.xml`、SDC、IP 可复现输入、BSP/Hello fail-closed 入口，并关闭 `auto_instantiation`；完成 Check Design 与 Codex 系统文件复核后，才可对本地候选重新运行 Efinity Map/PNR/STA/CDC。之后才可烧录匹配 bitstream 回归 J48/ch0 视频；板卡可用时再验证 USER2/片上 RAM/UART0 Hello 与回显。
-  - 失效条件：本地合并后的 `mem_test.xml`、`.peri.xml`、`constrain.sdc`、`top.v`、Hard SoC IP/BSP、时钟复位、USER TAP、UART0 引脚或板级现象与交接证据不一致。
+- 日期：2026-07-16，来源 Agent：libaoxun688 补交 / Codex 合并复核（单摄 M2 Hard SoC 真源与离线构建已关闭，板上 CPU Hello 待验证）
+  - 适用范围：仅隔离候选工程 `competition_project_single_camera/`；不替代 `final_project/` 正式主线，也不表示 CPU 分类、OSD 回写、UART2 或机械臂闭环。
+  - 合入结论：在既有 `dev/libaoxun688@e129885` 的 framebuffer/feature tap/CPU Host 候选基础上，固定补交提交 `2d4b3b7b3d0c59d88ece0669534ae38de02ed938` 与 `0604d33f3fe76851e1dfe738403875b4a7d0721c` 已同步 `mem_test.xml`、`.peri.xml`、SDC、`top.v`、Hard SoC IP 可复现输入、最小 BSP 和 UART0 Hello。2026-07-15 的“Hard SoC 系统真源缺失/HOLD”已失效，不得再作为当前阻塞。
+  - 系统契约：`mem_test.xml` 同时登记 `feature_stats_tap` 与 `EfxSapphireHpSoc_slb`，`debugger.auto_instantiation=off`；DDR AXI0 启用、AXI1 禁用；视频 JTAG 使用 `USER1`，QCRV32 使用 `USER2`；UART0 RX/TX 为 `GPIOR_165/GPIOR_145`，SoC reset 为 `GPIOL_79`；视频状态机继续唯一驱动 DDR `CFG_START/RST/SEL`，Hard SoC 只读取 `CFG_DONE`，未形成双驱动。FPGA/CPU 职责边界未改变。
+  - Codex 新构建：在合入前对精确提交 `0604d33` 使用 Efinity 2025.2 重新运行完整工程，Map、Interface、Placement、Routing、bitstream 均完成；最差 Setup/Hold 为 `+1.742ns/+0.018ns`，CDC 为 `No Synchronizer warnings to report.`。Interface Check 为 `0 error / 4` 个物理距离 warning；post-synthesis netlist 另有 118 个 warning，主要来自继承 Demo/IP 与未使用的 AXI-A 顶层端口，不能与 4 个 Interface warning 混为一谈，也不能描述成零 warning。
+  - 证据批次边界：Codex 新构建 bitstream SHA-256 为 `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`，尚未上板。来源联合副本的旧 bitstream `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31` 与 J48/ch0 视频正常证据只属于来源批次，不能证明新构建已板测。
+  - CPU 检查点：提交的最小 BSP fail-closed 构建通过；UART0 Hello 为 2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段至 `0xF9000A30`，无未解析符号，`ELF_LOAD_AUDIT=PASS`。USER2 JTAG 实际连接、CPU 从片上 RAM 取指、UART0 115200 横幅和单字符回显仍为 `NOT VERIFIED`。
+  - 调试边界：下一门只允许使用匹配的新 bitstream、FPGA `USER2` 和 `0xF9000000` 片上 RAM 执行 UART0 Hello；禁止 `USER1`、Flash erase/program、外部 DDR 初始化、UART2/J52、机械臂接线或动作。CPU Hello 通过前不得进入 feature snapshot、OSD、按键或 myCobot。
+  - 证据路径：`competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`、`competition_project_single_camera/WORK_LOG.md` M2-26 至 M2-34、`competition_project_single_camera/cpu_bringup/uart_hello_onchip/README.md`、`competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json`、`competition_project_single_camera/mem_test.xml`、`competition_project_single_camera/mem_test.peri.xml`、`competition_project_single_camera/constrain.sdc`、`competition_project_single_camera/src/top.v`。
+  - 下一门：在不连接机械臂的安全台面上，先记录新 bitstream 完整 SHA-256，再烧录匹配 bitstream 并回归 J48/ch0 视频；随后选择 FPGA `USER2`，仅下载 Hello ELF 到片上 RAM，采集 UART0 完整横幅与单字符回显。任何一步失败都停在当前层，不扩展到 UART2/myCobot。
+  - 失效条件：`mem_test.xml`、`.peri.xml`、SDC、`top.v`、Hard SoC IP/BSP、时钟复位、USER TAP、UART0 引脚或构建/板级现象发生变化，或新的 Efinity fatal/时序/CDC 问题出现。
 
 - 日期：2026-07-15，来源 Agent：Codex（wsc CPU 优先融合与环境等价性整改）
   - 适用范围：`origin/dev/wsc6090-cpu@df45b5a` 的统一结果语义、ARM_DISABLED 候选 adapter、task_matcher 真值 reason、Host 测试和 G0–G3 规范目标构建；不表示 G4 正式 SoC、APB/OSD wire ABI、UART2 或真实机械臂闭环。

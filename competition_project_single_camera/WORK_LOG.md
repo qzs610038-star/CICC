@@ -1297,18 +1297,30 @@ git diff --check
 - 验证边界：来源联合副本为 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`；USER2 JTAG实际取指、UART0完整横幅和回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。未连接机械臂，未合并main。
 - 下一步：提交本条日志和Review Packet，推送个人分支，等待管理员审核；不得自行合并main。
 
-### [M2-34] USER2 / 片上 RAM / UART0 Hello 板级 Gate 关闭
+### [M2-34] 管理员合并复核、状态收敛与新离线构建
 
 - 日期：2026-07-16（Asia/Shanghai）。
-- 执行边界：仅验证匹配 bitstream、FPGA `USER2`、片上 RAM `0xF9000000` 和 UART0 `115200 8N1`；未写 Flash，未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送 myCobot 帧。
-- bitstream：通过 JTAG 临时加载到 FPGA SRAM，SHA-256 为 `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`；FPGA IDCODE 为 `0x006A0EF3`。用户现场确认真实摄像头 HDMI 画面正常。该加载不是 Flash 烧录，断电后会丢失。
-- Hello ELF：使用本分支本地忽略产物 `cpu_bringup/uart_hello_onchip/build/uart_hello_onchip.elf`，SHA-256 为 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口 `0xF9000000`。OpenOCD 报告向片上 RAM 下载并校验 538 bytes 成功；ELF 未提交。
-- JTAG 证据：FTDI channel 1，经 FPGA BSCAN tunnel 选择 `USER2` IR=9；识别 4 个 RV32 hart，XLEN=32，`misa=0x4004112d`。
-- 启动根因：仅 halt 后设置 `pc=0xF9000000` 会在首条取指产生 instruction access fault（`mcause=1`、`mepc/mtval=0xF9000000`），而 RAM verify、program-buffer 数据端读取、Machine mode、`satp=0` 和 PMP 检查正常，`fence.i` 无效。按标准 RISC-V Debug Module 执行 `riscv dmi_write 0x10 0x00000003`、等待 100 ms、`riscv dmi_write 0x10 0x00000001`、等待 200 ms 后，重新 halt 四核、下载/校验 ELF、设置 PC 并 resume，CPU 正常取指。NDMRESET 是本工程 CPU Hello 的必要启动步骤。
-- CPU 证据：运行约 8 秒后 halt 采样为 `pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`，随后恢复运行。
-- UART0 证据：COM10 收到完整横幅 `TJ375 CPU+VIDEO UART0 HELLO`、`ONCHIP_RAM=0xF9000000 UART0=115200 8N1`、`Type characters to verify echo.`；发送 ASCII `K`（hex `4B`）后收到 `K` 回显。COM13 无输出。因此 `UART0 HELLO + ECHO = PASS`，本次 UART0 身份为 COM10。
-- 视频启动经验：带电直接重配曾出现 DDR 横带花屏；完全断电冷启动后再 JTAG 加载同一 bitstream，HDMI 恢复。后续推荐顺序为完全断电 -> 冷启动 -> JTAG SRAM 加载匹配 bitstream -> USER2 -> NDMRESET -> 四核 halt -> 片上 RAM 下载/校验 -> CPU0 从 `0xF9000000` resume -> UART0 横幅/回显。
-- 收尾检查：OpenOCD 正常 shutdown，无残留进程；COM10/COM13/COM17 仍枚举；隔离 worktree 在文档更新前保持干净，HEAD 为 `0604d33f3fe76851e1dfe738403875b4a7d0721c`。
-- 结果：`USER2 JTAG PASS / CPU EXECUTION PASS / UART0 HELLO PASS / UART0 ECHO PASS / HDMI PASS`。
-- 未完成边界：feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 和 myCobot 均未进入本 Gate；不得从 UART0 Hello 推断这些链路可用。
-- 下一步：由管理员审核本条、`CURRENT_STATE.md` 和 Hard SoC Review Packet 的差分；审核通过前不扩大板级范围，不提交或推送本次文档更新。
+- 合并范围：管理员锁定并合入 `dev/libaoxun688-hard-soc-source-sync-20260716@0604d33f3fe76851e1dfe738403875b4a7d0721c`；该分支相对基线 `main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde` 为 0 behind / 2 ahead，合并无冲突。
+- 真源裁定：补交的 25 个系统/IP/BSP/Hello 文件齐备，四个系统文件、Hard SoC wrapper、UART0 GPIO、USER1/USER2、AXI0/AXI1 与 DDR CFG 唯一驱动契约复核一致。2026-07-15 的“Hard SoC 系统真源缺失/HOLD”已被本条替代。
+- Hello 新构建：在合并工作树用 Efinity RISC-V GCC 8.3.0 重建 PASS；2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段至 `0xF9000A30`，`ELF_LOAD_AUDIT=PASS`。
+- FPGA 新构建：Efinity 2025.2 从同一合并工作树执行 Map/Interface/PNR/PGM 全流程 PASS；最差 Setup/Hold `+1.742ns/+0.018ns`；CDC 为 `No Synchronizer warnings to report.`；Interface Design Issues 为 4 个既有物理距离 warning，post-synthesis netlist 另有 118 个 warning。
+- 路径说明：Efinity map 直接使用中文绝对路径时因旧组件字符转换失败；改用仓库既有 ASCII junction 指向同一工作树后 PASS。未把该本机路径写入任何工程配置。
+- 新 bitstream：SHA-256 `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`；只保存在仓库外临时验证目录，未提交，且尚未上板。来源旧 bitstream `AA1338...` 的 J48/ch0 视频证据不继承到本次新 bitstream。
+- 文档收敛：更新 `CURRENT_STATE.md`、`AGENTS.md`、`CLAUDE.md`、`fpga_vision`/`cpu_mycobot` Skills、Review Packet，并生成 2026-07-16 A/B/C 三轨学习指南；不再要求队友重复补交已存在的 Hard SoC 真源。
+- 安全边界：未烧录、未连接机械臂、未运行任何动作。USER2 实际连接、片上 RAM 取指、UART0 115200 横幅与回显仍为 `NOT VERIFIED`。
+- 下一门：仅使用匹配的新 bitstream、FPGA `USER2` 与片上 RAM Hello 完成 UART0 横幅/回显；禁止 `USER1`、Flash、外部 DDR、UART2/J52 和机械臂。
+
+### [M2-35] 来源匹配 bitstream 的 USER2 / UART0 板级 Gate
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 证据批次：本次板测使用来源联合副本 bitstream `AA133887F3D5CE19768C35C3E1775019D370AAC66FE95ABEE46503A63BA96F31`，不是 M2-34 从仓库真源新生成的 `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`。以下 PASS 只属于 `AA1338...` 批次，不得继承给 `1D697F...`。
+- 执行边界：bitstream 仅通过 JTAG 临时加载到 FPGA SRAM；Hello 仅下载到片上 RAM `0xF9000000`。未写 Flash，未使用 `USER1`，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂，未发送 myCobot 帧。
+- Hello ELF：本地忽略产物 SHA-256 为 `4AD5CA14147D45B4594C498A3976BDD36EC3570E982B09DC21744669D91CC78A`，入口 `0xF9000000`；OpenOCD 下载并校验 538 bytes 成功，ELF 未提交。
+- JTAG/CPU：FPGA IDCODE `0x006A0EF3`；FTDI channel 1，经 BSCAN tunnel 选择 `USER2` IR=9；识别 4 个 RV32 hart，XLEN=32，`misa=0x4004112d`。NDMRESET 后 CPU 正常取指，运行采样为 `pc=0xF900019A`、`mcause=0`、`mepc=0`、`mtval=0`。
+- 启动根因：仅 halt 后设置 `pc=0xF9000000` 会在首条取指产生 instruction access fault；执行 `riscv dmi_write 0x10 0x00000003`、等待 100 ms、`riscv dmi_write 0x10 0x00000001`、等待 200 ms 后，再 halt 四核、下载/校验 ELF、设置 PC 并 resume，首条取指成功。NDMRESET 是必要步骤。
+- UART0：COM10 在 `115200 8N1` 收到完整三行横幅；发送 ASCII `K`（hex `4B`）后收到 `K` 回显。COM13 无输出。
+- HDMI：用户确认真实摄像头 HDMI 画面正常。带电直接重配曾出现 DDR 横带花屏；完全断电冷启动后加载同一 bitstream，HDMI 恢复。
+- 结果：来源 `AA1338...` 批次为 `USER2 JTAG PASS / CPU EXECUTION PASS / UART0 HELLO PASS / UART0 ECHO PASS / HDMI PASS`。
+- 收尾：OpenOCD 正常 shutdown，无残留进程；COM10/COM13/COM17 仍枚举。
+- 未完成边界：仓库新构建 `1D697F...` 的 HDMI、USER2、CPU 和 UART0 仍为 `NOT VERIFIED`；feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 和 myCobot 均未进入本 Gate。
+- 下一步：先对 `1D697F...` 重走冷启动、JTAG SRAM 加载、HDMI、USER2、NDMRESET、片上 RAM Hello 与回显 Gate；通过前不进入 APB MAGIC、feature、OSD、UART2/J52 或机械臂。
