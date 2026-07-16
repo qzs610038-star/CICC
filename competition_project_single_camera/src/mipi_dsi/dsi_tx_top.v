@@ -141,7 +141,7 @@ assign pixel_data_en        =  vid_rst_n;
 // Panel driver initialization
 panel_config
 #(
-	.INITIAL_CODE	("/src/mipi_dsi/Panel_1080p_reg.mem"),
+	.INITIAL_CODE	("src/mipi_dsi/Panel_1080p_reg.mem"),
 	.REG_DEPTH		(9'd150)
 )
 inst_panel_config
