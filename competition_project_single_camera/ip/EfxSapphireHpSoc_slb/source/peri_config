@@ -1,0 +1,3 @@
+--peripheralFrequency 200000000
+--PeripheralClock true
+--uart name=system_uart_0_io,address=0x10000,interruptId=0

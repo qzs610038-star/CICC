@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<efxpt:design_db name="mem_test" device_def="TJ375N529" version="2025.2.288.4.15" db_version="20261006" last_change_date="Sun May  3 19:20:37 2026" xmlns:efxpt="http://www.efinixinc.com/peri_design_db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/peri_design_db peri_design_db.xsd ">
+<efxpt:design_db name="mem_test" device_def="TJ375N529" version="2025.2.288.4.15" db_version="20261006" last_change_date="Wed Jul 15 21:15:38 2026" xmlns:efxpt="http://www.efinixinc.com/peri_design_db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/peri_design_db peri_design_db.xsd ">
     <efxpt:device_info>
         <efxpt:iobank_info>
             <efxpt:iobank name="2A" iostd="1.8 V LVCMOS" is_dyn_voltage="false" mode_sel_name="2A_MODE_SEL"/>
@@ -160,6 +160,9 @@
         <efxpt:comp_gpio name="i_sw[1]" gpio_def="GPIOL_46" mode="input" bus_name="i_sw" io_standard="3.3 V LVCMOS">
             <efxpt:input_config name="i_sw[1]" name_ddio_lo="" conn_type="normal" is_register="false" clock_name="" is_clock_inverted="false" pull_option="none" is_schmitt_trigger="false" ddio_type="none" is_bus_hold="false" delay="0" is_serial="false" is_dyn_delay="false" fastclk_name="" pullup_ena_name="i_sw_PULL_UP_ENA[1]" dyn_delay_en_name="i_sw_DLY_ENA[1]" dyn_delay_reset_name="i_sw_DLY_RST[1]" dyn_delay_ctrl_name="i_sw_DLY_CTRL[1]" clkmux_buf_name=""/>
         </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="io_gpio_sw_n" gpio_def="GPIOL_79" mode="input" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:input_config name="io_gpio_sw_n" name_ddio_lo="" conn_type="normal" is_register="false" clock_name="" is_clock_inverted="false" pull_option="none" is_schmitt_trigger="false" ddio_type="none" is_bus_hold="false" delay="0" is_serial="false" is_dyn_delay="false" fastclk_name="" pullup_ena_name="io_gpio_sw_n_PULL_UP_ENA" dyn_delay_en_name="io_gpio_sw_n_DLY_ENA" dyn_delay_reset_name="io_gpio_sw_n_DLY_RST" dyn_delay_ctrl_name="io_gpio_sw_n_DLY_CTRL" clkmux_buf_name=""/>
+        </efxpt:comp_gpio>
         <efxpt:comp_gpio name="led[0]" gpio_def="GPIOB_N_30" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
             <efxpt:output_config name="led[0]" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
         </efxpt:comp_gpio>
@@ -172,12 +175,18 @@
         <efxpt:comp_gpio name="led[3]" gpio_def="GPIOB_P_17" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
             <efxpt:output_config name="led[3]" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
         </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="system_uart_0_io_rxd" gpio_def="GPIOR_165" mode="input" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:input_config name="system_uart_0_io_rxd" name_ddio_lo="" conn_type="normal" is_register="false" clock_name="" is_clock_inverted="false" pull_option="none" is_schmitt_trigger="false" ddio_type="none" is_bus_hold="false" delay="0" is_serial="false" is_dyn_delay="false" fastclk_name="" pullup_ena_name="system_uart_0_io_rxd_PULL_UP_ENA" dyn_delay_en_name="system_uart_0_io_rxd_DLY_ENA" dyn_delay_reset_name="system_uart_0_io_rxd_DLY_RST" dyn_delay_ctrl_name="system_uart_0_io_rxd_DLY_CTRL" clkmux_buf_name=""/>
+        </efxpt:comp_gpio>
+        <efxpt:comp_gpio name="system_uart_0_io_txd" gpio_def="GPIOR_145" mode="output" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:output_config name="system_uart_0_io_txd" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        </efxpt:comp_gpio>
         <efxpt:global_unused_config state="input with weak pullup"/>
         <efxpt:bus name="i_sw" mode="input" msb="1" lsb="0"/>
         <efxpt:bus name="led" mode="output" msb="3" lsb="0"/>
     </efxpt:gpio_info>
     <efxpt:pll_info>
-        <efxpt:pll name="pll_inst1" pll_def="PLL_BL1" ref_clock_name="" ref_clock_freq="74.2500" multiplier="1" pre_divider="1" post_divider="8" reset_name="sys_pll_rstn" locked_name="sys_pll_lock" is_ipfrz="false" is_bypass_lock="true">
+        <efxpt:pll name="pll_inst1" pll_def="PLL_BL1" ref_clock_name="" ref_clock_freq="74.2500" multiplier="1" pre_divider="1" post_divider="2" reset_name="sys_pll_rstn" locked_name="sys_pll_lock" is_ipfrz="false" is_bypass_lock="true">
             <efxpt:adv_prop ref_clock_mode="external" ref_clock1_name="" ext_ref_clock_id="3" clksel_name="" feedback_clock_name="pll_inst1_CLKOUT0" feedback_mode="local"/>
             <efxpt:gen_pin>
                 <efxpt:pin name="" type_name="SHIFT_ENA" is_bus="false"/>
@@ -190,13 +199,23 @@
                 <efxpt:pin name="" type_name="SHIFT" is_bus="true"/>
                 <efxpt:pin name="" type_name="SHIFT_SEL" is_bus="true"/>
             </efxpt:gen_pin>
-            <efxpt:comp_output_clock name="pll_inst1_CLKOUT0" number="0" out_divider="8" is_dyn_phase="false" phase_setting="0" is_inverted="false" conn_type="gclk" clkmux_buf_name="">
+            <efxpt:comp_output_clock name="pll_inst1_CLKOUT0" number="0" out_divider="32" is_dyn_phase="false" phase_setting="0" is_inverted="false" conn_type="gclk" clkmux_buf_name="">
                 <efxpt:gen_pin/>
                 <efxpt:gen_param/>
             </efxpt:comp_output_clock>
-            <efxpt:comp_output_clock name="CLK_5M" number="2" out_divider="119" is_dyn_phase="false" phase_setting="0" is_inverted="false" conn_type="gclk" clkmux_buf_name="">
+            <efxpt:comp_output_clock name="soc_system_clk" number="2" out_divider="4" is_dyn_phase="false" phase_setting="0" is_inverted="false" conn_type="gclk" clkmux_buf_name="">
                 <efxpt:gen_pin/>
                 <efxpt:gen_param/>
+            </efxpt:comp_output_clock>
+            <efxpt:comp_output_clock name="soc_memory_clk" number="1" out_divider="10" is_dyn_phase="false" phase_setting="0" is_inverted="false" conn_type="gclk" clkmux_buf_name="">
+                <efxpt:gen_pin/>
+                <efxpt:gen_param>
+                    <efxpt:param name="HALF_DC_SHIFT_EN" value="false" value_type="bool"/>
+                    <efxpt:param name="PDIV" value="5" value_type="int"/>
+                    <efxpt:param name="PROG_DUTY_CYCLE_EN" value="false" value_type="bool"/>
+                    <efxpt:param name="REQUEST_DUTY_CYCLE" value="50.0000" value_type="float"/>
+                    <efxpt:param name="SWALLOWING_DIV" value="5" value_type="int"/>
+                </efxpt:gen_param>
             </efxpt:comp_output_clock>
             <efxpt:comp_prop/>
             <efxpt:gen_param>
@@ -405,6 +424,21 @@
                 <efxpt:pin name="jtag_inst1_TDO" type_name="TDO" is_bus="false"/>
             </efxpt:gen_pin>
         </efxpt:jtag>
+        <efxpt:jtag name="soc_jtag_inst1" jtag_def="JTAG_USER2">
+            <efxpt:gen_pin>
+                <efxpt:pin name="ut_jtagCtrl_capture" type_name="CAPTURE" is_bus="false"/>
+                <efxpt:pin name="" type_name="DRCK" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_reset" type_name="RESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="RUNTEST" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_enable" type_name="SEL" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_shift" type_name="SHIFT" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_tck" type_name="TCK" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_tdi" type_name="TDI" is_bus="false"/>
+                <efxpt:pin name="" type_name="TMS" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_update" type_name="UPDATE" is_bus="false"/>
+                <efxpt:pin name="ut_jtagCtrl_tdo" type_name="TDO" is_bus="false"/>
+            </efxpt:gen_pin>
+        </efxpt:jtag>
     </efxpt:jtag_info>
     <efxpt:ddr_info>
         <efxpt:adv_ddr name="ddr_inst1" ddr_def="DDR_0" clkin_sel="0" data_width="32" physical_rank="1" mem_type="LPDDR4x" mem_density="4G">
@@ -452,48 +486,48 @@
                     <efxpt:pin name="axi0_ARESETn" type_name="ARSTN_0" is_bus="false"/>
                 </efxpt:gen_pin_axi>
             </efxpt:axi_target0>
-            <efxpt:axi_target1 is_axi_width_256="false" is_axi_enable="true">
+            <efxpt:axi_target1 is_axi_width_256="false" is_axi_enable="false">
                 <efxpt:gen_pin_axi>
-                    <efxpt:pin name="axi0_ACLK" type_name="ACLK_1" is_bus="false" is_clk="true" is_clk_invert="false"/>
-                    <efxpt:pin name="axi1_ARAPCMD" type_name="ARAPCMD_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_ARREADY" type_name="ARREADY_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_ARVALID" type_name="ARVALID_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_ARQOS" type_name="ARQOS_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWAPCMD" type_name="AWAPCMD_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWALLSTRB" type_name="AWALLSTRB_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWCOBUF" type_name="AWCOBUF_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWREADY" type_name="AWREADY_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWVALID" type_name="AWVALID_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWLOCK" type_name="AWLOCK_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWQOS" type_name="AWQOS_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_BREADY" type_name="BREADY_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_BVALID" type_name="BVALID_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_RLAST" type_name="RLAST_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_RREADY" type_name="RREADY_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_RVALID" type_name="RVALID_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_WLAST" type_name="WLAST_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_WREADY" type_name="WREADY_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_WVALID" type_name="WVALID_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_ARADDR" type_name="ARADDR_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARBURST" type_name="ARBURST_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARID" type_name="ARID_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARLEN" type_name="ARLEN_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARSIZE" type_name="ARSIZE_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARLOCK" type_name="ARLOCK_1" is_bus="false"/>
-                    <efxpt:pin name="axi1_AWADDR" type_name="AWADDR_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_AWBURST" type_name="AWBURST_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_AWID" type_name="AWID_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_AWLEN" type_name="AWLEN_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_AWSIZE" type_name="AWSIZE_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_AWCACHE" type_name="AWCACHE_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_BID" type_name="BID_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_BRESP" type_name="BRESP_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_RDATA" type_name="RDATA_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_RID" type_name="RID_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_RRESP" type_name="RRESP_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_WDATA" type_name="WDATA_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_WSTRB" type_name="WSTRB_1" is_bus="true"/>
-                    <efxpt:pin name="axi1_ARESETn" type_name="ARSTN_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="ACLK_1" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ARAPCMD_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="ARREADY_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="ARVALID_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="ARQOS_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWAPCMD_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWALLSTRB_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWCOBUF_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWREADY_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWVALID_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWLOCK_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWQOS_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="BREADY_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="BVALID_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="RLAST_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="RREADY_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="RVALID_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="WLAST_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="WREADY_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="WVALID_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="ARADDR_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARBURST_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARID_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARLEN_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARSIZE_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARLOCK_1" is_bus="false"/>
+                    <efxpt:pin name="" type_name="AWADDR_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="AWBURST_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="AWID_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="AWLEN_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="AWSIZE_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="AWCACHE_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="BID_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="BRESP_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="RDATA_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="RID_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="RRESP_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="WDATA_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="WSTRB_1" is_bus="true"/>
+                    <efxpt:pin name="" type_name="ARSTN_1" is_bus="false"/>
                 </efxpt:gen_pin_axi>
             </efxpt:axi_target1>
             <efxpt:gen_pin_controller>
@@ -1043,5 +1077,200 @@
             </efxpt:tx_info>
         </efxpt:mipi_dphy>
     </efxpt:mipi_dphy_info>
-    <efxpt:soc_info/>
+    <efxpt:soc_info>
+        <efxpt:soc name="qcrv32_inst1" block_def="SOC_0">
+            <efxpt:gen_param>
+                <efxpt:param name="AXI_MASTER_EN" value="false" value_type="bool"/>
+                <efxpt:param name="AXI_SLAVE_EN" value="true" value_type="bool"/>
+                <efxpt:param name="CUSTOM_INSTRUCTION_0_EN" value="false" value_type="bool"/>
+                <efxpt:param name="CUSTOM_INSTRUCTION_1_EN" value="false" value_type="bool"/>
+                <efxpt:param name="CUSTOM_INSTRUCTION_2_EN" value="false" value_type="bool"/>
+                <efxpt:param name="CUSTOM_INSTRUCTION_3_EN" value="false" value_type="bool"/>
+                <efxpt:param name="JTAG_TYPE" value="FPGA" value_type="str"/>
+                <efxpt:param name="MEM_CLK_SOURCE" value="Clock 1" value_type="str"/>
+                <efxpt:param name="OCR_FILE_PATH" value="" value_type="str"/>
+                <efxpt:param name="PIPELINE_SOC_AXI_MEM_INTERFACE_EN" value="false" value_type="bool"/>
+                <efxpt:param name="SYS_CLK_SOURCE" value="Clock 1" value_type="str"/>
+                <efxpt:param name="WRITEBUFFER_SOC_AXI_INTERFACE_EN" value="false" value_type="bool"/>
+            </efxpt:gen_param>
+            <efxpt:gen_pin>
+                <efxpt:pin name="axiAInterrupt" type_name="AXIAINTERRUPT" is_bus="false"/>
+                <efxpt:pin name="axiA_araddr" type_name="AXIA_ARADDR" is_bus="true"/>
+                <efxpt:pin name="axiA_arburst" type_name="AXIA_ARBURST" is_bus="true"/>
+                <efxpt:pin name="axiA_arcache" type_name="AXIA_ARCACHE" is_bus="true"/>
+                <efxpt:pin name="axiA_arlen" type_name="AXIA_ARLEN" is_bus="true"/>
+                <efxpt:pin name="axiA_arlock" type_name="AXIA_ARLOCK" is_bus="false"/>
+                <efxpt:pin name="axiA_arprot" type_name="AXIA_ARPROT" is_bus="true"/>
+                <efxpt:pin name="axiA_arqos" type_name="AXIA_ARQOS" is_bus="true"/>
+                <efxpt:pin name="axiA_arready" type_name="AXIA_ARREADY" is_bus="false"/>
+                <efxpt:pin name="axiA_arregion" type_name="AXIA_ARREGION" is_bus="true"/>
+                <efxpt:pin name="axiA_arsize" type_name="AXIA_ARSIZE" is_bus="true"/>
+                <efxpt:pin name="axiA_arvalid" type_name="AXIA_ARVALID" is_bus="false"/>
+                <efxpt:pin name="axiA_awaddr" type_name="AXIA_AWADDR" is_bus="true"/>
+                <efxpt:pin name="axiA_awburst" type_name="AXIA_AWBURST" is_bus="true"/>
+                <efxpt:pin name="axiA_awcache" type_name="AXIA_AWCACHE" is_bus="true"/>
+                <efxpt:pin name="axiA_awlen" type_name="AXIA_AWLEN" is_bus="true"/>
+                <efxpt:pin name="axiA_awlock" type_name="AXIA_AWLOCK" is_bus="false"/>
+                <efxpt:pin name="axiA_awprot" type_name="AXIA_AWPROT" is_bus="true"/>
+                <efxpt:pin name="axiA_awqos" type_name="AXIA_AWQOS" is_bus="true"/>
+                <efxpt:pin name="axiA_awready" type_name="AXIA_AWREADY" is_bus="false"/>
+                <efxpt:pin name="axiA_awregion" type_name="AXIA_AWREGION" is_bus="true"/>
+                <efxpt:pin name="axiA_awsize" type_name="AXIA_AWSIZE" is_bus="true"/>
+                <efxpt:pin name="axiA_awvalid" type_name="AXIA_AWVALID" is_bus="false"/>
+                <efxpt:pin name="axiA_bready" type_name="AXIA_BREADY" is_bus="false"/>
+                <efxpt:pin name="axiA_bresp" type_name="AXIA_BRESP" is_bus="true"/>
+                <efxpt:pin name="axiA_bvalid" type_name="AXIA_BVALID" is_bus="false"/>
+                <efxpt:pin name="axiA_rdata" type_name="AXIA_RDATA" is_bus="true"/>
+                <efxpt:pin name="axiA_rlast" type_name="AXIA_RLAST" is_bus="false"/>
+                <efxpt:pin name="axiA_rready" type_name="AXIA_RREADY" is_bus="false"/>
+                <efxpt:pin name="axiA_rresp" type_name="AXIA_RRESP" is_bus="true"/>
+                <efxpt:pin name="axiA_rvalid" type_name="AXIA_RVALID" is_bus="false"/>
+                <efxpt:pin name="axiA_wdata" type_name="AXIA_WDATA" is_bus="true"/>
+                <efxpt:pin name="axiA_wlast" type_name="AXIA_WLAST" is_bus="false"/>
+                <efxpt:pin name="axiA_wready" type_name="AXIA_WREADY" is_bus="false"/>
+                <efxpt:pin name="axiA_wstrb" type_name="AXIA_WSTRB" is_bus="true"/>
+                <efxpt:pin name="axiA_wvalid" type_name="AXIA_WVALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_CMD_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_CMD_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_FUNCTION_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_INPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_INPUTS_1" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_OUTPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_RSP_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU0_CUSTOMINSTRUCTION_RSP_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_CMD_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_CMD_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_FUNCTION_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_INPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_INPUTS_1" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_OUTPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_RSP_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU1_CUSTOMINSTRUCTION_RSP_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_CMD_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_CMD_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_FUNCTION_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_INPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_INPUTS_1" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_OUTPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_RSP_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU2_CUSTOMINSTRUCTION_RSP_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_CMD_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_CMD_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_FUNCTION_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_INPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_INPUTS_1" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_OUTPUTS_0" is_bus="true"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_RSP_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="CPU3_CUSTOMINSTRUCTION_RSP_VALID" is_bus="false"/>
+                <efxpt:pin name="io_asyncReset" type_name="IO_ASYNCRESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_CFUCLK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="IO_CFURESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_ADDR" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_BURST" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_CACHE" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_LEN" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_LOCK" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_PROT" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_QOS" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_REGION" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_PAYLOAD_SIZE" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AR_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_ADDR" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_ALLSTRB" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_BURST" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_CACHE" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_LEN" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_LOCK" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_PROT" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_QOS" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_REGION" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_PAYLOAD_SIZE" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_AW_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_B_PAYLOAD_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_B_PAYLOAD_RESP" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_B_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_B_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_CLK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_RESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_PAYLOAD_DATA" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_PAYLOAD_ID" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_PAYLOAD_LAST" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_PAYLOAD_RESP" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_R_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_W_PAYLOAD_DATA" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_W_PAYLOAD_LAST" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_W_PAYLOAD_STRB" is_bus="true"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_W_READY" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_DDRMASTERS_0_W_VALID" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_JTAG_TCK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="IO_JTAG_TDI" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_JTAG_TDO" is_bus="false"/>
+                <efxpt:pin name="" type_name="IO_JTAG_TMS" is_bus="false"/>
+                <efxpt:pin name="axi0_ACLK" type_name="IO_PERIPHERALCLK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="io_peripheralReset" type_name="IO_PERIPHERALRESET" is_bus="false"/>
+                <efxpt:pin name="io_systemReset" type_name="IO_SYSTEMRESET" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_capture" type_name="JTAGCTRL_CAPTURE" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_enable" type_name="JTAGCTRL_ENABLE" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_reset" type_name="JTAGCTRL_RESET" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_shift" type_name="JTAGCTRL_SHIFT" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_tck" type_name="JTAGCTRL_TCK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="jtagCtrl_tdi" type_name="JTAGCTRL_TDI" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_tdo" type_name="JTAGCTRL_TDO" is_bus="false"/>
+                <efxpt:pin name="jtagCtrl_update" type_name="JTAGCTRL_UPDATE" is_bus="false"/>
+                <efxpt:pin name="" type_name="MEM_SHUTDOWN" is_bus="false"/>
+                <efxpt:pin name="" type_name="TEST_PCR_CLK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="T_ATPG_NMBIST" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_COMP_EN" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_COMP_MASK_EN" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_COMP_MASK_LD" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_DFT_CLOCK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="T_LOS_EN" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_OPCG_ENABLE" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_OPCG_LOAD" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_OPCG_TRIGGER" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_DONE" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_FAIL" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_RESET" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_TCK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_TDI" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_PMDA_TDO" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_RSTN" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_SCANIN" is_bus="true"/>
+                <efxpt:pin name="" type_name="T_SCANOUT" is_bus="true"/>
+                <efxpt:pin name="" type_name="T_SCK" is_bus="false" is_clk="true" is_clk_invert="false"/>
+                <efxpt:pin name="" type_name="T_SE" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_SE_CG" is_bus="false"/>
+                <efxpt:pin name="" type_name="T_TM" is_bus="false"/>
+                <efxpt:pin name="userInterruptA" type_name="USERINTERRUPTA" is_bus="false"/>
+                <efxpt:pin name="userInterruptB" type_name="USERINTERRUPTB" is_bus="false"/>
+                <efxpt:pin name="userInterruptC" type_name="USERINTERRUPTC" is_bus="false"/>
+                <efxpt:pin name="userInterruptD" type_name="USERINTERRUPTD" is_bus="false"/>
+                <efxpt:pin name="userInterruptE" type_name="USERINTERRUPTE" is_bus="false"/>
+                <efxpt:pin name="userInterruptF" type_name="USERINTERRUPTF" is_bus="false"/>
+                <efxpt:pin name="userInterruptG" type_name="USERINTERRUPTG" is_bus="false"/>
+                <efxpt:pin name="userInterruptH" type_name="USERINTERRUPTH" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTI" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTJ" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTK" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTL" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTM" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTN" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTO" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTP" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTQ" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTR" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTS" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTT" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTU" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTV" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTW" is_bus="false"/>
+                <efxpt:pin name="" type_name="USERINTERRUPTX" is_bus="false"/>
+            </efxpt:gen_pin>
+        </efxpt:soc>
+    </efxpt:soc_info>
 </efxpt:design_db>
