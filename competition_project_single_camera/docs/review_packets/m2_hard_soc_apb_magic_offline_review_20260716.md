@@ -4,7 +4,7 @@
 > 分支：`codex/hard-soc-apb-magic-20260716`
 > 基线：`db94aa4a38a02c2ea3a738cf9d209f193b4b7526`
 > 工具：Efinity `2025.2.288.4.15`
-> 当前裁定：APB0 `REG_MAGIC` 离线实现及 Map/Interface/PNR/STA/CDC/bitstream generation 已通过；新 bitstream 尚未上板，APB 实读为 `NOT VERIFIED`。
+> 当前裁定：APB0 `REG_MAGIC` 离线实现及 Map/Interface/PNR/STA/CDC/bitstream generation 已通过；匹配 bitstream 已临时加载 FPGA SRAM，HDMI 与 CDONE 通过；USER2/CPU/UART0 和 APB 实读仍为 `NOT VERIFIED`。
 
 ## 1. 任务与安全边界
 
@@ -109,7 +109,7 @@ size: 11847132 bytes
 SHA-256: 138F435C7F2B6CA2EDA2605CABCBA1C44D3C0BD6E3A7AE1D54D244DA12277D15
 ```
 
-该文件只存在于本地忽略的 `outflow/`，不提交 Git。没有执行 JTAG SRAM 下载或 Flash program。
+该文件只存在于本地忽略的 `outflow/`，不提交 Git。2026-07-16 已通过官方 JTAG programmer 临时加载到 FPGA SRAM，未执行 Flash program。
 
 ### 5.4 UART0 Hello 回归
 
@@ -128,16 +128,25 @@ ELF 为本地构建产物，不提交。
 
 `tests/apb_reg_magic/tb_apb_reg_magic.v` 覆盖空闲、SETUP、合法读、非法写和非法偏移。当前机器未安装 Icarus、Verilator、ModelSim/Questa，因此 testbench 状态为 `NOT RUN`，不得表述为仿真 PASS。Map 已确认 `apb_reg_magic` 与官方 AXI/BMB-to-APB bridge 实际展开，但 Map 不替代协议行为仿真或 CPU 板级实读。
 
-## 6. 未验证项与下一门
+## 6. 板级增量与下一门
+
+2026-07-16 对匹配 `138F435C...` 批次完成：
+
+- 开发板完全断电后冷启动。
+- JTAG 链检测到 1 个 TJ375，IDCODE `0x006A0EF3`。
+- 官方 programmer 以 3 MHz 完成 FPGA SRAM 临时加载。
+- 用户确认真实摄像头 HDMI 正常。
+- 用户确认 CDONE 点亮。
+- 未写 Flash，未使用 USER1，未初始化外部 DDR，未连接 UART2/J52 或机械臂。
+
+因此 `JTAG SRAM LOAD / HDMI / CDONE = PASS`。
 
 以下全部为 `NOT VERIFIED`：
 
-- 新 `138F435C...` bitstream 的 JTAG SRAM 加载
-- 冷启动后的真实摄像头 HDMI
 - USER2、NDMRESET、4 hart 识别和 CPU 实际取指
 - 片上 RAM UART0 Hello 横幅与单字符回显
 - CPU 读取 `0xE8100000` 得到 `0x375A0001`
 - 非法 APB 写/偏移的 CPU 侧异常表现
 - feature snapshot、CPU 分类、OSD、按键、UART2/J52 和机械臂
 
-下一板级门必须再次审核。批准后只允许按以下顺序执行：匹配 bitstream 冷启动 JTAG SRAM 临时加载 -> HDMI 回归 -> USER2 + NDMRESET + 片上 RAM UART0 Hello/回显 -> 单次只读 `0xE8100000`。任一步失败立即停止，不扩大到 feature/OSD/UART2/J52/myCobot；继续禁止 Flash、USER1 和外部 DDR 初始化。
+下一步只允许按以下顺序执行：USER2 + NDMRESET + 片上 RAM UART0 Hello/回显 -> 单次只读 `0xE8100000`。任一步失败立即停止，不扩大到 feature/OSD/UART2/J52/myCobot；继续禁止 Flash、USER1 和外部 DDR初始化。

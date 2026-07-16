@@ -27,17 +27,18 @@
 
 ## 活跃状态与路线覆盖项
 
-- 日期：2026-07-16，来源 Agent：Codex / 用户 Efinity GUI 操作确认（单摄 Hard SoC APB0 `REG_MAGIC` 隔离离线批次）
-  - 适用范围：分支 `codex/hard-soc-apb-magic-20260716` 的 `competition_project_single_camera/`；不替代 `final_project/` 正式主线，也不表示新 bitstream 已上板或 CPU 已实读 APB。
+- 日期：2026-07-16，来源 Agent：Codex / 用户 Efinity GUI 与板级现象确认（单摄 Hard SoC APB0 `REG_MAGIC` 批次）
+  - 适用范围：分支 `codex/hard-soc-apb-magic-20260716` 的 `competition_project_single_camera/`；不替代 `final_project/` 正式主线，也不表示 CPU 已实读 APB。
   - 最新结论：使用 Efinity 2025.2 IP Manager 在现有 `EfxSapphireHpSoc_slb` 中启用 APB3 interface 0，窗口为 4 KiB，其余 APB1-4、USER2、UART0、PLL、DDR 和 AXI 配置保持原值；生成 BSP 固定 `IO_APB_SLAVE_0_INPUT=0xE8100000`、大小 4096。新增无状态只读 `apb_reg_magic`，偏移 `0x000` 返回 `0x375A0001`，写访问或其他偏移在 APB access phase 以 `PSLVERROR=1` fail closed，`PREADY=1`。顶层仅使用窗口内 `PADDR[11:0]`，未接收无语义的 `PWDATA`。
-  - 离线 Gate：Efinity `2025.2.288.4.15` Map、Interface、PNR、STA、CDC 和 PGM/bitstream generation 均 PASS；Interface 为 `0 error / 4` 个既有 MIPI/LVDS 距离 warning；post-synthesis netlist 仍为 118 个 warning。最差 Setup/Hold 为 `+1.321ns/+0.026ns`，CDC 原文为 `No Synchronizer warnings to report.`。新 bitstream SHA-256 为 `138F435C7F2B6CA2EDA2605CABCBA1C44D3C0BD6E3A7AE1D54D244DA12277D15`，大小 11847132 bytes，仅保存在本地忽略的 `outflow/`，未提交、未下载、未烧录。
+  - 离线 Gate：Efinity `2025.2.288.4.15` Map、Interface、PNR、STA、CDC 和 PGM/bitstream generation 均 PASS；Interface 为 `0 error / 4` 个既有 MIPI/LVDS 距离 warning；post-synthesis netlist 仍为 118 个 warning。最差 Setup/Hold 为 `+1.321ns/+0.026ns`，CDC 原文为 `No Synchronizer warnings to report.`。新 bitstream SHA-256 为 `138F435C7F2B6CA2EDA2605CABCBA1C44D3C0BD6E3A7AE1D54D244DA12277D15`，大小 11847132 bytes，仅保存在本地忽略的 `outflow/`，未提交。
   - 资源增量：相对已板测 `6B6728...` 对应精确 main 基线，`EFX_ADD 2065->2065`、`EFX_LUT4 11204->11385`、`EFX_FF 9957->10104`、`EFX_RAM10 165->165`、`EFX_DPRAM10 4->4`，即 APB0 + `REG_MAGIC` 增量为 `LUT4 +181 / FF +147`，其余三项不变。
   - warning 裁定：官方生成外层端口为 32 位而内部 4 KiB APB0 端口为 12 位，产生 1 条 `io_apbSlave_0_PADDR` 32->12 warning；生成源码、BSP 窗口和顶层低 12 位译码一致，因此裁定为官方生成边界的确定性截断，不手改生成 RTL。自定义从机移除未使用 `PWDATA` 后，原 32 条 `pwdata[x]` 冗余 warning 已消失。该裁定不等于所有继承 warning 可忽略。
   - CPU 回归：原 UART0 Hello 以新生成最小 BSP 重建 PASS，2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段 `0xF9000000..0xF9000A30`，`ELF_LOAD_AUDIT=PASS`；本地 ELF SHA-256 为 `67A1AE3CFB7D8388CD3C8D14906FBF6F4128EF2722AEC0A8BF145F27C6050B26`，未提交。APB 行为 testbench 已保存，但本机无 Icarus/Verilator/ModelSim，保持 `NOT RUN`，不得写成仿真 PASS。
-  - 替代旧结论：不改变 `M2-38` 对已板测 `6B6728...` 的 `APB0/REG_MAGIC = ABSENT` 裁定；仅覆盖其“下一门尚未实施”的状态。新 `138F435C...` 批次已完成离线实现，但与 `6B6728...` 是不同 bitstream，不能继承后者的 HDMI、USER2、CPU、UART0 或板级稳定性证据。
-  - 证据路径：`competition_project_single_camera/docs/review_packets/m2_hard_soc_apb_magic_offline_review_20260716.md`、`competition_project_single_camera/WORK_LOG.md` M2-39、`competition_project_single_camera/src/apb_reg_magic.v`、`competition_project_single_camera/src/top.v`、`competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json`、`competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.h`。
-  - NOT VERIFIED：新 bitstream 的 JTAG SRAM 加载、冷启动 HDMI、USER2/NDMRESET、片上 RAM Hello、UART0 横幅/回显，以及 CPU 对 `0xE8100000` 的 `REG_MAGIC` 实读全部未验证。feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 和机械臂均未进入本批次。
-  - 下一门：再次经用户审核批准后，才允许对匹配 `138F435C...` 批次执行冷启动、JTAG SRAM 临时加载、HDMI 回归、USER2 + 片上 RAM Hello/UART0 回归，最后只读一次 `0xE8100000` 并核对 `0x375A0001`。继续禁止 Flash、USER1、外部 DDR 初始化、UART2/J52、机械臂接线或动作。
+  - 板级 Gate（部分通过）：开发板完全断电冷启动后，使用官方 JTAG programmer 以 3 MHz 将匹配 `138F435C...` bitstream 临时加载到 FPGA SRAM并成功完成；未写 Flash。用户确认真实摄像头 HDMI 画面正常且 CDONE 点亮。因此当前批次为 `JTAG SRAM LOAD / HDMI / CDONE = PASS`。这些结果只属于 `138F435C...`，不能由旧批次代替。
+  - 替代旧结论：不改变 `M2-38` 对已板测 `6B6728...` 的 `APB0/REG_MAGIC = ABSENT` 裁定；覆盖本条先前“新 bitstream 未下载、冷启动 HDMI 未验证”的状态。新 `138F435C...` 与 `6B6728...` 是不同 bitstream，仍不能继承后者的 USER2、CPU 或 UART0 证据。
+  - 证据路径：`competition_project_single_camera/docs/review_packets/m2_hard_soc_apb_magic_offline_review_20260716.md`、`competition_project_single_camera/docs/debug_sessions/hard_soc_board_config.md`、`competition_project_single_camera/WORK_LOG.md` M2-39 至 M2-40、`competition_project_single_camera/src/apb_reg_magic.v`、`competition_project_single_camera/src/top.v`、`competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json`、`competition_project_single_camera/embedded_sw/efx_hard_soc/bsp/efinix/EfxSapphireSoc/include/soc.h`。
+  - NOT VERIFIED：当前 `138F435C...` 的 USER2/NDMRESET、4 hart、CPU 实际取指、片上 RAM Hello、UART0 横幅/回显，以及 CPU 对 `0xE8100000` 的 `REG_MAGIC` 实读仍未验证。feature snapshot、CPU 分类主循环、OSD、按键、UART2/J52 和机械臂均未进入本批次。
+  - 下一门：使用匹配 Hello ELF `67A1AE3C...`，仅通过 USER2 执行 NDMRESET、4 hart 独立控制和片上 RAM UART0 横幅/回显；全部通过后只读一次 `0xE8100000` 并核对 `0x375A0001`。继续禁止 Flash、USER1、外部 DDR 初始化、UART2/J52、机械臂接线或动作。
   - 失效条件：Hard SoC 生成参数、wrapper/BSP、APB RTL、顶层连接、工程 XML、时钟复位、bitstream、Efinity 版本或任一离线/板级结果发生变化。
 
 - 日期：2026-07-16，来源 Agent：Codex / 用户现场确认（来源与精确 main 重建 Hard SoC bitstream 的 USER2 + 片上 RAM + UART0 Hello 板级 Gate）

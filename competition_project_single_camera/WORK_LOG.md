@@ -1380,3 +1380,15 @@ git diff --check
 - 结果：`OFFLINE APB0/REG_MAGIC IMPLEMENTATION + MAP/INTERFACE/PNR/STA/CDC/BITSTREAM = PASS`；`NEW BITSTREAM BOARD / APB READ = NOT VERIFIED`。
 - Review Packet：`docs/review_packets/m2_hard_soc_apb_magic_offline_review_20260716.md`。
 - 下一步门禁：再次经用户审核后，只允许匹配新 bitstream 的冷启动 + JTAG SRAM 临时加载 + HDMI + USER2/片上 RAM UART0 回归，全部通过后再单次只读 `0xE8100000`。禁止 Flash、USER1、外部 DDR、UART2/J52、机械臂和 feature/OSD 扩展。
+
+### [M2-40] APB0 REG_MAGIC 匹配 bitstream 的 FPGA SRAM 与 HDMI 板级回归
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 证据批次：APB0/REG_MAGIC bitstream SHA-256 `138F435C7F2B6CA2EDA2605CABCBA1C44D3C0BD6E3A7AE1D54D244DA12277D15`，大小 11847132 bytes；与 M2-39 离线构建批次一致。
+- 冷启动：开发板完全断电后重新上电，避免带电重配导致的 DDR 横带花屏残留。
+- JTAG 链：检测到 1 个 TJ375，IDCODE `0x006A0EF3`；使用官方 programmer 以 3 MHz 将 bitstream 临时加载到 FPGA SRAM，工具报告 JTAG programming 完成。
+- 安全边界：未写 Flash，未执行 Flash erase/program，未使用 USER1，未初始化或访问外部 DDR，未连接 UART2/J52 或机械臂。
+- 板级现象：用户确认真实摄像头 HDMI 画面正常，CDONE 点亮。
+- 结果：`138F435C... JTAG SRAM LOAD / HDMI / CDONE = PASS`。
+- NOT VERIFIED：当前 `138F435C...` 的 USER2、NDMRESET、4 hart、CPU0 取指、片上 RAM UART0 Hello/回显和 `0xE8100000 -> 0x375A0001` 实读仍未验证。
+- 下一步：只允许使用匹配 Hello ELF `67A1AE3C...`，按独立 4 hart + NDMRESET 路径完成 UART0 Gate；通过后才进行一次 `REG_MAGIC` 只读。
