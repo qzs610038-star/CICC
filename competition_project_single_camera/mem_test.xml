@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<efx:project name="mem_test" description="" last_change="1783949094" sw_version="2025.2.288.4.15" last_run_state="pass" last_run_flow="bitstream" config_result_in_sync="true" design_ood="sync" place_ood="sync" route_ood="sync" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
+<efx:project name="mem_test" description="" last_change="1784123462" sw_version="2025.2.288.4.15" last_run_state="pass" last_run_flow="bitstream" config_result_in_sync="true" design_ood="sync" place_ood="sync" route_ood="sync" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
     <efx:device_info>
         <efx:family name="Titanium"/>
         <efx:device name="TJ375N529"/>
@@ -77,6 +77,9 @@
         <efx:ip instance_name="dsi_tx" path="ip/dsi_tx/settings.json" ooc="false">
             <efx:ip_src_file name="dsi_tx.sv"/>
         </efx:ip>
+        <efx:ip instance_name="EfxSapphireHpSoc_slb" path="ip/EfxSapphireHpSoc_slb/settings.json" ooc="false">
+            <efx:ip_src_file name="EfxSapphireHpSoc_slb.v"/>
+        </efx:ip>
     </efx:ip_info>
     <efx:synthesis tool_name="efx_map">
         <efx:param name="work_dir" value="work_syn" value_type="e_string"/>
@@ -122,6 +125,7 @@
         <efx:param name="suppress_warning_msgs" value="off" value_type="e_bool"/>
         <efx:param name="include" value="ip/csi_rx_controller" value_type="e_string"/>
         <efx:param name="include" value="ip/dsi_tx" value_type="e_string"/>
+        <efx:param name="include" value="ip/EfxSapphireHpSoc_slb" value_type="e_string"/>
     </efx:synthesis>
     <efx:place_and_route tool_name="efx_pnr">
         <efx:param name="work_dir" value="work_pnr" value_type="e_string"/>
@@ -158,7 +162,7 @@
     </efx:bitstream_generation>
     <efx:debugger>
         <efx:param name="work_dir" value="work_dbg" value_type="e_string"/>
-        <efx:param name="auto_instantiation" value="on" value_type="e_bool"/>
+        <efx:param name="auto_instantiation" value="off" value_type="e_bool"/>
         <efx:param name="profile" value="debug_profile.wizard.json" value_type="e_string"/>
     </efx:debugger>
     <efx:security>

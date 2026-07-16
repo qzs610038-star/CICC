@@ -15,8 +15,11 @@ description: Handles SoC RISC-V CPU firmware, UART registers, myCobot 280 serial
    - 第一阶段：只做环境检查、COM 口枚举、文档核对、只读状态读取方案。
    - 第二阶段：用户明确确认机械臂已固定、姿态安全、急停/断电方式明确后，才允许 RGB 灯板、读角度或极小幅动作测试。
    - 第三阶段：再讨论板上 CPU 通过 FPGA UART/GPIO 与机械臂控制器的协议桥接。未确认电平、接线和协议前，不把 FPGA 管脚直接接入机械臂控制线。
-4. **波特率**：myCobot 280 串口控制固定 `1000000`；开发板 Type-C UART、JTAG-IF UART、UART2 波特率须按对应固件/RTL 另行确认。
+4. **波特率分层**：单摄 Hard SoC 的最小 UART0 Hello 固定按其固件 `115200` 验证；myCobot 280 正式串口控制固定 `1000000`。两者不是同一串口 Gate，禁止因 UART0 Hello 通过而推断 UART2/myCobot 链路可用。
 5. **PC 仅开发期**：`pymycobot`、myBlockly、PC 只用于调试/标定/日志，不进正式识别控制闭环（见 `mycobot_pc_tests/` 归档说明）。
 6. **动作类修改触发 Codex Gate**：涉及实际动作、夹爪、快速移动、FPGA-to-机械臂接线、CP210x 驱动安装或 `pymycobot` 控制脚本时，必须生成 Codex Review Packet。
 7. **唯一响应与防重复触发**：稳定识别结果只允许锁存一次本轮事务；同一物体不得因连续视频帧重复触发抓取。非目标物必须明确输出不动作及理由，目标物才可在安全门满足后请求控制器动作。
 8. **目标不等于状态**：host/mock 测试通过不等于 SoC、UART、OSD 或机械臂实机闭环；完成度必须回查 `CURRENT_STATE.md` 和对应板级证据。
+9. **当前 SoC 最小启动门**：`competition_project_single_camera/cpu_bringup/uart_hello_onchip/` 已能以提交的最小 BSP 构建，入口和唯一 LOAD 段位于 `0xF9000000` 的 16 KiB 片上 RAM；这只证明 ELF 版图审计，不证明 CPU 已执行。
+10. **板上验证顺序**：匹配新 bitstream -> FPGA `USER2` -> 仅下载片上 RAM -> UART0 115200 横幅 -> 单字符回显。禁止 `USER1`、Flash erase/program、外部 DDR 初始化。USER2/横幅/回显未通过前，不进入 feature snapshot、OSD、按键、UART2 或 myCobot。
+11. **机械隔离继续有效**：CPU Hello 阶段不得连接机械臂，不得发送任何 myCobot 帧；只有 CPU 执行和 UART0 基础链路形成独立证据后，才评审 UART2/J52 电气与只读协议门。

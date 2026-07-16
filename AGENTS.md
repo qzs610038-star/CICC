@@ -4,7 +4,7 @@
 本仓库是第十届集创赛雄芯院方向的 TJ375N529/Efinity FPGA 资料包和分赛区决赛开发工程。赛方原始资料主要位于 `赛方提供材料/`，正式协作开发主线位于 `final_project/`。
 
 - `final_project/`：分赛区决赛正式开发工程，包含 FPGA RTL/Efinity 工程、板上 CPU 程序、接口契约、测试和文档。
-- `competition_project_single_camera/`：隔离的单摄候选 Efinity 工程。它保留已知可运行 Demo 的白名单源码和 M0 证据；在 `CURRENT_STATE.md` 记录的新构建、匹配 bitstream、烧录与板级复现门通过前，不替代 `final_project/` 的正式主线身份。
+- `competition_project_single_camera/`：隔离的单摄候选 Efinity 工程。当前已提交 Hard SoC 可复现输入、最小 BSP/UART0 Hello 和完整 FPGA 工程真源，并由 Codex 在 Efinity 2025.2 下重新通过 Map/PNR/STA/CDC；新生成 bitstream 尚未板测，USER2/片上 RAM/UART0 仍为 `NOT VERIFIED`。它在板级 Gate 关闭前不替代 `final_project/` 的正式主线身份。
 - `硬件文档/`：开发板说明、管脚定义、硬件框图及 TJ375 相关技术文档。
 - `EDA软件/` 与 `EDA软件培训文档及视频/`：Efinity 安装说明、培训 PDF 和视频。
 - `例程/`：赛方示例工程，包括 `RISC-V例程/` 压缩包和 `2ChMIPICSI_2ChMIPIDSI_Demo_Test/`。
@@ -17,7 +17,7 @@
 ## Codebase Knowledge Graph
 本项目已初始化 codebase-memory-mcp 图谱。Agent 做代码发现时应先使用图谱缩小范围，再回到真实文件核查。
 
-- 默认项目：`D-cicc_cbm-main`（2026-07-14 双分支合并后完整重建，6078 nodes；精确边数以 `.codebase-memory/artifact.json` 为准）
+- 默认项目：`D-cicc_cbm-main`（最后一次完整重建为 2026-07-14，6078 nodes；精确边数以 `.codebase-memory/artifact.json` 为准）。2026-07-16 新合入的单摄 Hard SoC/IP/BSP 尚未声明已进入该图谱；查询不到时直接核查真实文件，不得据此判定源码缺失。
 - 兼容别名：`D-cicc_cbm_link` 是旧缓存项目，仅用于历史查询；它缺少本次 `arm_runtime` 和单摄候选符号，不再作为当前图谱真源。
 - 默认入口：`D:\cicc_cbm_link` junction 指向本仓库真实路径。
 - 主图谱 artifact：`.codebase-memory/graph.db.zst`
@@ -47,6 +47,13 @@
 - 不得直接迁移初赛识别 RTL、`DEMO_MODE`、临时脚本、硬编码路径或旧 `outflow` 结论。
 - 初赛 README、Work_Log、修正方案、源码和构建日志存在版本差异；引用参数前必须以真实源码、最新构建日志和上板现象交叉确认。
 
+### 单摄 Hard SoC 当前安全门（2026-07-16）
+
+- 仓库真源已具备：`competition_project_single_camera/mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`ip/EfxSapphireHpSoc_slb/`、`embedded_sw/efx_hard_soc/` 与 `cpu_bringup/uart_hello_onchip/`。不得继续沿用“Hard SoC 源码未同步”的旧结论。
+- 当前离线门已通过：Efinity 2025.2 Map/Interface/PNR/bitstream、Setup/Hold `+1.742ns/+0.018ns`、CDC 无 synchronizer warning；UART0 Hello 为 2608 B，入口与唯一 LOAD 段位于 `0xF9000000` 片上 RAM。详细证据以 `CURRENT_STATE.md` 和 `competition_project_single_camera/docs/review_packets/m2_hard_soc_source_sync_review_20260716.md` 为准。
+- 当前板级门未通过：新构建 bitstream 未上板；`JTAG_USER2`、CPU 实际取指、UART0 115200 bps 横幅与回显均为 `NOT VERIFIED`。来源副本的历史 J48/ch0 视频和旧 bitstream 哈希不能冒充新构建板测结果。
+- 下一步只允许做隔离 CPU Hello：使用 FPGA `USER2`，仅下载到 `0xF9000000` 片上 RAM；禁止 `USER1`、Flash 擦写、外部 DDR 初始化、UART2/J52、机械臂接线或动作。Hello 通过后再单独申请扩大联调范围。
+
 ## 官方分赛区决赛细则（核心目标与约束）
 
 最新官方细则的仓库内可检索版本是 `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`，原始证据是 `赛方提供材料/第十届集创赛分赛区决赛“雄芯院”企业命题比赛细则-0710新.pdf`。所有 Agent 在规划任务、设计接口、定义验收和判断优先级前必须先读该 Markdown；疑义回到原 PDF 和现场企业专家口径。
@@ -64,7 +71,7 @@
 项目对照差距和建议验收顺序见 `final_project/docs/competition_manual/细则对照项目优化建议_20260712.md`。该建议文件可随工程事实更新，但不得改写官方条款。
 
 ## 构建、测试与开发命令
-仓库根目录没有统一的包管理器、Makefile 或自动化构建脚本。正式工程优先使用 `final_project/`；`competition_project_single_camera/` 仅按其 M0 Gate 做候选工程复现；赛方主 demo 只作为来源参考和必要时的对照工程。FPGA 构建以 Efinity 2025.2 为准。
+仓库根目录没有统一的包管理器、Makefile 或自动化构建脚本。正式工程优先使用 `final_project/`；`competition_project_single_camera/` 仅按 `CURRENT_STATE.md` 的单摄 Hard SoC/板级 Gate 做候选工程复现；赛方主 demo 只作为来源参考和必要时的对照工程。FPGA 构建以 Efinity 2025.2 为准。
 
 ```powershell
 codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm-main`"}"
@@ -72,9 +79,12 @@ Invoke-Item "final_project\fpga\efinity\mem_test.xml"
 rg --files "final_project\fpga\rtl"
 Set-Location "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\ip\ram\Testbench"
 vsim -do modelsim.do
+
+Set-Location "competition_project_single_camera\cpu_bringup\uart_hello_onchip"
+.\build.ps1 -ToolchainRoot $env:EFINITY_RISCV_IDE
 ```
 
-第一条命令用于确认 CBM 主图谱可用；第二条打开正式 Efinity 工程；第三条快速清点正式 RTL；后两条在已安装 ModelSim/Questa 时运行赛方 RAM IP 对照仿真。
+第一条命令用于确认 CBM 主图谱可用；第二条打开正式 Efinity 工程；第三条快速清点正式 RTL；第四、五条在已安装 ModelSim/Questa 时运行赛方 RAM IP 对照仿真；最后两条只构建片上 RAM UART0 Hello，不执行下载、烧录或外设连接。`EFINITY_RISCV_IDE` 只在本机环境设置，工具安装路径不能写回仓库。
 
 myCobot 280 机械臂联调优先走只读环境检查和串口探测，不要直接执行动作命令：
 

@@ -1281,3 +1281,31 @@ git diff --check
 - 未执行：本条只生成合并交接文档，尚未把联合副本覆盖到候选工程，尚未新建/切换/提交/推送分支，也未运行新的Efinity构建或上板操作。
 - 结果：`TEAM MERGE HANDOFF WRITTEN / WIP UPLOAD BOUNDARY FROZEN / MIGRATION AND COMMIT NOT YET EXECUTED`。
 - 下一步：按交接文档建立新个人分支并执行白名单迁移；迁移后先做Git差分和工程完整性审查，再决定是否提交。CPU Hello上板门仍保持 `NOT VERIFIED`。
+
+### [M2-33] Hard SoC 系统真源补交与个人分支发布
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 管理员要求：只允许选择一个同时匹配bitstream `AA133887...F31`、Setup/Hold `+1.742/+0.018ns`、CDC无同步器warning和J48/ch0板级视频正常的完整工程副本；禁止按时间选取或跨副本拼接。
+- 唯一来源：`TJ375N529_SC431HAI2LCD_Demo_V3_cpu_video_joint_20260715_161500`。已直接复核同一副本的bitstream哈希、STA行、CDC原文、Efinity版本、Check Design问题表、Map/Placement/Routing报告和工程资源字段；板级J48/ch0结果由M2-28同一bitstream记录与截图哈希绑定。
+- 分支：从最新 `origin/main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde` 建立独立worktree分支 `dev/libaoxun688-hard-soc-source-sync-20260716`；未切换、清理或覆盖共享主工作区。
+- 第一次提交：`2d4b3b7b3d0c59d88ece0669534ae38de02ed938`，提交四个系统工程真源、管理员点名的10个Hard SoC文件、UART0 Hello四个入口文件和7个最小BSP依赖。
+- 系统契约复核：`feature_stats_tap + EfxSapphireHpSoc_slb`登记完整、`auto_instantiation=off`、AXI1关闭、视频USER1、QCRV32 USER2、UART0=`GPIOR_165/GPIOR_145`、SoC reset=`GPIOL_79`。
+- 可移植化：只将Hard SoC `settings.json` 的 `--base_path` 改为相对 `..`；`build.ps1`移除安装路径硬编码并新增7个最小BSP文件fail-closed检查；README补充无本机路径的构建与重生步骤。其余列入Review Packet的来源文件与唯一副本SHA-256一致。
+- Hello复现：用提交的最小BSP重新构建成功，2608B/16KiB，入口 `0xF9000000`，唯一LOAD段至 `0xF9000A30`，无未解析符号，`ELF_LOAD_AUDIT=PASS`。ELF及其他构建产物保持忽略，未提交。
+- 禁止项检查：第一提交不含outflow/work/.metadata、bit/elf/map/rpt/log、pickle、许可证文件、用户目录、Efinity安装路径、来源绝对路径、`.mcp.json`或串口枚举缓存。
+- Review Packet：`docs/review_packets/m2_hard_soc_source_sync_review_20260716.md`，记录唯一来源指纹、Efinity `2025.2.288.4.15`、Check Design `0 error/4 warning`、Map/PNR、Setup/Hold、CDC、bitstream、板级视频和25个文件SHA-256。
+- 验证边界：来源联合副本为 `HARD SOC + VIDEO BUILD/PNR/BOARD-VIDEO PASS`；USER2 JTAG实际取指、UART0完整横幅和回显仍为 `CPU EXECUTION + UART0 NOT VERIFIED`。未连接机械臂，未合并main。
+- 下一步：提交本条日志和Review Packet，推送个人分支，等待管理员审核；不得自行合并main。
+
+### [M2-34] 管理员合并复核、状态收敛与新离线构建
+
+- 日期：2026-07-16（Asia/Shanghai）。
+- 合并范围：管理员锁定并合入 `dev/libaoxun688-hard-soc-source-sync-20260716@0604d33f3fe76851e1dfe738403875b4a7d0721c`；该分支相对基线 `main@4e35b05453c1cd30c943bb3d567fd0316ca6bdde` 为 0 behind / 2 ahead，合并无冲突。
+- 真源裁定：补交的 25 个系统/IP/BSP/Hello 文件齐备，四个系统文件、Hard SoC wrapper、UART0 GPIO、USER1/USER2、AXI0/AXI1 与 DDR CFG 唯一驱动契约复核一致。2026-07-15 的“Hard SoC 系统真源缺失/HOLD”已被本条替代。
+- Hello 新构建：在合并工作树用 Efinity RISC-V GCC 8.3.0 重建 PASS；2608 B / 16 KiB，入口 `0xF9000000`，唯一 LOAD 段至 `0xF9000A30`，`ELF_LOAD_AUDIT=PASS`。
+- FPGA 新构建：Efinity 2025.2 从同一合并工作树执行 Map/Interface/PNR/PGM 全流程 PASS；最差 Setup/Hold `+1.742ns/+0.018ns`；CDC 为 `No Synchronizer warnings to report.`；Interface Design Issues 为 4 个既有物理距离 warning，post-synthesis netlist 另有 118 个 warning。
+- 路径说明：Efinity map 直接使用中文绝对路径时因旧组件字符转换失败；改用仓库既有 ASCII junction 指向同一工作树后 PASS。未把该本机路径写入任何工程配置。
+- 新 bitstream：SHA-256 `1D697F0DBA62CEDA3A8877729FF29A314F9BBA1A24CDCDFEDB751C7CF4B8AECC`；只保存在仓库外临时验证目录，未提交，且尚未上板。来源旧 bitstream `AA1338...` 的 J48/ch0 视频证据不继承到本次新 bitstream。
+- 文档收敛：更新 `CURRENT_STATE.md`、`AGENTS.md`、`CLAUDE.md`、`fpga_vision`/`cpu_mycobot` Skills、Review Packet，并生成 2026-07-16 A/B/C 三轨学习指南；不再要求队友重复补交已存在的 Hard SoC 真源。
+- 安全边界：未烧录、未连接机械臂、未运行任何动作。USER2 实际连接、片上 RAM 取指、UART0 115200 横幅与回显仍为 `NOT VERIFIED`。
+- 下一门：仅使用匹配的新 bitstream、FPGA `USER2` 与片上 RAM Hello 完成 UART0 横幅/回显；禁止 `USER1`、Flash、外部 DDR、UART2/J52 和机械臂。
