@@ -20,7 +20,8 @@
 - G1 已针对该固定 SHA 的原子输入完成 Efinity 2025.2 冷构建：Map、Interface、PNR、STA、CDC 与 bitstream 生成通过；STA 的 WNS/WHS 为正，warning 保持分类记录。匹配 bitstream SHA-256 为 `A897E33514A1079BB1B46C02C464B0BD679AF551CEFCB67C4A0EBD5B8FCD1ACD`。
 - UART0 Hello 已完成冷构建和静态 LOAD/入口审计；匹配 ELF SHA-256 为 `E5BC80A2F18A7E2951D53DA539BE2FC61AAECFA90C5CDADB29E65FFC6141928A`，LOAD 范围位于 `0xF9000000..0xF9000A30`。这些仅是离线构建证据，不是板级 PASS。
 - `USER2`、CPU 实际取指、UART0 115200 bps 横幅/回显和 APB 实读仍均为 `NOT VERIFIED`。旧批次 bitstream、ELF、slack、CDC、warning 和板级记录仍不得继承；操作前须重新核对上述匹配 hash。
-- `CURRENT_G1_OPERATION_PACK_BLOCKED`：现有 2026-07-16 M2 操作卡和采集脚本固定旧 bitstream `2EA4AD28...` / ELF `C99FD39D...`，不得用于当前 `A897...` / `E5BC...` 批次。必须先新建当前批次专用 manifest、preflight、PC 范围 checkpoint 和 UART0 只读采集材料；旧卡只作历史证据。
+- `LEGACY_M2_OPERATION_PACK_FORBIDDEN_FOR_CURRENT_G1`：现有 2026-07-16 M2 操作卡和采集脚本固定旧 bitstream `2EA4AD28...` / ELF `C99FD39D...`，不得用于当前 `A897...` / `E5BC...` 批次；旧卡只作历史证据。
+- `CURRENT_G1_OPERATION_PACK_OFFLINE_READY_BOARD_NOT_VERIFIED`：当前批次专用 manifest、USER2 制品 preflight、ASCII staging、PC checkpoint 约束与 UART0 只读采集脚本已完成无板 fail-closed 验证；三次 offline presubmit 均为 `PASS_WITH_WARNINGS`（exit 0，freshness WARN=7）。证据见 `competition_project_single_camera/docs/review_packets/G1_USER2_UART0_BOARD_GATE_REVIEW_PACKET_DRAFT_20260717.md`。这不证明 `USER2`、CPU 取指、UART0、APB、视频或 OSD；旧 M2 卡仍只作历史证据。
 - 证据索引：[G1 冷构建 Review Packet](competition_project_single_camera/docs/review_packets/G1_EFINITY_COLD_BUILD_REVIEW_PACKET_20260717_0307.md)、[合并记录](docs/merge_governance/MERGE_REGISTER.md)、[单摄候选目录](competition_project_single_camera/)。
 
 ### CPU 决策
@@ -45,14 +46,14 @@
 
 ## CURRENT_BLOCKERS
 
-1. 当前可用操作卡/脚本仍绑定旧 M2 制品；在当前 G1 批次专用操作包通过 fail-closed 审查前，不得进入 USER2 板测。
+1. 当前批次操作包已离线就绪但板级未验证；持板机必须先按新操作卡完成 `USER2 + RAM + PC` Checkpoint A 并回传原始证据，未获 qzs/Codex 审核 JSON 前不得 Resume 或监听 UART0。
 2. `USER2`、片上 RAM CPU 取指、UART0 横幅/回显和 APB 实读尚未验证；G1 离线 PASS 不得升级为板级 PASS。
 3. G2 真实 RISC-V/MMIO transport ABI、正式寄存器地址和板级证据尚未定版；不得从 Host/fake seam 推断硬件接口。
 4. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
 
 ## NEXT_GATE
 
-1. 新建且审查当前 G1 批次专用操作包；固定输入基线、匹配 bitstream/ELF 完整 SHA-256、大小、LOAD/entry、`USER2`、安全 debug cfg、PC 范围和禁止项。任何不一致都停止，不能自动选择或覆盖制品。
+1. 使用已离线审查的当前 G1 批次专用操作包；持板机以显式源路径预检并 staging，固定输入基线、匹配 bitstream/ELF 完整 SHA-256、大小、LOAD/entry、`USER2`、安全 debug cfg、PC 范围和禁止项。任何不一致都停止，不能自动选择或覆盖制品。
 2. 在无硬件 dry-run 中证明错误 hash、缺文件、冲突 staging 和缺少 PC checkpoint 均 fail-closed；旧 2026-07-16 M2 卡不得被改写后继续使用。
 3. 仅允许使用上述匹配 bitstream、FPGA `USER2`，并仅下载匹配 ELF 到 `0xF9000000` 片上 RAM；暂停并证明 PC 位于 `0xF9000000..0xF9003FFF`。经 qzs/Codex 复核后才可 Resume 并只读验证 UART0 115200 bps Hello。
 4. 本 Gate 禁止 `USER1`、Flash 擦写/烧录、外部 DDR 初始化、UART2/J52、机械臂接线和动作；Hello 通过后必须另立 Review Packet，只读取当前已存在的 APB0 MAGIC `0x375A0001`。
