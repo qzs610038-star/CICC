@@ -5,6 +5,7 @@
 ## 📁 目录结构
 
 * [daily_guide_template.md](daily_guide_template.md)：标准卡片式学习指南模板。
+* [no_board_mycobot_maintenance_learning_brief_20260717.md](no_board_mycobot_maintenance_learning_brief_20260717.md)：供 Gemini 扩写的无板机械臂/项目维护学习简报；当前 Gate 以 `CURRENT_STATE.md` 为准。
 * `daily_sync/`：按日期和合并分支归档的子目录。例如：
   * [daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/](daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/)：7 月 8 日合并分支时生成的讲解指南。
     * [guide_fpga_vision_front.md](daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
