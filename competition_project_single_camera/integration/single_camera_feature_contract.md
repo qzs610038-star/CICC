@@ -4,7 +4,7 @@
 >
 > 日期：2026-07-15
 >
-> 状态：`HOST CONTRACT VERIFIED / FPGA-SoC-APB NOT IMPLEMENTED`
+> 状态：`HOST CONTRACT VERIFIED / FEATURE RTL PRESENT BUT DISCONNECTED / BOARD NOT VERIFIED`
 
 ## 1. 目的与边界
 
@@ -142,19 +142,22 @@ sc_features_t -> sc_classify_features() -> sc_observation_t
 | ch0 Debayer 后 RGB tap 位置 | 已由真实 `src/top.v` 审计 |
 | 画面旁路不回压原则 | 已冻结 |
 | `sc_features_t` 和 Host 分类器 | 已实现并 Host 测试 |
-| FPGA 统计 RTL | 未实现 |
-| SoC/APB/CDC/ACK 硬件 | 未实现，且 Hard SoC PLL 冲突未关闭 |
-| 正式地址/`soc.h`/IRQ | 未定义，禁止手填 |
+| FPGA 统计 RTL | 源码与 testbench 已存在；顶层 `i_capture_enable=1'b0`，ACK 固定关闭，输出 unused |
+| Hard SoC / `soc.h` / APB0 MAGIC | 源码与同批生成物已存在；仅离线冷构建有证据，板级仍未验证 |
+| 业务 APB/CDC/ACK/result/OSD | 未实现；当前 feature 不可由 CPU 读取 |
+| 正式业务地址/IRQ | 未定义，禁止手填；`IO_APB_SLAVE_0_INPUT` 只作为同批 APB0 MAGIC 候选基址，尚未板级实读 |
 | 板级特征、五色准确率、OSD | 未验证 |
 
 ## 8. 后续实施门禁
 
-开始 RTL 前必须同时满足：
+开始 feature/APB/CDC/OSD 业务接入前必须同时满足：
 
-1. 用户批准新增的 feature tap 小 Gate；
-2. 先补独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出和 ACK
-   不匹配；
-3. RTL 仅新增旁路统计模块及受控顶层连接，不修改 framebuffer、Debayer、HDMI、
-   `constrain.sdc`、`mem_test.xml`、`.peri.xml` 或 IP；
-4. 初次综合/PNR 必须回传资源、Setup、Hold、CDC 和 HDMI 回归证据；
-5. SoC 未合法生成前，feature RTL 不得伪装为 CPU 可读 APB 外设。
+1. 当前 G1 的 USER2/UART0 与既有 APB MAGIC 实读 Gate 已通过；
+2. 用户批准包含 feature、目标/事件、result/OSD 的最小 F1 原子批次 Review Packet；
+3. 保留并扩展独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出、
+   ACK 不匹配、CDC 和 APB 访问方向；
+4. RTL 只做受审旁路统计及业务通道连接，不修改 framebuffer、Debayer、HDMI
+   数据路径；若 `constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP 或顶层发生变化，
+   必须作为同一原子批次重开全部构建和板级证据；
+5. 初次综合/PNR 必须回传资源、Setup、Hold、CDC 和 HDMI 回归证据；
+6. 业务地址与 `soc.h` 未同批冻结前，feature RTL 不得伪装为 CPU 可读 APB 外设。
