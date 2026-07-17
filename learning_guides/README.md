@@ -56,6 +56,14 @@
 * [mycobot_cpu_board_bringup_explanation_guide.md](mycobot_cpu_board_bringup_explanation_guide.md)：myCobot 机械臂上板主实施方案的大白话通俗解读与分级门禁指南。
 * [m2_preflight_and_risk_guide.md](m2_preflight_and_risk_guide.md)：单摄 M2 预飞行安全门与物理推进风险白话指南。
 
+## 🤝 AI 协作与三岗位学习包（2026-07-17）
+
+* [ai_collaboration_roles_20260717/](ai_collaboration_roles_20260717/)：面向 qzs、wsc、libaoxun 的 Agent 使用与岗位补课指南；以 `competition_project_single_camera/` 的 bring-up 任务为场景，强调接口优先、证据分层、原子批次和安全 Gate。
+  * [guide_agent_common.md](ai_collaboration_roles_20260717/guide_agent_common.md)：全员通用的方案讨论—执行—验收工作流。
+  * [guide_qzs_integration_owner.md](ai_collaboration_roles_20260717/guide_qzs_integration_owner.md)：qzs 的集成负责人、机械臂安全与仓库治理学习重点。
+  * [guide_wsc_cpu_control.md](ai_collaboration_roles_20260717/guide_wsc_cpu_control.md)：wsc 的 CPU、分类、状态机与 ABI/MMIO 学习重点。
+  * [guide_libaoxun_fpga_vision.md](ai_collaboration_roles_20260717/guide_libaoxun_fpga_vision.md)：libaoxun 的视频前端、Hard SoC、CDC 与构建证据学习重点。
+
 ---
 
 ## 🚀 交互触发生成机制
