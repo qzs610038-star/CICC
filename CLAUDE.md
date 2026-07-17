@@ -1,212 +1,48 @@
-# CLAUDE.md
+# Claude 仓库适配层
 
-This file provides Claude Code specific guidance for this repository. Shared project rules, safety boundaries, and cross-agent handoff rules are maintained in `AGENTS.md`; current route overrides and mutable phase state are maintained in `CURRENT_STATE.md`.
+> 本文件只定义 Claude 专属路由、执行方式与交接。稳定规则见 [AGENTS.md](AGENTS.md)，动态状态见 [CURRENT_STATE.md](CURRENT_STATE.md)。不得在此复制 SHA、构建批次、hash、节点/资源/warning/测试计数或板级结论。
 
-## 必读入口
+## ENTRY_ROUTING
 
-Claude 开始任何任务前按以下顺序读取：
+Claude 开始任务时依次读取：
 
-1. `AGENTS.md`：仓库结构、系统架构硬边界、机械臂安全、Codex Gate、Review Packet、交接规则。
-2. `final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md`：最新官方任务、评分、时间和现场流程硬约束。
-3. `CURRENT_STATE.md`：最新路线增量、当前阶段、已降级或废弃的旧结论。
-4. `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`：当前“决赛主方案”，定义拿分顺序、阶段门和回退策略。
-5. 本文件：Claude 专属执行方式、常用命令和交接命令。
+1. [AGENTS.md](AGENTS.md)：稳定架构、安全、审查门和优先级。
+2. [0710 比赛细则](final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md)：官方任务与现场约束。
+3. [CURRENT_STATE.md](CURRENT_STATE.md)：当前快照、阻塞、下一 Gate 和禁止项。
+4. [决赛主方案](final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md)：执行顺序与回退。
+5. 本文件：Claude 专属行为。
 
-若这些入口冲突，以 `AGENTS.md`「文档优先级与交接规则」为准。不要在本文件重复维护官方细则、主线边界、机械臂安全三阶段或 Codex Gate 清单。
+若入口冲突，按 `AGENTS.md` 的文档优先级处理；不得从历史计划、旧 handoff、Host 测试或架构目标推断板级闭环。
 
-## 仓库性质
+## CLAUDE_EXECUTION_MODE
 
-本仓库是第十届集创赛雄芯院方向的 FPGA 资料包和分赛区决赛开发工程，不是单一的软件工程。当前正式协作开发主工程位于 `final_project/`；`competition_project_single_camera/` 已具备 Hard SoC/IP/BSP/Hello 可复现真源，并已合入 APB0 与 DSI 路径修复，但该合并后的工程尚未重新完成 Efinity 或板级 Gate，未过 Gate 前不得替代正式主线。`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/` 和初赛 demo 是来源参考、对照工程和经验库，不再作为直接修改的决赛代码基线。
+### 架构初设
 
-除非任务明确要求，否则以下内容按只读处理：
+- 用于跨模块、视频/AXI/framebuffer、时钟复位或顶层策略；默认只读探索。
+- 分别列出官方约束、AGENTS 稳定边界、CURRENT_STATE 当前事实，再核对真实源码/XML/日志。
+- 输出目标、涉及文件、信号链、时钟/复位、双通道影响、备选方案、风险与验证计划；形成 Review Packet 后等待 Codex Gate。
 
-- 赛方补丁目录与安装包
-- ZIP / RAR 原始压缩包
-- myBlockly、Python、CP210x 等机械臂相关安装包和驱动原件
-- Efinity / ModelSim 生成数据库
-- 波形导出文件（`.vcd`、`.gtkw`、`.wlf` 等）
-- `outflow/` 等构建产物
+### 具体执行
 
-## 主工程入口
+- 每轮只处理一个明确问题，保持小 diff，不重排无关生成文件。
+- 修改前说明影响范围及是否改变四任务、逐轮事务、OSD 语义或机械臂唯一响应。
+- 修改后列出文件、命令、退出码、日志、warning 与未验证项。
+- 连续两轮同错未解决时停止补丁，生成 Codex Review Packet。
 
-正式开发主工程：
+### 入口发现
 
-- FPGA 工程：`final_project/fpga/efinity/mem_test.xml`
-- FPGA 约束：`final_project/fpga/efinity/constrain.sdc`
-- FPGA 顶层：`final_project/fpga/rtl/top/top.v` 中的 `top`
-- 板上 CPU 程序：`final_project/cpu/app/src/*.c`
-- CPU BSP / MMIO 边界：`final_project/cpu/app/include/bsp.h`
-- 接口契约和文档：`final_project/integration/`、`final_project/docs/`
+- 优先用 codebase-memory 图谱定位，再回到真实文件核查；图谱无结果不等于源码缺失。
+- 模块操作命令统一见 [Agent runbook](docs/agent_context/operations_runbook.md)，不要在本文件维护易漂移命令和状态。
 
-候选单摄工程：`competition_project_single_camera/mem_test.xml`。Hard SoC 真源入口包括 `ip/EfxSapphireHpSoc_slb/settings.json`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`embedded_sw/efx_hard_soc/` 与 `cpu_bringup/uart_hello_onchip/`。不得再报告“系统真源缺失”；也不得把来源副本的历史 bitstream/J48 视频证据写成当前仓库新构建的板测结果。只有 `CURRENT_STATE.md` 明确记录板级复现通过后，才可讨论升格。
+## CLAUDE_HANDOFF
 
-赛方对照工程：
+- 修改前运行 `tools/agent_handoff_health_check.ps1`；触发矛盾条件时输出 `[Contradiction Report]`。
+- 阶段结束使用 `.claude/commands/fpga-handoff.md` 的 JSON 模板；只记录恢复所需事实、相对路径、命令结果、未验证项和下一 Gate，不写密钥或长日志。
+- 交给 Codex 的包使用 [review_packet_template.md](docs/agent_context/review_packet_template.md)，并明确机械臂/外设是否涉及、是否执行动作及安全确认。
 
-- 工具链 / 器件：Efinity `2025.2.288.4.15`，Titanium `TJ375N529`，时序模型 `I3`
-- 原始主工程文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/mem_test.xml`
-- 原始主约束文件：`赛方提供材料/TJ375N529_SC431HAI2LCD_Demo_V3/constrain.sdc`
-- 原始顶层模块：`src/top.v` 中的 `top`
-- 主要生成 IP 配置入口：`ip/csi_rx_controller/settings.json`、`ip/dsi_tx/settings.json`、`ip/ram/settings.json`
+## REQUIRED_BOUNDARY_POINTERS
 
-## Codebase Memory 图谱
-
-本项目已启用 codebase-memory-mcp，用于让 Claude/Codex/队友 Agent 在阅读代码前快速定位真实入口。
-
-- 默认图谱项目：`D-cicc_cbm-main`；旧 `D-cicc_cbm_link` 仅作历史兼容查询。
-- 默认索引入口：`D:\cicc_cbm_link`
-- 主 artifact：`.codebase-memory/graph.db.zst`
-- Phase 2 资料库 artifact：`.codebase-memory/phase2/official_demo/`、`.codebase-memory/phase2/prelim_src/`、`.codebase-memory/phase2/prelim_sw/`
-- 详细维护说明：`CBM_CONFIG_GUIDE.md`
-
-推荐使用顺序：
-
-```text
-list_projects / index_status
--> get_architecture / search_graph / search_code
--> 回到真实源码、Efinity XML、日志和上板现象核查
-```
-
-图谱只负责定位和上下文压缩。涉及 RTL 连线、时钟复位、AXI/framebuffer、QCRV32、myCobot 实机安全或 warning 取舍时，必须以真实文件和验证日志为准。
-
-共享 artifact 已重建为 7560 nodes / 16960 edges，覆盖单摄 Hard SoC/APB0、UART0 Hello 和 DSI 路径修复；准确代码基线以 `.codebase-memory/artifact.json` 的 `commit` 字段为准。图谱查询无结果时仍必须直接读取上述候选工程文件；不得把“未索引”误写成“未提交”。
-
-## 权威层级与执行定位
-
-Claude 必须按以下职责使用文档，不得把它们混成同一个“路线源”：
-
-- 最新官方细则：定义四项任务、评分、10 分钟实操、现场操作与结果确认要求。
-- `AGENTS.md`「分赛区决赛系统架构硬边界」：定义 FPGA、板上 CPU、PC/外部 MCU 的长期职责和安全红线。
-- `CURRENT_STATE.md`：定义当前已完成项、阻塞、占位事实、暂缓验证项和下一步最小闭环。
-- `final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md`：当前最高执行方案；局部方案、实现顺序和降级选择不得与其冲突，但不能覆盖官方细则、架构安全边界或真实进度。
-- `分赛区决赛实施开发路线.md`：仅作历史实施路线与经验库；被官方细则或 `CURRENT_STATE.md` 覆盖的内容不得恢复为当前目标。
-
-开始任务时，先把请求归类为“官方要求、稳定架构边界、当前状态或历史经验”中的一种或多种，再回到真实源码、工程 XML、日志和上板现象核查。不要从旧 handoff、旧保底方案、架构目标或 host 单测推断板级闭环。
-
-与正式比赛闭环有关的方案或实现，必须显式说明是否覆盖：五色/三形状/三尺寸、四任务关系判定、逐轮识别—判断—执行事务、明确结果输出、唯一机械臂响应和 20 轮时限。具体缺口以 `CURRENT_STATE.md` 最新条目为准，不在本文件复制易过期的完成度清单。
-
-## 常用命令
-
-打开主 Efinity 工程：
-
-```powershell
-Invoke-Item "final_project\fpga\efinity\mem_test.xml"
-```
-
-确认 codebase-memory 主图谱：
-
-```powershell
-codebase-memory-mcp cli index_status "{`"project`":`"D-cicc_cbm-main`"}"
-```
-
-运行 RAM IP 仿真：
-
-```powershell
-Set-Location "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\ip\ram\Testbench"
-vsim -do modelsim.do
-```
-
-运行 DSI TX IP 仿真：
-
-```powershell
-Set-Location "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\ip\dsi_tx\Testbench"
-vsim -do modelsim.do
-```
-
-运行 AXI interconnect 仿真：
-
-```powershell
-Set-Location "赛方提供材料\TJ375N529_SC431HAI2LCD_Demo_V3\src\axi_interconnect\sim"
-cmd /c run.bat
-```
-
-构建单摄片上 RAM UART0 Hello（只构建，不下载/烧录）：
-
-```powershell
-Set-Location "competition_project_single_camera\cpu_bringup\uart_hello_onchip"
-.\build.ps1 -ToolchainRoot $env:EFINITY_RISCV_IDE
-```
-
-当前板级最小门：只用匹配的新 bitstream、FPGA `USER2` 和 `0xF9000000` 片上 RAM 验证 UART0 115200 bps 横幅/回显。禁止选择 `USER1`、Flash 擦写、外部 DDR 初始化、UART2/J52、机械臂接线或动作；任何扩大范围必须重新形成 Review Packet。
-
-myCobot 280 环境只读检查：
-
-```powershell
-python -c "import sys, importlib.util; print(sys.executable); print(sys.version); print('serial', bool(importlib.util.find_spec('serial'))); print('pymycobot', bool(importlib.util.find_spec('pymycobot')))"
-python -c "import serial.tools.list_ports as p; [print(x.device, x.description, x.hwid) for x in p.comports()]"
-Get-PnpDevice -Class Ports -ErrorAction SilentlyContinue | Select-Object Status,Class,FriendlyName,InstanceId
-```
-
-交接健康检查：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "tools\agent_handoff_health_check.ps1"
-powershell -ExecutionPolicy Bypass -File "tools\agent_handoff_health_check.ps1" -Handoff "debug_records\some_handoff.md"
-```
-
-若只想验证单个模块，优先去该模块附近查找 `modelsim.do` 或 `sim.do`。其中 AXI 仿真的 `run.bat` 依赖本机 ModelSim 安装路径，通常需要先把 `run.bat` 里的 `modelsim=` 改成本机实际路径。
-
-## Claude 工作模式
-
-### Mode A: 架构初设
-
-用于重大结构调整、跨模块方案、视频链路/AXI/framebuffer/时序方案、顶层连线策略。
-
-- 建议使用高能力模型，例如 Opus 系列。
-- 默认只读探索，不直接修改 RTL、约束或工程文件。
-- 必须先定位真实工程入口：`mem_test.xml`、`top.v`、相关 RTL 子目录和对应 IP `settings.json`。
-- 必须分别列出：官方细则约束、`AGENTS.md` 架构边界、`CURRENT_STATE.md` 当前事实；不得把 `分赛区决赛实施开发路线.md` 单独当作当前权威来源。
-- 输出必须包含：目标、涉及文件、信号链路、时钟/复位假设、双通道影响、备选方案、主要风险、验证计划。
-- 方案结束时生成 Codex Review Packet，等待 Codex 复核后再进入执行。
-
-### Mode B: 具体执行
-
-用于局部 RTL 修改、testbench 或脚本调整、日志整理、常规调试。
-
-- 建议使用廉价执行模型。
-- 每轮只处理一个明确问题，优先小 diff，不做无关重排。
-- 修改前必须核对 `CURRENT_STATE.md` 的当前阻塞和暂缓边界，并说明本轮是否改变四任务、逐轮事务、OSD 结果语义或机械臂唯一响应链路。
-- 修改前说明影响范围；修改后列出文件、命令、结果、仍存在的 warning 和未验证项。
-- 不直接重写 `ipm/`、赛方补丁、原始压缩包、波形和 `outflow/` 等生成产物。
-- 若连续两轮未解决同一问题，应停止继续试补丁，改为生成 Codex Review Packet。
-
-## Codex Review Packet 模板
-
-```md
-# Codex Review Packet
-
-## 任务目标
-
-## 当前结论
-
-## 修改或计划涉及的文件
-
-## 关键模块与信号链路
-
-## 时钟、复位、AXI、framebuffer、双通道影响
-
-## 已运行验证
-- 命令：
-- 结果：
-- 日志位置：
-- 关键 warning：
-
-## 机械臂 / 外设状态
-- myCobot 是否涉及：
-- COM 口 / CP210x 状态：
-- 波特率：
-- 是否执行动作：
-- 安全确认：
-
-## 未验证项和风险假设
-
-## 希望 Codex 判断的问题
-```
-
-## Handoff
-
-阶段结束、切换 Agent 或任务暂停时，优先使用 `.claude/commands/fpga-handoff.md` 的 v1.1 JSON 模板，并同步全局协议：
-
-- 写入 `~/.agents/handoff/{agent}-handoff-{YYYYMMDD_HHMMSS}.json`
-- 向 `~/.agents/shared/today-summary.md` 追加一条短摘要
-- 交接内容只记录下一位 Agent 恢复所需的信息，不写密钥和无关长日志
-- 仓库内路径写相对项目根路径，绝对路径只作来源追溯
+- FPGA/CPU/PC 职责：`AGENTS.md`「分赛区决赛系统架构硬边界」。
+- 当前单摄 Gate、UART0/myCobot 波特率和禁止项：`CURRENT_STATE.md`。
+- 合并治理：`docs/merge_governance/`。
+- 模块细则：`.agents/skills/fpga_vision/SKILL.md`、`.agents/skills/cpu_mycobot/SKILL.md`。

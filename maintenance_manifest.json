@@ -1,73 +1,41 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "cicc-tj375-final-project",
-  "last_verified_commit": "510caca79ce439da143916fa4c91854f79e3db7a",
+  "last_verified_commit": "489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f",
+  "integration_state": "uncommitted_g1_g2_g3_review_worktree",
+  "context_baseline_tokens": 65241,
+  "required_reading_chain": ["AGENTS.md","CLAUDE.md","CURRENT_STATE.md","final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md","final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md"],
+  "context_files": [
+    {"file":"AGENTS.md","max_bytes":16384,"max_tokens":4500,"required_markers":["分赛区决赛系统架构硬边界","官方比赛不可弱化约束","UART 与机械臂安全","Codex 审查门","Handoff 与矛盾报告","Git 与合并治理"]},
+    {"file":"CLAUDE.md","max_bytes":6144,"max_tokens":1500,"required_markers":["ENTRY_ROUTING","CLAUDE_EXECUTION_MODE","CLAUDE_HANDOFF","REQUIRED_BOUNDARY_POINTERS"]},
+    {"file":"CURRENT_STATE.md","max_bytes":25600,"max_tokens":5500,"required_markers":["CURRENT_SNAPSHOT","CURRENT_BLOCKERS","NEXT_GATE","PENDING_DECISIONS","DEPRECATED_ROUTES","HISTORY_ARCHIVE_INDEX","POST_MERGE_REFRESH_REQUIRED","NOT VERIFIED","USER2","0xF9000000","115200","1000000"]}
+  ],
+  "archive": {
+    "file": "debug_records/state_history/CURRENT_STATE_20260717_pre_g3.md",
+    "sha256": "FC022DBC9839C11C0A47F6FAD3AE21361B1FE10A17318E21C9FF5D41642C2D5B",
+    "lines": 566,
+    "manifest": "debug_records/state_history/archive_manifest.md"
+  },
+  "stable_entrypoints": ["AGENTS.md","CLAUDE.md","final_project/README.md","final_project/docs/README.md","final_project/docs/technical_plans/README.md","final_project/docs/review_packets/README.md"],
+  "forbidden_dynamic_patterns": [
+    "\\b[0-9]{2,}/[0-9]{2,}\\b",
+    "\\b[0-9]+\\s+nodes?\\s*/\\s*[0-9]+\\s+edges?\\b",
+    "\\b[0-9]+\\s+(?:warnings?|IO)\\b",
+    "\\b(?:Map|PNR|STA|CDC)\\s+PASS\\s*[:：=]",
+    "\\b[A-Fa-f0-9]{64}\\b"
+  ],
   "managed_documents": [
-    {
-      "file": "CURRENT_STATE.md",
-      "role": "mutable_route_and_status",
-      "refresh_on": [
-        "final_project/fpga/rtl/top/top.v",
-        "final_project/fpga/efinity/mem_test.xml",
-        "final_project/cpu/app/src/main.c",
-        "final_project/cpu/app/src/arm_controller.c",
-        "final_project/integration/"
-      ]
-    },
-    {
-      "file": "final_project/cpu/CPU_MODULE_PLAN.txt",
-      "role": "cpu_implementation_and_test_record",
-      "refresh_on": [
-        "final_project/cpu/app/",
-        "final_project/cpu/tests/"
-      ]
-    },
-    {
-      "file": "final_project/integration/register_map.md",
-      "role": "interface_contract_index",
-      "refresh_on": [
-        "final_project/integration/",
-        "final_project/cpu/app/include/board_io.h",
-        "final_project/fpga/rtl/"
-      ]
-    },
-    {
-      "file": "final_project/docs/architecture/current_code_architecture_2026-07-13.md",
-      "role": "current_architecture_snapshot",
-      "refresh_on": [
-        "final_project/fpga/rtl/",
-        "final_project/cpu/app/",
-        "final_project/integration/"
-      ]
-    },
-    {
-      "file": "CBM_CONFIG_GUIDE.md",
-      "role": "shared_graph_operation_guide",
-      "refresh_on": [
-        ".codebase-memory/graph.db.zst",
-        ".codebase-memory/artifact.json",
-        "final_project/fpga/rtl/",
-        "final_project/cpu/app/"
-      ]
-    },
-    {
-      "file": "方案评审/003_Agent协作与交接优化方案/README.md",
-      "role": "maintenance_entrypoint",
-      "refresh_on": [
-        "maintenance_manifest.json",
-        "tools/project_freshness_check.ps1",
-        "tools/agent_handoff_health_check.ps1"
-      ]
-    },
-    {
-      "file": "方案评审/003_Agent协作与交接优化方案/Agent协作与交接优化方案_v1.1_维护闭环.md",
-      "role": "maintenance_workflow_contract",
-      "refresh_on": [
-        "maintenance_manifest.json",
-        "tools/project_freshness_check.ps1",
-        "AGENTS.md",
-        "HANDOFF_TEMPLATE.md"
-      ]
-    }
+    {"file":"AGENTS.md","role":"stable_governance_entry","refresh_on":["final_project/docs/competition_manual/","docs/merge_governance/","tools/agent_handoff_health_check.ps1"]},
+    {"file":"CLAUDE.md","role":"claude_adapter","refresh_on":["AGENTS.md","CURRENT_STATE.md",".claude/commands/"]},
+    {"file":"CURRENT_STATE.md","role":"mutable_route_and_status","refresh_on":["final_project/fpga/","final_project/cpu/app/","final_project/cpu/tests/","final_project/integration/","competition_project_single_camera/mem_test.xml","competition_project_single_camera/mem_test.peri.xml","competition_project_single_camera/constrain.sdc","competition_project_single_camera/src/","competition_project_single_camera/cpu/","competition_project_single_camera/cpu_bringup/","competition_project_single_camera/integration/","competition_project_single_camera/docs/review_packets/G1_EFINITY_COLD_BUILD_REVIEW_PACKET_20260717_0307.md","final_project/docs/review_packets/g2_cpu_observability_review_packet_20260717_025111.md"]},
+    {"file":"competition_project_single_camera/docs/review_packets/G1_EFINITY_COLD_BUILD_REVIEW_PACKET_20260717_0307.md","role":"fixed_sha_efinity_cold_build_evidence","refresh_on":["competition_project_single_camera/mem_test.xml","competition_project_single_camera/mem_test.peri.xml","competition_project_single_camera/constrain.sdc","competition_project_single_camera/src/","competition_project_single_camera/cpu_bringup/"]},
+    {"file":"final_project/docs/review_packets/g2_cpu_observability_review_packet_20260717_025111.md","role":"offline_cpu_observability_evidence","refresh_on":["competition_project_single_camera/cpu/","final_project/tools/board_observability/"]},
+    {"file":"final_project/README.md","role":"stable_project_index","refresh_on":["CURRENT_STATE.md","final_project/docs/README.md"]},
+    {"file":"final_project/cpu/CPU_MODULE_PLAN.txt","role":"cpu_implementation_and_test_record","refresh_on":["final_project/cpu/app/","final_project/cpu/tests/"]},
+    {"file":"final_project/integration/register_map.md","role":"interface_contract_index","refresh_on":["final_project/integration/","final_project/cpu/app/include/board_io.h","final_project/fpga/rtl/"]},
+    {"file":"final_project/docs/architecture/current_code_architecture_2026-07-13.md","role":"current_architecture_snapshot","refresh_on":["final_project/fpga/rtl/","final_project/cpu/app/","final_project/integration/"]},
+    {"file":"CBM_CONFIG_GUIDE.md","role":"shared_graph_operation_guide","refresh_on":[".codebase-memory/graph.db.zst",".codebase-memory/artifact.json","final_project/fpga/rtl/","final_project/cpu/app/"]},
+    {"file":"方案评审/003_Agent协作与交接优化方案/README.md","role":"maintenance_entrypoint","refresh_on":["maintenance_manifest.json","tools/project_freshness_check.ps1","tools/agent_handoff_health_check.ps1"]},
+    {"file":"方案评审/003_Agent协作与交接优化方案/Agent协作与交接优化方案_v1.1_维护闭环.md","role":"maintenance_workflow_contract","refresh_on":["maintenance_manifest.json","tools/project_freshness_check.ps1","AGENTS.md","HANDOFF_TEMPLATE.md"]}
   ]
 }

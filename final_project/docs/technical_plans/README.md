@@ -4,7 +4,7 @@
 
 ## 当前方案
 
-- **[决赛主方案：最大化得分总控执行方案](competition_score_maximization_execution_plan_20260712.md)**：当前最高执行方案。状态：`v1.3-main`；已吸收 2026-07-13 团队整合事实，将当前重点转为接口契约收口、`ARM_DISABLED` 主循环集成、production/debug 构建拆分和 periphery/PNR 修复，不自动解除硬件或机械臂安全门槛。
+- **[决赛主方案：最大化得分总控执行方案](competition_score_maximization_execution_plan_20260712.md)**：当前最高执行方案；版本、已完成项和下一 Gate 以文件正文及根目录 `CURRENT_STATE.md` 为准，不在索引复制。
 - [三成员决赛保底冲刺执行板](three_member_execution_board_20260712_17.md)：把主方案拆成A（FPGA/SoC）、B（CPU负责人）、C（机械臂/现场）三张逐日任务卡，包含文件所有权、当日验收、交接格式和失败降级规则。
 - [摄像头不可用期间的下游并行推进方案](camera_independent_downstream_execution_plan_20260712.md)：状态：部分实施。Host 回放、合成像素源、竞赛契约和逐轮事务已形成证据；正式 SoC/APB/CDC/OSD、PNR 和板级闭环未完成，仍是非正式比赛路径。
 - [FPGA/SoC 分阶段执行计划](a_fpga_soc_execution_plan_20260712.md)：A2–A4 已有隔离工程和 Review Packet 证据；正式协作工程继续受 Codex Gate，当前优先关闭 production/debug 与 periphery/PNR 门。
@@ -13,7 +13,7 @@
 - [预处理 APB/CDC 生成物门禁](../architecture/generated_soc_summary_2026-07-11.md)：确认当前缺失生成的 `soc.h`、APB 从机与 CDC RTL，并列出恢复 CPU/APB 集成所需输入。
 - [预处理 APB/CDC 接口草案](../../integration/preprocess_apb_cdc_contract_draft_20260711.md)：冻结特征快照、配置提交和 CPU-to-OSD 的交接语义；不分配地址、不修改 RTL。
 - [Priority 3 myCobot 板上 CPU 迁移设计](priority3_mycobot_cpu_migration_design.md)：机械臂控制从 PC 调试流程迁移到板上 CPU 的设计约束。
-- [myCobot 板上调试执行计划](mycobot_board_debug_execution_plan_20260712.md)与[操作员 SOP](mycobot_board_bringup_operator_sop_20260712.md)：当前统一基线为 `codex/team-integration-20260713@510caca`；只允许 Host/QEMU、D1 CPU/APB 和 D2 无臂 UART 回环/监听，真实动作 NO-GO。
+- [myCobot 板上调试执行计划](mycobot_board_debug_execution_plan_20260712.md)与[操作员 SOP](mycobot_board_bringup_operator_sop_20260712.md)：具体基线、允许范围和动作门以 `CURRENT_STATE.md` 为准。
 - [myCobot 机械臂上板控制推进方案](mycobot_arm_board_control_advancement_plan_20260715.md)：状态：待 Codex 审核。按 G4→G11 顺序分层解锁，先做阶段 B（纯软件完善：协议真值表、模拟故障注入、回环测试套件），再做阶段 A（G4 攻坚：审查工程、修 PNR/outpad、闭合 SoC/BSP/PNR/部署链）。本方案不解除任何硬件或机械臂安全门槛。
 - [Type-C UART1 视频调试方案](typec_uart1_video_debug_plan.md)：Type-C 调试观测链路的规划和接口边界。
 

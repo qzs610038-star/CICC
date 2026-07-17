@@ -155,7 +155,7 @@ if ($null -ne $manifest) {
 $statePath = Join-Path $root 'CURRENT_STATE.md'
 if (Test-Path -LiteralPath $statePath) {
     $stateLines = Get-Content -Encoding UTF8 -LiteralPath $statePath
-    $evidenceLines = @($stateLines | Where-Object { $_ -match '^\s*-\s*\u8BC1\u636E\u8DEF\u5F84\uFF1A' })
+    $evidenceLines = @($stateLines | Where-Object { $_ -match '^\s*-\s*\u8BC1\u636E(?:\u8DEF\u5F84|\u7D22\u5F15)\uFF1A' })
     if ($evidenceLines.Count -eq 0) {
         Fail 'CURRENT_STATE evidence scan found no evidence lines'
     }
@@ -175,13 +175,19 @@ if (Test-Path -LiteralPath $statePath) {
 }
 
 $linkDocs = @(
+    'AGENTS.md',
+    'CLAUDE.md',
     'CURRENT_STATE.md',
     'final_project/README.md',
     'final_project/cpu/README.md',
     'final_project/docs/README.md',
     'final_project/docs/technical_plans/README.md',
     'final_project/integration/register_map.md',
-    'learning_guides/README.md'
+    'learning_guides/README.md',
+    'final_project/docs/review_packets/README.md',
+    'docs/agent_context/migration_map.md',
+    'docs/agent_context/operations_runbook.md',
+    'debug_records/state_history/archive_manifest.md'
 )
 if ($null -ne $manifest) {
     $linkDocs += @($manifest.managed_documents | ForEach-Object { $_.file })
@@ -230,6 +236,54 @@ if (Test-Path -LiteralPath $artifactPath) {
     }
 } else {
     Warn 'CBM artifact metadata is missing'
+}
+
+# G3 context budgets, required markers, archive integrity and anti-bloat checks.
+if ($null -ne $manifest -and [int]$manifest.schema_version -ge 2) {
+    foreach ($entry in @($manifest.context_files)) {
+        $entryPath = Join-Path $root ([string]$entry.file)
+        if (-not (Test-Path -LiteralPath $entryPath)) { Fail "context entry missing: $($entry.file)"; continue }
+        $entryText = Get-Content -Raw -Encoding UTF8 -LiteralPath $entryPath
+        $entryBytes = (Get-Item -LiteralPath $entryPath).Length
+        if ($entryBytes -gt [int64]$entry.max_bytes) { Fail "context entry exceeds max_bytes: $($entry.file)" }
+        foreach ($marker in @($entry.required_markers)) {
+            if ($entryText.IndexOf([string]$marker, [System.StringComparison]::Ordinal) -lt 0) { Fail "required marker missing: $($entry.file) -> $marker" }
+        }
+    }
+
+    foreach ($relative in @($manifest.stable_entrypoints)) {
+        $stablePath = Join-Path $root ([string]$relative)
+        if (-not (Test-Path -LiteralPath $stablePath)) { Fail "stable entrypoint missing: $relative"; continue }
+        $stableText = Get-Content -Raw -Encoding UTF8 -LiteralPath $stablePath
+        foreach ($pattern in @($manifest.forbidden_dynamic_patterns)) {
+            if ([regex]::IsMatch($stableText, [string]$pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)) {
+                Fail "dynamic artifact fact found in stable entrypoint: $relative pattern=$pattern"
+            }
+        }
+    }
+
+    $archivePath = Join-Path $root ([string]$manifest.archive.file)
+    $archiveManifestPath = Join-Path $root ([string]$manifest.archive.manifest)
+    if (-not (Test-Path -LiteralPath $archivePath)) {
+        Fail 'CURRENT_STATE history archive is missing'
+    } else {
+        $archiveHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
+        $archiveLines = (Get-Content -Encoding UTF8 -LiteralPath $archivePath).Count
+        if ($archiveHash -ne [string]$manifest.archive.sha256) { Fail "CURRENT_STATE history archive hash mismatch: $archiveHash" }
+        if ($archiveLines -ne [int]$manifest.archive.lines) { Fail "CURRENT_STATE history archive line mismatch: $archiveLines" }
+        if ($archiveHash -eq [string]$manifest.archive.sha256 -and $archiveLines -eq [int]$manifest.archive.lines) { Pass 'CURRENT_STATE history archive hash/line mapping verified' }
+    }
+    if (-not (Test-Path -LiteralPath $archiveManifestPath)) { Fail 'CURRENT_STATE archive manifest is missing' }
+
+    $budgetScript = Join-Path $root 'tools/agent_context_budget.ps1'
+    if (-not (Test-Path -LiteralPath $budgetScript)) {
+        Fail 'agent_context_budget.ps1 is missing'
+    } else {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $budgetScript
+        if ($LASTEXITCODE -ne 0) { Fail "agent context budget failed: exit $LASTEXITCODE" } else { Pass 'agent context budget completed' }
+    }
+} else {
+    Fail 'maintenance manifest schema 2 context gates are missing'
 }
 
 Write-Host "`nFreshness summary: PASS checks completed; WARN=$($warnItems.Count); FAIL=$($failItems.Count)."

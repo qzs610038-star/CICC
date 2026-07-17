@@ -18,6 +18,13 @@
 - `tests/run_single_camera_f1_host.ps1`：严格 Host 编译与执行入口。
 - `tests/run_single_camera_classifier_host.ps1`：五色和正方体优先分类的 Host 回归入口。
 - `tests/run_single_camera_feature_adapter_host.ps1`：特征快照 flags 的 fail-closed Host 回归入口。
+- `include/single_camera_runtime.h` 与 `src/single_camera_runtime.c`：平台无关的
+  `read/ack/submit/emit` runtime seam；事件采用版本化 `@E|v=1|...` 键值行，ARM 永久禁用。
+- `include/single_camera_fake_transport.h` 与 `src/single_camera_fake_transport.c`：确定性 Host
+  fake transport，不含 COM、UART、MMIO 或机械臂协议。
+- `include/single_camera_mmio_transport.h` 与 `src/single_camera_mmio_transport.c`：地址/ABI
+  未确认前的 fail-closed 占位 backend，全部操作返回 `SC_TRANSPORT_UNAVAILABLE`。
+- `tests/run_g2_host_evidence.ps1`：自动定位 VS2022/MSVC 的非交互 G2 Host runner；对象文件只落在系统临时目录。
 - `../integration/single_camera_feature_contract.md`：分类器唯一允许的未来 FPGA
   特征来源；当前是无地址的 Host 契约，不能据此编写 MMIO。
 
@@ -30,4 +37,6 @@
   任务判定，现场标定前不得将圆柱/锥体细分作为得分能力宣称。
 - `ARM_ENABLED=0`；任何 `EXECUTE` 都只表示 F1 应显示 `ARM_DISABLED`，绝不
   发送机械臂请求。
+- runtime seam 的 `source=fake_transport` 仅证明 Host/fake 事务；它不证明 RISC-V ELF、
+  APB、UART 或板级能力。真实 APB ABI 经过独立审核后，才可新增 production backend。
 - 同次 Efinity GUI 生成 `soc.h`、linker 和合法 SoC 资源后，才添加平台适配层。

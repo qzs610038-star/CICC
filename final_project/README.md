@@ -14,11 +14,10 @@ MIPI 摄像头
 -> HDMI 显示与 myCobot 控制
 ```
 
-## 当前视频链路状态
+## 状态与证据入口
 
-- 当前双摄像头视频链路、上板证据、LED 诊断映射、SW4 约束与下一步分支：[video_link_current_state_20260711.md](docs/debug_sessions/video_link_current_state_20260711.md)。
-- 每轮 HDMI/MIPI 上板调试的详细历史日志：[hdmi_stripe_debug_20260707.md](docs/debug_sessions/hdmi_stripe_debug_20260707.md)。
-- 当前硬件状态：ch1 I2C 控制有响应，但尚未观测到稳定 CSI 视频帧；请优先阅读上述现状摘要，不要根据早期日志重复修改 HDMI/DDR 下游逻辑。
+- 当前完成度、阻塞、下一 Gate 和禁止项只见根目录 [CURRENT_STATE.md](../CURRENT_STATE.md)。
+- 历史视频调试记录：[video_link_current_state_20260711.md](docs/debug_sessions/video_link_current_state_20260711.md) 与 [hdmi_stripe_debug_20260707.md](docs/debug_sessions/hdmi_stripe_debug_20260707.md) 仅作证据，不定义当前状态。
 
 ## 当前实施方案
 
@@ -26,15 +25,11 @@ MIPI 摄像头
 - FPGA ROI/统计特征预处理模块的范围、接口、实施阶段和队友交接约束：[fpga_vision_preprocess_execution_plan_20260711.md](docs/technical_plans/fpga_vision_preprocess_execution_plan_20260711.md)。
 - 其他已批准或待执行的技术方案统一从 [technical_plans/README.md](docs/technical_plans/README.md) 进入。
 
-## 当前系统集成状态
+## 系统集成索引
 
-- 两位队友分支与个人工作区已在本地整合：Host CPU/competition 回归 795/795 PASS，8 个关键 C 源完成 Efinity RISC-V strict compile-only；正式链接、烧录和板级运行尚未验证。详见 [团队整合 Review Packet](docs/review_packets/team_integration_merge_review_20260713.md)。
-- CPU 侧已有五色/四任务 matcher、完整 `round_controller` 和轻量 `competition_round_transaction`；`main.c` 尚未接入两层逐轮控制器、正式 APB/OSD 或 arm done/ACK。
-- FPGA 合成像素源已接入当前验证路径，整合工程 map PASS；PNR 因 1,776 个 IO 无 placement 与 `outpad` 断言 FAIL，没有可验收 bitstream。合成源不替代真实摄像头。
-- myCobot 的板上 CPU 协议与控制器已有代码和 mock 测试骨架；正式 UART、接线/电平和动作验证尚未开始，PC `pymycobot` 不进入比赛闭环，真实动作维持 NO-GO。
-- CPU/APB/OSD 仍受生成 SoC 产物门禁：当前缺少正式 `soc.h`、APB slave、CDC RTL 和地址分配，见 [生成 SoC 摘要](docs/architecture/generated_soc_summary_2026-07-11.md)。
-- 全项目的当前路线、阻塞和待定决策以根目录 [CURRENT_STATE.md](../CURRENT_STATE.md) 为准。
-- 当前代码分层与门禁见 [2026-07-13 综合架构快照](docs/architecture/current_code_architecture_2026-07-13.md)。
+- 动态状态：[CURRENT_STATE.md](../CURRENT_STATE.md)。
+- 接口契约：`integration/`；历史架构快照：`docs/architecture/`；审查证据：`docs/review_packets/`。
+- README 不维护测试计数、资源数、warning 数、构建 PASS 或板级结论，避免与证据和状态入口漂移。
 
 ## 目录边界
 
