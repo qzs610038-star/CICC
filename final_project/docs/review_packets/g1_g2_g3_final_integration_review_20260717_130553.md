@@ -2,11 +2,11 @@
 
 ## 结论与隔离边界
 
-- 审查基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`。
-- G1、G2、G3 三个分支的 HEAD 均仍为该基线；G1/G2 成果只有未提交工作树补丁，因此本轮执行的是“核验后导入 G3”，不是 `git merge`。
+- 工程证据输入基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`。
+- 已验证 G1/G2/G3 内容提交：`683814edb46f0185fe61df5e6829ce2862fccca4`。G1/G2 源分支没有独立新增 commit，其成果通过核验后随该 G3 提交纳入。
 - 组合工作树：`D:\CICC-g3-context-slim`，分支 `codex/g3-context-slim`。
-- 源仓库 `D:\第十届集创赛-雄芯院材料` 保持 `main`、同一 HEAD、clean。
-- 未 fetch、未 commit、未 push、未合并 main、未删除任何 worktree，也未执行下载、烧录、串口写入或机械臂动作。
+- 合并到本地 `main` 后，以 Git 实读 HEAD 和本 Packet 的最终验证记录为准；merge commit 不得被误写为新的硬件证据批次。
+- 未 fetch、未 push、未删除任何 worktree，也未执行下载、烧录、串口写入或机械臂动作。
 
 ## G1 探测与纳入
 

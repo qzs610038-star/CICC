@@ -1,6 +1,6 @@
 # CURRENT_STATE — 当前状态快照
 
-> 状态基线：`main@489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`（G3 固定基线，2026-07-17）。
+> 工程证据输入基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`；已验证 G1/G2/G3 内容提交：`683814edb46f0185fe61df5e6829ce2862fccca4`（2026-07-17）。
 > 真实源码、工程 XML、构建日志和板上现象是最终事实；本文件仅索引当前结论、阻塞和下一 Gate。
 > 稳定架构与安全红线见 [AGENTS.md](AGENTS.md)，官方任务见 [0710 比赛细则](final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md)。
 
@@ -8,10 +8,10 @@
 
 ### 当前 main / SHA
 
-- 固定状态基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`。
-- `G1_G2_VERIFIED_PATCHES_IMPORTED`：G1/G2 源 worktree 均没有新增 commit；经独立核验的补丁已导入本 G3 worktree，但仍是未提交整合，不得称为 Git merge 或已进入 `main`。
-- 本快照描述“固定 SHA + 当前 G3 未提交整合补丁”；G1/G2 源 worktree 的其他 dirty 内容和外部产物不能自动成为事实。
-- `POST_MERGE_REFRESH_REQUIRED`：审核者形成最终 commit/合并后，必须基于结果 HEAD 重跑 freshness/context budget，更新 manifest 的 `last_verified_commit` 并复核本快照和 Review Packet；本轮不得预写未来 SHA。
+- 工程证据输入基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`；已验证整合内容提交：`683814edb46f0185fe61df5e6829ce2862fccca4`。
+- `G1_G2_VERIFIED_PATCHES_COMMITTED`：G1/G2 源 worktree 没有独立新增 commit；其经核验补丁随 G3 内容提交纳入。不得把源 worktree 的其他 dirty 内容或外部产物自动视为已合并事实。
+- 本快照描述上述内容提交及随后仅用于记录验证基线的治理元数据；真实 `main`/HEAD 必须以 Git 实读为准。
+- `POST_MERGE_REFRESH_REQUIRED`：合并到本地 `main` 后必须在结果 HEAD 重跑 freshness/context budget、handoff、G2 离线测试与范围检查；若工程输入相对内容提交变化，G1 证据立即失效。
 
 ### 单摄 FPGA / Hard SoC
 
