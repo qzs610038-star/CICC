@@ -8,7 +8,7 @@
   2026-07-17 状态覆盖:
     - 当前 Gate 与完成度以仓库根目录 CURRENT_STATE.md 为准。
     - 最新 main 已整合 G1/G2/G3 离线证据；当前 NEXT_GATE 仅为匹配
-      bitstream + USER2 + 片上 RAM UART0 Hello。
+      bitstream + USER2 + 片上 RAM UART0 115200 bps Hello。
     - UART2、J52 和 myCobot 仍禁止。
     - 下方 2026-07-15 停工记录仅作历史审计，不再代表当前 Gate。
 
