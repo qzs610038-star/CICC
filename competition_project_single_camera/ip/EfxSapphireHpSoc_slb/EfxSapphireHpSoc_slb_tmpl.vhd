@@ -59,8 +59,8 @@ port (
     ut_jtagCtrl_tdi : in std_logic;
     ut_jtagCtrl_tdo : out std_logic;
     ut_jtagCtrl_update : in std_logic;
-    system_uart_0_io_rxd : in std_logic;
-    system_uart_0_io_txd : out std_logic;
+    system_uart_1_io_rxd : in std_logic;
+    system_uart_1_io_txd : out std_logic;
     cfg_done : in std_logic;
     cfg_start : out std_logic;
     cfg_sel : out std_logic;
@@ -137,8 +137,8 @@ port map (
     ut_jtagCtrl_tdi => ut_jtagCtrl_tdi,
     ut_jtagCtrl_tdo => ut_jtagCtrl_tdo,
     ut_jtagCtrl_update => ut_jtagCtrl_update,
-    system_uart_0_io_rxd => system_uart_0_io_rxd,
-    system_uart_0_io_txd => system_uart_0_io_txd,
+    system_uart_1_io_rxd => system_uart_1_io_rxd,
+    system_uart_1_io_txd => system_uart_1_io_txd,
     cfg_done => cfg_done,
     cfg_start => cfg_start,
     cfg_sel => cfg_sel,

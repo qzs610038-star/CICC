@@ -2,8 +2,8 @@
     "PLL": {},
     "GPIO": {
         "UART": [
-            "system_uart_0_io_rxd",
-            "system_uart_0_io_txd"
+            "system_uart_1_io_rxd",
+            "system_uart_1_io_txd"
         ],
         "SPI": [],
         "I2C": [],
