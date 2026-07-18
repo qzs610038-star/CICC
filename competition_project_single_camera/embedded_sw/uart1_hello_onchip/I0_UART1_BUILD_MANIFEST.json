@@ -23,21 +23,24 @@
                                 "root":  "efinity",
                                 "relative_path":  "bin/efx_map.exe",
                                 "size":  7766386,
-                                "sha256":  "3A5C1A94B956AA0DE6E27B6A7AB296F4385D5F62FE999AE87A2C020E44EE4B7A"
+                                "sha256":  "3A5C1A94B956AA0DE6E27B6A7AB296F4385D5F62FE999AE87A2C020E44EE4B7A",
+                                "version":  "2025.2.288.4.15"
                             },
                             {
                                 "name":  "riscv-none-embed-gcc.exe",
                                 "root":  "riscv",
                                 "relative_path":  "riscv-none-embed-gcc.exe",
                                 "size":  4012272,
-                                "sha256":  "94447BC6162C88318FD620DD216CF243F3B0C797376D096609FE939ED104C43E"
+                                "sha256":  "94447BC6162C88318FD620DD216CF243F3B0C797376D096609FE939ED104C43E",
+                                "version":  "8.3.0"
                             },
                             {
                                 "name":  "make.exe",
                                 "root":  "make",
                                 "relative_path":  "make.exe",
                                 "size":  238080,
-                                "sha256":  "5D8F07675CE1BB6A0A419EDCA790F8FE1020380322A4CBFC53BEFEB5B4B29E0E"
+                                "sha256":  "5D8F07675CE1BB6A0A419EDCA790F8FE1020380322A4CBFC53BEFEB5B4B29E0E",
+                                "version":  "4.2.1"
                             }
                         ],
     "artifacts":  [
@@ -45,61 +48,61 @@
                           "root":  "evidence",
                           "path":  "efinity_console.log",
                           "size":  5960,
-                          "sha256":  "B9E2F01AB742CF3DFF03EAC57AF086F790F5B9919C7B59A5813E273AEE25ABB4"
+                          "sha256":  "4DD0C40BAF660B440B08B6668617D37ED01476B192663155385CF24F421655B4"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.log",
-                          "size":  541697,
-                          "sha256":  "FDE6E783C5937048895FECB47ED7BE6AE3D68D93D9A5CFB8AD63C692A8DF8F3B"
+                          "size":  541677,
+                          "sha256":  "751B5F6AA271EAD87E79AEFBCAC73AB7DB3E6BC6B054879A8ECE64B91E2D927F"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.map.out",
                           "size":  149123,
-                          "sha256":  "68031148F99142AD2AEE8E0A7CA694DE06BD3839B926C55D1538F4DC731D6C7C"
+                          "sha256":  "2D7527566B2089EDBC5BA3CC1C69AD8CE5ED6CA8B4751F7320720C9AD31259B2"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.map.rpt",
                           "size":  1012552,
-                          "sha256":  "07BA57F15D606A5323307016F6B6AB1511F103A16FA5CEBDA598530945E3030A"
+                          "sha256":  "9A80554339B55772D514096DF585661B3A5077195CD88D12AA8B4987897A7421"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.warn.log",
                           "size":  48258,
-                          "sha256":  "B9BDD7F2E4211561B98E95AE3ED868CE84AAE14ADF2A12DDFAC05B7C04B63A08"
+                          "sha256":  "865BEE3EA94793F5A3D51B601A2221FF5D56A1AD1F293D524791237157B1F1B8"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pt.rpt",
                           "size":  50464,
-                          "sha256":  "52D8B746FFF8203632779EE8AF2CC4D40078AD4E2657E1FE5FA68CD20EADE61A"
+                          "sha256":  "3CE42D71883381E9AD4CB986246A083247A2E4F7BE673DF749EF4ED13784B61F"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.interface.csv",
                           "size":  108550,
-                          "sha256":  "37C20CBADDB3C4C1BDCC185AC7CB4D260DFCD79824F95715A059137A0C8FC230"
+                          "sha256":  "667EAB85A2DCBE03B1D630C4566FF9C39E6A632065D5A1FCF7E22CDD1F93DA05"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pinout.rpt",
                           "size":  109583,
-                          "sha256":  "E3E307D948AA2739D780F92B4ADE273CE19A7DB0CC07C2E1C6CE638596273451"
+                          "sha256":  "2310FAA7E6CB6230EED718AD74D00642C9DD38077F558F815885D19A87BCE4A4"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.route.rpt",
                           "size":  1267,
-                          "sha256":  "1592723607898B97E286E12DA0F47D6024701DAEE2A28418E72390AA2FA24E2F"
+                          "sha256":  "014BEB6B0796350D0C5D25350C9F2603CC41117A4D955533F3BCD9A3911222CD"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.timing.rpt",
                           "size":  1316684,
-                          "sha256":  "87588A83E907C80A2AD6C983DB479E3333C544847B0DCB5A658961EDFF76ED0D"
+                          "sha256":  "3731B25413218BFB7586CCE142B6FB51BD0A4A2A022B36A2344405CCE88EDF98"
                       },
                       {
                           "root":  "outflow",
@@ -110,32 +113,32 @@
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pgm.out",
-                          "size":  2365,
-                          "sha256":  "BA9C054D5187D66CB4DAAE7E7224F97DB46F930D6AF9EAB0CC1A3930BF678636"
+                          "size":  2363,
+                          "sha256":  "E9D174D789BEB12697D842140EF8A26F17FEA5BB24E305E246546FF134C94C44"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.bit",
                           "size":  11809029,
-                          "sha256":  "971C84EE7A86939688800295BB29E3E0D02A3A3C5F40EB5B4763B6E9B572AF87"
+                          "sha256":  "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.hex",
                           "size":  11809089,
-                          "sha256":  "C7821D8FC6184FE48C02D47878A5253598B7B619378ED163A11541D4A052EA91"
+                          "sha256":  "B5A3F08CDC436EC1440D2D115E39ADDC6E75F2C3A8848DAC9A35713FB541BFA0"
                       },
                       {
                           "root":  "work",
                           "path":  "mem_test.lbf",
                           "size":  2463201,
-                          "sha256":  "BBCAB284F42BA47A73CCE03425E0E351CDECDEA3800C75BD230E4C8C4C102FF2"
+                          "sha256":  "A6417CB0A3573F9E804E0C746221D90B0E4338197E9D6B11B8228E1EEB11243B"
                       },
                       {
                           "root":  "project",
                           "path":  "embedded_sw/uart1_hello_onchip/build/uart1_hello_onchip.elf",
                           "size":  30672,
-                          "sha256":  "98553B804DB8AF6ABCAC673CC24649FEC209C8F2FE67C2BD5FA7C946780E4D87"
+                          "sha256":  "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA"
                       },
                       {
                           "root":  "evidence",

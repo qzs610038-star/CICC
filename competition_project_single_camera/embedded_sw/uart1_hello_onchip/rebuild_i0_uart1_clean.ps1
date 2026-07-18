@@ -47,6 +47,15 @@ function Get-ArtifactRecord([string]$Root, [string]$RelativePath, [string]$RootN
     return [ordered]@{ root = $RootName; path = $RelativePath.Replace('\', '/'); size = [Int64]$file.Length; sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
 }
 
+function Get-ToolVersion([string]$Name, [string]$Path) {
+    switch ($Name) {
+        'efx_map.exe' { return (Get-Item -LiteralPath $Path).VersionInfo.ProductVersion }
+        'riscv-none-embed-gcc.exe' { return ((& $Path --version | Select-Object -First 1) -replace '^.*\)\s*', '') }
+        'make.exe' { return ((& $Path --version | Select-Object -First 1) -replace '^GNU Make\s+', '') }
+        default { return $null }
+    }
+}
+
 Assert-DesignTree
 Assert-FreshDirectory $EvidenceRoot 'EvidenceRoot'
 Assert-FreshDirectory $OutflowRoot 'OutflowRoot'
@@ -146,7 +155,7 @@ $artifactSpec = @(
 )
 $artifacts = @($artifactSpec | ForEach-Object { Get-ArtifactRecord $_.base $_.path $_.root })
 $toolSpec = @(@{name='efx_run.bat';root='efinity';relative_path='bin/efx_run.bat';full_path=$efxRun}, @{name='efx_map.exe';root='efinity';relative_path='bin/efx_map.exe';full_path=$efxMap}, @{name='riscv-none-embed-gcc.exe';root='riscv';relative_path='riscv-none-embed-gcc.exe';full_path=$gcc}, @{name='make.exe';root='make';relative_path='make.exe';full_path=$MakePath})
-$tools = @($toolSpec | ForEach-Object {$f=Get-Item -LiteralPath $_.full_path;[ordered]@{name=$_.name;root=$_.root;relative_path=$_.relative_path;size=[Int64]$f.Length;sha256=(Get-FileHash -LiteralPath $_.full_path -Algorithm SHA256).Hash}})
+$tools = @($toolSpec | ForEach-Object {$f=Get-Item -LiteralPath $_.full_path;$record=[ordered]@{name=$_.name;root=$_.root;relative_path=$_.relative_path;size=[Int64]$f.Length;sha256=(Get-FileHash -LiteralPath $_.full_path -Algorithm SHA256).Hash};$version=Get-ToolVersion $_.name $_.full_path;if($null -ne $version){$record['version']=$version};$record})
 $warningText=Get-Content -LiteralPath (Join-Path $OutflowRoot 'mem_test.warn.log') -Raw
 $manifest=[ordered]@{batch_id='I0_UART1_20260719_CLEAN_LF_FINAL';design_sha=$designSha;design_parent=$designParent;eol='LF clean checkout with core.autocrlf=false';tool=[ordered]@{name='Efinity';version='2025.2.288.4.15';family='Titanium';device='TJ375N529';timing_model='I3'};toolchain_files=$tools;artifacts=$artifacts;warnings=[ordered]@{EFX_0011=([regex]::Matches($warningText,'EFX-0011 VERI-WARNING')).Count;EFX_0200=([regex]::Matches($warningText,'EFX-0200 WARNING')).Count;EFX_0201=([regex]::Matches($warningText,'EFX-0201 WARNING')).Count;EFX_0256=([regex]::Matches($warningText,'EFX-0256 WARNING')).Count;ERROR_OR_FATAL=([regex]::Matches($warningText,'EFX ERROR|EFX FATAL')).Count};non_claims=@('USER2, UART1 terminal I/O, APB MAGIC, ch0/HDMI board regression, UART2/J52, and myCobot remain NOT VERIFIED.')}
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'I0_UART1_BUILD_MANIFEST.json') -Encoding ascii

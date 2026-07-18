@@ -36,6 +36,15 @@ function Assert-HashAndSize([string]$Path, [string]$ExpectedHash, [Int64]$Expect
     if ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ne $ExpectedHash) { throw "SHA-256 mismatch $Label" }
 }
 
+function Get-ToolVersion([string]$Name, [string]$Path) {
+    switch ($Name) {
+        'efx_map.exe' { return (Get-Item -LiteralPath $Path).VersionInfo.ProductVersion }
+        'riscv-none-embed-gcc.exe' { return ((& $Path --version | Select-Object -First 1) -replace '^.*\)\s*', '') }
+        'make.exe' { return ((& $Path --version | Select-Object -First 1) -replace '^GNU Make\s+', '') }
+        default { throw "No version probe for tool: $Name" }
+    }
+}
+
 if ((git -C $designRoot rev-parse HEAD).Trim() -ne $manifest.design_sha) { throw 'HEAD does not equal design_sha.' }
 if ((git -C $designRoot status --porcelain).Length -ne 0) { throw 'Design worktree is dirty.' }
 & git -C $designRoot diff --check
@@ -66,6 +75,7 @@ foreach ($tool in $manifest.toolchain_files) {
     $root = switch ($tool.root) { 'efinity' { $EfinityRoot } 'riscv' { $RiscvToolchainBin } 'make' { Split-Path -Parent $MakePath } default { throw "Unknown tool root: $($tool.root)" } }
     $path = if ($tool.root -eq 'make') { $MakePath } else { Join-CheckedPath $root $tool.relative_path 'toolchain' }
     Assert-HashAndSize $path $tool.sha256 ([Int64]$tool.size) "toolchain $key"
+    if ($tool.PSObject.Properties.Name -contains 'version' -and (Get-ToolVersion $tool.name $path) -ne $tool.version) { throw "Tool version mismatch: $key" }
 }
 
 $seenArtifacts = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
