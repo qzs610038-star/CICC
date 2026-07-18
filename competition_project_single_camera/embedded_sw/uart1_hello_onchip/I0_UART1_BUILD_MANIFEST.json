@@ -1,0 +1,85 @@
+{
+  "batch_id": "I0_UART1_20260719_FINAL",
+  "executor": "libaoxun (Codex)",
+  "build_date": "2026-07-19 Asia/Shanghai",
+  "design_commit": "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
+  "design_parent": "f47af290c2f014dfa8a131a3baebec1e9560ae21",
+  "tool": {
+    "name": "Efinity",
+    "version": "2025.2.288.4.15",
+    "family": "Titanium",
+    "device": "TJ375N529",
+    "timing_model": "I3",
+    "entrypoint": "D:\\Efinity\\2025.2\\bin\\efx_run.bat",
+    "entrypoint_sha256": "46CCF2D36DB0FB6CAA50778E69E11391687DEB5B5BDA079B6541482853A1BE1A",
+    "runner_sha256": "011290D1DFD51CAA8262FCF2517BF83FB42D555097D1AD1A03AD81CCA612BB39"
+  },
+  "project_state_after_run": {
+    "last_run_state": "pass",
+    "last_run_flow": "bitstream",
+    "config_result_in_sync": "sync",
+    "design_ood": "sync",
+    "place_ood": "sync",
+    "route_ood": "sync"
+  },
+  "raw_evidence_root": "D:\\cicc_cbm_link\\competition_project_single_camera\\outflow_i0_uart1_20260719_final",
+  "raw_work_root": "D:\\cicc_cbm_link\\competition_project_single_camera\\work_i0_uart1_20260719_final",
+  "results": {
+    "map": "PASS",
+    "interface": "PASS",
+    "pnr": "PASS",
+    "sta_worst_setup_ns": 1.511,
+    "sta_worst_hold_ns": 0.026,
+    "cdc": "PASS: No Synchronizer warnings to report.",
+    "pgm": "PASS"
+  },
+  "pinout": {
+    "rx": "system_uart_1_io_rxd -> GPIOR_96_CLK13 -> B12",
+    "tx": "system_uart_1_io_txd -> GPIOR_100 -> D12"
+  },
+  "uart": {
+    "uart0_enabled": false,
+    "uart1_enabled": true,
+    "uart2_enabled": false,
+    "baud": 115200,
+    "data_length_encoding": 7,
+    "parity": "NONE",
+    "stop": "ONE",
+    "official_uart_driver_sha256": "05DFD0CF1DF75A7A8DD6FD3DF6F1DC89F0DB99233A69B69DCB57DA9CBCD58B24",
+    "official_uart_driver_path": "D:\\Efinity\\2025.2\\ipm\\ip\\efx_hard_soc\\embedded_sw\\software\\standalone\\driver\\uart.h"
+  },
+  "artifacts": [
+    {"name":"mem_test.log","sha256":"0296CE7F541EEE7488CF9F7ABDFFAFFB1CDE64065F9F6812251D791441ECF85F","size":532377},
+    {"name":"mem_test.map.out","sha256":"8644E5605AAB9860F5012BDE881A53F85CB0A41FBEE4D7B4FDD7B5B20FED08A6","size":138476},
+    {"name":"mem_test.map.rpt","sha256":"D2FD9CB852A394ACB229AB4C5332C3B14BD090012D6D506C1B492521D4B169DE","size":941824},
+    {"name":"mem_test.warn.log","sha256":"035FAE719AABE71BA046E96E9A5619AD6B25CE596D3B66FF44A2E7D6CA121D1D","size":86528},
+    {"name":"mem_test.pt.rpt","sha256":"DF64D8F058E63B8B46CA4684105046E071FBDDF1D8C64AA6A57B5A44F5C79EC1","size":50464},
+    {"name":"mem_test.interface.csv","sha256":"DD5BF934E453F63E1607696B694C3D0B1837DB6EC3C06B8D6B4827C3113D6253","size":108550},
+    {"name":"mem_test.pinout.rpt","sha256":"8512317D20E733B14613BAEDAAD549DFB848BD002FF0135DEC8CCAC243C8AF1A","size":109583},
+    {"name":"mem_test.route.rpt","sha256":"FF9BB509378AD6413916919F5ECD8A982AC13EFF04E6DA33CDC7221DF2D88FFF","size":1267},
+    {"name":"mem_test.timing.rpt","sha256":"9402A7D1CAD94B822D59ED7BDBBB75ACFB95E73DBE4C9721C9D1C8A28B82D26E","size":1316684},
+    {"name":"mem_test.cdc.rpt","sha256":"0C4DEDEF53C5E37AAFB83940864046F70ABA77E0AFBCF0A11B815C7982637031","size":296},
+    {"name":"mem_test.pgm.out","sha256":"0643FA1007AA9B4A3E83C0DB97391DBF08B060A8CF144579CE9E925DB6DA565C","size":2326},
+    {"name":"mem_test.bit","sha256":"8F02D32335C0D4DD70256C2A7D37B84F0A8DB59D3506374256B8D8F6514864E1","size":11809029},
+    {"name":"mem_test.hex","sha256":"ABB35781D2A7613545EB8B53E1CCEB57BAAFCF6CC2D8D1383B40D4487B9A2D11","size":11809089},
+    {"name":"work/mem_test.lbf","sha256":"5F5F20B3EB72126140C55A8845CB6B9DCC41DEBC6BD3314287B161182CA4E02D","size":2465409},
+    {"name":"uart1_hello_onchip.elf","path":"embedded_sw/uart1_hello_onchip/build/uart1_hello_onchip.elf","sha256":"36EBB1BB06E73479897DA834DED6E4E8A06175EEBF31421F1C47CF5F4CE83241","size":30672}
+  ],
+  "warnings": {
+    "post_synthesis_summary": 118,
+    "interface_physical_distance": 4,
+    "raw_complete_flow_records": {
+      "EFX-0011 VERI-WARNING": 396,
+      "EFX-0200 WARNING": 40,
+      "EFX-0201 WARNING": 20,
+      "EFX-0256 WARNING": 28,
+      "EFX_ERROR_OR_FATAL": 0
+    },
+    "disposition": "Retained for review; no warning waiver or board-behavior claim."
+  },
+  "non_claims": [
+    "No UART0/R0 artifact or board result was reused.",
+    "USER2, UART1 terminal echo, APB MAGIC, and ch0/HDMI board regression are NOT VERIFIED.",
+    "UART2/J52 and all myCobot operations are out of scope and were not performed."
+  ]
+}
