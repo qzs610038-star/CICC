@@ -1,0 +1,181 @@
+{
+    "batch_id":  "I0_UART1_20260719_CLEAN_LF_FINAL",
+    "design_sha":  "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
+    "design_parent":  "f47af290c2f014dfa8a131a3baebec1e9560ae21",
+    "eol":  "LF clean checkout with core.autocrlf=false",
+    "tool":  {
+                 "name":  "Efinity",
+                 "version":  "2025.2.288.4.15",
+                 "family":  "Titanium",
+                 "device":  "TJ375N529",
+                 "timing_model":  "I3"
+             },
+    "toolchain_files":  [
+                            {
+                                "name":  "efx_run.bat",
+                                "root":  "efinity",
+                                "relative_path":  "bin/efx_run.bat",
+                                "size":  274,
+                                "sha256":  "46CCF2D36DB0FB6CAA50778E69E11391687DEB5B5BDA079B6541482853A1BE1A"
+                            },
+                            {
+                                "name":  "efx_map.exe",
+                                "root":  "efinity",
+                                "relative_path":  "bin/efx_map.exe",
+                                "size":  7766386,
+                                "sha256":  "3A5C1A94B956AA0DE6E27B6A7AB296F4385D5F62FE999AE87A2C020E44EE4B7A"
+                            },
+                            {
+                                "name":  "riscv-none-embed-gcc.exe",
+                                "root":  "riscv",
+                                "relative_path":  "riscv-none-embed-gcc.exe",
+                                "size":  4012272,
+                                "sha256":  "94447BC6162C88318FD620DD216CF243F3B0C797376D096609FE939ED104C43E"
+                            },
+                            {
+                                "name":  "make.exe",
+                                "root":  "make",
+                                "relative_path":  "make.exe",
+                                "size":  238080,
+                                "sha256":  "5D8F07675CE1BB6A0A419EDCA790F8FE1020380322A4CBFC53BEFEB5B4B29E0E"
+                            }
+                        ],
+    "artifacts":  [
+                      {
+                          "root":  "evidence",
+                          "path":  "efinity_console.log",
+                          "size":  5894,
+                          "sha256":  "12197A0491170701A786BF489D8B54AF88A76395DDCDB85E0F24025AA13AEE1C"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.log",
+                          "size":  541573,
+                          "sha256":  "5E7942058802F15074A4AC8B83AFC240D56C8ADFA85FD7891D32A9B661D6E95E"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.map.out",
+                          "size":  149129,
+                          "sha256":  "E408C1EDC212E6BCE30BA9F1259A6B9A9DB1B4EA86D0C2DFA5BCCA7FECDE3467"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.map.rpt",
+                          "size":  1012540,
+                          "sha256":  "C10B5375556E5EFBA5B29762D2DC33475A4C1DEA6F8926C1A795DBD160158D3B"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.warn.log",
+                          "size":  48258,
+                          "sha256":  "C938FB211CBEAC77799105EA4C74D5B608060353BE30C7BEAEEE271A039284B9"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.pt.rpt",
+                          "size":  50464,
+                          "sha256":  "4C1982C7E17336C2BA947536AA3138D115A0D68EC9030D6C11272CCA46881EA8"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.interface.csv",
+                          "size":  108550,
+                          "sha256":  "72ADEFFE1E84F2053FB2A9776F7B038C0964D0885BEFE28EE4E67741EFB648A2"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.pinout.rpt",
+                          "size":  109583,
+                          "sha256":  "4C654273E494DDD51634F9147013EC73A2D3561C50982443267960D0A57A2007"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.route.rpt",
+                          "size":  1267,
+                          "sha256":  "1E45D368A3A39A5285835A2A253E86E9B29E6BE4632DFAAEA21BE3CA0727C0E0"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.timing.rpt",
+                          "size":  1316684,
+                          "sha256":  "4445AF8A3E0D4453C99D0905D5F8113AE23F70F529955DA68D20733F1E5F1AA5"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.cdc.rpt",
+                          "size":  296,
+                          "sha256":  "0C4DEDEF53C5E37AAFB83940864046F70ABA77E0AFBCF0A11B815C7982637031"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.pgm.out",
+                          "size":  2354,
+                          "sha256":  "1854E796B939D6E0EBC04ADBBB92D20BBC3CF600ECF287153AFCD7ACD9E45A8B"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.bit",
+                          "size":  11809029,
+                          "sha256":  "2738A7FBC3737CB88FA893422C3B08088DD8125D8F0FC3FE99C18D741FBE9B67"
+                      },
+                      {
+                          "root":  "outflow",
+                          "path":  "mem_test.hex",
+                          "size":  11809089,
+                          "sha256":  "C88C1678F1195FFBC988118C1CD5A55A67532FBD4BA7F2D04E25B9DA30B157BE"
+                      },
+                      {
+                          "root":  "work",
+                          "path":  "mem_test.lbf",
+                          "size":  2463505,
+                          "sha256":  "D53B4C16C85CEC09825A18249D43CABBDDB1CE7F2679C59E5C1F28931D47502D"
+                      },
+                      {
+                          "root":  "project",
+                          "path":  "embedded_sw/uart1_hello_onchip/build/uart1_hello_onchip.elf",
+                          "size":  30672,
+                          "sha256":  "C2C5EAF354D5FE7D9292D1B96188FF89267054CCBBE8CD2B222F2205F26E3CA8"
+                      },
+                      {
+                          "root":  "evidence",
+                          "path":  "uart1_hello_build.log",
+                          "size":  416,
+                          "sha256":  "83CAAC75485C8C0098DFE2379C9CA329CE75429C1257F88A29E38CF4EF08B939"
+                      },
+                      {
+                          "root":  "evidence",
+                          "path":  "uart1_hello_readelf.txt",
+                          "size":  1250,
+                          "sha256":  "43C7825F6FEAC3086E17B57772D2469BD53EA9831528001DBC8771CF2C3277F3"
+                      },
+                      {
+                          "root":  "evidence",
+                          "path":  "uart1_hello_undefined.txt",
+                          "size":  0,
+                          "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+                      },
+                      {
+                          "root":  "evidence",
+                          "path":  "preflight.txt",
+                          "size":  180,
+                          "sha256":  "9DC15B0661CF43C3C2877946A989D89D53751F58E5F5B70A53BF7A2964F53CEF"
+                      },
+                      {
+                          "root":  "evidence",
+                          "path":  "postflight.txt",
+                          "size":  137,
+                          "sha256":  "A502C8C5CD0437E379C957838FAD61FC0F48FEFE1D236C3DBBC97E9DCCE03D9F"
+                      }
+                  ],
+    "warnings":  {
+                     "EFX_0011":  198,
+                     "EFX_0200":  20,
+                     "EFX_0201":  10,
+                     "EFX_0256":  14,
+                     "ERROR_OR_FATAL":  0
+                 },
+    "non_claims":  [
+                       "USER2, UART1 terminal I/O, APB MAGIC, ch0/HDMI board regression, UART2/J52, and myCobot remain NOT VERIFIED."
+                   ]
+}
