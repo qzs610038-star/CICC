@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$RunDir,
-    [string]$PythonExe
+    [string]$PythonExe,
+    [ValidateSet('Auto', 'Gcc', 'Msvc')]
+    [string]$CompilerPreference = 'Auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,16 +29,18 @@ $fixedGccCandidates = @(
     (Join-Path $sharedRoot 'tools\mingw64\bin\gcc.exe')
 ) | Select-Object -Unique
 $gccPath = $null
-foreach ($candidate in $fixedGccCandidates) {
-    if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-        $gccPath = (Resolve-Path -LiteralPath $candidate).Path
-        break
+if ($CompilerPreference -ne 'Msvc') {
+    foreach ($candidate in $fixedGccCandidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $gccPath = (Resolve-Path -LiteralPath $candidate).Path
+            break
+        }
     }
-}
-if ($null -eq $gccPath) {
-    $gccCommand = Get-Command gcc -ErrorAction SilentlyContinue
-    if ($null -ne $gccCommand) {
-        $gccPath = $gccCommand.Source
+    if ($null -eq $gccPath) {
+        $gccCommand = Get-Command gcc -ErrorAction SilentlyContinue
+        if ($null -ne $gccCommand) {
+            $gccPath = $gccCommand.Source
+        }
     }
 }
 $pythonPath = $null
@@ -94,7 +98,7 @@ function Invoke-Bundle {
     exit 0
 }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if ($null -ne $gccPath) {
+if ($CompilerPreference -ne 'Msvc' -and $null -ne $gccPath) {
     New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
     $build = Join-Path ([System.IO.Path]::GetTempPath()) ('cicc-g2-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $build | Out-Null
@@ -116,6 +120,9 @@ if ($null -ne $gccPath) {
     $bundleTool = Join-Path $repoRoot 'final_project\tools\board_observability\g2_run_bundle.py'
     Invoke-Bundle -BundleTool $bundleTool -RawLog $rawLog -CompilerVersion $compilerVersion -TestCommandBase64 $testCommandBase64 -TestExit $testExit
 }
+if ($CompilerPreference -eq 'Gcc' -and $null -eq $gccPath) {
+    throw 'HOST_RUNTIME_BLOCKED_COMPILER: GCC requested but gcc.exe is unavailable'
+}
 if (-not (Test-Path -LiteralPath $vswhere)) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: neither gcc nor vswhere.exe is available' }
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: VS2022 C++ tools not found' }
@@ -126,10 +133,47 @@ $envCommand = 'call "' + $vcvars + '" x64 >nul && set'
 $envArgs = @('/d', '/s', '/c', $envCommand)
 $envOutput = & $env:ComSpec @envArgs
 if ($LASTEXITCODE -ne 0) { throw "HOST_RUNTIME_BLOCKED_COMPILER: vcvarsall failed with $LASTEXITCODE" }
+
+$vcvarsEnvironment = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([System.StringComparer]::OrdinalIgnoreCase)
+$vcvarsPathCandidates = New-Object 'System.Collections.Generic.List[string]'
 foreach ($line in $envOutput) {
     if ($line -match '^([^=]+)=(.*)$') {
-        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+        $name = $Matches[1]
+        $value = $Matches[2]
+        if ($name -ieq 'PATH') {
+            $vcvarsPathCandidates.Add($value)
+        }
+        if (-not $vcvarsEnvironment.ContainsKey($name)) {
+            $vcvarsEnvironment.Add($name, $value)
+        }
     }
+}
+
+if ($vcvarsPathCandidates.Count -gt 0) {
+    $selectedPath = $vcvarsPathCandidates[0]
+    foreach ($pathCandidate in $vcvarsPathCandidates) {
+        foreach ($pathEntry in ($pathCandidate -split ';')) {
+            if (-not [string]::IsNullOrWhiteSpace($pathEntry)) {
+                $clCandidate = Join-Path $pathEntry 'cl.exe'
+                if (Test-Path -LiteralPath $clCandidate -PathType Leaf) {
+                    $selectedPath = $pathCandidate
+                    break
+                }
+            }
+        }
+        if ($selectedPath -eq $pathCandidate -and ($pathCandidate -split ';' | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and
+            (Test-Path -LiteralPath (Join-Path $_ 'cl.exe') -PathType Leaf)
+        })) {
+            break
+        }
+    }
+    $vcvarsEnvironment['Path'] = $selectedPath
+}
+
+foreach ($entry in $vcvarsEnvironment.GetEnumerator()) {
+    $environmentName = if ($entry.Key -ieq 'PATH') { 'Path' } else { $entry.Key }
+    [Environment]::SetEnvironmentVariable($environmentName, $entry.Value, 'Process')
 }
 $clCommand = Get-Command cl.exe -ErrorAction SilentlyContinue
 if ($null -eq $clCommand) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: cl.exe not found after vcvarsall import' }
@@ -156,7 +200,14 @@ if ($compileExit -ne 0) {
 $testArgs = @('--raw-log', $rawLog)
 & $exe @testArgs
 $testExit = $LASTEXITCODE
-$compilerVersion = (& $clPath 2>&1 | Select-Object -First 1)
+$savedErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = 'Continue'
+    $compilerVersion = (& $clPath 2>&1 | ForEach-Object { [string]$_ } | Select-Object -First 1)
+}
+finally {
+    $ErrorActionPreference = $savedErrorActionPreference
+}
 $steps = @((New-ArgvStep -Exe $clPath -Args $compileArgs), (New-ArgvStep -Exe $exe -Args $testArgs))
 $testCommandBase64 = Convert-StepsToBase64 -Steps $steps
 $bundleTool = Join-Path $repoRoot 'final_project\tools\board_observability\g2_run_bundle.py'
