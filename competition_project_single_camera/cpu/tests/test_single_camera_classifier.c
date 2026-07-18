@@ -5,8 +5,16 @@
 static int checks;
 static int failures;
 
-#define CHECK(expr) do { checks++; if (!(expr)) { failures++; \
-    printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); } } while (0)
+static void record_check(int condition, int line, const char *expression)
+{
+    checks++;
+    if (!condition) {
+        failures++;
+        printf("FAIL %s:%d: %s\n", __FILE__, line, expression);
+    }
+}
+
+#define CHECK(expr) record_check(!!(expr), __LINE__, #expr)
 
 static sc_features_t features(uint32_t red, uint32_t blue, uint32_t yellow,
                               uint32_t foreground, uint16_t width, uint16_t height,
