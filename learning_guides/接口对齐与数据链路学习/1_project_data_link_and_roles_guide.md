@@ -1,6 +1,6 @@
 # 1. 项目数据链路与三人分工对齐指南
 
-本指南配合单摄隔离候选工程（[competition_project_single_camera](../../competition_project_single_camera/)）的最新标准，详细拆解单摄 F1 阶段的系统级数据链路传输规则，并明确团队三位成员（A: libaoxun, B: wsc, C: qzs）的分工边界。
+本指南配合正式单摄视频/识别工程（[competition_project_single_camera](../../competition_project_single_camera/)）的冻结标准，详细拆解单摄 F1 阶段的系统级数据链路传输规则，并明确团队三位成员（A: libaoxun, B: wsc, C: qzs）的唯一写入边界。原双摄方案已取消。
 
 ---
 
@@ -132,7 +132,7 @@ flowchart TB
     end
 
     subgraph AREA_C["C：集成、安全与板级 Gate（qzs）"]
-        UART0["I0 UART0<br/>115200 Hello / 回显"]
+        UART1["I0 SoC UART1 -> Type-C UART1<br/>115200 Hello / 回显"]
         UART2["I5 UART2<br/>1,000,000 bps；F1 BLOCKED"]
         ARM["myCobot 280<br/>F1 阶段物理断开"]
     end
@@ -155,14 +155,14 @@ flowchart TB
     CTRL -.->|结果 staging / commit| I4
     I4 -.->|整体锁存后渲染| OSD
     OSD -.->|字符叠加（待接入）| HDMI
-    CPU -->|I0：Hello / 回显| UART0
+    CPU -->|I0：Hello / 回显| UART1
     CPU -.->|I5：ARM_DISABLED；不发送控制帧| UART2
     UART2 -.->|物理断开| ARM
 
     class CAM,VID,HDMI,TAP fpga;
     class CPU,ADAPT,CLS,CTRL cpu;
     class I1_SNAP,I1_BUS,I2_STAGE,I2_COMMIT,I2_ACTIVE,I4,OSD proposed;
-    class UART0,UART2,ARM safety;
+    class UART1,UART2,ARM safety;
     class OVR alert;
 ```
 
@@ -175,7 +175,7 @@ flowchart TB
 *   **Tap 旁路 (feature statistics tap)**：从高速视频流中旁路“只读监听”出特征数据，不介入视频主干，不会造成画面卡顿。
 *   **QCRV32 CPU**：板上运行的 32 位轻量级 RISC-V CPU 软核，用于运行 C 程序分类器和控制状态机。
 *   **OSD (On-Screen Display)**：未来的屏幕字符显示叠加器。拟议职责是在 HDMI 输出上绘制可解释文字；目标框、字体、清屏和像素渲染细节均尚未冻结或实现。
-*   **UART0**：调试串口（115200bps），用来让 CPU 向上位机电脑“自证存活”（打印 Hello）。
+*   **I0 UART1**：SoC UART1 路由到板载 Type-C UART1（RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`），115200bps，用来让 CPU 向上位机电脑“自证存活”。UART0/R0 仅作历史证据。
 *   **UART2**：机械臂控制串口（1000000bps），用于发送 myCobot 的控制指令帧。
 *   **myCobot 280**：六轴桌面机械臂，执行最终的分拣物块抓取和轻拿轻放动作。
 *   **CDC (Cross Clock Domain，跨时钟域)**：在不同频率时钟电路（如视频像素时钟域与 APB 总线时钟域）之间进行安全的信号同步与传输。
@@ -199,11 +199,11 @@ flowchart TB
 
 在摄像头采用单路分工（ch0）的配置下，接口的详细规则如下：
 
-### 3.1 I0: CPU 生命证明（QCRV32 $\rightarrow$ UART0）
+### 3.1 I0: CPU 生命证明（QCRV32 SoC UART1 $\rightarrow$ Type-C UART1）
 *   **提供方**：CPU (B 负责固件，C 负责测试与串口采集)
 *   **消费方**：Host 主机 / 调试串口助手
-*   **物理层**：UART0 引脚，波特率固定 `115200`。
-*   **功能**：CPU 启动后通过 UART0 打印首字符及 Hello 横幅，并回显接收到的单字符。G1b 仅证明当前批次的 CPU/ELF/UART0 子门；必须另立 G1c Review Packet 后才可只读 APB MAGIC，绝不自动授权 I1-I4 业务 MMIO。
+*   **物理层**：RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`，`115200 8N1`。
+*   **功能**：CPU 启动后通过 UART1 打印首字符及 Hello 横幅，并回显单字符。同一固定输入 hash 可在一次批准窗口内继续只读 APB MAGIC；这只关闭 I0-SMOKE，不自动授权 I1-I4 业务 MMIO。
 
 <details>
 <summary>💡 点击展开/收起：I0 接口生动形象中文介绍</summary>
@@ -359,4 +359,4 @@ sequenceDiagram
 ### C：机械臂控制调试与项目系统维护负责人 (qzs) 的“安全与集成关口”
 *   [ ] **物理断线确认**：UART2（J52）控制线与 myCobot 机械臂是否已完全拔除？
 *   [ ] **F1 安全语义确认**：I4 的拟议结果语义是否保持 `arm_enabled=0` 与 `EXECUTE_ARM_DISABLED`？这不是已存在的 OSD 回写结构体，更不代表 UART2 已初始化。
-*   [ ] **板级 Gate 推进**：是否严格按照 G1a (USER2) $\rightarrow$ G1b (Hello) $\rightarrow$ G1c (只读 APB MAGIC) 的顺序进行验证？（禁止在 G1c 成功前对 MMIO 地址发起试探性读写，防止总线死机）。
+*   [ ] **板级 Gate 推进**：是否先固定 I0-BUILD 输入/hash，再在一次批准窗口内按 USER2 $\rightarrow$ UART1 Hello $\rightarrow$ 只读 APB MAGIC 连续完成 I0-SMOKE？（禁止对未由新 `soc.h` 证明的 MMIO 地址试探读写）。

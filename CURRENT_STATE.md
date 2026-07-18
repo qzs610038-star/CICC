@@ -1,8 +1,12 @@
-# CURRENT_STATE — 三人本地集成候选状态
+# CURRENT_STATE — 单摄接口冻结与三人最终日状态
 
 > 日期：2026-07-18（Asia/Shanghai）
 > 正式 `main` 仍为 `9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`；本文件描述独立分支 `codex/qzs-wsc-libaoxun-integration-20260718`。
 > 真实源码、工程 XML、构建日志和板上现象是最终事实；稳定架构与安全红线见 [AGENTS.md](AGENTS.md)。
+
+- 证据索引：`competition_project_single_camera/integration/interface_freeze_manifest.json`
+- 证据路径：`competition_project_single_camera/integration/I0_UART1_INTERFACE_FREEZE.md`
+- 证据路径：`docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md`
 
 ## CURRENT_SNAPSHOT
 
@@ -13,6 +17,9 @@
 - libaoxun：PR #13 `5bada18a4079053b0531772b2ab645492043e912`，合入提交 `8495859`。
 - WSC 根目录四份重复指南已排除；唯一规范版本位于 `learning_guides/接口对齐与数据链路学习/`。
 - 当前结果只存在于独立本地集成分支；尚未合入 `main`，尚未推送。
+- 2026-07-18 用户与三位协作者确认：正式视频/识别路线固定为单摄 J48/ch0，原双摄方案取消；三人文件范围已冻结。
+- I0 固定为 SoC UART1 → 板载 Type-C UART1，`115200 8N1`，RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`。UART0/R0 退出活动路线，仅保留历史证据。
+- I0 UART1 板级状态仍为 `NOT VERIFIED`；片上 RAM 地址继续以同批 `soc.h` 核对，预期启动区域为 `0xF9000000`，不得凭旧批次外推。
 
 ### CPU / F1 语义裁决
 
@@ -21,10 +28,11 @@
 - runtime 已实现终态 idle-drain：结果锁存后只对成功读取的同一 `frame_id` 做释放 ACK，更新帧序水位，不再分类、不产生第二个结果、不触发动作。
 - 撕裂、配置版本错误或释放 ACK 失败继续 fail-closed。该逻辑仅为 Host seam；真实 I1/APB/CDC wire ABI 仍未冻结、未实现、未上板。
 - `ARM_ENABLED=0`；UART2/J52、myCobot transport、接线和动作继续禁止。
+- myCobot 正式速率仍为 `1000000`，与 I0 UART1 `115200` 完全独立；本次 Gate 放宽不适用于机械臂。
 
 ### 离线测试状态
 
-旧 `182/182`、`921/921` 均为历史计数，不得继承。用户已要求停止后续检测，最终状态如下：
+旧 `182/182`、`921/921` 均为历史计数，不得继承。2026-07-18 本次接口治理后的状态如下：
 
 | 项目 | 当前结果 |
 |---|---|
@@ -34,51 +42,62 @@
 | G2 bundle 格式校验 | `PASS`；runner 已修复为传播 C 测试失败码 |
 | classifier 直接 Host 入口 | `FAIL`：MSVC `/W4 /WX` 下测试宏常量表达式触发 `C4127`，测试可执行文件未运行 |
 | classifier/F1/adapter 原 GCC 入口 | 本机无 `gcc`；已增加 VS2022 fallback，其中 classifier 仍为上述 `FAIL` |
-| `tools/offline_presubmit.ps1` | `NOT RUN`（用户要求停止检测） |
-| myCobot 非动作 QEMU/Host 完整矩阵 | `NOT RUN`（用户要求停止检测） |
-| freshness / context budget / 最终 handoff health | `NOT RUN`（用户要求停止检测） |
-| PowerShell fail-closed 负例 / `git diff --check` | `NOT RUN`（用户要求停止检测） |
+| `tools/offline_presubmit.ps1` | `PASS_WITH_WARNINGS`；沙箱外真实运行 exit 0，接口冻结、G2 bundle/runtime、QEMU、空白与 diff 检查均 PASS |
+| myCobot 非动作 QEMU skeleton | `PASS`；仅断言执行，不授权 UART2/J52、接线或动作；完整矩阵仍未重跑 |
+| freshness / context budget / handoff health | `PASS`；freshness 有 7 个既有/dirty/stale/CBM WARN，无 FAIL |
+| 接口冻结 / qzs 范围 / `git diff --check` | `PASS`；wsc、libaoxun 白名单已静态加载；各自分支仍须单独执行 |
+| PowerShell fail-closed 负例 | 本次未单独重跑 |
 
 Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ### FPGA / Hard SoC 制品批次
 
-本次集成没有修改 `mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`src/apb_reg_magic.v`、Hard SoC `settings.json`、UART0 Hello `build.ps1` 或 `src/main.c` 的 Git blob。因此本次合并本身不强制重跑 Efinity，也不自动使 Hello ELF 失效。
+当前生成 Hard SoC 仍是 UART0 配置：`PERI_UART_0=1`、`PERI_UART_1=0`，wrapper、`.peri.xml` 和 `soc.h` 只包含 UART0。因此 I0 UART1 是已冻结目标接口，不是已实现接口。启用 UART1 将改变 IP/wrapper、`.peri.xml`、BSP/`soc.h`、bitstream 和 Hello ELF，必须建立全新原子批次。
 
 | 批次 | 制品 | 当前结论 |
 |---|---|---|
-| G1 历史离线批次 | bitstream `A897...1ACD` / ELF `E5BC...1928A` | 冷构建和离线操作包可追溯；不得与 R0 混用，不是当前下一 Gate 活动批次 |
-| R0 唯一活动批次 | bitstream `9F6F...8F320` / ELF `CD4C...9411B` | 独立 manifest 已绑定八项输入 blob；PR #13 文档报告 USER2、四 hart/PC、APB MAGIC，但原始外部日志本轮未独立复核；UART0 COM12/COM17 均为 0 RX bytes，仍 `BLOCKED` |
+| G1 历史离线批次 | bitstream `A897...1ACD` / ELF `E5BC...1928A` | `HISTORICAL`；不得继承到 UART1 |
+| R0 UART0 历史批次 | bitstream `9F6F...8F320` / ELF `CD4C...9411B` | `HISTORICAL / SUPERSEDED`；原始结论与 0-byte UART0 记录保留，不再排障 |
+| I0-UART1 新批次 | 尚未生成 | `NOT STARTED`；等待 libaoxun Efinity 原子生成与 wsc UART1 Hello |
 
-- R0 manifest：[`r0_current_batch_manifest_20260718.json`](competition_project_single_camera/docs/debug_sessions/r0_current_batch_manifest_20260718.json)。
-- 串口采集脚本只允许 `COM12`/`COM17`，并要求枚举身份为 CH340 `VID:PID 1A86:7523`、匹配 R0 manifest 和独立批准 JSON。
-- 采集脚本仅完成 PowerShell 语法解析 `PASS`；实际 dry-run、错误 manifest/hash/端口/批准 JSON 负例均为 `NOT RUN`。
+- R0/UART0 历史索引：[`UART0_R0_HISTORICAL_INDEX_20260718.md`](competition_project_single_camera/docs/debug_sessions/UART0_R0_HISTORICAL_INDEX_20260718.md)。
+- I0 UART1 冻结页：[`I0_UART1_INTERFACE_FREEZE.md`](competition_project_single_camera/integration/I0_UART1_INTERFACE_FREEZE.md)。
+- 禁止手改生成 wrapper/`soc.h` 或复用 R0 COM口、批准 JSON、bitstream、ELF 和采集结论。
 
 ## CURRENT_BLOCKERS
 
 1. classifier 严格 Host 入口仍为 `FAIL(C4127)`。
 2. 任务二非正方体识别未实拍标定，完整能力为 `BLOCKED`。
 3. idle-drain 仅 Host 验证；真实 I1 单槽、ACK、overrun、CDC 和 APB ABI 未冻结。
-4. R0 UART0 横幅仍为 0 字节阻塞；PR #13 的 USER2/PC/APB 结论未由本轮直接读取原始外部日志复核。
+4. I0 UART1 的 Hard SoC/IP/`.peri.xml`/BSP/`soc.h`/Hello 尚未生成；当前无可用于 UART1 的匹配 bitstream/ELF。
 5. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
 
 ## NEXT_GATE
 
-1. 三位队友先在各自本机基于本集成分支决定 I1/I2/I3/I4 接口文件、下一步任务分工与实施方案；本步骤只做本地设计确认，不授权硬件动作。
-2. 修复 classifier 的 MSVC `C4127` 严格测试入口，再重跑完整离线矩阵、presubmit、freshness、handoff 和脚本负例。
-3. 接口语义确认后，由独立 F1 ABI Review Packet 冻结 I1 snapshot/ACK/flush、I2 配置和 I4 结果语义；禁止提前手填 APB 地址。
-4. 若继续 R0，只能使用 R0 manifest 的匹配制品，并在用户确认的 CH340 COM12 或 COM17 上同步 CPU/SoC reset 做只读采集；本文件不授权执行该动作。
-5. UART2/J52、机械臂接线、myCobot 帧和动作继续 `NO-GO`。
+1. wsc 修复 classifier 的 MSVC `C4127` 严格入口并重跑 classifier/F1/adapter/runtime；qzs 已完成本基线离线、freshness、handoff、冻结/范围检查，并在两位队友固定 SHA 合并后再执行一次最终刷新。
+2. libaoxun 在 Efinity 中启用 SoC UART1、路由 Type-C `GPIOR_96/GPIOR_100`，原子生成 IP/wrapper/`.peri.xml`/BSP/`soc.h`，再冷构建新 bitstream。
+3. wsc 仅依据新 `SYSTEM_UART_1_*` 宏构建片上 RAM UART1 Hello ELF；禁止猜基址。
+4. 固定新输入与制品 hash 后，在一次批准窗口内连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认。
+5. I0-SMOKE PASS 后直接进入受审 I1-I4；UART2/J52、机械臂接线、myCobot 帧和动作继续独立 `NO-GO`。
 
 ## PENDING_DECISIONS
 
-- 三人对 I1/I2/I3/I4 的文件所有权、Review Packet 负责人和下一轮提交边界。
 - 任务二圆柱/锥体真实标定方案与混淆矩阵验收阈值。
 - idle-drain 在真实单槽 I1 中的 wire ACK/flush 编码和跨轮调度规则。
-- R0 UART0 下一次只读排障的唯一端口、接线核验和 reset 时间同步方案。
+- 新 UART1 原子批次生成后的实际 `soc.h` 基址/IRQ、匹配制品 hash 和 Type-C 枚举端口。
 
 ## DEPRECATED_ROUTES
 
 - WSC 根目录四份重复指南：不纳入集成结果。
-- G1 与 R0 manifest/制品混选：禁止。
+- 原双摄视频/识别路线：取消，只作历史资料，不得恢复。
+- G1/R0 UART0 manifest、制品、COM口、操作卡和 0-byte 结论：历史保留，不得改名或继承到 UART1。
 - 纯 FPGA 分类、PC/`pymycobot` 进入正式闭环、UART2/J52 提前接入：禁止。
+
+## HISTORY_ARCHIVE_INDEX
+
+- 历史状态总索引：`debug_records/state_history/archive_manifest.md`。
+- UART0/R0 专项索引：`competition_project_single_camera/docs/debug_sessions/UART0_R0_HISTORICAL_INDEX_20260718.md`。
+
+## POST_MERGE_REFRESH_REQUIRED
+
+当前裁决仍只在独立本地集成分支。合并 libaoxun、wsc 固定 SHA 后，qzs 必须最后刷新本文件、接口 manifest、证据索引和 freshness；合并前状态不得写成正式 `main` 结论。

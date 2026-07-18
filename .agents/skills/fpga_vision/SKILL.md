@@ -12,7 +12,7 @@ description: Handles FPGA top-level, RTL coding, video pipelines (CSI/DSI/OSD/RO
 1. **仅关注 FPGA 边界**：本模块只负责视频接入、Debayer、GAMMA、ROI 提取、基础统计特征、OSD 像素渲染与 UART/AXI/FIFO 物理通道。OSD 的任务/判断/动作语义由板上 CPU 产生；FPGA 不做颜色/形状/尺寸分类、四任务关系判定、逐轮事务、阈值管理或 myCobot 协议（见 `cpu_mycobot` Skill）。
 2. **拒绝过度设计**：不在此处编写复杂视觉识别算法或机械臂轨迹算法。
 3. **时序与约束联动**：任何时钟或复位信号修改必须同步检查 `constrain.sdc` 和 `.peri.xml`；改 `mem_test.xml` 或 IP `settings.json` 触发 Codex Gate。
-4. **双通道对称**：改一路逻辑时，必须同步检查通道 0 / 通道 1 是否需要一致改动（信号和模块常用 `0`/`1` 后缀区分）。
+4. **单摄固定**：正式视频/识别路线只使用 J48/ch0。ch1/双摄/DSI 旧逻辑只作历史或未使用兼容资源；修改 ch0 时检查是否误触旧 ch1，但不得为“对称”恢复双摄功能。
 5. **编译与警告**：Efinity 编译后必须记录 Setup/Hold Slack，不可忽略 CDC Warning；warning 被判断为可忽略时触发 Codex Gate。
 6. **生成产物只读**：不直接改 `ipm/`、赛方补丁、原始压缩包、波形、`outflow/`。
 7. **初赛 demo 仅作经验库**：不直接迁移其中的识别 RTL、`DEMO_MODE`、临时脚本或硬编码路径。

@@ -1,5 +1,7 @@
 # 单摄板上图像识别最小闭环紧急计划
 
+> **HISTORICAL / SUPERSEDED（2026-07-18）：** 本文记录旧 R0/UART0 路线，保留用于追溯，不再作为执行入口。当前 I0 已固定为 SoC UART1 → 板载 Type-C UART1（RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`）；执行以 [`I0_UART1_INTERFACE_FREEZE.md`](../../integration/I0_UART1_INTERFACE_FREEZE.md)、根目录 `CURRENT_STATE.md` 和团队最终日分工为准。不得执行本文的 UART0 步骤或继承旧制品 PASS。
+
 > 日期：2026-07-17
 > 实时仓库基线：`main@9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`
 > 状态：`PLAN ONLY / IMPLEMENTATION NOT STARTED`

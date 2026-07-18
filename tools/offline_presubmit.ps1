@@ -115,6 +115,10 @@ $checks = @(
         Run = { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools/project_freshness_check.ps1') }
     },
     [pscustomobject]@{
+        Name = 'interface_freeze_check'
+        Run = { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools/interface_freeze_check.ps1') }
+    },
+    [pscustomobject]@{
         Name = 'agent_context_budget'
         Run = { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools/agent_context_budget.ps1') }
     },

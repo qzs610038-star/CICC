@@ -1,5 +1,7 @@
 # 2026-07-17—2026-07-21 单摄项目收敛与板卡/协作依赖执行方案
 
+> **HISTORICAL / SUPERSEDED（2026-07-18）：** 本文中的 G1/R0、UART0 和多重 checkpoint 是旧批次计划，只作历史追溯。当前正式执行入口为根目录 `CURRENT_STATE.md`、`competition_project_single_camera/integration/I0_UART1_INTERFACE_FREEZE.md` 与 `docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md`；不得继续执行本文的 UART0 操作卡。
+
 > 审计状态：`AUDITED PLAN / BOARD F0`
 >
 > 当前攻关对象：`competition_project_single_camera/`（板级 Gate 关闭前仍是隔离候选，不替代 `final_project/` 正式协作主线）

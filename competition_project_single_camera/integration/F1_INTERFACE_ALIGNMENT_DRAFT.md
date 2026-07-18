@@ -1,9 +1,9 @@
-# 单摄 F1 接口对齐总账（初步草案）
+# 单摄 F1 接口对齐总账（团队冻结基线）
 
-> 版本：v0.1-draft
+> 版本：v1.0-semantic-freeze
 > 日期：2026-07-18
-> 适用工程：`competition_project_single_camera/`（隔离候选）
-> 状态：`SEMANTICS PARTIALLY FROZEN / WIRE ABI NOT FROZEN / BOARD NOT VERIFIED`
+> 适用工程：`competition_project_single_camera/`（正式单摄视频/识别主线）
+> 状态：`TEAM SEMANTICS CONFIRMED / I0 UART1 ROUTE FROZEN / I1-I4 WIRE ABI NOT FROZEN / BOARD NOT VERIFIED`
 
 ## 0. 用途与边界
 
@@ -41,7 +41,7 @@ flowchart LR
   VID -. "只读旁路；不得回压主链" .-> TAP["feature statistics tap"]
   TAP -. "future snapshot CDC + APB" .-> CPU["QCRV32 CPU"]
   CPU -. "future semantic result" .-> OSD["FPGA OSD renderer"]
-  CPU --> LOG["UART0 115200 debug only"]
+  CPU --> LOG["I0: SoC UART1 -> Type-C UART1, 115200"]
   CPU -. "F1 hard-disabled" .-> ARM["UART2 / myCobot 1000000"]
 ```
 
@@ -51,7 +51,7 @@ F1 的终点是“CPU 产生可解释的识别、判断、执行/不执行语义
 
 | ID | 接口 | 提供方 → 消费方 | 当前状态 | 当前允许的工作 |
 |---|---|---|---|---|
-| I0 | CPU 生命证明 | QCRV32 → UART0 | `BOARD NOT VERIFIED` | 仅当前批次 USER2、片上 RAM、Hello 与回显 Gate |
+| I0 | CPU 生命证明 | QCRV32 SoC UART1 → Type-C UART1 | `ROUTE FROZEN / IMPLEMENTATION PENDING / BOARD NOT VERIFIED` | RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`、`115200 8N1`；等待 Efinity 原子再生成，不猜基址 |
 | I1 | 特征快照 | FPGA → CPU | `SEMANTICS DRAFT / RTL DISCONNECTED` | Host 映射与 RTL/testbench；不得接入或猜测地址 |
 | I2 | 统计配置 | CPU → FPGA | `SEMANTICS DRAFT` | 讨论 ROI/background/mask/`config_seq`；不得实现业务 APB |
 | I3 | 轮次目标与操作事件 | 输入侧 → CPU | `UNSPECIFIED` | 只定义需求与候选状态机；不得沿用旧双摄字段 |
@@ -130,22 +130,21 @@ I4 的提交规则建议为：CPU 写完同一结果的 staging 字段后，以 
 
 | 项目 | 当前规则 |
 |---|---|
-| 物理链路 | UART2/J52，目标波特率 1000000；与 UART0 Hello 完全独立 |
+| 物理链路 | UART2/J52，目标波特率 1000000；与 I0 UART1 Hello 完全独立 |
 | CPU 语义 | F1 只允许 `EXECUTE_ARM_DISABLED`，不得产生传输对象 |
 | 进入条件 | I0、I1、I4 的板级 Gate 关闭后，用户确认电平、线序、共地、固定姿态、速度/角度范围和急停/断电方式，并通过独立 Codex Review Packet |
 | 禁止项 | 当前不得接线、发送帧、执行动作，PC/pymycobot 不进入正式闭环 |
 
-## 9. Gate 与证据矩阵
+## 9. 精简 Gate 与证据矩阵
 
 | Gate | 最小观察 | 证明什么 | 不证明什么 |
 |---|---|---|---|
-| G1a | 匹配 bitstream + USER2 + PC 位于片上 RAM | 调试/下载前置范围 | CPU 已执行 |
-| G1b | UART0 完整 Hello 与单字符回显 | 当前 CPU/ELF/UART0 链路可运行 | APB、特征、OSD、UART2 或机械臂 |
-| G1c | 只读 APB MAGIC | 当前 APB0 基础窗口实读 | I1–I4 业务寄存器可用 |
+| I0-BUILD | 新单摄 UART1 原子批次冷构建、同批 `soc.h`、bitstream/ELF hash | UART1 已被真实生成且制品身份一致 | 板上 CPU/UART/APB 已运行 |
+| I0-SMOKE | 同一次批准窗口连续完成 USER2、片上 RAM、UART1 Hello/回显、只读 APB MAGIC | 当前 CPU/ELF/Type-C UART1/APB0 基础链可运行 | I1–I4 业务寄存器、OSD、UART2 或机械臂 |
 | F1-ABI | 同批 `soc.h`、RTL、CDC、寄存器审查 | I1–I4 可开始实现 | HDMI/板级业务闭环 |
 | F1-board | 特征帧、ACK、CPU 结果、OSD 的原始板级证据 | 无机械臂 F1 闭环 | myCobot 动作能力 |
 
-每个 Gate 的证据必须包含：工程/制品身份、命令或操作卡、原始日志/截图、结果、warning、未验证项。任何 XML、SDC、IP、顶层、BSP 或 linker 输入变化均使相关旧证据失效。
+同一输入 hash 的 I0-BUILD 与 I0-SMOKE 只需一次连续批准，不在 USER2、Hello、APB MAGIC 之间反复确认。只有 XML、SDC、IP、顶层、BSP、linker、接线、制品 hash 或失败现象变化时才重开对应 Gate。证据仍须包含工程/制品身份、命令或操作卡、原始日志/截图、结果、warning 和未验证项。
 
 ## 10. 所有权与变更规则
 
@@ -155,7 +154,7 @@ I4 的提交规则建议为：CPU 写完同一结果的 staging 字段后，以 
 | I1 适配、分类、I3 事务、I4 结果语义 | wsc | libaoxun（真实 ABI）、qzs（状态/安全） |
 | I4 展示要求、I5 安全边界、文档总账与合并 | qzs | wsc（CPU语义）、libaoxun（硬件事实） |
 
-任何接口变更必须在同一个 PR/Review Packet 中回答：
+冻结接口变更必须先获得用户完整口令 `确认接口文件修改，已经和wsc、libaoxun、qzs沟通。`，并在同一个 PR/Review Packet 中回答：
 
 1. 改的是 CPU 语义、线接口 ABI，还是协议？
 2. 生产者、消费者、测试与文档各需要改什么？
@@ -166,7 +165,7 @@ I4 的提交规则建议为：CPU 写完同一结果的 staging 字段后，以 
 
 ## 11. 当前待定项（只能通过证据关闭）
 
-1. 当前 G1 的 USER2、CPU 实际取指、UART0 回显与 APB MAGIC 仍未板级验证；
+1. SoC UART1 尚未在当前 Hard SoC 中启用；必须由 Efinity 生成匹配 wrapper、`.peri.xml`、`soc.h`、bitstream 与 UART1 Hello ELF 后，再执行一次 I0-SMOKE；
 2. I1–I4 的真实 APB 基址、寄存器偏移、PSTRB、IRQ 与复位行为；
 3. I1 snapshot CDC 的具体实现与 RTL testbench 证据；
 4. I3 的真实目标/操作事件来源；
@@ -180,12 +179,12 @@ I4 的提交规则建议为：CPU 写完同一结果的 staging 字段后，以 
 2. **快照要原子。** CPU 不能把帧 N 的 `red_area` 与帧 N+1 的 `bbox_height` 拼成一次识别；`frame_id` + ACK 就是防止这种混帧的收据。
 3. **配置也要原子。** ROI/阈值不能半帧变更；`staging → commit → frame-boundary active` 的目的，是让一帧统计只使用一套参数。
 4. **结果必须可追溯。** `round_id + frame_id + reason` 让 OSD 上的“跳过”可解释为哪一轮、依据哪一帧、为何跳过。
-5. **Gate 是能力边界。** UART0 Hello 只证明 CPU 基础生命，不自动授权 APB、OSD、UART2 或机械臂。
+5. **Gate 是能力边界。** UART1 Hello 只证明 CPU 基础生命；I0-SMOKE 可在同一窗口继续只读 APB MAGIC，但仍不自动授权业务 APB、OSD、UART2 或机械臂。
 
 ## 13. 下一步（只做文档与审查准备）
 
-1. qzs 组织三人逐项确认 I1 字段和 I1 ACK 规则是否为共同理解；有异议先改源契约；
-2. G1b/G1c 板级证据关闭前，不写 I1–I4 的生产 MMIO backend；
-3. G1c 后，由 libaoxun 提供同批 `soc.h`、APB/CDC RTL 与端口事实，由 wsc 提出最小 I1/I4 寄存器草案；
+1. 三人语义与文件所有权已确认；后续按冻结清单执行，不再重复讨论既定方向；
+2. libaoxun 生成新的 SoC UART1/Type-C UART1 原子批次，旧 UART0/R0 只保留为历史；
+3. I0-SMOKE 后，由 libaoxun 提供同批 `soc.h`、APB/CDC RTL 与端口事实，由 wsc 提出最小 I1/I4 寄存器草案；
 4. 再创建一次 F1 ABI Review Packet，逐项把本文件中的 `DRAFT` 改为 `FROZEN`；
-5. I4 板级通过前，I5 保持阻断。
+5. I4 板级通过前，I5 保持阻断；Gate 简化不改变机械臂安全门。

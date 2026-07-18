@@ -15,11 +15,11 @@ description: Handles SoC RISC-V CPU firmware, UART registers, myCobot 280 serial
    - 第一阶段：只做环境检查、COM 口枚举、文档核对、只读状态读取方案。
    - 第二阶段：用户明确确认机械臂已固定、姿态安全、急停/断电方式明确后，才允许 RGB 灯板、读角度或极小幅动作测试。
    - 第三阶段：再讨论板上 CPU 通过 FPGA UART/GPIO 与机械臂控制器的协议桥接。未确认电平、接线和协议前，不把 FPGA 管脚直接接入机械臂控制线。
-4. **波特率分层**：单摄 Hard SoC 的最小 UART0 Hello 固定按其固件 `115200` 验证；myCobot 280 正式串口控制固定 `1000000`。两者不是同一串口 Gate，禁止因 UART0 Hello 通过而推断 UART2/myCobot 链路可用。
+4. **波特率分层**：单摄 Hard SoC 的 I0 固定为 SoC UART1 路由到板载 Type-C UART1（RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`），按 `115200 8N1` 验证；UART0/R0 只作历史证据。myCobot 280 正式 UART2 控制固定 `1000000`。两者不是同一串口 Gate，禁止因 UART1 Hello 通过而推断 UART2/myCobot 链路可用。
 5. **PC 仅开发期**：`pymycobot`、myBlockly、PC 只用于调试/标定/日志，不进正式识别控制闭环（见 `mycobot_pc_tests/` 归档说明）。
 6. **动作类修改触发 Codex Gate**：涉及实际动作、夹爪、快速移动、FPGA-to-机械臂接线、CP210x 驱动安装或 `pymycobot` 控制脚本时，必须生成 Codex Review Packet。
 7. **唯一响应与防重复触发**：稳定识别结果只允许锁存一次本轮事务；同一物体不得因连续视频帧重复触发抓取。非目标物必须明确输出不动作及理由，目标物才可在安全门满足后请求控制器动作。
 8. **目标不等于状态**：host/mock 测试通过不等于 SoC、UART、OSD 或机械臂实机闭环；完成度必须回查 `CURRENT_STATE.md` 和对应板级证据。
 9. **动态状态单一真源**：当前 SoC/BSP 地址、ELF 版图、NOT VERIFIED 项、下一 Gate 和禁止项只从 `CURRENT_STATE.md` 与匹配生成物读取；不得在本 Skill 复制随 SHA 变化的状态或提前试探 MMIO。
-10. **板上验证分层**：严格遵守 `CURRENT_STATE.md` 的当前 Gate；UART0 Hello 与 UART2/myCobot 始终隔离，前者通过也不授权 feature snapshot、OSD、按键、UART2/J52 或机械臂。
+10. **板上验证分层**：严格遵守 `CURRENT_STATE.md` 的当前 Gate；I0 UART1 Hello 与 UART2/myCobot 始终隔离，前者通过也不授权 feature snapshot、OSD、按键、UART2/J52 或机械臂。
 11. **机械隔离继续有效**：CPU 基础启动 Gate 不得连接机械臂或发送 myCobot 帧；扩大到 UART2/J52 必须另行评审电气与只读协议门。

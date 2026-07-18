@@ -1,4 +1,4 @@
-# SESSION HANDOFF — 2026-07-18 三人本地集成候选
+# SESSION HANDOFF — 2026-07-18 单摄接口冻结与三人分工确认
 
 ## 恢复入口
 
@@ -17,6 +17,9 @@
 4. G1 与 R0 分成独立批次。R0 manifest 固定 `9F6F.../CD4C...`、八项输入 blob、COM12/COM17 和 CH340 `1A86:7523`。
 5. PR #12 feature contract 的 Gate 文案已改为未来条件，避免误读成当前全部通过。
 6. G2 runner 已修复为传播 C 测试失败码；直接 Host 脚本增加 VS2022 fallback。
+7. 用户与三人确认单摄为唯一正式视频/识别路线，原双摄方案取消。
+8. I0 固定为 SoC UART1 → 板载 Type-C UART1，RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`、`115200 8N1`；UART0/R0 只保留为历史证据。
+9. 三人文件所有权与精简 Gate 已冻结，见 `docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md`。
 
 ## 已观察测试结果
 
@@ -26,13 +29,13 @@
 - G2 bundle validation：`PASS`
 - classifier 直接 Host 入口：`FAIL`，MSVC `/W4 /WX` 下 `test_single_camera_classifier.c` 常量宏断言触发 `C4127`，可执行文件未运行。
 - PowerShell R0 capture 脚本：仅语法解析 `PASS`。
-- 用户随后要求停止检测；presubmit、myCobot 完整非动作矩阵、freshness、context budget、最终 handoff health、脚本负例和 `git diff --check` 均为 `NOT RUN`。
+- 本次接口治理后已补跑离线门禁：`offline_presubmit=PASS_WITH_WARNINGS`（exit 0），接口冻结、context budget、handoff health、G2 bundle/runtime、QEMU skeleton 和 `git diff --check` 均 PASS；freshness 为 7 WARN/0 FAIL。完整 myCobot 非动作矩阵与 PowerShell fail-closed 负例未单独重跑。
 
 ## 硬件与安全状态
 
 - 本次三方集成未改变 FPGA/Hard SoC 八项关键输入 blob，不因合并自动重跑 Efinity，不因合并自动使现有 Hello ELF 失效。
-- R0 是唯一下一 Gate 活动批次。PR #13 文档报告 USER2、四 hart/PC 和 APB MAGIC；本轮没有重新取得原始外部日志，标记为 `REPORTED / NOT REVERIFIED`。
-- UART0 在 CH340 COM12/COM17 的历史只读窗口均为 0 RX bytes，R0 仍阻塞。
+- R0/UART0 已降级为历史批次，不再作为下一 Gate；其 bitstream/ELF、COM12/COM17 和 0-byte 记录不得继承到 UART1。
+- 当前 Hard SoC 仍只有 UART0：`PERI_UART_1=0`，wrapper/`.peri.xml`/`soc.h` 均未生成 UART1。I0 UART1 为 `ROUTE FROZEN / IMPLEMENTATION PENDING`。
 - UART2/J52、myCobot 接线、帧和动作全部 `NO-GO`；本次没有执行任何硬件或机械臂动作。
 
 ## 三位队友拉取后的第一步
@@ -45,11 +48,11 @@
 4. `competition_project_single_camera/integration/single_camera_feature_contract.md`
 5. `final_project/cpu/CPU_MODULE_PLAN.txt`
 
-随后只决定接口文件、文件所有权、下一步任务分工和 Review Packet 方案。尚未完成三人确认前，不实现真实 MMIO、不接入 OSD、不执行 UART/机械臂硬件动作。
+三人确认已经完成。下一步按所有权表直接执行：libaoxun 生成 UART1 原子硬件批次，wsc 修复离线 FAIL并在新 `soc.h` 后构建 UART1 Hello，qzs 维护冻结/范围检查和最终证据。固定同一输入 hash 后，USER2、UART1 Hello 与 APB MAGIC 使用一次连续批准，不重复确认。
 
 ## 下一执行者必须保留的标注
 
 - `FAIL`：classifier MSVC 严格测试入口。
-- `BLOCKED`：任务二非正方体完整能力、R0 UART0 横幅。
+- `BLOCKED`：任务二非正方体完整能力、I0 UART1 生成与板级链路。
 - `NOT VERIFIED`：真实 I1/APB/CDC、CPU→OSD、正式 RISC-V 集成、板级逐轮事务、机械臂闭环。
-- `NOT RUN`：用户叫停后的完整离线门禁与脚本负例。
+- `NOT RUN`：完整 myCobot 非动作矩阵与 PowerShell fail-closed 负例；不影响本次接口/分工冻结 PASS。

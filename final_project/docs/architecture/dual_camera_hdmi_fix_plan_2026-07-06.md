@@ -1,5 +1,7 @@
 # Dual-Camera HDMI Fix Plan
 
+> **CANCELLED / HISTORICAL ONLY：** 2026-07-18 团队已取消双摄方案，正式路线固定为 `competition_project_single_camera/` 单摄 J48/ch0。不得执行本文修复步骤或恢复双摄闭环。
+
 Date: 2026-07-06
 
 Scope: `final_project/fpga` current working tree. This note reviews the external diagnosis against the real RTL and the official demo, then gives a low-risk repair sequence intended to get one HDMI live-camera pass working before deeper image-quality tuning.

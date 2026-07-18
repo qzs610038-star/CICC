@@ -6,7 +6,7 @@
 2. `CPU → I5 → UART2/J52 → myCobot`：F1 阶段必须保持阻断的安全边界；
 3. `I0 / G1 → F1-ABI → F1-board`：按当前批次证据推进、不得越级的 Gate 链。
 
-> **当前状态（2026-07-18 实读）**：单摄候选仍为隔离候选；I4 为 `SEMANTICS PROPOSED`，I5 为 `OUT OF F1 / BLOCKED`。业务 APB、CDC、ACK、result/OSD 均未实现，板级特征与 OSD 均未验证。本文中实线只表示已存在的结构或已对齐的 Host 语义；虚线均为后续经 Review Packet 才能实现的 F1 目标链路，不得据此手填寄存器地址或进行板级 MMIO 试探。
+> **当前状态（2026-07-18 实读）**：单摄已固定为正式视频/识别路线；I0 UART1 路由已冻结但尚未生成，I4 为 `SEMANTICS PROPOSED`，I5 为 `OUT OF F1 / BLOCKED`。业务 APB、CDC、ACK、result/OSD 均未实现，板级特征与 OSD 均未验证。原双摄方案取消。
 
 权威事实以 [CURRENT_STATE.md](../../CURRENT_STATE.md)、[F1 接口对齐总账](../../competition_project_single_camera/integration/F1_INTERFACE_ALIGNMENT_DRAFT.md) 与 [单摄特征快照契约](../../competition_project_single_camera/integration/single_camera_feature_contract.md) 为准。
 
@@ -30,7 +30,7 @@ qzs 在 F1 中负责集成、安全、证据和文档一致性，而不是越过
 |---|---|---|
 | I4 OSD | 冻结可解释展示需求，核对 `round_id + frame_id + reason` 可追溯性，组织 I4 Review Packet | 宣称已有 result/OSD APB、要求板上清屏或把 OSD 当作已验证功能 |
 | I5 myCobot | 确认 F1 不接 J52、不发帧、不初始化真实 transport；保存安全与 Gate 证据 | 接线、测量/试探 UART2、发送 `GET_ANGLES` 或任何动作帧 |
-| G1 / F1 Gate | 按操作卡收集原始证据、在 Checkpoint A 后审查签发 JSON、阻止越级 | 以离线构建、Hello 或 Host 测试外推 APB、OSD 或机械臂能力 |
+| I0 / F1 Gate | 固定新 UART1 批次 hash 后，一次批准连续完成 USER2、UART1 Hello、APB MAGIC并收集原始证据 | 以离线构建、Hello 或 Host 测试外推业务 APB、OSD 或机械臂能力 |
 
 尺寸目前必须保持不可用；因此任何 F1 结果即使目标条件命中，也只能表达 `EXECUTE_ARM_DISABLED`，不得借由 OSD 文案暗示已经执行机械臂动作。
 
@@ -129,7 +129,7 @@ I4 接口被称为**“中控室的大液晶公告屏”**。它的任务就是�
 
 ### 2.3 何时才可把虚线变成实现？
 
-必须同时具备：当前批次 G1b/G1c 板级证据、用户批准 of I4 原子批次 Review Packet、同批 `soc.h`/RTL/CDC/寄存器定义，以及独立的 result/OSD RTL 与板级原始证据。此前只能做 Host 语义和文档审查。
+必须同时具备：新 UART1 批次 I0-SMOKE、用户批准的 I4 原子批次 Review Packet、同批 `soc.h`/RTL/CDC/寄存器定义，以及独立的 result/OSD RTL 与板级原始证据。此前只能做 Host 语义和文档审查。
 
 ---
 
@@ -200,7 +200,7 @@ flowchart TB
 <details>
 <summary>💡 点击展开/收起：I5 接口语义中文生动折叠介绍</summary>
 
-I5 是系统的**“受独立 Gate 管理的物理动能控制边界”**。其目标串口为 1M，与 UART0 独立；但 F1 阶段定义为 `BLOCKED`，不得接 UART2/J52 信号线、不得发送任何命令帧。后续任何真实接线、查询或动作均须经过独立 Gate、用户确认和安全 Review Packet。
+I5 是系统的**“受独立 Gate 管理的物理动能控制边界”**。其目标串口为 1M，与 I0 UART1 独立；但 F1 阶段定义为 `BLOCKED`，不得接 UART2/J52 信号线、不得发送任何命令帧。后续任何真实接线、查询或动作均须经过独立 Gate、用户确认和安全 Review Packet。
 
 </details>
 
@@ -229,22 +229,22 @@ flowchart TD
 
     %% 上半部分：从1中主路线图截出来的对应片段
     subgraph MAIN_PIECE["【主路线图对应片段】(1号总图中的 Gate 递进关系)"]
-        M_G1A["G1a: USER2下载"] --> M_G1B["G1b: UART0心跳"] --> M_G1C["G1c: APB MAGIC"] --> M_ABI["F1-ABI 审查"] --> M_BOARD["F1-board 验证"]
+        M_BUILD["I0-BUILD: UART1新批次"] --> M_SMOKE["I0-SMOKE: USER2 + UART1 + APB MAGIC"] --> M_ABI["F1-ABI 审查"] --> M_BOARD["F1-board 验证"]
     end
 
     %% 下半部分：在此基础上拓展画出的细致逻辑图与 qzs 的具体行动指南
     subgraph DETAIL_LOGIC["【qzs 负责的集成步骤、Checkpoint 动作与证据收集细致流程】"]
         PRE["1. 制品与Staging预检<br/>(核对 bitstream/ELF 哈希和大小)"]
 
-        A["2. Checkpoint A 暂停<br/>(仅下载 USER2 + RAM，保持挂起)"]
+        A["2. 同一批准窗口加载<br/>(USER2 + RAM，核对 PC 范围)"]
         A_CH{"PC 指针是否在<br/>0xF9000000..0xF9003FFF 范围？"}
 
-        REVIEW["3. qzs 审查原始证据并签发 JSON<br/>(Codex + qzs 联合会审)"]
+        REVIEW["3. qzs 核对制品身份与 PC<br/>(无变化则不重复签发批准)"]
 
-        B["4. Checkpoint B 只读监听<br/>(CPU 恢复运行，启动 UART0)"]
+        B["4. 同一批准窗口只读监听<br/>(CPU 恢复运行，启动 UART1)"]
         HELLO{"串口是否能成功输出 Hello 横幅<br/>且输入单字符能原样回显？"}
 
-        G1C["5. 启动 G1c Review Packet<br/>(发起 APB0 0xE8100000 地址实读)"]
+        APB["5. 同一窗口继续 APB 只读<br/>(地址仅取同批 soc.h)"]
         MAGIC{"读取 MAGIC 值是否等于 0x375A0001？"}
 
         ABI_APPLY["6. 发起 F1-ABI 对齐<br/>(核对同批 soc.h 与 RTL)"]
@@ -253,9 +253,9 @@ flowchart TD
     end
 
     %% 主图与分图拓展关联
-    M_G1A ==> A
-    M_G1B ===> B
-    M_G1C ===> G1C
+    M_BUILD ==> A
+    M_SMOKE ===> B
+    M_SMOKE ===> APB
     M_ABI ===> ABI_APPLY
 
     %% 细节流向
@@ -266,7 +266,7 @@ flowchart TD
     REVIEW -- 签发成功 --> B --> HELLO
     REVIEW -- 拒绝签发 --> STOP
 
-    HELLO -- 是 --> G1C --> MAGIC
+    HELLO -- 是 --> APB --> MAGIC
     HELLO -- 否 --> STOP
 
     MAGIC -- 是 --> ABI_APPLY
@@ -274,8 +274,8 @@ flowchart TD
 
     ABI_APPLY --> BOARD_GO["F1-board 闭环测试"]
 
-    class M_G1A,M_G1B,M_G1C,M_ABI,M_BOARD mainTrack;
-    class PRE,A,B,G1C,ABI_APPLY evidence;
+    class M_BUILD,M_SMOKE,M_ABI,M_BOARD mainTrack;
+    class PRE,A,B,APB,ABI_APPLY evidence;
     class REVIEW,HELLO,MAGIC,A_CH gate;
     class STOP stop;
     class BOARD_GO action;
@@ -284,9 +284,9 @@ flowchart TD
 <details>
 <summary>🔍 点击展开/收起：Gate 递进验证图专有名词释义</summary>
 
-*   **Checkpoint A (预加载暂停)**：将编译得到的二进制 ELF 下载到 QCRV32 的片上 RAM，但保持 CPU 在 halt（挂起）状态，专门校验 PC 指针是否落在安全合法范围，确认硬件烧录正常。
-*   **Checkpoint B / G1b (自证存活门)**：CPU 恢复运行并执行 `main` 中的首发 UART0 字符，证明 CPU 的取指、时钟和串口 0 物理链路能跑通。
-*   **G1c (总线只读门)**：在此阶段，CPU 第一次以 MMIO 寻址方式，只读读取 APB0 总线上的 `0xE8100000` 幻数寄存器，探测总线是否连通。
+*   **同窗加载与 PC 核对**：在已核对的同一制品 hash 下，将 ELF 下载到 QCRV32 片上 RAM 并核对 PC 是否落在合法范围。无输入或故障变化时，不再为 Resume、UART1、APB 分别重复签发批准。
+*   **UART1 Hello（自证存活）**：CPU 恢复运行并执行 `main` 中的首发 UART1 字符，证明 CPU 的取指、时钟和 Type-C UART1 物理链路能跑通。
+*   **APB MAGIC（总线只读）**：在同一次 I0-SMOKE 中，CPU 只按新批次 `soc.h` 读取 APB0 幻数寄存器；不得沿用旧地址猜测。
 *   **F1-ABI 审查**：在物理总线调通后，由全队成员对齐具体的寄存器地址偏移量、位宽及 CDC 时序的软件与 RTL 对齐过程。
 
 </details>
@@ -295,9 +295,9 @@ flowchart TD
 <summary>📖 点击展开/收起：Gate 递进验证图图文对照生动表述</summary>
 
 把这个递进验证流程比喻为**“航天火箭发射前的分级安全点检”**：
-1.  **火箭就位 (Checkpoint A)**：把卫星（ELF 文件）装入整流罩并吊装在塔架上，此时卫星处于静电关机状态。地面控制室（qzs 与 Codex）必须预检各种参数和指针。确认合法后，签发准许证，才能通电（Resume）。如果指针越界，立刻终止发射（STOP），防止一通电星箭俱毁。
-2.  **无线电心跳 (Checkpoint B)**：火箭通电，卫星天线发出第一声哔哔声（Hello 打印并回显）。这只证明天线和基础电路线通了（CPU 活着），但不能证明机械臂雷达或 OSD 摄像头能用。
-3.  **舱内雷达只读测试 (G1c)**：确认心跳后，发送最纯粹的雷达只读查询（读取 APB MAGIC 校验）。如果读出的不是幻数，说明雷达线路没接对，立即断电。如果幻数正确，说明舱内总线畅通，这时才准许进入下一步的业务接口对接（F1-ABI）。
+1.  **火箭就位（同窗加载）**：把卫星（ELF 文件）装入整流罩，核对制品 hash 与 PC 合法范围；通过后沿同一批准窗口继续，不再逐步等待二次确认。
+2.  **无线电心跳（UART1）**：CPU 运行后经板载 Type-C UART1 输出 Hello 并回显。这只证明 CPU 和基础链路存活，不能外推机械臂或 OSD 已可用。
+3.  **舱内雷达只读测试（APB MAGIC）**：紧接着按同批 `soc.h` 只读 APB MAGIC。正确后进入 F1-ABI；错误则停止并保留一次完整证据。
 
 </details>
 
@@ -305,13 +305,12 @@ flowchart TD
 
 | Gate | 当前最小观察 | 仅能证明 | 仍不能证明 |
 |---|---|---|---|
-| Checkpoint A | 匹配制品、USER2、RAM 下载、暂停 PC 范围 | 下载与暂停前置范围受控 | CPU 已执行、UART0、APB、视频、OSD、UART2 |
-| Checkpoint B / G1b | UART0 115200 的原始 Hello/回显证据 | 当前 CPU/ELF/UART0 子门 | APB, I1, I4, OSD, UART2, 机械臂 |
-| G1c | 在独立审查后只读同批 APB0 MAGIC | 基础 APB 窗口实读 | I1-I4 业务寄存器或 OSD 已可用 |
+| I0-BUILD | 新 UART1 原子批次冷构建、匹配 `soc.h`、bitstream/ELF hash | UART1 已真实生成且制品身份一致 | CPU、UART1、APB 已板上运行 |
+| I0-SMOKE | 一次批准连续完成 USER2、RAM、UART1 115200 Hello/回显、APB MAGIC | 当前 CPU/ELF/Type-C UART1/APB0 基础链 | I1-I4 业务寄存器、OSD、UART2、机械臂 |
 | F1-ABI | 同批 RTL、CDC、SoC、BSP、寄存器和测试审查 | 可以开始受审实现 I1-I4 | HDMI 或板级业务闭环 |
 | F1-board | 原始特征/ACK/结果/OSD 证据，机械臂继续断开 | 无机械臂 F1 闭环 | myCobot 动作能力 |
 
-`0xE8100000` 是当前同批 `soc.h` 中 APB0 MAGIC 的候选基址，`0x375A0001` 是现有 magic RTL 的值；两者目前均未板级实读。它们不是 I1-I4 的已冻结业务地址，也不能在 Checkpoint A/B 前被试探性访问。
+新 UART1 批次的 APB0 基址只能从同批 `soc.h` 读取；`0x375A0001` 是现有 magic RTL 的值。旧批次地址不是 I1-I4 的已冻结业务地址，也不能在新 `soc.h` 生成前被试探性访问。
 
 ---
 
@@ -319,9 +318,9 @@ flowchart TD
 
 | 现场现象或问题 | 当前安全结论 | qzs 应做 | 不应做 |
 |---|---|---|---|
-| Checkpoint A 中 hash、USER2、PC 范围或 warning 任一不符 | 当前批次身份不成立 | 停止并回传原始截图、console、hash 与 batch ID | Resume、换 USER1/SoftTap、猜 PC/地址或改工程输入重试 |
-| Checkpoint B 无 Hello、乱码或 reset 异常 | 仅 UART0 子门失败，不能进入 APB | 停止，保存 COM 号、115200 只读日志和 checkpoint JSON，按操作卡复核 | 读 APB、启用业务 MMIO、把 Host 通过当作板级通过 |
-| G1c 的 MAGIC 值异常 | 不能从单个返回值诊断 PSEL、CDC 或复位根因 | 停止并以同批 `soc.h`、RTL、BSP 与 G1c Review Packet 审查 | 根据 `0xFFFFFFFF`/`0x00000000` 直接下硬件结论或写业务寄存器 |
+| 同窗加载时 hash、USER2、PC 范围或 warning 任一不符 | 当前批次身份不成立 | 停止并回传原始截图、console、hash 与 batch ID | Resume、换 USER1/SoftTap、猜 PC/地址或改工程输入重试 |
+| UART1 无 Hello、乱码或 reset 异常 | I0-SMOKE 失败，不能进入 APB | 停止，保存 Type-C 枚举、115200 只读日志和批次 hash | 回退 UART0、启用业务 MMIO、把 Host 通过当作板级通过 |
+| APB MAGIC 值异常 | 不能从单个返回值诊断 PSEL、CDC 或复位根因 | 停止并以同批 `soc.h`、RTL、BSP 与 I0 Review Packet 审查 | 根据 `0xFFFFFFFF`/`0x00000000` 直接下硬件结论或写业务寄存器 |
 | HDMI 有画面但无 OSD | 在当前阶段属预期：I4/OSD 未实现且未板级验证 | 记录为 F1-board 前置未关闭，回到 I4 ABI/RTL Review Packet | 用 `result_valid`、ROI 或未来 APB 地址做板上试探 |
 | 发现 UART2/J52 接线、机械臂反应或状态不明 | F1 安全边界已被破坏 | 按已确认急停/断电方案处置，断开信号线、保留证据并停止 | 发查询/动作帧、临时接 USB-TTL、在带电状态下改变接线 |
 
@@ -335,7 +334,7 @@ Gemini 可以美化这三张分图、补充安全类比或扩写不改变结论�
 
 - 修改 I4 为 `SEMANTICS PROPOSED`、I5 为 `OUT OF F1 / BLOCKED`、业务 APB/CDC/result/OSD 未实现、板级未验证等当前事实；
 - 增加 result/OSD 的地址、位宽、清屏行为、UART2 命令、J52 接线、机械臂查询/动作或任何未经 Gate 允许的操作；
-- 删除 Checkpoint A 审核 JSON、UART0 只读、独立 G1c Review Packet、停止条件和“不得外推能力”的限制；
+- 删除 I0-BUILD 制品身份、UART1/APB只读证据、停止条件和“不得外推能力”的限制；
 - 修改 `CURRENT_STATE.md`、操作卡、F1 总账、特征契约、RTL/XML/SDC/IP/BSP 或把 Host/离线证据写成板级通过。
 
 涉及事实或安全边界的改动必须先由 qzs、wsc、libaoxun 回到同批真源和 Review Packet 共同复核。

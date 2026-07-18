@@ -1,6 +1,6 @@
 # competition_project_single_camera
 
-第十届集创赛雄芯院方向分赛区决赛的隔离单摄候选工程。
+第十届集创赛雄芯院方向分赛区决赛的正式单摄视频/识别工程。原双摄方案已取消，只保留历史资料供追溯。
 
 > 当前状态：**候选方案已批准；M0 初始白名单复制完成，M0-09 白平衡增量及主线合并除零防护已登记，等待用户重新构建、烧录和画面复现。**
 >
@@ -16,7 +16,7 @@
 4. 当前事实、阻塞和路线覆盖项以仓库根目录 [`CURRENT_STATE.md`](../CURRENT_STATE.md) 为准。
 5. 比赛任务、评分和现场流程以 [`0710 官方细则`](../final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md) 为准。
 6. 系统职责和机械臂安全边界继续服从仓库根目录 [`AGENTS.md`](../AGENTS.md)。
-7. [单摄板上图像识别最小闭环紧急计划](docs/technical_plans/minimum_board_recognition_loop_plan_20260717.md)：以当前 `main` 为基线，按 `USER2/UART0/APB -> feature mailbox -> 精简 CPU 分类 -> UART0 真实识别` 的 Gate 顺序实施。
+7. [I0 UART1 接口冻结](integration/I0_UART1_INTERFACE_FREEZE.md)：固定 SoC UART1 → Type-C UART1 以及一次性 I0-SMOKE Gate；旧 `USER2/UART0/APB` 计划只作历史参考。
 
 ## 路线边界
 

@@ -4,7 +4,7 @@
 
 ## 项目与权威入口
 
-- 正式协作主线：`final_project/`；`competition_project_single_camera/` 是隔离候选，板级 Gate 关闭前不替代正式主线。
+- 正式视频/识别主线固定为 `competition_project_single_camera/` 的单摄方案；原双摄视频方案取消，只保留为历史调试资料。`final_project/` 中仍可复用 CPU、myCobot、比赛文档与经审查模块，但不得恢复双摄闭环或以旧双摄寄存器覆盖单摄接口。
 - 官方任务、评分、时间和现场流程：[0710 比赛细则](final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md)。
 - 当前状态、阻塞、下一 Gate、待定决策：[CURRENT_STATE.md](CURRENT_STATE.md)。
 - 执行顺序与回退策略：[决赛主方案](final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md)。
@@ -39,7 +39,9 @@
 
 ## UART 与机械臂安全
 
-- UART0 Hello 为 `115200`；myCobot 为 `1000000`。两者是独立链路和独立 Gate，禁止混用或相互外推。
+- I0 CPU 生命证明固定使用 **SoC UART1 → 板载 Type-C UART1**，`115200 8N1`；物理管脚固定为 RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`。当前生成 Hard SoC 尚未启用 UART1，必须由 libaoxun 通过 Efinity 原子再生成，禁止手改 wrapper、`soc.h` 或猜测基址。
+- UART0 已被烧录器链路占用，不再作为活动 I0；旧 G1/R0 UART0 bitstream、ELF、manifest、操作卡和日志只作历史证据，不得改写或继承为 UART1 PASS。
+- UART1 I0 为 `115200`；myCobot UART2 为 `1000000`。两者是独立链路和独立 Gate，禁止混用或相互外推。
 - 正式 myCobot 控制必须由板上 CPU 实现；FPGA 仅提供硬件通道。
 - 未确认电平、线序、共地、协议和急停/断电前，禁止 FPGA 管脚接入机械臂控制线。
 - 联调顺序：只读环境/端口核验 → 用户确认固定、安全姿态与急停 → 只读或极小幅测试 → 独立动作 Review Packet。
@@ -67,6 +69,18 @@
 扩大修改范围前必须由 Codex 复核：跨两个以上子系统或顶层连线；时钟/复位/视频时序/AXI/framebuffer/位宽/双通道；XML/peri.xml/SDC/IP settings；QCRV32/JTAG/APB/CDC/OSD；机械臂动作/接线/驱动/控制脚本；warning 取舍；恢复纯 FPGA 决策；连续两轮同错失败；或判断高层方案是否合理可行。
 
 Review Packet 至少包含目标、文件/diff、模块与信号、时钟/复位/CDC/双通道、命令/日志/结果/warning、未验证项、风险假设、安全状态和希望裁定的问题。模板见 [review_packet_template.md](docs/agent_context/review_packet_template.md)。
+
+### 快速 Gate 规则
+
+- 同一固定输入 hash 的非动作开发只批准一次连续链：离线构建/检查 → USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复索取相同确认。
+- 只有硬件原子输入、固件输入、制品 hash、接线或失败现象变化时才重开对应 Gate；文档排版、Host 纯软件内部实现和不改变接口的测试补充不重开硬件 Gate。
+- UART2/J52、机械臂接线、查询或动作始终使用独立安全 Gate，不能由本节的快速规则放宽。
+
+## 接口冻结与三人文件所有权
+
+- 冻结接口、三人写入范围与最终日执行顺序见 [TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md](docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md)。
+- 修改冻结接口前，用户必须明确发送完整口令：`确认接口文件修改，已经和wsc、libaoxun、qzs沟通。`。口令只授权本次 Review Packet 列明的接口差分，不授权硬件动作或机械臂动作。
+- wsc 只写 CPU 实现/测试范围；libaoxun 只写单摄 FPGA/SoC 原子硬件范围；qzs 只写治理、状态、证据、工具和最终集成范围。任何跨范围修改必须先在 Review Packet 中重新分配所有权。
 
 ## Git 与合并治理
 

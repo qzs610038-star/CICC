@@ -8,7 +8,7 @@
 
 ## 1. 目的与边界
 
-此文档是单摄候选工程唯一的 FPGA 到板上 CPU 基础特征契约。它定义 CPU
+此文档是正式单摄视频/识别工程唯一的 FPGA 到板上 CPU 基础特征契约。它定义 CPU
 分类器所需的统计语义，不定义 APB 地址、`soc.h` 宏、IRQ、UART 命令、OSD
 寄存器格式或机械臂接口。
 
@@ -156,7 +156,7 @@ sc_features_t -> sc_classify_features() -> sc_observation_t
 
 开始 feature/APB/CDC/OSD 业务接入前必须同时满足：
 
-1. 未来在当前批次的 USER2、UART0 与既有 APB MAGIC 实读 Gate 均通过后；
+1. 新 UART1 原子批次完成后，在一次批准窗口内连续通过 USER2、Type-C UART1 Hello/回显与既有 APB MAGIC 实读；
 2. 用户批准包含 feature、目标/事件、result/OSD 的最小 F1 原子批次 Review Packet；
 3. 保留并扩展独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出、
    ACK 不匹配、CDC 和 APB 访问方向；
