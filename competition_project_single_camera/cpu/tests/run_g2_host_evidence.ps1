@@ -17,7 +17,32 @@ $sources = @(
     (Join-Path $cpuRoot 'src\single_camera_f1.c')
 )
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if (-not (Test-Path -LiteralPath $vswhere)) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: vswhere.exe not found' }
+$gcc = Get-Command gcc -ErrorAction SilentlyContinue
+if ($null -ne $gcc) {
+    New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
+    $build = Join-Path ([System.IO.Path]::GetTempPath()) ('cicc-g2-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $build | Out-Null
+    $exe = Join-Path $build 'test_single_camera_runtime.exe'
+    $rawLog = Join-Path $RunDir 'raw.log'
+    $compileArgs = @('-std=c11', '-Wall', '-Wextra', '-Werror', "-I$include", $test) + $sources + @('-o', $exe)
+    & $gcc.Source @compileArgs
+    if ($LASTEXITCODE -ne 0) { throw "HOST_RUNTIME_BLOCKED_COMPILER: gcc failed with $LASTEXITCODE" }
+    & $exe --raw-log $rawLog
+    $testExit = $LASTEXITCODE
+    $compilerVersion = (& $gcc.Source --version | Select-Object -First 1)
+    $compileLine = $gcc.Source + ' ' + (($compileArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ')
+    $bundleTool = Join-Path $repoRoot 'final_project\tools\board_observability\g2_run_bundle.py'
+    $testCommand = $compileLine + ' && ' + $exe + ' --raw-log ' + $rawLog
+    $testCommandBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($testCommand))
+    python $bundleTool create --run-dir $RunDir --raw-log $rawLog --repo-root $repoRoot --compiler $compilerVersion --test-command-base64 $testCommandBase64 --exit-code $testExit
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    python $bundleTool validate --run-dir $RunDir
+    $validateExit = $LASTEXITCODE
+    if ($validateExit -ne 0) { exit $validateExit }
+    if ($testExit -ne 0) { exit $testExit }
+    exit 0
+}
+if (-not (Test-Path -LiteralPath $vswhere)) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: neither gcc nor vswhere.exe is available' }
 $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'HOST_RUNTIME_BLOCKED_COMPILER: VS2022 C++ tools not found' }
 $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
