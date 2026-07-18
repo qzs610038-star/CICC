@@ -141,9 +141,14 @@ New-Item -ItemType Directory -Force -Path $build | Out-Null
 $exe = Join-Path $build 'test_single_camera_runtime.exe'
 $rawLog = Join-Path $RunDir 'raw.log'
 $compileArgs = @('/nologo', '/utf-8', '/std:c11', '/W4', '/WX', "/I$include", "/Fe$exe", $test) + $sources
-$compileExit = 0
-& $clPath @compileArgs
-$compileExit = $LASTEXITCODE
+Push-Location $build
+try {
+    & $clPath @compileArgs
+    $compileExit = $LASTEXITCODE
+}
+finally {
+    Pop-Location
+}
 if ($compileExit -ne 0) {
     Write-Host "HOST_RUNTIME_BLOCKED_COMPILER: cl.exe failed with $compileExit"
     exit $compileExit
