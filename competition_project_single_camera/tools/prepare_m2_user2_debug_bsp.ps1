@@ -180,7 +180,8 @@ $validation = [ordered]@{
     debug_softtap_has_legacy_instr_addr_00001000 = ($debugSoftText -match '(?m)^set instr_addr 0x00001000\r?$')
     ftdi_ti_vid_pid_is_0403_6011 = ($ftdiTiText -match '(?m)^ftdi vid_pid 0x0403 0x6011\r?$')
     ftdi_ti_channel_is_1 = ($ftdiTiText -match '(?m)^ftdi channel 1\r?$')
-    target_xml_device_is_tj375n529 = ($targetXmlText -match '<efx:device name="TJ375N529"/>')
+    # XML serializers may include whitespace before the self-closing slash.
+    target_xml_device_is_tj375n529 = ($targetXmlText -match '<efx:device\s+name="TJ375N529"\s*/>')
     official_tj375n529_jtag_id_is_006a0ef3 = ($jtagCtrlText -match '"TJ375N529"\s*:\s*IDCODE_value\s*=\s*32\x27h006A0EF3')
     ftdi_ti_supports_predefined_cputapid = ($ftdiTiText -match '(?s)if \{ \[info exists CPUTAPID\] \}.*?set _CPUTAPID \$CPUTAPID')
     ftdi_ti_default_cputapid_is_ti375_006a0a79 = ($ftdiTiText -match '(?m)^\s*set _CPUTAPID 0x006A0A79\s*$')

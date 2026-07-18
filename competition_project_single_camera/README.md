@@ -16,6 +16,7 @@
 4. 当前事实、阻塞和路线覆盖项以仓库根目录 [`CURRENT_STATE.md`](../CURRENT_STATE.md) 为准。
 5. 比赛任务、评分和现场流程以 [`0710 官方细则`](../final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md) 为准。
 6. 系统职责和机械臂安全边界继续服从仓库根目录 [`AGENTS.md`](../AGENTS.md)。
+7. [单摄板上图像识别最小闭环紧急计划](docs/technical_plans/minimum_board_recognition_loop_plan_20260717.md)：以当前 `main` 为基线，按 `USER2/UART0/APB -> feature mailbox -> 精简 CPU 分类 -> UART0 真实识别` 的 Gate 顺序实施。
 
 ## 路线边界
 
