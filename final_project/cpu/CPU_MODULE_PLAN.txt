@@ -49,6 +49,10 @@
        不得通过放宽阈值强行宣称五色可靠，必须保留 UNKNOWN/低置信度路径。
     7. ARM_DISABLED 始终有效；目标命中最多输出 EXECUTE_ARM_DISABLED，不能产生
        UART2 transport、myCobot 帧、真实抓取请求或“已经执行”的 OSD 文案。
+    8. 圆柱/锥体当前只是未标定诊断标签，保持 WAIT，只能超时或人工放弃；
+       任务二完整能力标为 BLOCKED，固定摄像头实拍标定和混淆矩阵前不得解除。
+    9. 结果锁存后的 Host runtime 采用 release-only idle-drain ACK：只释放同帧快照、
+       更新帧序，不分类、不重复提交结果。真实 I1/APB/CDC 编码仍待 Review Packet。
 
   【当前重要】I1 FPGA -> CPU 特征消费契约（先冻结语义，后冻结 wire ABI）:
     - 候选字段：frame_id、config_seq、red_area、blue_area、yellow_area、
@@ -88,6 +92,9 @@
     - I4 CPU 结果语义候选；保持 arm_enabled=0 和 EXECUTE_ARM_DISABLED。
     - 匹配批次的 ELF/UART0 原始证据（到达对应 Gate 后）；不得复用跨批次 ELF/bitstream。
     - 未验证项清单：真实 I1 MMIO、I2、I3 外部事件、I4/OSD、UART2/J52、机械臂。
+    - 2026-07-18 集成测试状态：F1 213/213、adapter 33/33、runtime 648/648；
+      classifier 的 MSVC /W4 /WX 入口因 C4127 为 FAIL。用户已停止后续检测，
+      presubmit/freshness/脚本负例均为 NOT RUN；不得沿用旧 182/182 或 921/921。
 
   【当前禁止】:
     - 禁止把旧 final_project 双摄 main 直接称为单摄固件或直接用于正式板级闭环。

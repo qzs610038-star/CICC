@@ -1,0 +1,57 @@
+{
+  "schema": "r0_current_batch_manifest",
+  "version": 1,
+  "batch_id": "R0-20260717-9F6F-CD4C",
+  "source_baseline_sha": "9acf4d8b2ec788ccd5777f3833a7bfb756c51cad",
+  "compatibility_rule": "Artifacts may be used only when every input_blobs entry matches the checked-out HEAD. A descendant commit alone is not sufficient.",
+  "input_blobs": {
+    "competition_project_single_camera/mem_test.xml": "42a48cf9d654c4b0bebc65653fe1464c3ed29d32",
+    "competition_project_single_camera/mem_test.peri.xml": "c5b744780ebb892feeb4c2f45ce9416c57a5a069",
+    "competition_project_single_camera/constrain.sdc": "de49ba3ff8320feb95008f840a41090b3039f2f8",
+    "competition_project_single_camera/src/top.v": "9b2d0f07ffec5d1d75d9e6d7f2c81e1b731872c4",
+    "competition_project_single_camera/src/apb_reg_magic.v": "5793ec42655568e9d1fe23f84be3d3f3238b4694",
+    "competition_project_single_camera/ip/EfxSapphireHpSoc_slb/settings.json": "c7f0e2fd204ea2619a396c3c63eb1440f107de99",
+    "competition_project_single_camera/cpu_bringup/uart_hello_onchip/build.ps1": "30f97805d67891b410763c3446c4078095904535",
+    "competition_project_single_camera/cpu_bringup/uart_hello_onchip/src/main.c": "68e013a748b0ff47e87d9160705070745c34be9c"
+  },
+  "bitstream": {
+    "logical_name": "mem_test.bit",
+    "sha256": "9F6F254E33C803C0F1B6D2F3CAB1929496477D9CBEE4655EC680A91B4028F320",
+    "size_bytes": 11847132
+  },
+  "hello_elf": {
+    "logical_name": "uart_hello_onchip.elf",
+    "sha256": "CD4CAB96D3C30ECDC085B5C5A36B175DCED0016FBD53929BB0E2D3741E29411B",
+    "size_bytes": 31148,
+    "load_range": "0xF9000000..0xF9000A30",
+    "entry_point": "0xF9000000",
+    "valid_pc_range": "0xF9000000..0xF9003FFF"
+  },
+  "board_evidence": {
+    "user2_tunnel": "REPORTED_PASS_IN_PR13_EVIDENCE_NOT_REVERIFIED_FROM_RAW_LOGS",
+    "four_harts_and_pc": "REPORTED_PASS_IN_PR13_EVIDENCE_NOT_REVERIFIED_FROM_RAW_LOGS",
+    "apb_magic_0xE8100000": "REPORTED_0x375A0001_IN_PR13_EVIDENCE_NOT_REVERIFIED_FROM_RAW_LOGS",
+    "uart0_banner": "BLOCKED_ZERO_RX_BYTES_ON_COM12_AND_COM17"
+  },
+  "uart0": {
+    "baud": 115200,
+    "format": "8N1",
+    "capture_mode": "read_only_no_tx",
+    "allowed_ports": ["COM12", "COM17"],
+    "required_usb_vid_pid": "1A86:7523"
+  },
+  "prohibited": [
+    "USER1",
+    "Flash",
+    "SPI",
+    "PROM",
+    "external DDR",
+    "UART transmit or echo before a separate approval",
+    "UART2",
+    "J52",
+    "myCobot wiring",
+    "myCobot frames",
+    "myCobot motion",
+    "manual legacy addresses"
+  ]
+}

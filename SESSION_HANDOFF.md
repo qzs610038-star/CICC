@@ -1,42 +1,55 @@
-# SESSION HANDOFF — 2026-07-17 G1 当前批次板级 Gate 恢复入口
+# SESSION HANDOFF — 2026-07-18 三人本地集成候选
 
-## 恢复前必读
+## 恢复入口
 
-1. `AGENTS.md`
-2. `CURRENT_STATE.md`
-3. `docs/merge_governance/BRANCH_MERGE_GOVERNANCE.md`
-4. `docs/merge_governance/MERGE_REGISTER.md`
-5. 本文件
+- 分支：`codex/qzs-wsc-libaoxun-integration-20260718`
+- 基线：`main@9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`
+- WSC 来源：`cbe6eafa395a2aa95bee0e86ff9fd3d54490a54f`，本地合并提交 `30d3274`
+- QZS 来源：PR #12 `b3682a4dc824e460b7018cee9d09ef4b52b09a90`，本地合并提交 `60afcbd`
+- libaoxun 来源：PR #13 `5bada18a4079053b0531772b2ab645492043e912`，本地合并提交 `8495859`
+- `main` 未改，远端未推送。恢复后先实读 `git status --short --branch` 和 `CURRENT_STATE.md`。
 
-开始任何修改前运行：
+## 已完成的集成裁决
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\agent_handoff_health_check.ps1
-git status --short --branch
-```
+1. 排除 WSC 根目录四份重复指南，只保留 `learning_guides/接口对齐与数据链路学习/`。
+2. 圆柱/锥体保持 `WAIT`；任务二完整能力标记为 `BLOCKED`，只能超时或人工放弃。
+3. runtime 终态改为 release-only idle-drain ACK：不分类、不重复提交结果、不产生动作；真实 I1 wire ABI 仍未冻结。
+4. G1 与 R0 分成独立批次。R0 manifest 固定 `9F6F.../CD4C...`、八项输入 blob、COM12/COM17 和 CH340 `1A86:7523`。
+5. PR #12 feature contract 的 Gate 文案已改为未来条件，避免误读成当前全部通过。
+6. G2 runner 已修复为传播 C 测试失败码；直接 Host 脚本增加 VS2022 fallback。
 
-## 当前 Git 与已合入内容
+## 已观察测试结果
 
-- 2026-07-17 实读：本地 `main` 与 `origin/main` 均为 `9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`。
-- 当前审查分支为 `codex/no-board-debug-plan-20260717`；其后已完成当前 G1 批次 USER2/UART0 离线操作包，真实 HEAD 和 dirty 状态仍须每次恢复时重读。
-- `f2ba66e` 已纳入 `@libaoxun688@14b9248` 的 Hard SoC 原子真源；`77c88d2` 仅纳入 `@wsc6090-CPU@82892d3` 的 DSI 初始化 `.mem` 相对路径修复。
-- G1/G2 经核验补丁随 `683814edb46f0185fe61df5e6829ce2862fccca4` 内容提交纳入；源 worktree 的其他 dirty 内容不得再次整树合并。
+- `single_camera_f1`：`213/213 PASS`
+- `single_camera_feature_adapter`：`33/33 PASS`
+- `single_camera_runtime`：`648/648 PASS`
+- G2 bundle validation：`PASS`
+- classifier 直接 Host 入口：`FAIL`，MSVC `/W4 /WX` 下 `test_single_camera_classifier.c` 常量宏断言触发 `C4127`，可执行文件未运行。
+- PowerShell R0 capture 脚本：仅语法解析 `PASS`。
+- 用户随后要求停止检测；presubmit、myCobot 完整非动作矩阵、freshness、context budget、最终 handoff health、脚本负例和 `git diff --check` 均为 `NOT RUN`。
 
-## 当前事实与禁止项
+## 硬件与安全状态
 
-- G1 已针对固定原子输入完成 Efinity 2025.2 冷构建：Map/Interface/PNR/STA/CDC/bitstream 与 Hello ELF 离线证据通过。匹配 bitstream 为 `A897E335...FCD1ACD`，匹配 ELF 为 `E5BC80A2...41928A`；无需因本文件旧结论重复冷构建。
-- 上述只证明离线批次。`USER2`、CPU 取指、UART0 115200、APB 实读、视频和 OSD 仍为 `NOT VERIFIED`。
-- 现有 2026-07-16 M2 操作卡/脚本绑定旧 `2EA4.../C99...` 制品，不能用于当前 G1。当前批次专用 manifest、preflight、ASCII staging、PC 范围 checkpoint 与 UART0 只读采集材料已完成无板 fail-closed 验证；状态仅为 `OPERATION PACK OFFLINE READY / BOARD NOT VERIFIED`。
-- 禁止 `USER1`、Flash、外部 DDR、UART2/J52、机械臂接线、myCobot 帧和任何动作。myCobot 的 1000000 baud 与 UART0 Hello 的 115200 是独立 Gate。
+- 本次三方集成未改变 FPGA/Hard SoC 八项关键输入 blob，不因合并自动重跑 Efinity，不因合并自动使现有 Hello ELF 失效。
+- R0 是唯一下一 Gate 活动批次。PR #13 文档报告 USER2、四 hart/PC 和 APB MAGIC；本轮没有重新取得原始外部日志，标记为 `REPORTED / NOT REVERIFIED`。
+- UART0 在 CH340 COM12/COM17 的历史只读窗口均为 0 RX bytes，R0 仍阻塞。
+- UART2/J52、myCobot 接线、帧和动作全部 `NO-GO`；本次没有执行任何硬件或机械臂动作。
 
-## 图谱与同步
+## 三位队友拉取后的第一步
 
-- 共享图谱 `D-cicc_cbm-main` 已在 `a473a52` 后持久化为 7560 nodes / 16960 edges；artifact 为 `.codebase-memory/graph.db.zst`，准确基线以 artifact metadata 为准。
-- 当前图谱能定位 `competition_project_single_camera/src/apb_reg_magic.v`、`cpu_bringup/uart_hello_onchip/` 和单摄 `dsi_tx_top.v`。图谱仅用于定位，不替代 XML、RTL、日志和板测证据。
+三位队友先在各自本机检出本集成分支，阅读：
 
-## 下一立即动作
+1. `CURRENT_STATE.md`
+2. `competition_project_single_camera/integration/F1_INTERFACE_ALIGNMENT_DRAFT.md`
+3. `competition_project_single_camera/integration/F1_INTERFACE_CONFIRMATION_REGISTER.md`
+4. `competition_project_single_camera/integration/single_camera_feature_contract.md`
+5. `final_project/cpu/CPU_MODULE_PLAN.txt`
 
-1. libaoxun：以 `competition_project_single_camera/docs/debug_sessions/g1_user2_uart0_board_operator_card_20260717.md` 和当前 manifest 进行显式源路径 preflight/staging；不得使用旧 M2 卡上板。
-2. libaoxun：仅完成 `USER2 + RAM + PC` Checkpoint A，回传原始证据并等待 qzs/Codex 当前批次审核 JSON；在此之前不得 Resume 或监听 UART0。
-3. wsc：可并行准备独立 `apb_magic_onchip/`，只读取同批 `soc.h` 的 APB0 offset 0、期望 `0x375A0001`；不得修改现有 Hello 或 FPGA。
-4. 未收到板级原始证据前，不得把 `CURRENT_STATE.md` 中任何板级项改为 PASS。
+随后只决定接口文件、文件所有权、下一步任务分工和 Review Packet 方案。尚未完成三人确认前，不实现真实 MMIO、不接入 OSD、不执行 UART/机械臂硬件动作。
+
+## 下一执行者必须保留的标注
+
+- `FAIL`：classifier MSVC 严格测试入口。
+- `BLOCKED`：任务二非正方体完整能力、R0 UART0 横幅。
+- `NOT VERIFIED`：真实 I1/APB/CDC、CPU→OSD、正式 RISC-V 集成、板级逐轮事务、机械臂闭环。
+- `NOT RUN`：用户叫停后的完整离线门禁与脚本负例。

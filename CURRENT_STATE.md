@@ -1,78 +1,84 @@
-# CURRENT_STATE — 当前状态快照
+# CURRENT_STATE — 三人本地集成候选状态
 
-> 工程证据输入基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`；已验证 G1/G2/G3 内容提交：`683814edb46f0185fe61df5e6829ce2862fccca4`（2026-07-17）。
-> 真实源码、工程 XML、构建日志和板上现象是最终事实；本文件仅索引当前结论、阻塞和下一 Gate。
-> 稳定架构与安全红线见 [AGENTS.md](AGENTS.md)，官方任务见 [0710 比赛细则](final_project/docs/competition_manual/第十届集创赛分赛区决赛雄芯院企业命题比赛细则_0710.md)。
+> 日期：2026-07-18（Asia/Shanghai）
+> 正式 `main` 仍为 `9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`；本文件描述独立分支 `codex/qzs-wsc-libaoxun-integration-20260718`。
+> 真实源码、工程 XML、构建日志和板上现象是最终事实；稳定架构与安全红线见 [AGENTS.md](AGENTS.md)。
 
 ## CURRENT_SNAPSHOT
 
-### 当前 main / SHA
+### 集成来源与范围
 
-- 工程证据输入基线：`489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`；已验证整合内容提交：`683814edb46f0185fe61df5e6829ce2862fccca4`。
-- `G1_G2_VERIFIED_PATCHES_COMMITTED`：G1/G2 源 worktree 没有独立新增 commit；其经核验补丁随 G3 内容提交纳入。不得把源 worktree 的其他 dirty 内容或外部产物自动视为已合并事实。
-- 本快照描述上述内容提交及随后仅用于记录验证基线的治理元数据；真实 `main`/HEAD 必须以 Git 实读为准。
-- `POST_MERGE_REFRESH_REQUIRED`：合并到本地 `main` 后必须在结果 HEAD 重跑 freshness/context budget、handoff、G2 离线测试与范围检查；若工程输入相对内容提交变化，G1 证据立即失效。
+- WSC：`dev/claude-cpu-plan-status-0717@cbe6eafa395a2aa95bee0e86ff9fd3d54490a54f`，选择性合入提交 `30d3274`。
+- QZS：PR #12 `b3682a4dc824e460b7018cee9d09ef4b52b09a90`，合入提交 `60afcbd`。
+- libaoxun：PR #13 `5bada18a4079053b0531772b2ab645492043e912`，合入提交 `8495859`。
+- WSC 根目录四份重复指南已排除；唯一规范版本位于 `learning_guides/接口对齐与数据链路学习/`。
+- 当前结果只存在于独立本地集成分支；尚未合入 `main`，尚未推送。
 
-### 单摄 FPGA / Hard SoC
+### CPU / F1 语义裁决
 
-- `competition_project_single_camera/` 是隔离候选，不替代 `final_project/` 正式主线。
-- 当前 SHA 已包含 Hard SoC/APB0/IP/XML/顶层、最小 BSP/UART0 Hello 和 DSI 相对路径修复的原子真源；不得再沿用“Hard SoC 源码缺失”旧结论，也不得拆分该原子批次。
-- G1 已针对该固定 SHA 的原子输入完成 Efinity 2025.2 冷构建：Map、Interface、PNR、STA、CDC 与 bitstream 生成通过；STA 的 WNS/WHS 为正，warning 保持分类记录。匹配 bitstream SHA-256 为 `A897E33514A1079BB1B46C02C464B0BD679AF551CEFCB67C4A0EBD5B8FCD1ACD`。
-- UART0 Hello 已完成冷构建和静态 LOAD/入口审计；匹配 ELF SHA-256 为 `E5BC80A2F18A7E2951D53DA539BE2FC61AAECFA90C5CDADB29E65FFC6141928A`，LOAD 范围位于 `0xF9000000..0xF9000A30`。这些仅是离线构建证据，不是板级 PASS。
-- `USER2`、CPU 实际取指、UART0 115200 bps 横幅/回显和 APB 实读仍均为 `NOT VERIFIED`。旧批次 bitstream、ELF、slack、CDC、warning 和板级记录仍不得继承；操作前须重新核对上述匹配 hash。
-- `LEGACY_M2_OPERATION_PACK_FORBIDDEN_FOR_CURRENT_G1`：现有 2026-07-16 M2 操作卡和采集脚本固定旧 bitstream `2EA4AD28...` / ELF `C99FD39D...`，不得用于当前 `A897...` / `E5BC...` 批次；旧卡只作历史证据。
-- `CURRENT_G1_OPERATION_PACK_OFFLINE_READY_BOARD_NOT_VERIFIED`：当前批次专用 manifest、USER2 制品 preflight、ASCII staging、PC checkpoint 约束与 UART0 只读采集脚本已完成无板 fail-closed 验证；三次 offline presubmit 均为 `PASS_WITH_WARNINGS`（exit 0，freshness WARN=7）。证据见 `competition_project_single_camera/docs/review_packets/G1_USER2_UART0_BOARD_GATE_REVIEW_PACKET_DRAFT_20260717.md`。这不证明 `USER2`、CPU 取指、UART0、APB、视频或 OSD；旧 M2 卡仍只作历史证据。
-- 证据索引：[G1 冷构建 Review Packet](competition_project_single_camera/docs/review_packets/G1_EFINITY_COLD_BUILD_REVIEW_PACKET_20260717_0307.md)、[合并记录](docs/merge_governance/MERGE_REGISTER.md)、[单摄候选目录](competition_project_single_camera/)。
+- 圆柱体和锥体只保留为未标定诊断标签，不产生 `SHAPE_MISMATCH/SKIP`，保持 `WAIT`。
+- `TASK2_FULL_CAPABILITY=BLOCKED`：混合形状池遇到非正方体时只能由超时或人工放弃结束；在固定摄像头实拍标定和混淆矩阵完成前，不得称为任务二完成。
+- runtime 已实现终态 idle-drain：结果锁存后只对成功读取的同一 `frame_id` 做释放 ACK，更新帧序水位，不再分类、不产生第二个结果、不触发动作。
+- 撕裂、配置版本错误或释放 ACK 失败继续 fail-closed。该逻辑仅为 Host seam；真实 I1/APB/CDC wire ABI 仍未冻结、未实现、未上板。
+- `ARM_ENABLED=0`；UART2/J52、myCobot transport、接线和动作继续禁止。
 
-### CPU 决策
+### 离线测试状态
 
-- 板上 CPU 负责五色、三形状、三尺寸分类、四任务关系判断、逐轮状态机、参数和 myCobot 控制；Host/mock 或 compile-only 结果不等于板级闭环。
-- G2 已导入 Host/fake transport 运行时缝、结构化事件和离线 L0 bundle；当前复测为 C Host `182/182`、Python `3/3`。MMIO transport 对未定版地址保持 fail-closed，机械臂命令保持禁用。
-- 上述计数只证明 G2 离线负例/顺序/ACK 校验，不证明 RISC-V 固件链接、真实 MMIO/APB、板级目标输入、逐轮事务或动作闭环。
-- 证据索引：[G2 CPU 可观测性 Review Packet](final_project/docs/review_packets/g2_cpu_observability_review_packet_20260717_025111.md)、[CPU 模块计划](final_project/cpu/CPU_MODULE_PLAN.txt)、[决赛主方案](final_project/docs/technical_plans/competition_score_maximization_execution_plan_20260712.md)。
+旧 `182/182`、`921/921` 均为历史计数，不得继承。用户已要求停止后续检测，最终状态如下：
 
-### APB / OSD
+| 项目 | 当前结果 |
+|---|---|
+| 单摄 F1 Host | `PASS 213/213` |
+| feature adapter Host | `PASS 33/33` |
+| runtime/G2 C Host | `PASS 648/648` |
+| G2 bundle 格式校验 | `PASS`；runner 已修复为传播 C 测试失败码 |
+| classifier 直接 Host 入口 | `FAIL`：MSVC `/W4 /WX` 下测试宏常量表达式触发 `C4127`，测试可执行文件未运行 |
+| classifier/F1/adapter 原 GCC 入口 | 本机无 `gcc`；已增加 VS2022 fallback，其中 classifier 仍为上述 `FAIL` |
+| `tools/offline_presubmit.ps1` | `NOT RUN`（用户要求停止检测） |
+| myCobot 非动作 QEMU/Host 完整矩阵 | `NOT RUN`（用户要求停止检测） |
+| freshness / context budget / 最终 handoff health | `NOT RUN`（用户要求停止检测） |
+| PowerShell fail-closed 负例 / `git diff --check` | `NOT RUN`（用户要求停止检测） |
 
-- APB0 候选 BSP 定义为 `IO_APB_SLAVE_0_INPUT=0xE8100000`，但当前 SHA 的 APB 实读仍未验证；不得以候选地址发起未经 Gate 的试探性 MMIO。
-- OSD 契约保持“CPU 产生识别/判断/动作及理由语义，FPGA 渲染像素”；当前不得宣称 CPU→OSD 回写已板级闭环。
-- 证据索引：[寄存器契约索引](final_project/integration/register_map.md)。
+Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
-### myCobot
+### FPGA / Hard SoC 制品批次
 
-- 正式闭环必须由板上 CPU 控制；PC、`pymycobot`、myBlockly 仅用于开发期调试、标定、健康检查、日志和录像。
-- UART0 Hello 固定 `115200`；myCobot 固定 `1000000`。两者是隔离 Gate，禁止混用或相互外推。
-- 当前禁止 UART2/J52、机械臂接线、myCobot 帧和任何动作。任何动作必须先由用户明确确认目标、速度、角度范围、安全姿态与急停/断电方式，并通过 Codex Review Gate。
-- 证据索引：[myCobot 板控计划](final_project/docs/technical_plans/mycobot_arm_board_control_advancement_plan_20260715.md)、[PC 历史归档](mycobot_pc_tests/)。
+本次集成没有修改 `mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、`src/top.v`、`src/apb_reg_magic.v`、Hard SoC `settings.json`、UART0 Hello `build.ps1` 或 `src/main.c` 的 Git blob。因此本次合并本身不强制重跑 Efinity，也不自动使 Hello ELF 失效。
+
+| 批次 | 制品 | 当前结论 |
+|---|---|---|
+| G1 历史离线批次 | bitstream `A897...1ACD` / ELF `E5BC...1928A` | 冷构建和离线操作包可追溯；不得与 R0 混用，不是当前下一 Gate 活动批次 |
+| R0 唯一活动批次 | bitstream `9F6F...8F320` / ELF `CD4C...9411B` | 独立 manifest 已绑定八项输入 blob；PR #13 文档报告 USER2、四 hart/PC、APB MAGIC，但原始外部日志本轮未独立复核；UART0 COM12/COM17 均为 0 RX bytes，仍 `BLOCKED` |
+
+- R0 manifest：[`r0_current_batch_manifest_20260718.json`](competition_project_single_camera/docs/debug_sessions/r0_current_batch_manifest_20260718.json)。
+- 串口采集脚本只允许 `COM12`/`COM17`，并要求枚举身份为 CH340 `VID:PID 1A86:7523`、匹配 R0 manifest 和独立批准 JSON。
+- 采集脚本仅完成 PowerShell 语法解析 `PASS`；实际 dry-run、错误 manifest/hash/端口/批准 JSON 负例均为 `NOT RUN`。
 
 ## CURRENT_BLOCKERS
 
-1. 当前批次操作包已离线就绪但板级未验证；持板机必须先按新操作卡完成 `USER2 + RAM + PC` Checkpoint A 并回传原始证据，未获 qzs/Codex 审核 JSON 前不得 Resume 或监听 UART0。
-2. `USER2`、片上 RAM CPU 取指、UART0 横幅/回显和 APB 实读尚未验证；G1 离线 PASS 不得升级为板级 PASS。
-3. G2 真实 RISC-V/MMIO transport ABI、正式寄存器地址和板级证据尚未定版；不得从 Host/fake seam 推断硬件接口。
-4. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
+1. classifier 严格 Host 入口仍为 `FAIL(C4127)`。
+2. 任务二非正方体识别未实拍标定，完整能力为 `BLOCKED`。
+3. idle-drain 仅 Host 验证；真实 I1 单槽、ACK、overrun、CDC 和 APB ABI 未冻结。
+4. R0 UART0 横幅仍为 0 字节阻塞；PR #13 的 USER2/PC/APB 结论未由本轮直接读取原始外部日志复核。
+5. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
 
 ## NEXT_GATE
 
-1. 使用已离线审查的当前 G1 批次专用操作包；持板机以显式源路径预检并 staging，固定输入基线、匹配 bitstream/ELF 完整 SHA-256、大小、LOAD/entry、`USER2`、安全 debug cfg、PC 范围和禁止项。任何不一致都停止，不能自动选择或覆盖制品。
-2. 在无硬件 dry-run 中证明错误 hash、缺文件、冲突 staging 和缺少 PC checkpoint 均 fail-closed；旧 2026-07-16 M2 卡不得被改写后继续使用。
-3. 仅允许使用上述匹配 bitstream、FPGA `USER2`，并仅下载匹配 ELF 到 `0xF9000000` 片上 RAM；暂停并证明 PC 位于 `0xF9000000..0xF9003FFF`。经 qzs/Codex 复核后才可 Resume 并只读验证 UART0 115200 bps Hello。
-4. 本 Gate 禁止 `USER1`、Flash 擦写/烧录、外部 DDR 初始化、UART2/J52、机械臂接线和动作；Hello 通过后必须另立 Review Packet，只读取当前已存在的 APB0 MAGIC `0x375A0001`。
-5. G2 的真实 MMIO/APB transport 必须在板级基础 Gate 与 F1 ABI Review Packet 后另行实现；不得先行猜测地址或启用机械臂命令。
+1. 三位队友先在各自本机基于本集成分支决定 I1/I2/I3/I4 接口文件、下一步任务分工与实施方案；本步骤只做本地设计确认，不授权硬件动作。
+2. 修复 classifier 的 MSVC `C4127` 严格测试入口，再重跑完整离线矩阵、presubmit、freshness、handoff 和脚本负例。
+3. 接口语义确认后，由独立 F1 ABI Review Packet 冻结 I1 snapshot/ACK/flush、I2 配置和 I4 结果语义；禁止提前手填 APB 地址。
+4. 若继续 R0，只能使用 R0 manifest 的匹配制品，并在用户确认的 CH340 COM12 或 COM17 上同步 CPU/SoC reset 做只读采集；本文件不授权执行该动作。
+5. UART2/J52、机械臂接线、myCobot 帧和动作继续 `NO-GO`。
 
 ## PENDING_DECISIONS
 
-- 板上参数掉电保存：追加受审存储驱动，或人工记录后重编译；未定版。
-- `TARGET_SEL` / `LIVE_FG_AREA` 等正式地址与字段：须以同一次 SoC 生成物、`soc.h` 和接口 Review Packet 定版，当前历史占位值不是硬件事实。
-- 任务三评分比例若现场口径与正文/表格不一致，须当场确认。
+- 三人对 I1/I2/I3/I4 的文件所有权、Review Packet 负责人和下一轮提交边界。
+- 任务二圆柱/锥体真实标定方案与混淆矩阵验收阈值。
+- idle-drain 在真实单槽 I1 中的 wire ACK/flush 编码和跨轮调度规则。
+- R0 UART0 下一次只读排障的唯一端口、接线核验和 reset 时间同步方案。
 
 ## DEPRECATED_ROUTES
 
-- 纯 FPGA 视觉分类、四任务关系判断或 myCobot 状态机：废弃，不得恢复。
-- PC/`pymycobot` 进入正式识别/控制闭环：禁止。
-- HDMI 双摄透传保底：仅历史基础链路，除非用户重新指定，不是当前攻关目标。
-
-## HISTORY_ARCHIVE_INDEX
-
-- 原 `CURRENT_STATE.md` 已逐字归档至 [CURRENT_STATE_20260717_pre_g3.md](debug_records/state_history/CURRENT_STATE_20260717_pre_g3.md)。
-- 归档 SHA-256、原行号映射、替代关系和失效条件见 [archive_manifest.md](debug_records/state_history/archive_manifest.md)。
-- 历史正文只用于审计和追溯；回答当前 Gate 不得依赖阅读全文历史。
+- WSC 根目录四份重复指南：不纳入集成结果。
+- G1 与 R0 manifest/制品混选：禁止。
+- 纯 FPGA 分类、PC/`pymycobot` 进入正式闭环、UART2/J52 提前接入：禁止。

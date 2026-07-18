@@ -1,18 +1,13 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^COM(?:3|7|8|10|13)$')]
-    [string]$PortName = 'COM3',
-    [ValidateRange(3, 10)]
+    [ValidateSet('COM12', 'COM17')]
+    [string]$PortName = 'COM12',
+    [ValidateRange(3, 60)]
     [int]$ListenSeconds = 5,
     [string]$PcGateApproval,
-    [Parameter(Mandatory = $true)]
-    [ValidatePattern('^[A-Fa-f0-9]{64}$')]
-    [string]$ExpectedBitSha256,
-    [Parameter(Mandatory = $true)]
-    [ValidatePattern('^[A-Fa-f0-9]{64}$')]
-    [string]$ExpectedElfSha256,
+    [string]$ManifestPath,
     [string]$EvidenceDir,
-    [string]$Label = 'm2_uart0_banner_capture',
+    [string]$Label = 'r0_uart0_banner_capture',
     [switch]$Listen
 )
 
@@ -23,10 +18,50 @@ if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
     $EvidenceDir = Join-Path $PSScriptRoot '..\docs\debug_sessions\evidence'
 }
 
-$expectedBitSha256 = $ExpectedBitSha256.ToUpperInvariant()
-$expectedElfSha256 = $ExpectedElfSha256.ToUpperInvariant()
-$requiredApprovalResult = 'M2_USER2_RAM_PC_GATE_APPROVED'
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$requiredApprovalResult = 'R0_USER2_RAM_PC_GATE_APPROVED'
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repoRoot = (& git -C $projectRoot rev-parse --show-toplevel).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
+    throw 'Unable to resolve the Git repository root.'
+}
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    $ManifestPath = Join-Path $projectRoot 'docs\debug_sessions\r0_current_batch_manifest_20260718.json'
+}
+if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
+    throw "R0 manifest is missing: $ManifestPath"
+}
+try {
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json -ErrorAction Stop
+}
+catch {
+    throw "R0 manifest is not valid JSON: $ManifestPath"
+}
+
+$manifestChecks = [ordered]@{
+    schema = ($manifest.schema -eq 'r0_current_batch_manifest')
+    version = ($manifest.version -eq 1)
+    batch_id = ($manifest.batch_id -eq 'R0-20260717-9F6F-CD4C')
+    bitstream_sha256 = ("$($manifest.bitstream.sha256)" -match '^[A-Fa-f0-9]{64}$')
+    bitstream_size = ([int64]$manifest.bitstream.size_bytes -eq 11847132)
+    elf_sha256 = ("$($manifest.hello_elf.sha256)" -match '^[A-Fa-f0-9]{64}$')
+    elf_size = ([int64]$manifest.hello_elf.size_bytes -eq 31148)
+    pc_range = ("$($manifest.hello_elf.valid_pc_range)" -eq '0xF9000000..0xF9003FFF')
+    allowed_ports = (@($manifest.uart0.allowed_ports) -contains $PortName)
+    ch340_vid_pid = ("$($manifest.uart0.required_usb_vid_pid)" -eq '1A86:7523')
+}
+$inputBlobChecks = [ordered]@{}
+foreach ($property in $manifest.input_blobs.PSObject.Properties) {
+    $actualBlob = (& git -C $repoRoot rev-parse "HEAD:$($property.Name)" 2>$null).Trim()
+    $inputBlobChecks[$property.Name] = ($LASTEXITCODE -eq 0 -and $actualBlob -eq "$($property.Value)")
+}
+$failedManifestChecks = @($manifestChecks.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object Key)
+$failedInputBlobs = @($inputBlobChecks.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object Key)
+if ($failedManifestChecks.Count -gt 0 -or $failedInputBlobs.Count -gt 0) {
+    throw ('R0 manifest does not bind the checked-out hardware/Hello inputs. checks=' +
+        ($failedManifestChecks -join ',') + '; blobs=' + ($failedInputBlobs -join ','))
+}
+$expectedBitSha256 = "$($manifest.bitstream.sha256)".ToUpperInvariant()
+$expectedElfSha256 = "$($manifest.hello_elf.sha256)".ToUpperInvariant()
 
 function Read-PcGateApproval {
     param([string]$Path)
@@ -54,7 +89,7 @@ function Read-PcGateApproval {
     return [ordered]@{
         exists = $true
         valid = $valid
-        reason = if ($valid) { 'approved' } else { 'approval_fields_do_not_match_current_m2_batch' }
+        reason = if ($valid) { 'approved' } else { 'approval_fields_do_not_match_current_r0_batch' }
         path = (Resolve-Path -LiteralPath $Path).Path
         result = $result
         bitstream_sha256 = $bitHash
@@ -117,8 +152,46 @@ function Initialize-SerialPortApi {
     return $false
 }
 
+function Get-Ch340PortIdentity {
+    param([string]$Name)
+
+    try {
+        $escapedName = [regex]::Escape($Name)
+        $device = @(
+            Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction Stop |
+                Where-Object {
+                    "$($_.Name)" -match "\($escapedName\)" -and
+                    "$($_.PNPDeviceID)" -match '(?i)VID_1A86&PID_7523'
+                }
+        ) | Select-Object -First 1
+        if ($null -eq $device) {
+            return [ordered]@{
+                valid = $false
+                reason = 'selected_port_is_not_enumerated_as_CH340_VID_1A86_PID_7523'
+                port = $Name
+            }
+        }
+        return [ordered]@{
+            valid = $true
+            reason = 'approved_ch340_identity'
+            port = $Name
+            name = "$($device.Name)"
+            pnp_device_id = "$($device.PNPDeviceID)"
+        }
+    }
+    catch {
+        return [ordered]@{
+            valid = $false
+            reason = 'ch340_identity_query_failed'
+            port = $Name
+            error = $_.Exception.Message
+        }
+    }
+}
+
 $approval = Read-PcGateApproval -Path $PcGateApproval
 $connectedPortNames = Get-ConnectedPortNames
+$portIdentity = Get-Ch340PortIdentity -Name $PortName
 $head = (& git -C $repoRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) {
     throw "git rev-parse HEAD failed with exit code $LASTEXITCODE"
@@ -137,6 +210,9 @@ elseif (-not $Listen) {
 }
 elseif ($connectedPortNames -notcontains $PortName) {
     $result = 'HOLD_SELECTED_PORT_NOT_ENUMERATED_NO_SERIAL_OPEN'
+}
+elseif (-not $portIdentity.valid) {
+    $result = 'HOLD_SELECTED_PORT_NOT_APPROVED_CH340_NO_SERIAL_OPEN'
 }
 else {
     $port = $null
@@ -196,10 +272,15 @@ New-Item -ItemType Directory -Force -Path $EvidenceDir | Out-Null
 $evidencePath = Join-Path (Resolve-Path $EvidenceDir).Path ("{0}_{1}.json" -f $Label, $timestamp)
 
 $evidence = [ordered]@{
-    schema = 'm2_uart0_banner_capture_v1'
+    schema = 'r0_uart0_banner_capture_v2'
     timestamp_local = (Get-Date).ToString('o')
     repo_head = $head
+    manifest_path = (Resolve-Path -LiteralPath $ManifestPath).Path
+    manifest_batch_id = "$($manifest.batch_id)"
+    manifest_checks = $manifestChecks
+    input_blob_checks = $inputBlobChecks
     requested_port = $PortName
+    selected_port_identity = $portIdentity
     listen_requested = [bool]$Listen
     listen_seconds = $ListenSeconds
     approval = $approval
@@ -215,7 +296,9 @@ $evidence = [ordered]@{
     parity = 'none'
     stop_bits = 1
     expected_bitstream_sha256 = $expectedBitSha256
+    expected_bitstream_size_bytes = [int64]$manifest.bitstream.size_bytes
     expected_elf_sha256 = $expectedElfSha256
+    expected_elf_size_bytes = [int64]$manifest.hello_elf.size_bytes
     raw_rx_byte_count = $rawBytes.Count
     raw_rx_base64 = [Convert]::ToBase64String($rawBytes.ToArray())
     raw_rx_ascii = $asciiText

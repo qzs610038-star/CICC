@@ -150,6 +150,33 @@ static int ack(sc_runtime_t *runtime, const sc_feature_snapshot_t *snapshot,
                       runtime->controller.reason, 0);
 }
 
+/* Terminal idle-drain: release one exact snapshot after the round result has
+   already latched. This ACK is transport housekeeping only: it never classifies,
+   never submits another result, and never changes the consumed-frame trace used
+   by ABANDON/TIMEOUT reporting. Newer frame IDs advance the ordering watermark;
+   duplicate/old IDs are released without moving the watermark backwards. */
+static int release_after_latch(sc_runtime_t *runtime,
+                               const sc_feature_snapshot_t *snapshot)
+{
+    int order = sc_runtime_frame_order(snapshot->frame_id, runtime->last_frame_id,
+                                       runtime->has_last_frame);
+
+    if (runtime->transport.ack_feature_frame(runtime->transport.context,
+                                             snapshot->frame_id) != SC_TRANSPORT_OK) {
+        return fatal(runtime, snapshot->frame_id, snapshot->source_flags,
+                     "LATCH_DRAIN_ACK_MISMATCH");
+    }
+    runtime->ack_count++;
+    if (!runtime->has_last_frame || order > 0) {
+        runtime->has_last_frame = 1u;
+        runtime->last_frame_id = snapshot->frame_id;
+    }
+    return emit_event(runtime, "FRAME_RELEASED_AFTER_LATCH", snapshot->frame_id,
+                      snapshot->source_flags, 0, runtime->controller.decision,
+                      runtime->controller.reason,
+                      "RESULT_ALREADY_LATCHED_RELEASE_ONLY");
+}
+
 static int submit_result(sc_runtime_t *runtime, const sc_feature_snapshot_t *snapshot,
                          const sc_observation_t *observation)
 {
@@ -214,17 +241,27 @@ int sc_runtime_process_one(sc_runtime_t *runtime, uint32_t now_ms)
 
     if (runtime == 0 || runtime->fatal) return -1;
 
-    /* Gate: result already latched this round — discard subsequent frames
-       without ACK and without fatal. */
+    /* Gate: result already latched this round. Drain exactly one published
+       snapshot per call with a same-frame ACK, but do not classify it or emit
+       another result. This prevents a single-slot I1 producer from remaining
+       occupied across rounds. */
     if (runtime->controller.result_valid) {
         memset(&snapshot, 0, sizeof(snapshot));
         status = runtime->transport.read_feature_snapshot(runtime->transport.context, &snapshot);
         if (status == SC_TRANSPORT_NO_DATA) return 0;
-        if (status != SC_TRANSPORT_OK) return 0; /* drop on the floor */
-        (void)emit_event(runtime, "FRAME_DISCARDED_AFTER_LATCH", snapshot.frame_id,
-                         snapshot.source_flags, 0, runtime->controller.decision,
-                         runtime->controller.reason, "RESULT_ALREADY_LATCHED");
-        return 0;
+        if (status == SC_TRANSPORT_SNAPSHOT_TORN) {
+            return fatal(runtime, snapshot.frame_id, snapshot.source_flags,
+                         "LATCH_DRAIN_SNAPSHOT_TORN");
+        }
+        if (status != SC_TRANSPORT_OK) {
+            return fatal(runtime, snapshot.frame_id, snapshot.source_flags,
+                         "LATCH_DRAIN_READ_FAILED");
+        }
+        if (snapshot.config_seq != runtime->expected_config_revision) {
+            return fatal(runtime, snapshot.frame_id, snapshot.source_flags,
+                         "LATCH_DRAIN_CONFIG_MISMATCH");
+        }
+        return release_after_latch(runtime, &snapshot);
     }
 
     memset(&snapshot, 0, sizeof(snapshot));

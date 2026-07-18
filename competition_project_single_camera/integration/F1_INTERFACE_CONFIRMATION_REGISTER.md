@@ -7,7 +7,7 @@
 
 | ID | 本机固定信息 | 唯一语义来源 | 明确保留为未冻结 |
 |---|---|---|---|
-| I1 | FPGA 向 CPU 发布完整帧快照；CPU 只消费稳定快照，对同一 `frame_id` ACK；未 ACK 的新帧只能标记 overrun，不能回压 HDMI。 | [特征契约](single_camera_feature_contract.md#4-帧快照载荷) / [总账](F1_INTERFACE_ALIGNMENT_DRAFT.md#4-i1fpga--cpu-特征快照已对齐的语义) | CDC 方案、寄存器布局、读序、ACK 位点、PSTRB、IRQ、复位。 |
+| I1 | FPGA 向 CPU 发布完整帧快照；CPU 只消费稳定快照，对同一 `frame_id` ACK；结果锁存后的 Host seam 另有 release-only ACK，只释放单槽、不分类、不产生第二个结果。未 ACK 的新帧只能标记 overrun，不能回压 HDMI。 | [特征契约](single_camera_feature_contract.md#5-帧原子性与-ack) / [总账](F1_INTERFACE_ALIGNMENT_DRAFT.md#4-i1fpga--cpu-特征快照已对齐的语义) | 业务 ACK 与终态释放的 wire 编码、CDC 方案、寄存器布局、读序、PSTRB、IRQ、复位。 |
 | I2 | CPU 配置必须遵循 `staging → commit(config_seq) → frame-boundary active`；统计只使用 active 配置。 | [特征契约](single_camera_feature_contract.md#3-cpu-配置语义) / [总账](F1_INTERFACE_ALIGNMENT_DRAFT.md#5-i2cpu--fpga-统计配置只冻结语义) | 配置寄存器、commit/active 回执、CDC 与实际 VSYNC 接入。 |
 | I4 | CPU 只产生可解释、可追溯的结果语义；F1 中 `arm_enabled=0`，不得把目标命中表述为机械臂已执行。 | [总账](F1_INTERFACE_ALIGNMENT_DRAFT.md#7-i4cpu--fpga-osd-结果语义初步提案) | result/OSD ABI、提交寄存器、清屏、字体、像素时序和 OSD 实现。 |
 | I5 | `OUT OF F1 / BLOCKED`：不接 J52、不初始化 UART2、不发送 myCobot 帧。 | [总账](F1_INTERFACE_ALIGNMENT_DRAFT.md#8-i5cpu--mycobot明确不属于当前-f1) | 全部电气、串口协议与动作条件。 |

@@ -112,6 +112,10 @@ ch0 framebuffer -> debayer_top_2to1 -> rgb0_data_rgb -> HDMI
    帧视为不稳定。
 6. 像素域到 CPU/总线域必须使用经审查的 multi-bit snapshot CDC 或异步 FIFO。
    不得逐字段直接打两拍后自行拼接。
+7. Host runtime 的集成裁决允许在本轮结果已经锁存后，对成功读取的同一
+   `frame_id` 做 release-only ACK：只释放单槽并更新帧序，不再分类或提交结果。
+   这只是待审语义，不是已冻结 wire ABI；真实 APB/CDC 必须另行定义如何区分
+   业务消费 ACK 与终态释放，并覆盖撕裂、错 ACK、overrun 和跨轮行为。
 
 ## 6. F1 Host 映射
 
@@ -152,7 +156,7 @@ sc_features_t -> sc_classify_features() -> sc_observation_t
 
 开始 feature/APB/CDC/OSD 业务接入前必须同时满足：
 
-1. 当前 G1 的 USER2/UART0 与既有 APB MAGIC 实读 Gate 已通过；
+1. 未来在当前批次的 USER2、UART0 与既有 APB MAGIC 实读 Gate 均通过后；
 2. 用户批准包含 feature、目标/事件、result/OSD 的最小 F1 原子批次 Review Packet；
 3. 保留并扩展独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出、
    ACK 不匹配、CDC 和 APB 访问方向；

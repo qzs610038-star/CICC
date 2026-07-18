@@ -9,12 +9,14 @@
  *
  * Shape classification notes:
  *   SC_SHAPE_CUBE       — production-reliable (fill rate heuristic, >= cube_fill_min_per_mille).
- *   SC_SHAPE_CYLINDER   — UNCALIBRATED HEURISTIC.  Treated as NON_CUBE in task decisions.
- *   SC_SHAPE_CONE       — UNCALIBRATED HEURISTIC.  Treated as NON_CUBE in task decisions.
+ *   SC_SHAPE_CYLINDER   — UNCALIBRATED DIAGNOSTIC. Keeps F1 in WAIT.
+ *   SC_SHAPE_CONE       — UNCALIBRATED DIAGNOSTIC. Keeps F1 in WAIT.
  *   SC_SHAPE_UNKNOWN    — insufficient foreground or below minimum fill rate.
  *
  * No real-camera calibration has been performed; CYLINDER and CONE thresholds are
- * Host-synthetic baselines and must not be reported as field-reliable.
+ * Host-synthetic baselines and must not be reported as field-reliable. Until
+ * real-camera calibration is complete, task 2 is BLOCKED for non-cube inputs
+ * and may terminate only by timeout or explicit operator abandon.
  *
  * Color classification notes:
  *   WHITE and BLACK depend on foreground_area, roi_pixel_count, and sum_luma.

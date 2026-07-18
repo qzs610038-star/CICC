@@ -28,7 +28,7 @@ $build = Join-Path ([System.IO.Path]::GetTempPath()) ('cicc-g2-' + [guid]::NewGu
 New-Item -ItemType Directory -Force -Path $build | Out-Null
 $exe = Join-Path $build 'test_single_camera_runtime.exe'
 $rawLog = Join-Path $RunDir 'raw.log'
-$compileArgs = @('/nologo', '/std:c11', '/W4', '/WX', "/I$include", "/Fe$exe", $test) + $sources
+$compileArgs = @('/nologo', '/utf-8', '/std:c11', '/W4', '/WX', "/I$include", "/Fe$exe", $test) + $sources
 $compileLine = 'pushd "' + $build + '" && call "' + $vcvars + '" x64 >nul && cl.exe ' + (($compileArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' && popd'
 cmd.exe /d /s /c $compileLine
 if ($LASTEXITCODE -ne 0) { throw "HOST_RUNTIME_BLOCKED_COMPILER: cl.exe failed with $LASTEXITCODE" }
@@ -41,4 +41,7 @@ $testCommandBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($t
 python $bundleTool create --run-dir $RunDir --raw-log $rawLog --repo-root $repoRoot --compiler $compilerVersion --test-command-base64 $testCommandBase64 --exit-code $testExit
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python $bundleTool validate --run-dir $RunDir
-exit $LASTEXITCODE
+$validateExit = $LASTEXITCODE
+if ($validateExit -ne 0) { exit $validateExit }
+if ($testExit -ne 0) { exit $testExit }
+exit 0

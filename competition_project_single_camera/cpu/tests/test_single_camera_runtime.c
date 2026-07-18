@@ -153,9 +153,9 @@ static void test_duplicate_timeout_abandon_and_unclassified(void)
     CHECK(sc_fake_transport_push_snapshot(&fake, &snapshot) == 0);
     CHECK(sc_runtime_process_one(&runtime, 2u) == 0);
     CHECK(sc_runtime_process_one(&runtime, 3u) == 0);
-    CHECK(fake.ack_count == 1u && fake.result_count == 1u);
-    /* Second identical frame arrives after result latched → discarded, not ACKed. */
-    CHECK(event_seen(&fake, "event=FRAME_DISCARDED_AFTER_LATCH"));
+    /* Second identical frame arrives after result latched → release-only ACK. */
+    CHECK(fake.ack_count == 2u);
+    CHECK(event_seen(&fake, "event=FRAME_RELEASED_AFTER_LATCH"));
 
     CHECK(start_color(&runtime, SC_COLOR_RED, 8u, 10u, 5u) == 0);
     CHECK(sc_runtime_tick(&runtime, 15u) == 1);
@@ -179,7 +179,7 @@ static void test_duplicate_timeout_abandon_and_unclassified(void)
     snapshot = snapshot_for(32u, 1u, SC_COLOR_UNKNOWN, 1);
     CHECK(sc_fake_transport_push_snapshot(&fake, &snapshot) == 0);
     CHECK(sc_runtime_process_one(&runtime, 41u) == 0);
-    CHECK(fake.ack_count == 3u && !runtime.controller.result_valid);
+    CHECK(fake.ack_count == 4u && !runtime.controller.result_valid);
     CHECK(event_seen(&fake, "reason=CLASSIFICATION_UNSTABLE"));
 }
 
@@ -320,9 +320,10 @@ typedef struct {
     uint16_t     exp_ack_frame_id;
 } truth_entry_t;
 
-static const uint8_t ALL_GOOD_FLAGS =
-    SC_FEATURE_FLAG_FRAME_STABLE | SC_FEATURE_FLAG_ROI_VALID |
-    SC_FEATURE_FLAG_STATS_VALID | SC_FEATURE_FLAG_SOURCE_CH0;
+#define ALL_GOOD_FLAGS ((uint8_t)(SC_FEATURE_FLAG_FRAME_STABLE | \
+                                  SC_FEATURE_FLAG_ROI_VALID | \
+                                  SC_FEATURE_FLAG_STATS_VALID | \
+                                  SC_FEATURE_FLAG_SOURCE_CH0))
 
 static const truth_entry_t TRUTH[20] = {
     /* ---- Task 1: COLOR_CUBE (RED target) ---- */
@@ -491,25 +492,80 @@ static void test_continuous_frames_no_fatal_no_duplicate_result(void)
     CHECK(fake.results[0].decision == SC_DECISION_EXECUTE_ARM_DISABLED);
     CHECK(!runtime.fatal);
 
-    /* Frame 2: result already latched → discarded, no ACK, no result, no fatal. */
+    /* Frame 2: result already latched → release-only ACK, no result, no fatal. */
     CHECK(sc_fake_transport_push_snapshot(&fake, &snap2) == 0);
     CHECK(sc_runtime_process_one(&runtime, 2u) == 0);
     CHECK(fake.result_count == 1u);
-    CHECK(fake.ack_count == 1u);
+    CHECK(fake.ack_count == 2u);
     CHECK(!runtime.fatal);
-    CHECK(event_seen(&fake, "event=FRAME_DISCARDED_AFTER_LATCH"));
+    CHECK(event_seen(&fake, "event=FRAME_RELEASED_AFTER_LATCH"));
 
-    /* Frame 3: same — discarded. */
+    /* Frame 3: same release-only behavior. */
     CHECK(sc_fake_transport_push_snapshot(&fake, &snap3) == 0);
     CHECK(sc_runtime_process_one(&runtime, 3u) == 0);
     CHECK(fake.result_count == 1u);
-    CHECK(fake.ack_count == 1u);
+    CHECK(fake.ack_count == 3u);
     CHECK(!runtime.fatal);
 
     /* arm_enabled always 0. */
     CHECK(fake.results[0].arm_enabled == 0u);
     CHECK(runtime.arm_request_count == 0u);
     CHECK(runtime.arm_send_count == 0u);
+}
+
+static void test_latched_idle_drain_then_next_round(void)
+{
+    sc_fake_transport_t fake;
+    sc_runtime_t runtime;
+    sc_feature_snapshot_t snap1 = snapshot_for(40u, 1u, SC_COLOR_RED, 1);
+    sc_feature_snapshot_t snap2 = snapshot_for(41u, 1u, SC_COLOR_BLUE, 1);
+    sc_feature_snapshot_t snap3 = snapshot_for(42u, 1u, SC_COLOR_RED, 1);
+
+    init_fake(&fake, &runtime);
+    CHECK(start_color(&runtime, SC_COLOR_RED, 1u, 0u, 100u) == 0);
+    CHECK(sc_fake_transport_push_snapshot(&fake, &snap1) == 0);
+    CHECK(sc_runtime_process_one(&runtime, 1u) == 0);
+    CHECK(fake.ack_count == 1u && fake.result_count == 1u);
+
+    /* Even an unusable terminal snapshot must be released from the transport
+       without classification or a second business result. */
+    snap2.source_flags |= SC_FEATURE_FLAG_SNAPSHOT_OVERRUN;
+    CHECK(sc_fake_transport_push_snapshot(&fake, &snap2) == 0);
+    CHECK(sc_runtime_process_one(&runtime, 2u) == 0);
+    CHECK(fake.ack_count == 2u && fake.acked_frames[1] == 41u);
+    CHECK(fake.result_count == 1u);
+    CHECK(runtime.last_frame_id == 41u);
+    CHECK(event_seen(&fake, "reason=RESULT_ALREADY_LATCHED_RELEASE_ONLY"));
+
+    /* A later round starts after the terminal slot was drained and accepts a
+       genuinely newer frame without inheriting the previous result. */
+    CHECK(start_color(&runtime, SC_COLOR_RED, 2u, 3u, 100u) == 0);
+    CHECK(sc_fake_transport_push_snapshot(&fake, &snap3) == 0);
+    CHECK(sc_runtime_process_one(&runtime, 4u) == 0);
+    CHECK(fake.ack_count == 3u && fake.result_count == 2u);
+    CHECK(fake.results[1].frame_id == 42u);
+    CHECK(!runtime.fatal);
+}
+
+static void test_latched_idle_drain_ack_failure_is_fatal(void)
+{
+    sc_fake_transport_t fake;
+    sc_runtime_t runtime;
+    sc_feature_snapshot_t snap1 = snapshot_for(50u, 1u, SC_COLOR_RED, 1);
+    sc_feature_snapshot_t snap2 = snapshot_for(51u, 1u, SC_COLOR_BLUE, 1);
+
+    init_fake(&fake, &runtime);
+    CHECK(start_color(&runtime, SC_COLOR_RED, 1u, 0u, 100u) == 0);
+    CHECK(sc_fake_transport_push_snapshot(&fake, &snap1) == 0);
+    CHECK(sc_runtime_process_one(&runtime, 1u) == 0);
+    CHECK(fake.ack_count == 1u && fake.result_count == 1u);
+
+    sc_fake_transport_set_ack_failure(&fake, 51u);
+    CHECK(sc_fake_transport_push_snapshot(&fake, &snap2) == 0);
+    CHECK(sc_runtime_process_one(&runtime, 2u) == -1);
+    CHECK(runtime.fatal);
+    CHECK(fake.ack_count == 1u && fake.result_count == 1u);
+    CHECK(event_seen(&fake, "reason=LATCH_DRAIN_ACK_MISMATCH"));
 }
 
 static void test_runtime_without_frames_times_out(void)
@@ -558,7 +614,7 @@ static void test_frame_id_half_range_ordering(void)
     CHECK(fake.result_count == 2u);
     CHECK(!runtime.fatal);
 
-    /* 10→10: duplicate — suppressed, no fatal, no ACK. */
+    /* 10→10 after terminal latch: release-only ACK, no duplicate result. */
     init_fake(&fake, &runtime);
     snap = snapshot_for(10u, 1u, SC_COLOR_RED, 1);
     CHECK(start_color(&runtime, SC_COLOR_RED, 1u, 0u, 100u) == 0);
@@ -568,9 +624,9 @@ static void test_frame_id_half_range_ordering(void)
     snap = snapshot_for(10u, 1u, SC_COLOR_RED, 1);
     CHECK(sc_fake_transport_push_snapshot(&fake, &snap) == 0);
     CHECK(sc_runtime_process_one(&runtime, 2u) == 0);
-    CHECK(fake.ack_count == 1u && fake.result_count == 1u);
-    /* FRAME_DISCARDED_AFTER_LATCH: result was already latched from round 1. */
-    CHECK(event_seen(&fake, "event=FRAME_DISCARDED_AFTER_LATCH"));
+    /* Duplicate terminal frame is released without producing another result. */
+    CHECK(fake.ack_count == 2u && fake.result_count == 1u);
+    CHECK(event_seen(&fake, "event=FRAME_RELEASED_AFTER_LATCH"));
     CHECK(!runtime.fatal);
 
     /* 10→9: old frame — fail-closed reject, no ACK, no result, no fatal. */
@@ -777,6 +833,8 @@ int main(int argc, char **argv)
     test_old_stable_not_reused_across_rounds();
     test_twenty_round_truth_table();
     test_continuous_frames_no_fatal_no_duplicate_result();
+    test_latched_idle_drain_then_next_round();
+    test_latched_idle_drain_ack_failure_is_fatal();
     test_frame_id_half_range_ordering();
     test_abandon_preserves_trace_after_consumed_frame();
     test_abandon_no_frame_has_zero_trace();
