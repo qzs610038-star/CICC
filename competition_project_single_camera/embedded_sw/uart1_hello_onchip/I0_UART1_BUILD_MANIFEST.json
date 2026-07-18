@@ -44,62 +44,62 @@
                       {
                           "root":  "evidence",
                           "path":  "efinity_console.log",
-                          "size":  5894,
-                          "sha256":  "12197A0491170701A786BF489D8B54AF88A76395DDCDB85E0F24025AA13AEE1C"
+                          "size":  5960,
+                          "sha256":  "B9E2F01AB742CF3DFF03EAC57AF086F790F5B9919C7B59A5813E273AEE25ABB4"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.log",
-                          "size":  541573,
-                          "sha256":  "5E7942058802F15074A4AC8B83AFC240D56C8ADFA85FD7891D32A9B661D6E95E"
+                          "size":  541697,
+                          "sha256":  "FDE6E783C5937048895FECB47ED7BE6AE3D68D93D9A5CFB8AD63C692A8DF8F3B"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.map.out",
-                          "size":  149129,
-                          "sha256":  "E408C1EDC212E6BCE30BA9F1259A6B9A9DB1B4EA86D0C2DFA5BCCA7FECDE3467"
+                          "size":  149123,
+                          "sha256":  "68031148F99142AD2AEE8E0A7CA694DE06BD3839B926C55D1538F4DC731D6C7C"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.map.rpt",
-                          "size":  1012540,
-                          "sha256":  "C10B5375556E5EFBA5B29762D2DC33475A4C1DEA6F8926C1A795DBD160158D3B"
+                          "size":  1012552,
+                          "sha256":  "07BA57F15D606A5323307016F6B6AB1511F103A16FA5CEBDA598530945E3030A"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.warn.log",
                           "size":  48258,
-                          "sha256":  "C938FB211CBEAC77799105EA4C74D5B608060353BE30C7BEAEEE271A039284B9"
+                          "sha256":  "B9BDD7F2E4211561B98E95AE3ED868CE84AAE14ADF2A12DDFAC05B7C04B63A08"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pt.rpt",
                           "size":  50464,
-                          "sha256":  "4C1982C7E17336C2BA947536AA3138D115A0D68EC9030D6C11272CCA46881EA8"
+                          "sha256":  "52D8B746FFF8203632779EE8AF2CC4D40078AD4E2657E1FE5FA68CD20EADE61A"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.interface.csv",
                           "size":  108550,
-                          "sha256":  "72ADEFFE1E84F2053FB2A9776F7B038C0964D0885BEFE28EE4E67741EFB648A2"
+                          "sha256":  "37C20CBADDB3C4C1BDCC185AC7CB4D260DFCD79824F95715A059137A0C8FC230"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pinout.rpt",
                           "size":  109583,
-                          "sha256":  "4C654273E494DDD51634F9147013EC73A2D3561C50982443267960D0A57A2007"
+                          "sha256":  "E3E307D948AA2739D780F92B4ADE273CE19A7DB0CC07C2E1C6CE638596273451"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.route.rpt",
                           "size":  1267,
-                          "sha256":  "1E45D368A3A39A5285835A2A253E86E9B29E6BE4632DFAAEA21BE3CA0727C0E0"
+                          "sha256":  "1592723607898B97E286E12DA0F47D6024701DAEE2A28418E72390AA2FA24E2F"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.timing.rpt",
                           "size":  1316684,
-                          "sha256":  "4445AF8A3E0D4453C99D0905D5F8113AE23F70F529955DA68D20733F1E5F1AA5"
+                          "sha256":  "87588A83E907C80A2AD6C983DB479E3333C544847B0DCB5A658961EDFF76ED0D"
                       },
                       {
                           "root":  "outflow",
@@ -110,32 +110,32 @@
                       {
                           "root":  "outflow",
                           "path":  "mem_test.pgm.out",
-                          "size":  2354,
-                          "sha256":  "1854E796B939D6E0EBC04ADBBB92D20BBC3CF600ECF287153AFCD7ACD9E45A8B"
+                          "size":  2365,
+                          "sha256":  "BA9C054D5187D66CB4DAAE7E7224F97DB46F930D6AF9EAB0CC1A3930BF678636"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.bit",
                           "size":  11809029,
-                          "sha256":  "2738A7FBC3737CB88FA893422C3B08088DD8125D8F0FC3FE99C18D741FBE9B67"
+                          "sha256":  "971C84EE7A86939688800295BB29E3E0D02A3A3C5F40EB5B4763B6E9B572AF87"
                       },
                       {
                           "root":  "outflow",
                           "path":  "mem_test.hex",
                           "size":  11809089,
-                          "sha256":  "C88C1678F1195FFBC988118C1CD5A55A67532FBD4BA7F2D04E25B9DA30B157BE"
+                          "sha256":  "C7821D8FC6184FE48C02D47878A5253598B7B619378ED163A11541D4A052EA91"
                       },
                       {
                           "root":  "work",
                           "path":  "mem_test.lbf",
-                          "size":  2463505,
-                          "sha256":  "D53B4C16C85CEC09825A18249D43CABBDDB1CE7F2679C59E5C1F28931D47502D"
+                          "size":  2463201,
+                          "sha256":  "BBCAB284F42BA47A73CCE03425E0E351CDECDEA3800C75BD230E4C8C4C102FF2"
                       },
                       {
                           "root":  "project",
                           "path":  "embedded_sw/uart1_hello_onchip/build/uart1_hello_onchip.elf",
                           "size":  30672,
-                          "sha256":  "C2C5EAF354D5FE7D9292D1B96188FF89267054CCBBE8CD2B222F2205F26E3CA8"
+                          "sha256":  "98553B804DB8AF6ABCAC673CC24649FEC209C8F2FE67C2BD5FA7C946780E4D87"
                       },
                       {
                           "root":  "evidence",
