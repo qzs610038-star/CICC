@@ -90,12 +90,18 @@ int sc_f1_observe(sc_f1_controller_t *controller,
     }
 
     controller->observation = *observation;
-    if (observation->shape != SC_SHAPE_CUBE) {
-        controller->decision = SC_DECISION_SKIP;
-        controller->reason = SC_REASON_SHAPE_MISMATCH;
-    } else if ((controller->target.task == SC_TASK_SIZE_DELTA_1CM_CUBE ||
-                controller->target.task == SC_TASK_SIZE_WITHIN_0P5CM_CUBE) &&
-               !controller->size_available) {
+
+    /* Gate: only CUBE is production-reliable for task decisions.
+       CYLINDER and CONE are uncalibrated diagnostic labels — keep WAIT,
+       do NOT produce a terminal SHAPE_MISMATCH/SKIP. */
+    if (!SC_SHAPE_IS_RELIABLE_CUBE(observation->shape)) {
+        return 0;
+    }
+
+    /* Reliable CUBE from this point onward. */
+    if ((controller->target.task == SC_TASK_SIZE_DELTA_1CM_CUBE ||
+         controller->target.task == SC_TASK_SIZE_WITHIN_0P5CM_CUBE) &&
+        !controller->size_available) {
         controller->decision = SC_DECISION_WAIT;
         controller->reason = SC_REASON_SIZE_UNAVAILABLE;
         return 0;
@@ -158,6 +164,7 @@ int sc_f1_tick(sc_f1_controller_t *controller, uint32_t now_ms)
 const char *sc_f1_reason_text(sc_reason_t reason)
 {
     switch (reason) {
+    case SC_REASON_NONE: return "NONE";
     case SC_REASON_TARGET_MATCH: return "TARGET_MATCH_ARM_DISABLED";
     case SC_REASON_COLOR_MISMATCH: return "COLOR_MISMATCH_SKIP";
     case SC_REASON_SHAPE_MISMATCH: return "SHAPE_MISMATCH_SKIP";
@@ -167,6 +174,6 @@ const char *sc_f1_reason_text(sc_reason_t reason)
     case SC_REASON_OPERATOR_ABANDONED: return "OPERATOR_ABANDONED";
     case SC_REASON_TIMEOUT: return "ROUND_TIMEOUT";
     case SC_REASON_INVALID_TARGET: return "INVALID_TARGET";
-    default: return "NONE";
+    default: return "INVALID_REASON";
     }
 }

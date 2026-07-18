@@ -70,6 +70,20 @@ static int emit_event(sc_runtime_t *runtime, const char *event_type,
     return runtime->transport.emit_diagnostic_event(runtime->transport.context, line);
 }
 
+/* 16-bit half-range frame order comparison.
+   Returns  1: candidate is a newer frame.
+   Returns  0: duplicate (same frame_id).
+   Returns -1: old or ambiguous frame — fail-closed diagnostic rejection. */
+static int sc_runtime_frame_order(uint16_t candidate, uint16_t last, int has_last)
+{
+    uint16_t delta;
+    if (!has_last) return 1;          /* first frame: always accept */
+    if (candidate == last) return 0;  /* duplicate */
+    delta = (uint16_t)(candidate - last);
+    if (delta > 0u && delta <= 0x7FFFu) return 1;  /* new frame */
+    return -1;  /* delta in [0x8000, 0xFFFF]: old or ambiguous → fail-closed */
+}
+
 static int fatal(sc_runtime_t *runtime, uint16_t frame_id, uint8_t flags,
                  const char *reason)
 {
@@ -107,6 +121,11 @@ int sc_runtime_start_round(sc_runtime_t *runtime, const sc_target_t *target,
                          "PLACE_DUPLICATE");
         return 0;
     }
+    /* Clear per-round ACK trace: prevents cross-round metadata leak. */
+    runtime->has_acked_frame_this_round = 0u;
+    runtime->last_acked_frame_id = 0u;
+    runtime->last_acked_flags = 0u;
+
     if (sc_f1_apply_target(&runtime->controller, target) != 0 ||
         sc_f1_place(&runtime->controller, place_event_seq, now_ms, timeout_ms) != 0) {
         return fatal(runtime, 0u, 0u, "INVALID_TARGET_OR_PLACE");
@@ -122,6 +141,10 @@ static int ack(sc_runtime_t *runtime, const sc_feature_snapshot_t *snapshot,
         return fatal(runtime, snapshot->frame_id, snapshot->source_flags, "ACK_MISMATCH");
     }
     runtime->ack_count++;
+    /* Save trace metadata: ABANDON terminal results restore these fields. */
+    runtime->last_acked_frame_id = snapshot->frame_id;
+    runtime->last_acked_flags = snapshot->source_flags;
+    runtime->has_acked_frame_this_round = 1u;
     return emit_event(runtime, "ACK", snapshot->frame_id, snapshot->source_flags,
                       observation, runtime->controller.decision,
                       runtime->controller.reason, 0);
@@ -153,9 +176,23 @@ static int submit_result(sc_runtime_t *runtime, const sc_feature_snapshot_t *sna
 static int submit_terminal_result(sc_runtime_t *runtime, const char *event_type)
 {
     sc_round_result_t result;
+    uint16_t emit_frame_id;
+    uint8_t  emit_flags;
 
     memset(&result, 0, sizeof(result));
     result.round_id = runtime->controller.round_seq;
+    /* Restore the last ACKed frame's trace metadata when available
+       (ABANDON after a consumed frame).  Falls back to zero for
+       pure timeout / no-frame paths. */
+    if (runtime->has_acked_frame_this_round) {
+        result.frame_id = runtime->last_acked_frame_id;
+        result.input_flags = runtime->last_acked_flags;
+        emit_frame_id = runtime->last_acked_frame_id;
+        emit_flags = runtime->last_acked_flags;
+    } else {
+        emit_frame_id = 0u;
+        emit_flags = 0u;
+    }
     result.config_revision = runtime->expected_config_revision;
     result.observation = runtime->controller.observation;
     result.decision = runtime->controller.decision;
@@ -163,9 +200,9 @@ static int submit_terminal_result(sc_runtime_t *runtime, const char *event_type)
     result.arm_enabled = SC_RUNTIME_ARM_ENABLED;
     if (runtime->transport.submit_round_result(runtime->transport.context, &result) !=
         SC_TRANSPORT_OK) {
-        return fatal(runtime, 0u, 0u, "ROUND_RESULT_REJECTED");
+        return fatal(runtime, emit_frame_id, emit_flags, "ROUND_RESULT_REJECTED");
     }
-    return emit_event(runtime, event_type, 0u, 0u, &result.observation,
+    return emit_event(runtime, event_type, emit_frame_id, emit_flags, &result.observation,
                       result.decision, result.reason, 0);
 }
 
@@ -176,6 +213,20 @@ int sc_runtime_process_one(sc_runtime_t *runtime, uint32_t now_ms)
     int status;
 
     if (runtime == 0 || runtime->fatal) return -1;
+
+    /* Gate: result already latched this round — discard subsequent frames
+       without ACK and without fatal. */
+    if (runtime->controller.result_valid) {
+        memset(&snapshot, 0, sizeof(snapshot));
+        status = runtime->transport.read_feature_snapshot(runtime->transport.context, &snapshot);
+        if (status == SC_TRANSPORT_NO_DATA) return 0;
+        if (status != SC_TRANSPORT_OK) return 0; /* drop on the floor */
+        (void)emit_event(runtime, "FRAME_DISCARDED_AFTER_LATCH", snapshot.frame_id,
+                         snapshot.source_flags, 0, runtime->controller.decision,
+                         runtime->controller.reason, "RESULT_ALREADY_LATCHED");
+        return 0;
+    }
+
     memset(&snapshot, 0, sizeof(snapshot));
     status = runtime->transport.read_feature_snapshot(runtime->transport.context, &snapshot);
     if (status == SC_TRANSPORT_NO_DATA) return 0;
@@ -192,12 +243,28 @@ int sc_runtime_process_one(sc_runtime_t *runtime, uint32_t now_ms)
         return fatal(runtime, snapshot.frame_id, snapshot.source_flags,
                      "CONFIG_REVISION_MISMATCH");
     }
-    if (runtime->has_last_frame && runtime->last_frame_id == snapshot.frame_id) {
-        (void)emit_event(runtime, "DUPLICATE_SUPPRESSED", snapshot.frame_id,
-                         snapshot.source_flags, 0, SC_DECISION_WAIT, SC_REASON_NONE,
-                         "DUPLICATE_FRAME");
-        return 0;
+
+    /* 16-bit half-range frame ordering. */
+    {
+        int order = sc_runtime_frame_order(snapshot.frame_id, runtime->last_frame_id,
+                                           runtime->has_last_frame);
+        if (order == 0) {
+            /* Duplicate frame_id: suppress without result. */
+            (void)emit_event(runtime, "DUPLICATE_SUPPRESSED", snapshot.frame_id,
+                             snapshot.source_flags, 0, SC_DECISION_WAIT, SC_REASON_NONE,
+                             "DUPLICATE_FRAME");
+            return 0;
+        }
+        if (order < 0) {
+            /* Old or ambiguous frame: fail-closed diagnostic rejection.
+               No ACK, no result, no fatal. */
+            (void)emit_event(runtime, "SNAPSHOT_REJECT", snapshot.frame_id,
+                             snapshot.source_flags, 0, SC_DECISION_WAIT, SC_REASON_NONE,
+                             "OLD_FRAME");
+            return 0;
+        }
     }
+
     if (sc_feature_snapshot_is_usable(&snapshot) != 0) {
         (void)emit_event(runtime, "SNAPSHOT_REJECT", snapshot.frame_id, snapshot.source_flags,
                          0, SC_DECISION_WAIT, SC_REASON_NONE, "SNAPSHOT_FLAGS_REJECTED");
