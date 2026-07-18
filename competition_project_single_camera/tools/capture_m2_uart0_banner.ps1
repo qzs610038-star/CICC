@@ -1,10 +1,16 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^COM(?:3|7|8)$')]
+    [ValidatePattern('^COM(?:3|7|8|10|13)$')]
     [string]$PortName = 'COM3',
     [ValidateRange(3, 10)]
     [int]$ListenSeconds = 5,
     [string]$PcGateApproval,
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[A-Fa-f0-9]{64}$')]
+    [string]$ExpectedBitSha256,
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[A-Fa-f0-9]{64}$')]
+    [string]$ExpectedElfSha256,
     [string]$EvidenceDir,
     [string]$Label = 'm2_uart0_banner_capture',
     [switch]$Listen
@@ -17,8 +23,8 @@ if ([string]::IsNullOrWhiteSpace($EvidenceDir)) {
     $EvidenceDir = Join-Path $PSScriptRoot '..\docs\debug_sessions\evidence'
 }
 
-$expectedBitSha256 = '2EA4AD287CCC6BFBF113E718B59EF6F5807222AFE1ECE3D55BD1E24D37FB8347'
-$expectedElfSha256 = 'C99FD39DB437409A63A6061CD29698B5B60099B9E24A77B155B871E169BF5DA5'
+$expectedBitSha256 = $ExpectedBitSha256.ToUpperInvariant()
+$expectedElfSha256 = $ExpectedElfSha256.ToUpperInvariant()
 $requiredApprovalResult = 'M2_USER2_RAM_PC_GATE_APPROVED'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
@@ -58,13 +64,57 @@ function Read-PcGateApproval {
 }
 
 function Get-ConnectedPortNames {
-    try {
-        Add-Type -AssemblyName System.IO.Ports -ErrorAction Stop
+    if (Initialize-SerialPortApi) {
+        try {
         return @([System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object)
+        }
+        catch {
+            # Fall through to the kernel map when enumeration itself fails.
+        }
+    }
+
+    try {
+        # Some PowerShell hosts cannot load System.IO.Ports even though Windows
+        # has enumerated serial devices.  Use the kernel serial map as a
+        # read-only fallback; opening the port still remains separately gated.
+        $serialMap = Get-ItemProperty 'HKLM:\HARDWARE\DEVICEMAP\SERIALCOMM' -ErrorAction Stop
+        return @(
+            $serialMap.PSObject.Properties |
+                Where-Object { $_.Name -notmatch '^PS' } |
+                ForEach-Object { "$($_.Value)" } |
+                Where-Object { $_ -match '^COM\d+$' } |
+                Sort-Object -Unique
+        )
     }
     catch {
         return @()
     }
+}
+
+function Initialize-SerialPortApi {
+    if ($null -ne ('System.IO.Ports.SerialPort' -as [type])) {
+        return $true
+    }
+
+    foreach ($assemblyPath in @(
+        'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.dll',
+        'C:\Windows\Microsoft.NET\Framework\v4.0.30319\System.dll'
+    )) {
+        if (-not (Test-Path -LiteralPath $assemblyPath)) {
+            continue
+        }
+        try {
+            Add-Type -Path $assemblyPath -ErrorAction Stop
+            if ($null -ne ('System.IO.Ports.SerialPort' -as [type])) {
+                return $true
+            }
+        }
+        catch {
+            # Try the remaining framework assembly before failing closed.
+        }
+    }
+
+    return $false
 }
 
 $approval = Read-PcGateApproval -Path $PcGateApproval
@@ -91,7 +141,9 @@ elseif ($connectedPortNames -notcontains $PortName) {
 else {
     $port = $null
     try {
-        Add-Type -AssemblyName System.IO.Ports -ErrorAction Stop
+        if (-not (Initialize-SerialPortApi)) {
+            throw 'System.IO.Ports.SerialPort is unavailable in this PowerShell host.'
+        }
         $port = [System.IO.Ports.SerialPort]::new($PortName, 115200, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One)
         $port.Handshake = [System.IO.Ports.Handshake]::None
         $port.DtrEnable = $false
@@ -162,6 +214,8 @@ $evidence = [ordered]@{
     data_bits = 8
     parity = 'none'
     stop_bits = 1
+    expected_bitstream_sha256 = $expectedBitSha256
+    expected_elf_sha256 = $expectedElfSha256
     raw_rx_byte_count = $rawBytes.Count
     raw_rx_base64 = [Convert]::ToBase64String($rawBytes.ToArray())
     raw_rx_ascii = $asciiText

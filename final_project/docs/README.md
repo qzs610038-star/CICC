@@ -9,6 +9,7 @@
 ## 目录索引
 
 - `architecture/`：架构设计、关键决策和当前代码链路说明。
+- 视频像素格式、时钟域、ROI/统计快照与 OSD 帧对齐学习讲义：[视频流水线与时序学习讲义](architecture/video_pipeline_timing_learning_guide_20260718.md)。
 - 当前活跃路线、阻塞和待定决策：根目录 [CURRENT_STATE.md](../../CURRENT_STATE.md)。
 - 当前综合架构快照：[current_code_architecture_2026-07-13.md](architecture/current_code_architecture_2026-07-13.md)；[2026-07-11 快照](architecture/current_code_architecture_2026-07-11.md)及更早文档仅作历史证据。
 - `technical_plans/`：已批准或待审核的实施方案。摄像头未恢复期间的并行路线见 [摄像头不可用期间的下游并行推进方案](technical_plans/camera_independent_downstream_execution_plan_20260712.md)，当前 FPGA 预处理入口见 [FPGA 视觉预处理模块执行与协作交接方案](technical_plans/fpga_vision_preprocess_execution_plan_20260711.md)。
