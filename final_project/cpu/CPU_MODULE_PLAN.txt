@@ -5,6 +5,103 @@
   更新: 2026-07-15（整合 wsc 统一语义层与跨编译器门；板级闭环仍待验证）
 ================================================================================
 
+================================================================================
+  【当前重要 / 强制执行覆盖层】WSC 单摄 CPU 工作入口（2026-07-18）
+================================================================================
+
+  阅读规则（Codex / Claude / 团队成员均必须遵守）:
+    1. 本节是 CPU_MODULE_PLAN 的当前执行入口，优先级高于本文件下方所有
+       2026-07-15 及更早的双摄设计、模块完成度、伪代码和停工记录。
+    2. 下方旧内容不删除，仅用于历史审计、复用已验证的纯 CPU 逻辑和追溯设计来源。
+    3. 旧内容只要与本节冲突，统一标记为【已被 2026-07-18 单摄覆盖层覆盖】，不得执行。
+    4. 当前动态事实、Gate、禁止项仍以仓库根目录 CURRENT_STATE.md 为最高事实源；
+       本节不能把单摄隔离候选、Host 测试或接口草案升级成正式主线/板级 PASS。
+
+  【当前重要】当前工程定位:
+    - 当前实际推进方向是 competition_project_single_camera/ 单摄隔离候选，输入来源为 ch0。
+    - 单摄候选尚未替代 final_project/ 正式主线；替代与合并必须经过独立 Review/Gate。
+    - final_project/cpu/app/src/main.c 当前仍按 Cam0 + Cam1 双摄初始化、轮询和融合，
+      不得直接作为“已适配单摄”的正式固件烧写或宣称可用。
+    - 单摄候选已有 Host/fake-transport CPU 语义、分类器和 F1 状态机；真实 MMIO
+      transport 仍 fail-closed。I1/I2/I3/I4 的 wire ABI、CDC、地址和板级证据未完成。
+    - FPGA feature_stats_tap RTL/testbench 存在，但当前顶层 i_capture_enable=0、
+      i_ack_valid=0、特征输出接 unused；CPU 当前不能据此宣称已读到真实 FPGA 特征。
+
+  【已覆盖】旧双摄假设（保留原文但当前不得执行）:
+    - “Cam0 俯视 + Cam1 侧视都必须初始化成功”已被当前单摄工作假设覆盖。
+    - “每轮固定读取两路并总是 fuse_results(&cam0, &cam1)”已被覆盖。
+    - “尺寸总能从 Cam1 height_px 获得”已被覆盖；单摄 ch0 当前尺寸必须视为不可用。
+    - “向 Cam0/Cam1 两路写相同 action/OSD 结果”已被覆盖，除非后续双摄正式恢复。
+    - 下方任何“双摄代码完成”“两路配置成功”“融合结果可用于抓取”的表述，
+      只代表历史设计或 Host 条件，不代表当前单摄候选或板级能力。
+
+  【当前重要】单摄语义硬规则:
+    1. CPU 不得伪造 Cam1，不得用全零 Cam1 或历史 Cam1 stable 参与当前帧融合。
+    2. 必须区分四种状态：有新快照、快照有效、分类稳定、通道当前在线；
+       不能仅凭滤波器对象存在或旧 stable 非零判断相机可用。
+    3. ch0 单摄可候选输出颜色和单视角形状；尺寸默认 size_valid=0、size=0。
+       size=0 的语义是“尺寸不可用”，不是“物体尺寸为 0 cm”。
+    4. 任务三/四依赖尺寸；在没有受审标定和真实尺寸特征前，必须 fail closed，
+       输出 SIZE_UNAVAILABLE/WAIT/BLOCKED 等明确语义，不得伪装成普通 SKIP 或 EXECUTE。
+    5. 输入不可靠与业务不匹配必须分开：撕裂、overrun、overflow、flags 无效、
+       frame_id 不一致属于 INVALID_INPUT/WAIT，不属于 COLOR/SHAPE/SIZE_MISMATCH。
+    6. 白/黑识别仍依赖 foreground_area、亮度统计和现场标定；真实字段未接入前，
+       不得通过放宽阈值强行宣称五色可靠，必须保留 UNKNOWN/低置信度路径。
+    7. ARM_DISABLED 始终有效；目标命中最多输出 EXECUTE_ARM_DISABLED，不能产生
+       UART2 transport、myCobot 帧、真实抓取请求或“已经执行”的 OSD 文案。
+
+  【当前重要】I1 FPGA -> CPU 特征消费契约（先冻结语义，后冻结 wire ABI）:
+    - 候选字段：frame_id、config_seq、red_area、blue_area、yellow_area、
+      foreground_area、roi_pixel_count、sum_luma、bbox_width、bbox_height、source_flags。
+    - CPU 接受快照前必须检查：FRAME_STABLE、ROI_VALID、STATS_VALID、SOURCE_CH0；
+      必须拒绝 SNAPSHOT_OVERRUN、COUNTER_OVERFLOW 和来源不匹配。
+    - 防撕裂顺序：读 frame_id -> 读全部字段 -> 再读 frame_id；两次相同且 flags
+      合法才允许适配/分类，只对成功消费的同一 frame_id 产生 ACK 语义。
+    - 上述 C 结构体只是语义模型，不是 APB wire ABI。禁止把结构体 memcpy 到 MMIO，
+      禁止在同批 soc.h、RTL/CDC 和 Review Packet 定版前猜地址、偏移、PSTRB 或 IRQ。
+
+  【当前重要】WSC 当前工作顺序（不得倒序）:
+    W0. 与 libaoxun/qzs 确认单摄物理事实：ch0、摄像头视角、可用特征、尺寸能力、
+        单摄候选是否以及何时允许替代 final_project 正式主线。
+    W1. 冻结单摄 CPU 语义：通道在线/新帧/有效/稳定、size_valid、UNKNOWN、WAIT、
+        INVALID_INPUT、SIZE_UNAVAILABLE、decision/reason 的唯一含义。
+    W2. 与 libaoxun 对齐 I1 字段/flags/frame_id/config_seq/valid/ACK/overrun；
+        只形成语义和 Review Packet 输入，不实现未冻结生产 MMIO。
+    W3. 只读审查 final_project 双摄 main 的单摄风险：Cam1 初始化致命停机、无条件
+        双路融合、旧 stable 残留、尺寸来源缺失；形成清单后再申请代码修改 Gate。
+    W4. 固化四任务真值表和 reason：任务一/二覆盖单摄可验证能力；任务三/四在
+        size_valid=0 时必须 fail closed。补齐 20 轮真源/Host 回放。
+    W5. 增加/维护 Host 测试场景：仅 ch0、仅 ch1（兼容边界）、两路均无、通道断开、
+        旧 stable、frame_id 撕裂、overrun、overflow、无尺寸、白/黑低置信度。
+    W6. 与 qzs 冻结 I4 结果语义：round_id、frame_id、config_revision、input_flags、
+        color/shape/size_valid、decision、reason、arm_enabled=0；不猜 OSD 寄存器。
+    W7. 等待匹配 bitstream/BSP/soc.h 后按 Gate 验证 RISC-V：USER2 + 片上 RAM
+        0xF9000000 + UART0 115200 Hello；Hello 不能外推 APB/I1/I4/UART2。
+    W8. 独立 G1c Review 后只读 APB MAGIC；F1 ABI 原子批次定版后才接真实 I1，
+        随后才讨论 I2 配置和 I4 result/OSD。机械臂 I5 始终是更后的独立安全 Gate。
+
+  【当前重要】阶段交付物与完成判据:
+    - 单摄能力矩阵：ch0 对颜色/形状/尺寸及任务 1-4 的可用/不可用结论和依据。
+    - I1 消费契约：字段、flags、防撕裂、ACK、overrun、拒绝原因，不含猜测地址。
+    - 20 轮任务真值表与可解释 reason；尺寸不可用必须有明确负例。
+    - Host 测试原始日志与失败用例；报告中明确 Host != RISC-V != APB != 板级。
+    - I4 CPU 结果语义候选；保持 arm_enabled=0 和 EXECUTE_ARM_DISABLED。
+    - 匹配批次的 ELF/UART0 原始证据（到达对应 Gate 后）；不得复用跨批次 ELF/bitstream。
+    - 未验证项清单：真实 I1 MMIO、I2、I3 外部事件、I4/OSD、UART2/J52、机械臂。
+
+  【当前禁止】:
+    - 禁止把旧 final_project 双摄 main 直接称为单摄固件或直接用于正式板级闭环。
+    - 禁止因 feature_stats_tap/Host 测试存在而声称 FPGA -> CPU 特征链已通。
+    - 禁止猜测或试探 I1-I4 地址、手填 soc.h、恢复旧 APB 占位地址。
+    - 禁止把尺寸不可用的任务三/四输出成可执行目标。
+    - 禁止启用 ARM_BACKEND_REAL/READONLY、UART2/J52、myCobot transport 或动作。
+    - 禁止用 PC/pymycobot 结果冒充板上 CPU 正式闭环。
+
+================================================================================
+  【以下内容为历史计划 / 兼容参考】
+  与上方 2026-07-18 覆盖层冲突的双摄、尺寸、接口、完成度和执行顺序均已被覆盖。
+================================================================================
+
   2026-07-17 状态覆盖:
     - 当前 Gate 与完成度以仓库根目录 CURRENT_STATE.md 为准。
     - 最新 main 已整合 G1/G2/G3 离线证据；当前 NEXT_GATE 仅为匹配

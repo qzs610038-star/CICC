@@ -45,6 +45,11 @@ typedef struct {
     uint32_t arm_send_count;
     uint8_t has_last_frame;
     uint8_t fatal;
+    /* Traceability: snapshot of the last successfully ACKed frame this round,
+       restored in ABANDON terminal results.  Cleared per round. */
+    uint16_t last_acked_frame_id;
+    uint8_t  last_acked_flags;
+    uint8_t  has_acked_frame_this_round;
 } sc_runtime_t;
 
 /* ARM is hard-disabled in this seam. No arm transport exists. */
