@@ -9,6 +9,8 @@
 
 本文件是 qzs、wsc、libaoxun 与其开发 Agent 共同使用的**接口对齐总账**。它把已有的局部契约、CPU Host 结构和板级 Gate 放到同一张表中，明确每一项：谁提供、谁消费、何时有效、目前证据等级、何时才允许修改。
 
+本机已将可由现有证据确认的 I1/I2/I4 语义和 I5 阻断集中到 [F1 最简接口确认册](F1_INTERFACE_CONFIRMATION_REGISTER.md)；该册不冻结 wire ABI，三人确认前不得据此实现业务 MMIO。
+
 它不是新的寄存器地图，也不授权修改 FPGA、SoC、XML、SDC、生成 IP 或机械臂接线。地址、APB 写选通、IRQ、CDC 实现和 UART2 均不在本草案中冻结。
 
 当前权威顺序如下：
