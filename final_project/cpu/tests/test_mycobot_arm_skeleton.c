@@ -272,6 +272,121 @@ static void test_get_angles_official_vectors_and_transaction(void)
     assert(counters->single_flight_reject == 1u);
 }
 
+static void test_mycobot_transaction_timeout_boundary(void)
+{
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 100u) == 1u);
+    assert(mycobot_transaction_expire(&transaction, 849u) == 0u); /* 749 ms */
+    assert(mycobot_transaction_active(&transaction) == 1u);
+    assert(mycobot_transaction_expire(&transaction, 850u) == 1u); /* 750 ms */
+    assert(mycobot_transaction_active(&transaction) == 0u);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->timeout == 1u);
+}
+
+static void test_mycobot_transaction_timeout_wraparound(void)
+{
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+    const uint32_t start_ms = UINT32_MAX - 749u;
+
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, start_ms) == 1u);
+    assert(transaction.deadline_ms == 0u);
+    assert(mycobot_transaction_expire(&transaction, UINT32_MAX) == 0u);
+    assert(mycobot_transaction_active(&transaction) == 1u);
+    assert(mycobot_transaction_expire(&transaction, 0u) == 1u);
+    assert(mycobot_transaction_active(&transaction) == 0u);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->timeout == 1u);
+}
+
+static void test_mycobot_transaction_bad_frames_remain_in_flight(void)
+{
+    mycobot_frame_t frame;
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+
+    memset(&frame, 0, sizeof(frame));
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 100u) == 1u);
+
+    frame.command = MYCOBOT_CMD_GET_GRIPPER_VALUE;
+    frame.payload_len = 12u;
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 101u) ==
+           MYCOBOT_TRANSACTION_BAD_COMMAND);
+    assert(mycobot_transaction_active(&transaction) == 1u);
+
+    frame.command = MYCOBOT_CMD_GET_ANGLES;
+    frame.payload_len = 11u;
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 102u) ==
+           MYCOBOT_TRANSACTION_BAD_LENGTH);
+    assert(mycobot_transaction_active(&transaction) == 1u);
+
+    frame.payload_len = 12u;
+    frame.payload[0] = 0x41u;
+    frame.payload[1] = 0xFAu; /* J1 = 1690 deg_x10, outside +1680. */
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 103u) ==
+           MYCOBOT_TRANSACTION_BAD_DOMAIN);
+    assert(mycobot_transaction_active(&transaction) == 1u);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->bad_command == 1u);
+    assert(counters->bad_length == 1u);
+    assert(counters->bad_domain == 1u);
+    assert(counters->accepted == 0u);
+}
+
+static void test_mycobot_transaction_first_valid_response_wins(void)
+{
+    mycobot_frame_t frame;
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+
+    memset(&frame, 0, sizeof(frame));
+    frame.command = MYCOBOT_CMD_GET_ANGLES;
+    frame.payload_len = 12u;
+
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 100u) == 1u);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 101u) ==
+           MYCOBOT_TRANSACTION_ACCEPTED);
+    assert(mycobot_transaction_active(&transaction) == 0u);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 102u) ==
+           MYCOBOT_TRANSACTION_IDLE);
+    assert(mycobot_transaction_accept_frame(&transaction, &frame, 103u) ==
+           MYCOBOT_TRANSACTION_IDLE);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->accepted == 1u);
+    assert(counters->late_or_duplicate == 2u);
+}
+
+static void test_mycobot_transaction_single_flight_reject(void)
+{
+    mycobot_transaction_t transaction;
+    const mycobot_transaction_counters_t *counters;
+
+    mycobot_transaction_init(&transaction);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_ANGLES, 100u) == 1u);
+    assert(mycobot_transaction_begin(&transaction, MYCOBOT_CMD_GET_GRIPPER_VALUE, 101u) == 0u);
+    assert(mycobot_transaction_active(&transaction) == 1u);
+    assert(transaction.expected_command == MYCOBOT_CMD_GET_ANGLES);
+
+    counters = mycobot_transaction_get_counters(&transaction);
+    assert(counters != 0);
+    assert(counters->single_flight_reject == 1u);
+}
+
 static void test_plan_validation(void)
 {
     arm_controller_plan_t p = make_valid_plan();
@@ -899,6 +1014,11 @@ int main(void)
     test_frame_build_and_parse();
     test_protocol_truth_table_and_joint_limits();
     test_get_angles_official_vectors_and_transaction();
+    test_mycobot_transaction_timeout_boundary();
+    test_mycobot_transaction_timeout_wraparound();
+    test_mycobot_transaction_bad_frames_remain_in_flight();
+    test_mycobot_transaction_first_valid_response_wins();
+    test_mycobot_transaction_single_flight_reject();
     test_plan_validation();
     test_default_arm_positions_plan();
     test_controller_happy_path();

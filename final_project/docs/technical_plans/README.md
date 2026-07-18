@@ -15,6 +15,8 @@
 - [Priority 3 myCobot 板上 CPU 迁移设计](priority3_mycobot_cpu_migration_design.md)：机械臂控制从 PC 调试流程迁移到板上 CPU 的设计约束。
 - [myCobot 板上调试执行计划](mycobot_board_debug_execution_plan_20260712.md)与[操作员 SOP](mycobot_board_bringup_operator_sop_20260712.md)：具体基线、允许范围和动作门以 `CURRENT_STATE.md` 为准。
 - [myCobot 机械臂上板控制推进方案](mycobot_arm_board_control_advancement_plan_20260715.md)：状态：待 Codex 审核。按 G4→G11 顺序分层解锁，先做阶段 B（纯软件完善：协议真值表、模拟故障注入、回环测试套件），再做阶段 A（G4 攻坚：审查工程、修 PNR/outpad、闭合 SoC/BSP/PNR/部署链）。本方案不解除任何硬件或机械臂安全门槛。
+- [2026-07-17 无板调试强 Goal 包](no_board_debug_strong_goals_20260717.md)：两个可独立闭环的 Host-only Goal（事务时间边界、离线 presubmit），明确验收命令、范围和停止条件。
+- [2026-07-17—2026-07-21 单摄项目收敛与板卡/协作依赖执行方案](board_dependent_execution_plan_20260717.md)：基于实时 Git/G1/G2/源码审计，把当前批次操作包、USER2/PC/UART0、既有 APB MAGIC、F1 原子批次和 20 轮验收拆成 qzs/libaoxun/wsc 可交接任务卡；UART2/机械臂继续 HOLD。
 - [Type-C UART1 视频调试方案](typec_uart1_video_debug_plan.md)：Type-C 调试观测链路的规划和接口边界。
 
 ## 使用规则

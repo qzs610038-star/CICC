@@ -1,0 +1,47 @@
+{
+  "schema": "g1_current_batch_manifest",
+  "version": 1,
+  "batch_id": "G1-20260717-A897-E5BC",
+  "input_baseline_sha": "489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f",
+  "bitstream": {
+    "logical_name": "mem_test.bit",
+    "sha256": "A897E33514A1079BB1B46C02C464B0BD679AF551CEFCB67C4A0EBD5B8FCD1ACD",
+    "size_bytes": 11847132
+  },
+  "hello_elf": {
+    "logical_name": "uart_hello_onchip.elf",
+    "sha256": "E5BC80A2F18A7E2951D53DA539BE2FC61AAECFA90C5CDADB29E65FFC6141928A",
+    "size_bytes": 31116,
+    "load_range": "0xF9000000..0xF9000A30",
+    "entry_point": "0xF9000000",
+    "valid_pc_range": "0xF9000000..0xF9003FFF"
+  },
+  "debug": {
+    "required_user_tap": "USER2",
+    "safe_cfg_requirements": [
+      "Use the approved hard-TAP USER2 debug configuration only.",
+      "Use ftdi_ti.cfg with the approved debug_ti_m2_safe.cfg derivative.",
+      "Keep RAM-only download, halt after load, and prove PC before resume."
+    ]
+  },
+  "uart0": {
+    "baud": 115200,
+    "format": "8N1",
+    "first_capture_mode": "read_only_no_tx"
+  },
+  "prohibited": [
+    "USER1",
+    "SoftTap",
+    "raw debug_ti.cfg",
+    "Flash",
+    "SPI",
+    "PROM",
+    "external DDR",
+    "UART2",
+    "J52",
+    "myCobot wiring",
+    "myCobot frames",
+    "myCobot motion",
+    "manual legacy addresses"
+  ]
+}

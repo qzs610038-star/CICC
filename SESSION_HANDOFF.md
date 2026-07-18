@@ -1,4 +1,4 @@
-# SESSION HANDOFF — 2026-07-17 main 合并后恢复入口
+# SESSION HANDOFF — 2026-07-17 G1 当前批次板级 Gate 恢复入口
 
 ## 恢复前必读
 
@@ -15,16 +15,18 @@ powershell -ExecutionPolicy Bypass -File tools\agent_handoff_health_check.ps1
 git status --short --branch
 ```
 
-## 当前 main 的已合入内容
+## 当前 Git 与已合入内容
 
-- `f2ba66e`：合并 `@libaoxun688@14b9248` 的 Hard SoC 原子真源，包括 IP/XML/wrapper/BSP/顶层、APB0 `REG_MAGIC` 与 testbench；BSP 地址为 `0xE8100000`。
-- `77c88d2`：仅合并 `@wsc6090-CPU@82892d3` 的 DSI 初始化 `.mem` 相对路径修复。
-- 候选分支中的状态、Map/PNR/板级文档均未整体合入；原因和逐项舍弃内容见 `docs/merge_governance/records/`。
+- 2026-07-17 实读：本地 `main` 与 `origin/main` 均为 `9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`。
+- 当前审查分支为 `codex/no-board-debug-plan-20260717`；其后已完成当前 G1 批次 USER2/UART0 离线操作包，真实 HEAD 和 dirty 状态仍须每次恢复时重读。
+- `f2ba66e` 已纳入 `@libaoxun688@14b9248` 的 Hard SoC 原子真源；`77c88d2` 仅纳入 `@wsc6090-CPU@82892d3` 的 DSI 初始化 `.mem` 相对路径修复。
+- G1/G2 经核验补丁随 `683814edb46f0185fe61df5e6829ce2862fccca4` 内容提交纳入；源 worktree 的其他 dirty 内容不得再次整树合并。
 
 ## 当前事实与禁止项
 
-- Hard SoC 源码已在仓库，但这些硬件输入合并后尚未在当前 SHA 重新跑 Efinity；Map/PNR/STA/CDC、bitstream/ELF、USER2、CPU 取指、UART0 与 APB 实读全部为 `NOT VERIFIED`。
-- 下一位只允许先由 `@libaoxun688` 的已配置 Efinity 环境重建并提交脱敏证据；随后才可做 `USER2` + 片上 RAM `0xF9000000` + UART0 115200 的隔离验证。
+- G1 已针对固定原子输入完成 Efinity 2025.2 冷构建：Map/Interface/PNR/STA/CDC/bitstream 与 Hello ELF 离线证据通过。匹配 bitstream 为 `A897E335...FCD1ACD`，匹配 ELF 为 `E5BC80A2...41928A`；无需因本文件旧结论重复冷构建。
+- 上述只证明离线批次。`USER2`、CPU 取指、UART0 115200、APB 实读、视频和 OSD 仍为 `NOT VERIFIED`。
+- 现有 2026-07-16 M2 操作卡/脚本绑定旧 `2EA4.../C99...` 制品，不能用于当前 G1。当前批次专用 manifest、preflight、ASCII staging、PC 范围 checkpoint 与 UART0 只读采集材料已完成无板 fail-closed 验证；状态仅为 `OPERATION PACK OFFLINE READY / BOARD NOT VERIFIED`。
 - 禁止 `USER1`、Flash、外部 DDR、UART2/J52、机械臂接线、myCobot 帧和任何动作。myCobot 的 1000000 baud 与 UART0 Hello 的 115200 是独立 Gate。
 
 ## 图谱与同步
@@ -34,4 +36,7 @@ git status --short --branch
 
 ## 下一立即动作
 
-`@libaoxun688`：在当前 `main` 重新运行 Efinity，并回传 Efinity 版本、Map/PNR/STA/CDC、关键 warning、bitstream/ELF SHA-256 和未验证边界。未完成该动作前，其他人不得更新硬件 PASS 结论。
+1. libaoxun：以 `competition_project_single_camera/docs/debug_sessions/g1_user2_uart0_board_operator_card_20260717.md` 和当前 manifest 进行显式源路径 preflight/staging；不得使用旧 M2 卡上板。
+2. libaoxun：仅完成 `USER2 + RAM + PC` Checkpoint A，回传原始证据并等待 qzs/Codex 当前批次审核 JSON；在此之前不得 Resume 或监听 UART0。
+3. wsc：可并行准备独立 `apb_magic_onchip/`，只读取同批 `soc.h` 的 APB0 offset 0、期望 `0x375A0001`；不得修改现有 Hello 或 FPGA。
+4. 未收到板级原始证据前，不得把 `CURRENT_STATE.md` 中任何板级项改为 PASS。
