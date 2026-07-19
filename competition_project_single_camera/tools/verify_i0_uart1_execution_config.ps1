@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$BaseSha = '69a1030e1e72854a857fab147aa2c9cc8f0e6800'
+$BaseSha = '9949e6ed737f25db82111cc38250dfc15bdb54c9'
 $QzsAuthorizationSha = 'a222ea64653a2232945342faacfb53a06ce50e42'
 $WscContractSha = '48548f47dfa5964b13aed7edf3b3e9da6f6583a2'
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -90,6 +90,9 @@ foreach ($clause in @(
     'RSP_FIXTURES=PASS', 'UART1_PNP_ALLOWLIST=PASS', 'WSC_CONTRACT_CONSUMED=PASS',
     'HELLO_THREE_LINES_FIXTURE=PASS', 'UART_TX_ECHO_FIXTURE=PASS', 'UART_ECHO_MISMATCH_NEGATIVE=PASS',
     'WRONG_POST_LOAD_PC_NEGATIVE=PASS', 'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
+    'Assert-ExternalRunDirectory', 'Assert-ExecutionCheckoutIntegrity', 'git -C $RepoRoot status --porcelain --untracked-files=all',
+    'LIVE_CHECKOUT_HEAD_MISMATCH', 'LIVE_CHECKOUT_DIRTY', 'manifest_file=', 'HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    "foreach (`$name in @('hello_timeout', 'line_mismatch', 'echo_mismatch', 'halt_unconfirmed'))", 'Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory',
     '"$Phase`_RESUME_ONCE.marker"', "Write-PhaseResumeMarker `$directory `$runId 'HELLO'", "Write-PhaseResumeMarker `$directory `$runId 'APB'",
     'HELLO_RESUME_COUNT=1', 'APB_RESUME_COUNT=1', 'RETRY_COUNT=0',
     '$Serial.Write([byte[]]@($TxByte), 0, 1)', 'Assert-EchoByte -Expected $TxByte -Actual $echoValue',
@@ -101,6 +104,7 @@ if ($runner -match 'ApprovalToken|I0_EXECUTION_WINDOW_APPROVED|WriteLine\(|(?i)p
 
 $startProcessIndex = $runner.IndexOf('Start-Process -FilePath $OpenOcdExe', [StringComparison]::Ordinal)
 foreach ($preflight in @(
+    '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest',
     "Assert-FileHash `$Bitstream `$Manifest.fixed_artifacts.bitstream_sha256",
     "Assert-FileHash `$HelloElf `$Manifest.fixed_artifacts.hello_elf_sha256",
     "Assert-FileHash `$ProbeElf `$wsc.ProbeElfSha256",
@@ -112,6 +116,9 @@ foreach ($preflight in @(
     $index = $runner.IndexOf($preflight, [StringComparison]::Ordinal)
     if ($index -lt 0 -or $index -ge $startProcessIndex) { throw "Preflight does not precede OpenOCD start: $preflight" }
 }
+Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Start-Process -FilePath $OpenOcdExe' 'checkout integrity before external process'
+Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' '$serial.Open()' 'checkout integrity before serial open'
+Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Invoke-GdbRamOnlyLoad $GdbExe' 'checkout integrity before GDB load'
 Assert-Ordered $runner 'Invoke-GdbRamOnlyLoad $GdbExe $HelloElf' "Write-RunLog `$executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'" 'Hello load before APB phase'
 Assert-Ordered $runner 'Complete-HelloEcho $serial' "Write-RunLog `$executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'" 'Hello/echo PASS before APB phase'
 Assert-Ordered $runner '$serial.Open()' 'Invoke-GdbRamOnlyLoad $GdbExe $HelloElf' 'UART capture before Hello load'
@@ -138,6 +145,10 @@ foreach ($marker in @(
     'HELLO_THREE_LINES_FIXTURE=PASS', 'UART_TX_ECHO_FIXTURE=PASS printable=true crlf=false same_byte=true',
     'UART_ECHO_MISMATCH_NEGATIVE=PASS', 'HELLO_BAD_LINE_NEGATIVE=PASS', 'WRONG_POST_LOAD_PC_NEGATIVE=PASS',
     'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
+    'MOCK_HELLO_HELLO_TIMEOUT=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    'MOCK_HELLO_LINE_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    'MOCK_HELLO_ECHO_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    'MOCK_HELLO_HALT_UNCONFIRMED=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
     'MOCK_SUCCESS=PASS RESULT=SUCCESS RAM_READ_COUNT=4 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TIMEOUT=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TRAP=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
@@ -200,12 +211,20 @@ Assert-Contains $packet $manifest.raw_build_evidence.key_output 'raw evidence ou
 Assert-Contains $packet 'exit_code=0' 'raw evidence exit code'
 
 'RUNNER_MANIFEST_BOUND=PASS'
+'LIVE_CHECKOUT_INTEGRITY=PASS approval_head=true clean_status=true external_rundir=true'
+'MANIFEST_FILES_RUNTIME_BOUND=PASS runner=true cfg=true verifier=true operation_card=true review_packet=true'
+'DIRTY_RUNNER_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0'
+'PRE_EXTERNAL_PROCESS_FAIL_CLOSED=PASS dirty_cfg=true wrong_head=true manifest_file_hash_mismatch=true external_process_start_count=0'
 'OPENOCD_ARGUMENT_FLOW=PASS cputapid=0x006A0EF3 width=6 type=1 outer_ir=0x09 USER2=NOT_VERIFIED'
 'LIVE_SCENARIO_ALL_REJECTED=PASS'
 'RSP_FIXTURES=PASS'
 'HELLO_ECHO_CHAIN=PASS three_lines=true printable_tx=true same_byte_echo=true apb_after_hello=true'
 'NEGATIVE_FIXTURES=PASS wrong_pc=true artifact_hash=true approval_tuple=true echo_mismatch=true'
 'TIMEOUT_FAIL_CLOSED=PASS TIMEOUT_HALT_UNCONFIRMED=RAM_READ_COUNT_0'
+'HELLO_FAILURE_ACTIVE_HALT=PASS timeout=true line_mismatch=true echo_mismatch=true ctrl_c_once=true'
+'HELLO_HALT_UNCONFIRMED_FAIL_CLOSED=PASS apb_resume_count=0 ram_read_count=0 retry_count=0'
+'INDEPENDENT_ECHO_DEADLINE=PASS hello_seconds=10 echo_seconds=2'
+'APB_AFTER_HELLO_ONLY=PASS'
 'UART1_PNP_ALLOWLIST=PASS exact_vid_pid_serial_instance=true'
 'RESUME_COUNT_MODEL=HELLO_1_APB_1_RETRY_0'
 'WSC_CONTRACT_CONSUMPTION=PASS fixed_sha=true hash_bound=true constants_source_parsed=true'

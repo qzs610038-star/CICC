@@ -1,10 +1,10 @@
 # I0 UART1 Goal 4 Two-Phase Execution Review Packet
 
-Status: `READY FOR QZS STATIC REVIEW / DO NOT MERGE 69a1030e / HARDWARE NOT AUTHORIZED`.
+Status: `READY FOR QZS RE-REVIEW / BASE 9949e6ed ONLY / HARDWARE NOT AUTHORIZED`.
 
 ## Provenance And Scope
 
-- Patch base: `69a1030e1e72854a857fab147aa2c9cc8f0e6800`.
+- Patch base: `9949e6ed737f25db82111cc38250dfc15bdb54c9`.
 - QZS temporary ownership registration:
   `a222ea64653a2232945342faacfb53a06ce50e42`, covering
   `competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1`.
@@ -14,12 +14,15 @@ Status: `READY FOR QZS STATIC REVIEW / DO NOT MERGE 69a1030e / HARDWARE NOT AUTH
 
 This is one minimal follow-up on the same libaoxun branch. It does not merge,
 rebase, cherry-pick, or migrate the histories of `a840f08`, `5a61c4c`,
-`48548f4`, or `a222ea6`. QZS should perform static review only and should not
-merge the current `69a1030e` baseline.
+`48548f4`, or `a222ea6`. QZS should review only the new commit on this base
+and must not merge `69a1030e`.
 
 Changed files remain within the six-file temporary scope: runner, static
 verifier, authoritative manifest, target cfg, operation card, and this Packet.
-The cfg is unchanged in this follow-up. User `.gitignore` is untouched.
+The inherited cfg carries the required target correction:
+`CPUTAPID 0x006A0A79 -> 0x006A0EF3`. `0x006A0EF3` is the correct TJ375N529
+outer TAP ID and must not be changed back to the Ti375 default `0x006A0A79`.
+User `.gitignore` is untouched.
 
 `tools/i0_uart1_execution_manifest.json` is the single authoritative hash
 inventory. It binds every changed file except itself. This Packet neither
@@ -33,7 +36,12 @@ Live mode represents one run ID and one OpenOCD process. It accepts only
 `Scenario=run`; `Scenario=all`, automatic retry, TAP/cable changes, UART0
 fallback, and generic token authorization fail before external action.
 
-Before OpenOCD starts, the runner checks the bitstream, Hello ELF, probe ELF,
+Before creating a live execution log, opening serial, or starting OpenOCD/GDB,
+the runner requires an external RunDir, confirms the checkout HEAD equals
+`approval_record.approved_commit`, requires empty
+`git status --porcelain --untracked-files=all`, and hashes every
+`manifest.files` member including the runner itself. Before OpenOCD starts it
+then checks the bitstream, Hello ELF, probe ELF,
 same-batch `soc.h`, FTDI cfg, target cfg, and all three WSC contract file hashes.
 It verifies the WSC checkout is clean at the fixed SHA, then parses entry PC,
 halt PC, timeout, RAM addresses/values, probe ELF hash, and `soc.h` hash from
@@ -58,11 +66,16 @@ files and arguments. It does not claim USER2 board PASS.
 
 The full sequence is uniquely bound Type-C UART1 capture, Hello load and exact
 post-load PC gate, `HELLO_RESUME_COUNT=1`, exact three-line Hello, one
-printable non-CR/LF TX byte and same-byte echo, confirmed halt, APB probe load
+printable non-CR/LF TX byte and same-byte echo on a new independent 2 s echo
+deadline (not the 10 s three-line Hello deadline), confirmed halt, APB probe load
 and exact post-load PC gate, then `APB_RESUME_COUNT=1`. The APB phase is logged
 only after `HELLO_ECHO=PASS`. Whole-chain `RETRY_COUNT=0`.
 
-The APB watchdog is the parsed WSC `1000 ms` value. Timeout issues one active
+After Hello resume, a timeout, line mismatch, echo mismatch, or RSP exception
+issues exactly one Ctrl-C and waits a finite halt reply. The log records the
+halt PC/reason; no reply records
+`HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0`.
+Either result prohibits APB and retry. The APB watchdog is the parsed WSC `1000 ms` value. Timeout issues one active
 Ctrl-C halt. `TIMEOUT_HALT_UNCONFIRMED`, timeout, trap, wrong PC, or wrong
 reason reads zero RAM words. Only confirmed `BREAKPOINT` at `0xF90000C4` reads
 the four WSC RAM evidence words.
@@ -71,6 +84,8 @@ RSP fixtures cover ACK, NACK without retry, checksum ACK/NACK generation,
 half/sticky/fragmented packets, and asynchronous stop replies. Additional
 negative fixtures cover the fixed Hello transcript, wrong echo byte, wrong
 post-load PC false positive, wrong artifact hash, and wrong approval tuple.
+The live-preflight negatives cover dirty runner, dirty cfg, wrong HEAD, and a
+manifest-file hash mismatch; all report `EXTERNAL_PROCESS_START_COUNT=0`.
 
 UART1 identity requires one exact `VID/PID/serial/instance` match. COM17,
 CH340, J44/UART0, and programmer identities are explicitly rejected. The same
@@ -129,3 +144,8 @@ APB=NOT_VERIFIED
 
 No Efinity Programmer, OpenOCD, GDB, JTAG, UART, APB, wiring, Flash, DDR,
 UART2/J52, or mechanical-arm session was started.
+
+OpenOCDExe/GdbExe normalization, version, and SHA-256 are intentionally not
+yet approval-bound. This remains an explicit live-execution blocker; the runner
+will not silently treat either executable as approved until a later minimal
+reviewed manifest and approval extension binds both paths and hashes.

@@ -3,7 +3,7 @@
 Status: `STATIC REVIEW ONLY / HARDWARE NOT AUTHORIZED / BOARD NOT VERIFIED`.
 
 This card describes a future single controlled window. It was updated offline
-on base `69a1030e1e72854a857fab147aa2c9cc8f0e6800`. QZS temporary ownership for
+on base `9949e6ed737f25db82111cc38250dfc15bdb54c9`. QZS temporary ownership for
 `tools/run_i0_uart1_execution_chain.ps1` is recorded at
 `a222ea64653a2232945342faacfb53a06ce50e42`. The APB contract is consumed from
 a clean checkout fixed at `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`.
@@ -17,6 +17,12 @@ tuple: final runner commit SHA, board ID, exact UART1
 and hashes for the bitstream, Hello ELF, probe ELF, `soc.h`, FTDI cfg, target
 cfg, and the three WSC contract files. Any mismatch or non-unique PnP result
 fails before OpenOCD starts.
+
+Before creating a live log, opening serial, launching OpenOCD, or starting GDB,
+the runner must require a RunDir outside its checkout, verify that HEAD equals
+`approval_record.approved_commit`, require empty
+`git status --porcelain --untracked-files=all`, and hash every manifest file,
+including the executing runner. Any failure exits before an external process.
 
 COM17, CH340 `VID:PID=1A86:7523`, and names identifying J44, UART0, programmer,
 downloader, or burner are prohibited. The programmer currently occupying J44
@@ -53,7 +59,7 @@ one run ID / one OpenOCD process / RETRY_COUNT=0
   -> HELLO_RESUME_COUNT=1
   -> require the fixed three Hello lines in order
   -> transmit exactly one printable ASCII byte, excluding CR and LF
-  -> require the same byte as echo
+  -> start a new independent echo deadline, then require the same byte as echo
   -> confirmed halt; otherwise APB phase is prohibited
   -> load fixed APB probe ELF without resume
   -> parse exactly one APB_POST_LOAD_PC and require WSC entry 0xF9000000
@@ -75,6 +81,12 @@ Timeout, trap, wrong PC, wrong reason, Hello failure, echo mismatch, artifact
 hash mismatch, approval tuple mismatch, or unconfirmed halt ends fail-closed.
 `TIMEOUT_HALT_UNCONFIRMED` permits no RAM read and no retry.
 
+After HELLO resume, a three-line timeout, line mismatch, echo mismatch, or RSP
+exception must send exactly one Ctrl-C and wait a finite halt reply. Log its
+PC/reason if confirmed. No reply must log
+`HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0`;
+both paths prohibit APB and retry.
+
 ```text
 HELLO_RESUME_COUNT=1
 APB_RESUME_COUNT=1
@@ -88,3 +100,7 @@ APB=NOT_VERIFIED
 No automatic retry, TAP/cable change, UART0 fallback, address scan, debugger
 direct APB access, APB write, Flash, DDR, UART2/J52, or mechanical-arm route is
 permitted.
+
+OpenOCDExe/GdbExe normalized paths, versions, and SHA-256 are not yet bound to
+the manifest or approval record. That omission remains a hard live-execution
+blocker and cannot be waived by this static card.

@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
-  "base_sha": "69a1030e1e72854a857fab147aa2c9cc8f0e6800",
+  "base_sha": "9949e6ed737f25db82111cc38250dfc15bdb54c9",
   "qzs_authorization_sha": "a222ea64653a2232945342faacfb53a06ce50e42",
   "qzs_authorization_path": "docs/agent_context/GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md",
   "wsc_contract_sha": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
@@ -66,22 +66,22 @@
     },
     {
       "path": "competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1",
-      "sha256": "9BF327B8DCCC33271CF805EB924A47A41D19C839C2874554CBEDE92AC452B8DE",
+      "sha256": "D23FC1331E1E10DA88FB6569E71710EB06DA49822D5C10634B6C8A0E2C642767",
       "eol": "crlf"
     },
     {
       "path": "competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1",
-      "sha256": "A2A7B3C98C6275D08FDB58CBE5F9E61246225DBB24B85BC690CF988870372179",
+      "sha256": "AD91321FB56C1B53124BC24DBAF2577CD555F7ED6B93D1C870636029C7C410C3",
       "eol": "crlf"
     },
     {
       "path": "competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md",
-      "sha256": "099A554840A8C684EA3F33C22A32793ADDEED6B4750AB76855F5903D69AD59BF",
+      "sha256": "9DC91375AFD3F05DA07DA924514FE245D2EC49EDF87A1075721146974AB65DE8",
       "eol": "lf"
     },
     {
       "path": "competition_project_single_camera/docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md",
-      "sha256": "4CA08C45D2F319CC5F47AE620483773C1054BA3D3F2ADBB7833A019788B6283E",
+      "sha256": "526F56B59DB29F6CBFBE0103D722396B9887A29513D8E539370DE98F57D8B1F2",
       "eol": "lf"
     }
   ]

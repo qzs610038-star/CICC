@@ -29,7 +29,7 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($TargetConfig)) {
     $TargetConfig = Join-Path $PSScriptRoot 'i0_uart1_cleanlf_user2.cfg'
 }
-$BaseSha = '69a1030e1e72854a857fab147aa2c9cc8f0e6800'
+$BaseSha = '9949e6ed737f25db82111cc38250dfc15bdb54c9'
 $QzsAuthorizationSha = 'a222ea64653a2232945342faacfb53a06ce50e42'
 $WscContractSha = '48548f47dfa5964b13aed7edf3b3e9da6f6583a2'
 $DesignSha = '6effdc3685d696cb4d33f3fbb1c449729ed72e33'
@@ -72,9 +72,31 @@ function Assert-FileHash {
 }
 
 function Get-CurrentCommit {
-    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    param([string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
     $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Unable to resolve the fixed runner commit.' }
+    $commit
+}
+
+function Assert-ExternalRunDirectory {
+    param([string]$Path, [string]$RepoRoot)
+    $runFull = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    if ($runFull -ieq $repoFull -or $runFull.StartsWith($repoFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "RunDir must be outside the execution checkout: $runFull"
+    }
+}
+
+function Assert-ExecutionCheckoutIntegrity {
+    param([string]$RepoRoot, $Approval, $RuntimeManifest)
+    $commit = Get-CurrentCommit -RepoRoot $RepoRoot
+    if ($commit -cne [string]$Approval.approved_commit) { throw "LIVE_CHECKOUT_HEAD_MISMATCH approved=$($Approval.approved_commit) actual=$commit" }
+    $status = @(& git -C $RepoRoot status --porcelain --untracked-files=all)
+    if ($LASTEXITCODE -ne 0 -or $status.Count -ne 0) { throw 'LIVE_CHECKOUT_DIRTY' }
+    foreach ($entry in @($RuntimeManifest.files)) {
+        $path = Join-Path $RepoRoot $entry.path
+        Assert-FileHash $path $entry.sha256 ("manifest_file=" + $entry.path) | Out-Null
+    }
     $commit
 }
 
@@ -449,7 +471,8 @@ function Complete-HelloEcho {
     $Serial.Write([byte[]]@($TxByte), 0, 1)
     $Counts.Tx++
     Write-RunLog $LogPath "TX 0x$($TxByte.ToString('X2')) RX_COUNT=$($Counts.Rx) TX_COUNT=$($Counts.Tx) AUTO_CRLF=DISABLED" | Out-Null
-    $echoValue = Read-SerialByte -Serial $Serial -Deadline $deadline -LogPath $LogPath -Counts $Counts
+    $echoDeadline = [DateTimeOffset]::UtcNow.AddSeconds(2)
+    $echoValue = Read-SerialByte -Serial $Serial -Deadline $echoDeadline -LogPath $LogPath -Counts $Counts
     Assert-EchoByte -Expected $TxByte -Actual $echoValue
     Write-RunLog $LogPath "HELLO_ECHO=PASS byte=0x$($TxByte.ToString('X2'))" | Out-Null
 }
@@ -522,6 +545,63 @@ function Invoke-MockApbScenario {
     [pscustomobject]@{ Name = $Name; Result = $result; RamReadCount = $ramReadCount; Directory = $directory }
 }
 
+function Invoke-MockHelloFailureScenario {
+    param([string]$Name)
+    $runId = 'mock-hello-' + $Name + '-' + [guid]::NewGuid().ToString('N')
+    $directory = Join-Path $RunDir $runId
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $logPath = Join-Path $directory 'execution.log'
+    $ready = [DateTimeOffset]::UtcNow
+    Write-RunLog $logPath "RUN_ID=$runId MODE=Mock HELLO_FAILURE=$Name EXTERNAL_PROCESS_START_COUNT=0" | Out-Null
+    $marker = Write-PhaseResumeMarker $directory $runId 'HELLO' $ready
+    Write-RunLog $logPath "HELLO_RESUME_ONCE_TIME=$($marker.Time.ToString('o')) HELLO_RESUME_COUNT=1" | Out-Null
+    if ($Name -eq 'halt_unconfirmed') {
+        Write-RunLog $logPath 'HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0' | Out-Null
+    } else {
+        Write-RunLog $logPath "HELLO_FAILURE=$Name ACTIVE_HALT_COUNT=1 HELLO_HALT_CONFIRMED=true HALT_REASON=SIGNAL_02 HALT_PC=0xF9000000" | Out-Null
+    }
+    Write-RunLog $logPath "FINAL_STATE=FAILED_CLOSED HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=0 RETRY_COUNT=0 RAM_READ_COUNT=0" | Out-Null
+    [pscustomobject]@{ Name = $Name; Directory = $directory }
+}
+
+function Invoke-PreExternalIntegrityFixtures {
+    param([string]$FixtureDirectory)
+    $repo = Join-Path $FixtureDirectory 'integrity-repo'
+    New-Item -ItemType Directory -Path $repo -Force | Out-Null
+    & git -C $repo init --quiet
+    & git -C $repo config user.email 'fixture@example.invalid'
+    & git -C $repo config user.name 'I0 fixture'
+    $runnerFile = Join-Path $repo 'runner.ps1'
+    $cfgFile = Join-Path $repo 'target.cfg'
+    [IO.File]::WriteAllText($runnerFile, 'runner-v1', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($cfgFile, 'cfg-v1', [Text.Encoding]::ASCII)
+    & git -C $repo add -- runner.ps1 target.cfg
+    & git -C $repo commit --quiet -m 'fixture baseline'
+    $head = Get-CurrentCommit -RepoRoot $repo
+    $fixtureManifest = [pscustomobject]@{ files = @(
+        [pscustomobject]@{ path = 'runner.ps1'; sha256 = Get-Sha256 $runnerFile },
+        [pscustomobject]@{ path = 'target.cfg'; sha256 = Get-Sha256 $cfgFile }
+    ) }
+    $approval = [pscustomobject]@{ approved_commit = $head }
+    Assert-ExecutionCheckoutIntegrity -RepoRoot $repo -Approval $approval -RuntimeManifest $fixtureManifest | Out-Null
+    $externalProcessStartCount = 0
+    foreach ($fixture in @(
+        [pscustomobject]@{ Name = 'DIRTY_RUNNER'; Mutate = { [IO.File]::WriteAllText($runnerFile, 'runner-dirty', [Text.Encoding]::ASCII) }; Expected = 'LIVE_CHECKOUT_DIRTY' },
+        [pscustomobject]@{ Name = 'DIRTY_CFG'; Mutate = { [IO.File]::WriteAllText($cfgFile, 'cfg-dirty', [Text.Encoding]::ASCII) }; Expected = 'LIVE_CHECKOUT_DIRTY' },
+        [pscustomobject]@{ Name = 'WRONG_HEAD'; Mutate = { $approval.approved_commit = '0000000000000000000000000000000000000000' }; Expected = 'LIVE_CHECKOUT_HEAD_MISMATCH' },
+        [pscustomobject]@{ Name = 'MANIFEST_FILE_HASH_MISMATCH'; Mutate = { $fixtureManifest.files[0].sha256 = ('0' * 64) }; Expected = 'ARTIFACT_HASH_MISMATCH' }
+    )) {
+        & git -C $repo checkout -- runner.ps1 target.cfg
+        $approval.approved_commit = $head
+        $fixtureManifest.files[0].sha256 = Get-Sha256 $runnerFile
+        & $fixture.Mutate
+        $closed = $false
+        try { Assert-ExecutionCheckoutIntegrity -RepoRoot $repo -Approval $approval -RuntimeManifest $fixtureManifest | Out-Null } catch { $closed = $_.Exception.Message.Contains($fixture.Expected) }
+        if (-not $closed) { throw "Pre-external $($fixture.Name) fixture did not fail closed." }
+        "PRE_EXTERNAL_$($fixture.Name)_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=$externalProcessStartCount"
+    }
+}
+
 function Invoke-MockFixtures {
     $wsc = Read-WscContract $WscContractRoot
     'WSC_CONTRACT_CONSUMED=PASS sha=48548f47dfa5964b13aed7edf3b3e9da6f6583a2 hashes=3 constants=source_parsed'
@@ -573,6 +653,14 @@ function Invoke-MockFixtures {
     if (-not $badApprovalClosed) { throw 'Bad approval tuple fixture did not fail closed.' }
     'BAD_APPROVAL_TUPLE_NEGATIVE=PASS'
 
+    foreach ($name in @('hello_timeout', 'line_mismatch', 'echo_mismatch', 'halt_unconfirmed')) {
+        $outcome = Invoke-MockHelloFailureScenario -Name $name
+        $log = Get-Content -LiteralPath (Join-Path $outcome.Directory 'execution.log') -Raw
+        if ($log -match 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true|APB_RESUME_COUNT=1|RAM_g_apb_probe_') { throw "$name Hello failure entered APB." }
+        "MOCK_HELLO_$($name.ToUpperInvariant())=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0"
+    }
+    Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory
+
     foreach ($name in @('success', 'timeout', 'trap', 'wrong_pc', 'wrong_reason', 'halt_unconfirmed')) {
         $outcome = Invoke-MockApbScenario -Name $name -Wsc $wsc
         if ($name -eq 'success') {
@@ -595,6 +683,9 @@ if ($Mode -eq 'Live') {
 }
 if ($Mode -eq 'Mock' -and [string]::IsNullOrWhiteSpace($WscContractRoot)) { throw 'Mock mode requires the clean fixed-SHA WSC contract checkout.' }
 
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+Assert-ExternalRunDirectory -Path $RunDir -RepoRoot $repoRoot
+
 New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
 Invoke-RspFixtures
 Invoke-Uart1PnPFixtures
@@ -607,7 +698,6 @@ if ($Mode -eq 'Mock') {
 
 $runId = 'live-' + [guid]::NewGuid().ToString('N')
 $liveDir = Join-Path $RunDir $runId
-New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
 $executionLog = Join-Path $liveDir 'execution.log'
 $openOcdStdout = Join-Path $liveDir 'openocd.stdout.log'
 $openOcdStderr = Join-Path $liveDir 'openocd.stderr.log'
@@ -621,9 +711,9 @@ $ramReadCount = 0
 $retryCount = 0
 $finalLogged = $false
 $counts = @{ Rx = 0; Tx = 0 }
-Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0" | Out-Null
 try {
-    $currentCommit = Get-CurrentCommit
+    $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw | ConvertFrom-Json
+    $currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest
     $wsc = Read-WscContract $WscContractRoot
     $artifactHashes = @{
         bitstream = Assert-FileHash $Bitstream $Manifest.fixed_artifacts.bitstream_sha256 'bitstream'
@@ -636,9 +726,10 @@ try {
         wsc_contract_summary = Get-Sha256 $wsc.SummaryPath
         wsc_contract_verifier = Get-Sha256 $wsc.VerifierPath
     }
-    $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw | ConvertFrom-Json
     $identity = Resolve-UniqueUart1Identity -Port $UartPort -ExpectedKey $approvalObject.uart1_pnp_key
     $approval = Get-LiveApproval -Path $ApprovalRecordPath -Commit $currentCommit -ExpectedBoard $BoardId -ExpectedPnp $identity.Key -ArtifactHashes $artifactHashes
+    New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
+    Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0" | Out-Null
     Write-RunLog $executionLog "COMMIT_SHA=$currentCommit"
     Write-RunLog $executionLog "APPROVAL_SHA256=$(Get-Sha256 $ApprovalRecordPath) WINDOW_ID=$($approval.window_id) BOARD_ID=$BoardId STOP_STRATEGY=$StopStrategy"
     Write-RunLog $executionLog "PNP=$($identity.Key) FRIENDLY_NAME=$($identity.FriendlyName) ROUTE=TYPEC_UART1"
@@ -664,12 +755,25 @@ try {
     $helloMarker = Write-PhaseResumeMarker $liveDir $runId 'HELLO' $captureReady
     $helloResumeCount++
     Write-RunLog $executionLog "HELLO_RESUME_ONCE_TIME=$($helloMarker.Time.ToString('o')) HELLO_RESUME_COUNT=$helloResumeCount MARKER=$($helloMarker.Path)"
-    Send-RspCommand $stream $rspState 'c' -NoReply | Out-Null
-    Complete-HelloEcho $serial $executionLog $counts ([byte][char]$EchoByte)
-    $stream.WriteByte(3); $stream.Flush()
-    $helloStop = Wait-AsyncStopReply $stream $rspState 1000
-    if ($null -eq $helloStop) { throw 'HELLO_HALT_UNCONFIRMED; APB phase prohibited.' }
+    $helloFailure = $null
+    try {
+        Send-RspCommand $stream $rspState 'c' -NoReply | Out-Null
+        Complete-HelloEcho $serial $executionLog $counts ([byte][char]$EchoByte)
+    } catch { $helloFailure = $_ }
+    $helloStop = $null
+    try {
+        # After HELLO resume, every result path performs exactly one active halt.
+        $stream.WriteByte(3); $stream.Flush()
+        $helloStop = Wait-AsyncStopReply $stream $rspState 1000
+    } catch {
+        if ($null -eq $helloFailure) { $helloFailure = $_ }
+    }
+    if ($null -eq $helloStop) {
+        Write-RunLog $executionLog 'HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0' | Out-Null
+        throw 'HELLO_HALT_UNCONFIRMED; APB phase prohibited.'
+    }
     Write-RunLog $executionLog ('HELLO_HALT_CONFIRMED=true HALT_REASON={0} HALT_PC=0x{1:X8}' -f $helloStop.Reason, $helloStop.Pc)
+    if ($null -ne $helloFailure) { throw $helloFailure }
     $stream.Dispose(); $stream = $null; $client.Dispose(); $client = $null
 
     Invoke-GdbRamOnlyLoad $GdbExe $ProbeElf $OpenOcdHost $OpenOcdPort $wsc.EntryPc 'APB' $executionLog | Out-Null
