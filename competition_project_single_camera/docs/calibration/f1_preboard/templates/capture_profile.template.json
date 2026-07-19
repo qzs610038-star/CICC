@@ -1,0 +1,15 @@
+{
+  "schema": "QW-CALIBRATION-SAMPLE-v1",
+  "batch_id": "REPLACE_WITH_NEW_BATCH_ID",
+  "capture_profile_id": "REPLACE_WITH_IMMUTABLE_PROFILE_ID",
+  "camera_route": "J48/ch0",
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "camera_pose": {"height_mm": 0, "pitch_deg": 0, "focal_length_mm": 0},
+  "exposure": {"mode": "MANUAL", "value": "REPLACE"},
+  "white_balance": {"mode": "MANUAL", "value": "REPLACE"},
+  "lighting_id": "REPLACE_WITH_FIXED_LIGHTING",
+  "background": {"r": 0, "g": 0, "b": 0},
+  "roi": {"x0": 0, "y0": 0, "x1": 1919, "y1": 1079},
+  "thresholds": {"foreground_delta": 0, "red_min": 0, "blue_min": 0, "yellow_min": 0, "color_delta": 0}
+}
