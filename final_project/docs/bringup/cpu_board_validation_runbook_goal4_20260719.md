@@ -17,6 +17,7 @@
 | Efinity | `2025.2.288.4.15` |
 | bitstream SHA-256 | `D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544` |
 | UART1 Hello ELF SHA-256 | `919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA` |
+| `soc.h` SHA-256 | `25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B` |
 | ELF entry | `0xF9000000` |
 | 片上 RAM | `0xF9000000..0xF9003FFF` |
 | CPU JTAG | FPGA `USER2` |
@@ -122,9 +123,9 @@ Type characters to verify echo.
 
 | 步骤 | 明确输入/动作 | 观察点 | PASS 判据 | 失败分类 |
 |---|---|---|---|---|
-| I1.1 | 再次核对终端配置并保持原始日志连续 | 端口身份、`115200 8N1`、无流控 | 配置与匹配 `soc.h` 一致 | `UART1_CONFIG_FAIL` |
+| I1.1 | 再次核对终端配置并保持原始日志连续；关闭 local echo 和自动追加 CR/LF | 端口身份、`115200 8N1`、无流控、发送模式 | 配置与匹配 `soc.h` 一致，发送一个 byte 时终端不会附加其他字节 | `UART1_CONFIG_FAIL` |
 | I1.2 | 从已验证 entry free-run | 首字节时间、完整 RX 字节、CPU run 状态 | 10 s 内出现三行完整横幅 | `UART1_NO_OUTPUT` / `UART1_GARBLED` / `UART1_PARTIAL_BANNER` |
-| I1.3 | 横幅完整后发送 `G4I1-<session-id>\r\n` 一次 | TX/RX 十六进制和时间差 | 每字节按顺序回显一次，无增删重排 | `UART1_TX_FAIL` / `UART1_ECHO_MISMATCH` / `UART1_DUPLICATE_ECHO` |
+| I1.3 | 横幅完整后，只发送批准记录中固定的一个 printable ASCII byte 一次 | 批准 byte、TX/RX 十六进制和时间差 | 只收到一次与批准 byte 完全相同的单字节回显，无额外字节 | `UART1_TX_FAIL` / `UART1_ECHO_MISMATCH` / `UART1_DUPLICATE_ECHO` |
 | I1.4 | halt CPU 并关闭日志 | PC、halt reason、日志结束时间 | CPU 可控停止且证据落盘 | `CPU_HALT_FAIL` / `EVIDENCE_INCOMPLETE` |
 
 乱码、只有部分横幅、只有回显或重复回显均不构成 PASS。相同失败连续两轮后停止试错并提交 Review Packet。
@@ -192,6 +193,8 @@ jtag_adapter=
 typec_uart1_adapter=
 typec_uart1_port=
 typec_uart1_identity_evidence=
+approved_echo_ascii=
+approved_echo_hex=
 
 collection_commit=e72fb6a3ce1b7999f61cae1e0ed7b2773f1e4fda
 uart1_design_commit=6effdc3685d696cb4d33f3fbb1c449729ed72e33
