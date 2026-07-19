@@ -14,12 +14,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single
 Expected for each: exit 0; evidence\verifier.txt contains P0_A_EVIDENCE=PASS and board_status=NOT_VERIFIED.
 
 R1 automatic fail-closed comparison:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\compare_reproducibility.ps1 -ManifestA <fresh-a>\evidence\manifest.json -ManifestB <fresh-b>\evidence\manifest.json -OutputPath <output>\reproducibility.json -BundleLabelA fresh_detached_a -BundleLabelB fresh_detached_b
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\compare_reproducibility.ps1 -ManifestA <fresh-a>\evidence\manifest.json -ManifestB <fresh-b>\evidence\manifest.json -OutputPath <output>\reproducibility.json
 Expected: exit 0; P0_A_REPRODUCIBILITY=PASS compared=12. The script checks each manifest hash against its actual artifact before comparing fields; any mismatch throws before PASS output.
 
 R2 executable runtime replay bundle:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_replay_bundle.ps1 -RunDir <absolute-output>\p1-replay -SchemaPath <qzs-governance-root>\competition_project_single_camera\docs\evidence_manifests\p1_feature_vector.schema.json -ImplementationGitSha 2564f146fede84383be0ff607aa63408b2889f37 -GovernanceGitSha e282a95fcef306c87e4015385c9fcd0041f5a722
 Expected: exit 0; P1_VECTOR_SCHEMA=PASS count=11; P1_REPLAY_SCHEMA=PASS rounds=20 ARM=0; P1_TAMPER_NEGATIVE=PASS hash_mismatch=1 result_mismatch=1; P1_REPLAY_BUNDLE=PASS status=AWAITING_QZS_REVIEW.
+
+R2 clean-checkout manifest hash verification:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\verify_p1_replay_manifest.ps1 -BundleDir .\competition_project_single_camera\cpu\tests\evidence\p1_replay_remediation_20260719
+Expected: exit 0; P1_MANIFEST_HASHES=PASS files=4 policy=LF_NORMALIZED.
+
+R2 single-file tamper negative (temporary copy only):
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\test_p1_replay_manifest_verifier.ps1 -BundleDir .\competition_project_single_camera\cpu\tests\evidence\p1_replay_remediation_20260719
+Expected: exit 0; clean temporary copy PASS, then rounds.jsonl tamper is rejected and P1_MANIFEST_TAMPER_NEGATIVE=PASS.
 
 R2 validator checks:
 - recompute SHA-256 from each round's 33-byte snapshot_bytes_hex

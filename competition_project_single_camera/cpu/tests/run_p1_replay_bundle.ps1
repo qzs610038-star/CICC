@@ -44,16 +44,25 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & (Join-Path $PSScriptRoot 'validate_p1_vectors.ps1') -SchemaPath $SchemaPath -ReplayPath $records -TamperPath $negative -RunnerLogPath $rawLog
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+function Get-NormalizedTextSha256([string]$Path) {
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $normalized = New-Object IO.MemoryStream
+    for ($i = 0; $i -lt $bytes.Length; $i++) {
+        if ($bytes[$i] -eq 13 -and ($i + 1) -lt $bytes.Length -and $bytes[$i + 1] -eq 10) {
+            $normalized.WriteByte(10)
+            $i++
+        } else {
+            $normalized.WriteByte($bytes[$i])
+        }
+    }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($normalized.ToArray()))).Replace('-','') }
+    finally { $sha.Dispose(); $normalized.Dispose() }
+}
 $files = @('rounds.jsonl','runner.txt','compile.txt','tamper.jsonl')
 $hashes = [ordered]@{}
 foreach ($name in $files) {
-    $hashes[$name] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $RunDir $name)).Hash
-}
-function Get-NormalizedTextSha256([string]$Path) {
-    $text = (Get-Content -Raw -LiteralPath $Path) -replace "`r`n", "`n"
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)))).Replace('-','') }
-    finally { $sha.Dispose() }
+    $hashes[$name] = Get-NormalizedTextSha256 (Join-Path $RunDir $name)
 }
 $hashes['test_source_lf'] = Get-NormalizedTextSha256 $test
 $hashes['host_model_source_lf'] = Get-NormalizedTextSha256 $sources[0]
@@ -70,7 +79,7 @@ $manifest = [ordered]@{
     implementation_git_sha = $ImplementationGitSha
     governance_git_sha = $GovernanceGitSha
     compiler_policy = 'MSVC C11 /W4 /WX'
-    text_hash_policy = 'UTF-8 with CRLF normalized to LF'
+    text_hash_policy = 'SHA-256 of file bytes after CRLF byte pairs are normalized to LF; lone CR bytes are preserved'
     round_count = 20
     task_counts = [ordered]@{'1'=5;'2'=5;'3'=5;'4'=5}
     actual_result_source = 'single_camera_runtime + single_camera_fake_transport counters'

@@ -22,12 +22,14 @@
       "change": "snapshot hash is recomputed from serialized fake bytes; actual decision/reason/submits/commits/ACKs come from runtime, fake transport, and packer calls",
       "evidence": [
         "../../p1_replay_runner.c",
+        "../verify_p1_replay_manifest.ps1",
+        "../test_p1_replay_manifest_verifier.ps1",
         "../p1_replay_remediation_20260719/rounds.jsonl",
         "../p1_replay_remediation_20260719/tamper.jsonl",
         "../p1_replay_remediation_20260719/runner.txt",
         "../p1_replay_remediation_20260719/manifest.json"
       ],
-      "result": "20/20 rounds; tamper hash/result mismatch PASS; ARM=0"
+      "result": "20/20 rounds; runtime tamper PASS; clean-checkout manifest 4/4 and single-file tamper negative PASS; ARM=0"
     }
   ],
   "claims": {

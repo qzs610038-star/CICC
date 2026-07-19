@@ -1,9 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$ManifestA,
     [Parameter(Mandatory = $true)][string]$ManifestB,
-    [Parameter(Mandatory = $true)][string]$OutputPath,
-    [string]$BundleLabelA = 'fresh_bundle_a',
-    [string]$BundleLabelB = 'fresh_bundle_b'
+    [Parameter(Mandatory = $true)][string]$OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,8 +69,8 @@ $output = [ordered]@{
     schema = 'p0-a-reproducibility-v2'
     status = 'PASS_AWAITING_QZS_REVIEW'
     generated_by = 'compare_reproducibility.ps1'
-    manifest_a = [ordered]@{label=$BundleLabelA;sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $a.Path).Hash}
-    manifest_b = [ordered]@{label=$BundleLabelB;sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $b.Path).Hash}
+    manifest_a = [ordered]@{label='fresh_detached_a';sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $a.Path).Hash}
+    manifest_b = [ordered]@{label='fresh_detached_b';sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $b.Path).Hash}
     artifact_hashes_validated = $true
     compared_fields = $comparisons
     all_compared_fields_match = ($comparisons.Count -gt 0 -and @($comparisons | Where-Object { -not $_.match }).Count -eq 0)

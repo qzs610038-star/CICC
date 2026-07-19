@@ -4,7 +4,7 @@
     "implementation_git_sha":  "2564f146fede84383be0ff607aa63408b2889f37",
     "governance_git_sha":  "e282a95fcef306c87e4015385c9fcd0041f5a722",
     "compiler_policy":  "MSVC C11 /W4 /WX",
-    "text_hash_policy":  "UTF-8 with CRLF normalized to LF",
+    "text_hash_policy":  "SHA-256 of file bytes after CRLF byte pairs are normalized to LF; lone CR bytes are preserved",
     "round_count":  20,
     "task_counts":  {
                         "1":  5,
@@ -26,7 +26,7 @@
     "files_sha256":  {
                          "rounds.jsonl":  "2D32393E9F20B7B01137DCFCADC3BD93AF152A77674F4242B9ABC3CDA56A6BC1",
                          "runner.txt":  "8C4CCF1071B134326445B9BDC3193BC5A19787E442243147FB9DE1CF7D66E73F",
-                         "compile.txt":  "04FA4D3EF660722D59379F4BFD32B19D3489574DB66D122973F63BD0A2E3801B",
+                         "compile.txt":  "DFABC3264C3062CB6A3019BE66BECBE030E35EA67E3CA1F4CCF5B6232F520065",
                          "tamper.jsonl":  "0C830B89CBBDBCB21A7FFA75D7BFEC404C9A01A69BA0A15FF07D6E825F8F5CA9",
                          "test_source_lf":  "D2C5DDA45E193CF026E93569AC20B676E965A08191E5AD633FFDE59867150FE1",
                          "host_model_source_lf":  "EE312CA8143598187D0B88177A661499219D9AD72F1F27B86CCE57B62F461618",
