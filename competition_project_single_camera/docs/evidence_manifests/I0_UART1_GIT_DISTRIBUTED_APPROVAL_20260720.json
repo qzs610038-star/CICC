@@ -1,0 +1,59 @@
+{
+  "schema_version": 2,
+  "template_status": "ISSUED_APPROVAL",
+  "authorization_transport": "GIT_FIXED_COMMIT",
+  "authorization_phrase": "G4I0-B477-YLS4232DL-COM10-20260720",
+  "authorization_phrase_notice": "This phrase is a synchronization challenge, not a secret. The Git commit SHA and this file's SHA-256 are authoritative.",
+  "qzs_temp_scope_authorization_sha": "a222ea64653a2232945342faacfb53a06ce50e42",
+  "qzs_final_static_acceptance_sha": "56505ccba2b5e172a38788ae7e6f5c8263757e4c",
+  "approved_commit": "b4771979e7154ecbee2d3ec45e16822b1199112a",
+  "board_id": "YLS_4232DL",
+  "uart1_pnp_key": "VID=0403;PID=6011;SERIAL=FTBI7G42C;INSTANCE=FTDIBUS\\VID_0403+PID_6011+FTBI7G42C\\0000",
+  "com_port": "COM10",
+  "window_id": "GOAL4-I0-UART1-GIT-20260720T0020CST",
+  "window_start_utc": "2026-07-19T16:20:00Z",
+  "window_end_utc": "2026-07-19T18:20:00Z",
+  "stop_strategy": "FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT",
+  "manifest_sha256": "8C9E4ADA9BF14FB7B827B34FFB2FE13B93D84AE7037A21DEE1FF2AB6A932FDC2",
+  "artifact_sha256": {
+    "bitstream": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
+    "hello_elf": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
+    "probe_elf": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
+    "soc_h": "25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B",
+    "ftdi_cfg": "934FF4B47010461DB627A74BF8D5124CCD21CDAB64FE9080B06CEB395C9298FE",
+    "target_cfg": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83",
+    "wsc_contract_document": "590F3CB6CDE347EF9C55EE5F2E70A915DFAD1D053AC537CB0F706B6A8331B5FC",
+    "wsc_contract_summary": "4B843432A4C86B200F888D1255EEBE8BB0DD5D926BE37412655674610F52C83A",
+    "wsc_contract_verifier": "6EE50C587B9135D4BEA537104F8632AF24E90B9C833D78C15815C6F9226346F2"
+  },
+  "tools": {
+    "openocd": {
+      "normalized_path": "C:\\Users\\20306\\Desktop\\赛题资料\\CICC\\赛方提供材料\\efinity-2025.2.288.4.15-windows-x64-patch\\files\\debugger\\openocd\\bin\\openocd.exe",
+      "sha256": "FD8F9242B8BA34C33A22409103F0DFA9798070BEC64F3549F11CB911B312151A",
+      "version": "Open On-Chip Debugger 0.11.0+dev-04060-g967f8f6f0-dirty (2026-03-24-19:56)"
+    },
+    "gdb": {
+      "normalized_path": "D:\\Efinity\\efinity-riscv-ide-2025.2\\toolchain\\bin\\riscv-none-embed-gdb.exe",
+      "sha256": "BF89D58E62CDFAF4729518FA19AC6626B3219F3FF26F5A981593723F5EF3DFCB",
+      "version": "GNU gdb (xPack GNU RISC-V Embedded GCC, 64-bit) 8.3"
+    }
+  },
+  "authorized_scope": [
+    "volatile FPGA configuration with the fixed bitstream",
+    "USER2 on-chip RAM Hello load and one resume",
+    "UART1 three-line Hello and one printable U echo without CR/LF",
+    "WSC APB probe only after Hello/echo PASS",
+    "four on-chip RAM evidence reads after the fixed breakpoint halt"
+  ],
+  "prohibited_identities": [
+    "COM17",
+    "CH340",
+    "J44/UART0 programmer"
+  ],
+  "prohibited_actions": [
+    "retry after first failure",
+    "hash, TAP, cable, or UART route substitution",
+    "Flash, DDR, APB write, or APB address scan",
+    "UART2/J52 or mechanical-arm action"
+  ]
+}
