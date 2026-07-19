@@ -147,6 +147,6 @@ $manifest = [ordered]@{
 $target = Join-Path $repoRoot $OutputPath
 $targetDirectory = Split-Path -Parent $target
 if (-not (Test-Path -LiteralPath $targetDirectory -PathType Container)) { throw "MANIFEST_FAIL: output directory missing: $targetDirectory" }
-$json = $manifest | ConvertTo-Json -Depth 6
+$json = ($manifest | ConvertTo-Json -Depth 6).Replace("`r`n", "`n")
 [IO.File]::WriteAllText($target, ($json + "`n"), [Text.UTF8Encoding]::new($false))
 Write-Host "FINAL_STATIC_INTEGRATION_MANIFEST=PASS commit=$commit files=$($entries.Count) output=$OutputPath"

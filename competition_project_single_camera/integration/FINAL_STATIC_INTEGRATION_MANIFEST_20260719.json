@@ -1,106 +1,154 @@
 {
-    "schema_version":  1,
-    "purpose":  "final static integration identity; checkout bytes are authoritative for execution",
-    "source_commit":  "8f0f6184cbba7ab7efcf8c649beceb1a6b90fea9",
-    "clean_checkout_verified":  true,
-    "eol_policy":  {
-                       "ps1":  "CRLF",
-                       "gdb":  "LF",
-                       "cfg":  "LF",
-                       "docs_json_source":  "repository existing .gitattributes rule"
-                   },
-    "ownership_input_audit":  {
-                                  "claimed_exception_count":  7,
-                                  "actual_acmr_cross_owner_input_count":  11,
-                                  "interpretation":  "Eleven fixed upstream inputs are audited by their source role; they are not qzs write exceptions.",
-                                  "libaoxun_inputs":  5,
-                                  "wsc_inputs":  2,
-                                  "qzs_gate_and_governance_inputs":  4
-                              },
-    "execution_files":  [
-                            {
-                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_MANIFEST.json",
-                                "checkout_sha256":  "8670838BF1AEC381134AF2D9DC60D6F75C4F55B990D8B68587E723318B3A417F",
-                                "git_blob_sha1":  "7ac63165e0f1e70d33dd22dc32f44c378c423356",
-                                "eol_attribute":  "lf",
-                                "required_eol":  "repository_existing_rule"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_INPUTS.sha256",
-                                "checkout_sha256":  "A7752E24BFA3EB3780CE60FA28FFFD23FA449E20DAC3FA9F06F6EA4B6767F5C5",
-                                "git_blob_sha1":  "b0fd65ba8ee414865ac252f2a28d882c221766e3",
-                                "eol_attribute":  "unspecified",
-                                "required_eol":  "repository_existing_rule"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_EVIDENCE.md",
-                                "checkout_sha256":  "EF64F81C16700C34329F84B925B15DF95B0BBBC6A2790EA448C3947ACBCD147B",
-                                "git_blob_sha1":  "59fc23e6f50b6f0ebfb34a15c39415d45b0f110a",
-                                "eol_attribute":  "lf",
-                                "required_eol":  "repository_existing_rule"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/rebuild_i0_uart1_clean.ps1",
-                                "checkout_sha256":  "0281C036AF56B692B4C9E70EF137BA0C688D77481EE53EB17469D8159633B23D",
-                                "git_blob_sha1":  "c773dc4fa9ba6303052ce6781409e50b855c7bd6",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/verify_i0_uart1_build_evidence.ps1",
-                                "checkout_sha256":  "94461531DC7927BEF3324F5F8C2A408832F34231B47BC8EAFD025DC4BAA54A4A",
-                                "git_blob_sha1":  "c35736a1432d2bdc089ce411363b6633a8fff9f3",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/cpu/tests/run_g2_host_evidence.ps1",
-                                "checkout_sha256":  "00791AA3B5F42CBBF1B918491CEBB8F8BBC53AD08B1D6ADD73AE6A71D8A99B76",
-                                "git_blob_sha1":  "818bf36e56ada60556e9860e1d7e4db4e924de41",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/cpu/tests/test_single_camera_classifier.c",
-                                "checkout_sha256":  "18A17AC487BB166010C5DBF11CB95A12D82BE574285B3492EF663B24A97D6B69",
-                                "git_blob_sha1":  "b339fa3caeea8ee132df7a20ec8a95b39ff70ac4",
-                                "eol_attribute":  "lf",
-                                "required_eol":  "repository_existing_rule"
-                            },
-                            {
-                                "path":  "tools/interface_freeze_check.ps1",
-                                "checkout_sha256":  "F5DFC5C5121D047DE5C3A851C2FEFC0E02C6D92811BCE6C34DE70986CC6C4C10",
-                                "git_blob_sha1":  "267c8629922bd65dbce76509206ba83f843d4cef",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "tools/team_scope_check.ps1",
-                                "checkout_sha256":  "D8DACC2ED0A6F3C51E56C6793B7EA030914EED610847E9323E2496E242DB6013",
-                                "git_blob_sha1":  "095682f820106ee290a019f5e125ad62c7d4ecea",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "tools/verify_final_static_integration_manifest.ps1",
-                                "checkout_sha256":  "C62E00DA42B288C7B3A5BF58BCC16A37873E14292BDB45F1857BEE3629DC9557",
-                                "git_blob_sha1":  "36b408eaa0a4f8c1ec606a7a6fd9f6388ceff067",
-                                "eol_attribute":  "crlf",
-                                "required_eol":  "crlf"
-                            },
-                            {
-                                "path":  "competition_project_single_camera/docs/debug_sessions/I0_SMOKE_OPERATION_CARD_DRAFT_20260718.md",
-                                "checkout_sha256":  "BD012C2B9E9E32FF82DC0F494852D3A338FCBE283C4628FA9CC370488460E69F",
-                                "git_blob_sha1":  "1ecd83586826ecd9fdc7edcca2843b84cfa4feba",
-                                "eol_attribute":  "lf",
-                                "required_eol":  "repository_existing_rule"
-                            },
-                            {
-                                "path":  "docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md",
-                                "checkout_sha256":  "E012E71DE0F5532ED0864334CBB2CBA346EF60758EE0714D1437BE5B21B88B29",
-                                "git_blob_sha1":  "44cca13f0408b1042abfbd204081f6d4ad1e2973",
-                                "eol_attribute":  "lf",
-                                "required_eol":  "repository_existing_rule"
-                            }
-                        ]
+  "schema_version": 2,
+  "purpose": "final static integration identity; checkout bytes are authoritative for execution",
+  "source_commit": "9c006928a770b06faee213a1b99b2af7bfa261a0",
+  "clean_checkout_verified": true,
+  "eol_policy": {
+    "ps1": "CRLF",
+    "gdb": "LF",
+    "cfg": "LF",
+    "docs_json_source": "repository existing .gitattributes rule"
+  },
+  "ownership_input_audit": {
+    "claimed_exception_count": 7,
+    "actual_acmr_cross_owner_input_count": 11,
+    "interpretation": "Eleven fixed upstream inputs are audited by their source role; they are not qzs write exceptions.",
+    "libaoxun_inputs": 5,
+    "wsc_inputs": 2,
+    "qzs_gate_and_governance_inputs": 4
+  },
+  "execution_files": [
+    {
+      "path": "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_MANIFEST.json",
+      "checkout_sha256": "8670838BF1AEC381134AF2D9DC60D6F75C4F55B990D8B68587E723318B3A417F",
+      "git_blob_sha1": "7ac63165e0f1e70d33dd22dc32f44c378c423356",
+      "eol_attribute": "lf",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "lf",
+      "crlf_count": 0,
+      "bare_lf_count": 184,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_INPUTS.sha256",
+      "checkout_sha256": "A7752E24BFA3EB3780CE60FA28FFFD23FA449E20DAC3FA9F06F6EA4B6767F5C5",
+      "git_blob_sha1": "b0fd65ba8ee414865ac252f2a28d882c221766e3",
+      "eol_attribute": "unspecified",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "crlf",
+      "crlf_count": 82,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_EVIDENCE.md",
+      "checkout_sha256": "EF64F81C16700C34329F84B925B15DF95B0BBBC6A2790EA448C3947ACBCD147B",
+      "git_blob_sha1": "59fc23e6f50b6f0ebfb34a15c39415d45b0f110a",
+      "eol_attribute": "lf",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "lf",
+      "crlf_count": 0,
+      "bare_lf_count": 47,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/embedded_sw/uart1_hello_onchip/rebuild_i0_uart1_clean.ps1",
+      "checkout_sha256": "0281C036AF56B692B4C9E70EF137BA0C688D77481EE53EB17469D8159633B23D",
+      "git_blob_sha1": "c773dc4fa9ba6303052ce6781409e50b855c7bd6",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 162,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/embedded_sw/uart1_hello_onchip/verify_i0_uart1_build_evidence.ps1",
+      "checkout_sha256": "94461531DC7927BEF3324F5F8C2A408832F34231B47BC8EAFD025DC4BAA54A4A",
+      "git_blob_sha1": "c35736a1432d2bdc089ce411363b6633a8fff9f3",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 90,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/cpu/tests/run_g2_host_evidence.ps1",
+      "checkout_sha256": "00791AA3B5F42CBBF1B918491CEBB8F8BBC53AD08B1D6ADD73AE6A71D8A99B76",
+      "git_blob_sha1": "818bf36e56ada60556e9860e1d7e4db4e924de41",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 214,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/cpu/tests/test_single_camera_classifier.c",
+      "checkout_sha256": "18A17AC487BB166010C5DBF11CB95A12D82BE574285B3492EF663B24A97D6B69",
+      "git_blob_sha1": "b339fa3caeea8ee132df7a20ec8a95b39ff70ac4",
+      "eol_attribute": "lf",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "lf",
+      "crlf_count": 0,
+      "bare_lf_count": 194,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "tools/interface_freeze_check.ps1",
+      "checkout_sha256": "545A385B210BB7EE7ACCFAB28D757D27460AC31112FA7379D72739035FBFE436",
+      "git_blob_sha1": "267c8629922bd65dbce76509206ba83f843d4cef",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 116,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "tools/team_scope_check.ps1",
+      "checkout_sha256": "FFFE247F2AD71CABF163FA100868A48233279812B1799876BC28AA27C90DB833",
+      "git_blob_sha1": "095682f820106ee290a019f5e125ad62c7d4ecea",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 108,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "tools/verify_final_static_integration_manifest.ps1",
+      "checkout_sha256": "86BE49C9DFF524276014CFA24F3B3F4826347E000F84D658722C6F6927F53D4D",
+      "git_blob_sha1": "78d74301da7e1efb7443fefcdfcfd7c57b2082f2",
+      "eol_attribute": "crlf",
+      "required_eol": "crlf",
+      "actual_eol": "crlf",
+      "crlf_count": 108,
+      "bare_lf_count": 0,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "competition_project_single_camera/docs/debug_sessions/I0_SMOKE_OPERATION_CARD_DRAFT_20260718.md",
+      "checkout_sha256": "BD012C2B9E9E32FF82DC0F494852D3A338FCBE283C4628FA9CC370488460E69F",
+      "git_blob_sha1": "1ecd83586826ecd9fdc7edcca2843b84cfa4feba",
+      "eol_attribute": "lf",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "lf",
+      "crlf_count": 0,
+      "bare_lf_count": 31,
+      "bare_cr_count": 0
+    },
+    {
+      "path": "docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md",
+      "checkout_sha256": "E012E71DE0F5532ED0864334CBB2CBA346EF60758EE0714D1437BE5B21B88B29",
+      "git_blob_sha1": "44cca13f0408b1042abfbd204081f6d4ad1e2973",
+      "eol_attribute": "lf",
+      "required_eol": "repository_existing_rule",
+      "actual_eol": "lf",
+      "crlf_count": 0,
+      "bare_lf_count": 105,
+      "bare_cr_count": 0
+    }
+  ]
 }
