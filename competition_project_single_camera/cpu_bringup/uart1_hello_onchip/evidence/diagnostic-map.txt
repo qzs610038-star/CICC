@@ -1,0 +1,182 @@
+Archive member included to satisfy reference by file (symbol)
+
+<TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a(lib_a-init.o)
+                              build/obj_files/start.o (__libc_init_array)
+
+Discarded input sections
+
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/main.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .group         0x0000000000000000        0xc build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000      0x796 build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000       0x22 build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000       0x8e build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000       0x51 build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000      0x103 build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000       0x6a build/obj_files/p0a_diag.o
+ .debug_macro   0x0000000000000000      0x1df build/obj_files/p0a_diag.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ram              0x00000000f9000000 0x0000000000004000 axwl !r
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+LOAD build/obj_files/main.o
+LOAD build/obj_files/p0a_diag.o
+LOAD build/obj_files/start.o
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32imafdc/ilp32d\libgcc.a
+                0x0000000000000800                __stack_size = DEFINED (__stack_size)?__stack_size:0x800
+
+.init           0x00000000f9000000       0x52
+ *(SORT_NONE(.init))
+ .init          0x00000000f9000000       0x52 build/obj_files/start.o
+                0x00000000f9000000                _start
+                0x00000000f9000050                _init
+
+.text           0x00000000f9000052      0x2c2
+ *libc.a:*(.text .text.*)
+ .text          0x00000000f9000052        0x0 <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a(lib_a-init.o)
+ .text.__libc_init_array
+                0x00000000f9000052       0x6a <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a(lib_a-init.o)
+                0x00000000f9000052                __libc_init_array
+ *(.text.main)
+ *(.text.unlikely .text.unlikely.*)
+ *(.text.startup .text.startup.*)
+ *(.text .text.*)
+ .text          0x00000000f90000bc       0x8a build/obj_files/main.o
+                0x00000000f90000ec                main
+ .text          0x00000000f9000146      0x1ce build/obj_files/p0a_diag.o
+                0x00000000f9000146                p0a_canary_checksum
+                0x00000000f9000194                p0a_canary_init
+                0x00000000f90001d4                p0a_canary_mark
+                0x00000000f90001e8                p0a_canary_set_uart
+                0x00000000f90001fe                p0a_canary_heartbeat
+                0x00000000f9000216                p0a_uart_putc_bounded
+                0x00000000f9000270                p0a_uart_write_bounded
+                0x00000000f90002a2                p0a_run_uart_probe
+ .text          0x00000000f9000314        0x0 build/obj_files/start.o
+ *(.gnu.linkonce.t.*)
+ *(.note.gnu.build-id)
+
+.rela.dyn       0x00000000f9000314        0x0
+ .rela.init     0x00000000f9000314        0x0 build/obj_files/main.o
+ .rela.text.__libc_init_array
+                0x00000000f9000314        0x0 build/obj_files/main.o
+
+.fini
+ *(SORT_NONE(.fini))
+                0x00000000f9000314                . = ALIGN (0x4)
+
+.preinit_array  0x00000000f9000314        0x0
+                0x00000000f9000314                PROVIDE (__preinit_array_start = .)
+ *(.preinit_array)
+                0x00000000f9000314                PROVIDE (__preinit_array_end = .)
+
+.init_array     0x00000000f9000314        0x0
+                0x00000000f9000314                PROVIDE (__init_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*))
+ *(.init_array)
+                0x00000000f9000314                PROVIDE (__init_array_end = .)
+
+.fini_array     0x00000000f9000314        0x0
+                [!provide]                        PROVIDE (__fini_array_start = .)
+ *(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*))
+ *(.fini_array)
+                [!provide]                        PROVIDE (__fini_array_end = .)
+
+.lalign         0x00000000f9000314        0x0
+                0x00000000f9000314                PROVIDE (_data_lma = .)
+
+.dalign         0x00000000f9000314        0x0
+                0x00000000f9000314                PROVIDE (_data = .)
+
+.data           0x00000000f9000314       0x4e
+ *(.rdata)
+ *(.rodata .rodata.*)
+ .rodata        0x00000000f9000314       0x14 build/obj_files/main.o
+ .rodata.str1.4
+                0x00000000f9000328       0x30 build/obj_files/main.o
+                                         0x2e (size before relaxing)
+ *(.gnu.linkonce.r.*)
+ *(.data .data.*)
+ .data          0x00000000f9000358        0x0 build/obj_files/main.o
+ .data          0x00000000f9000358        0x0 build/obj_files/p0a_diag.o
+ .data          0x00000000f9000358        0x0 build/obj_files/start.o
+ .data          0x00000000f9000358        0x0 <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a(lib_a-init.o)
+ *(.gnu.linkonce.d.*)
+                0x00000000f9000358                . = ALIGN (0x8)
+                0x00000000f9000b48                PROVIDE (__global_pointer$ = (. + 0x7f0))
+ *(.sdata .sdata.*)
+ *(.gnu.linkonce.s.*)
+ *(.srodata .srodata.*)
+                0x00000000f9000362                . = (. + 0xa)
+ *fill*         0x00000000f9000358        0xa
+                0x00000000f9000364                . = ALIGN (0x4)
+                0x00000000f9000364                PROVIDE (_edata = .)
+                [!provide]                        PROVIDE (edata = .)
+                0x00000000f9000370                . = ALIGN (0x10)
+                0x00000000f9000370                __p0a_canary_start = .
+
+.p0a_canary     0x00000000f9000370       0x28
+ *(.p0a_canary)
+ .p0a_canary    0x00000000f9000370       0x28 build/obj_files/p0a_diag.o
+                0x00000000f9000370                g_p0a_canary
+                0x00000000f9000398                __p0a_canary_end = .
+                0x00000000f9000398                . = ALIGN (0x4)
+                0x00000000f9000398                __bss_start = .
+
+.bss            0x00000000f9000398        0x0
+ *(.sbss*)
+ *(.gnu.linkonce.sb.*)
+ *(.bss .bss.*)
+ .bss           0x00000000f9000398        0x0 build/obj_files/main.o
+ .bss           0x00000000f9000398        0x0 build/obj_files/p0a_diag.o
+ .bss           0x00000000f9000398        0x0 build/obj_files/start.o
+ .bss           0x00000000f9000398        0x0 <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a(lib_a-init.o)
+ *(.gnu.linkonce.b.*)
+ *(COMMON)
+                0x00000000f9000398                . = ALIGN (0x4)
+                0x00000000f9000398                _end = .
+
+.stack          0x00000000f90003a0      0x800
+                0x00000000f90003a0                __stack_bottom = .
+                0x00000000f9000ba0                . = (. + __stack_size)
+ *fill*         0x00000000f90003a0      0x800
+                0x00000000f9000ba0                _sp = .
+                0x00000000f9000ba0                __stack_top = .
+                0x00000000f9000ba0                __freertos_irq_stack_top = .
+                0x0000000000000001                ASSERT ((__p0a_canary_start >= ORIGIN (ram)), canary below RAM)
+                0x0000000000000001                ASSERT ((__p0a_canary_end <= __stack_bottom), canary overlaps stack)
+                0x0000000000000001                ASSERT ((__stack_top <= (ORIGIN (ram) + LENGTH (ram))), image exceeds RAM)
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libm.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32imafdc/ilp32d\libgcc.a
+START GROUP
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32imafdc/ilp32d\libgcc.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libg.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a
+END GROUP
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32imafdc/ilp32d\libgcc.a
+START GROUP
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/rv32imafdc/ilp32d\libgcc.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libc.a
+LOAD <TOOLCHAIN>/toolchain/bin/../lib/gcc/riscv-none-embed/8.3.0/../../../../riscv-none-embed/lib/rv32imafdc/ilp32d\libnosys.a
+END GROUP
+OUTPUT(build/p0a_uart1_diag.elf elf32-littleriscv)

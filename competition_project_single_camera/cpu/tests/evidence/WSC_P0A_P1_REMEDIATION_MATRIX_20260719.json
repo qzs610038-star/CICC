@@ -1,0 +1,42 @@
+{
+  "schema": "wsc-p0a-p1-remediation-matrix-v2",
+  "status": "AWAITING_QZS_REVIEW",
+  "ready": false,
+  "implementation_git_sha": "2564f146fede84383be0ff607aa63408b2889f37",
+  "governance_git_sha": "e282a95fcef306c87e4015385c9fcd0041f5a722",
+  "scope": "R1_R2_ONLY",
+  "items": [
+    {
+      "id": "R1",
+      "closed_by_wsc_candidate": true,
+      "change": "two fresh manifests are artifact-hash validated and compared by script; PASS is derived fail-closed",
+      "evidence": [
+        "../../../cpu_bringup/uart1_hello_onchip/compare_reproducibility.ps1",
+        "../../../cpu_bringup/uart1_hello_onchip/evidence/reproducibility.json"
+      ],
+      "result": "P0_A_REPRODUCIBILITY=PASS compared=12"
+    },
+    {
+      "id": "R2",
+      "closed_by_wsc_candidate": true,
+      "change": "snapshot hash is recomputed from serialized fake bytes; actual decision/reason/submits/commits/ACKs come from runtime, fake transport, and packer calls",
+      "evidence": [
+        "../../p1_replay_runner.c",
+        "../verify_p1_replay_manifest.ps1",
+        "../test_p1_replay_manifest_verifier.ps1",
+        "../p1_replay_remediation_20260719/rounds.jsonl",
+        "../p1_replay_remediation_20260719/tamper.jsonl",
+        "../p1_replay_remediation_20260719/runner.txt",
+        "../p1_replay_remediation_20260719/manifest.json"
+      ],
+      "result": "20/20 rounds; runtime tamper PASS; clean-checkout manifest 4/4 and single-file tamper negative PASS; ARM=0"
+    }
+  ],
+  "claims": {
+    "p0_a_ready": false,
+    "p1_host_ready": false,
+    "board_verified": false,
+    "arm_enabled": 0,
+    "awaiting_qzs_review": true
+  }
+}

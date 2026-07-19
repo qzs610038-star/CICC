@@ -1,0 +1,99 @@
+{
+    "schema":  "p0-a-evidence-v1",
+    "status":  "AWAITING_QZS_REVIEW",
+    "firmware":  {
+                     "git_sha":  "6e9475ff6678c289160b3374cd98b6fda88c8455",
+                     "input_sha256":  "14D5F966E7EA61369EA9247FA96C1ABF50D45311ED7E71A6F3EC34AA0C89CA5C",
+                     "build_id_rule":  "uint32_be(SHA256(normalized input hash lines)[0:4])",
+                     "build_id_hex":  "0x14D5F966",
+                     "debug_elf_identity":  "NON_IDENTITY_LOCAL_BUILD_ONLY",
+                     "identity_artifact":  "diagnostic.elf (strip-debug, prefix-mapped)",
+                     "map_policy":  "loadable layout only; debug sections removed from text evidence"
+                 },
+    "artifacts":  {
+                      "elf":  {
+                                  "path":  "diagnostic.elf",
+                                  "sha256":  "341D902E00A44B099D6BDBC0872873153E37DDB80D22D04FAFADF3F65E490C3A"
+                              },
+                      "map":  {
+                                  "path":  "diagnostic-map.txt",
+                                  "sha256":  "69443007F8DAAC349E123785777F280CF2F84ACB72564861D69D582AB762B6E3"
+                              },
+                      "readelf":  {
+                                      "path":  "readelf-lW.txt",
+                                      "sha256":  "9EF233C951E93079E332F1450B5E81E755A21E6EB72F8F825B11882DDCE78740"
+                                  },
+                      "objdump":  {
+                                      "path":  "objdump-d.txt",
+                                      "sha256":  "4986D71AE5C2C50C385E33D0C7F8BF45C28762F23A7EDD155C1C792CC2135EEF"
+                                  },
+                      "build_log":  {
+                                        "path":  "strict-build.txt",
+                                        "sha256":  "19FCB034DE11BAEED91F2C6C6C7B1223DAE5ECCBFD195AEB202C81E2D2A16731"
+                                    },
+                      "tx_never_ready":  {
+                                             "path":  "tx-never-ready.json",
+                                             "sha256":  "07E7C0F90A490F418838F8B0021FDE71657524F34BEB181F9932DDE6B12539E9"
+                                         }
+                  },
+    "memory":  {
+                   "base":  "0xF9000000",
+                   "size_bytes":  16384,
+                   "regions":  [
+                                   {
+                                       "name":  "text_data_bss",
+                                       "start":  "0xF9000000",
+                                       "end":  "0xF9000370"
+                                   },
+                                   {
+                                       "name":  "canary",
+                                       "start":  "0xF9000370",
+                                       "end":  "0xF9000398"
+                                   },
+                                   {
+                                       "name":  "stack",
+                                       "start":  "0xF90003A0",
+                                       "end":  "0xF9000BA0"
+                                   }
+                               ]
+               },
+    "canary":  {
+                   "symbol":  "g_p0a_canary",
+                   "size_bytes":  40,
+                   "build_id":  "0x14D5F966"
+               },
+    "disassembly_order_witness":  {
+                                      "artifact":  "objdump",
+                                      "canary_write_offsets":  [
+                                                                   "0xf90002bc",
+                                                                   "0xf90002cc",
+                                                                   "0xf90002d4"
+                                                               ],
+                                      "uart_wait_offsets":  [
+                                                                "0xf90002da"
+                                                            ],
+                                      "semantic_order":  [
+                                                             "C003",
+                                                             "UART_CONFIG_WRITES",
+                                                             "C004",
+                                                             "C005",
+                                                             "FIRST_TX_POLL"
+                                                         ]
+                                  },
+    "stop_conditions":  {
+                            "same_failure_max_attempts":  2,
+                            "requires_new_evidence_per_attempt":  true,
+                            "third_attempt_requires_review":  true
+                        },
+    "safety":  {
+                   "arm_enabled":  0,
+                   "board_verified":  false,
+                   "forbidden":  [
+                                     "USER2",
+                                     "P0-B",
+                                     "UART2/J52",
+                                     "myCobot",
+                                     "board action"
+                                 ]
+               }
+}

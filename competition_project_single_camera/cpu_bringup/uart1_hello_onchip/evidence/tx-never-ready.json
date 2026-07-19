@@ -1,0 +1,15 @@
+{
+  "case_id": "P0-A-TX-NEVER-READY",
+  "status": "PASS",
+  "runner_exit_code": 0,
+  "observed_stage": "E101",
+  "uart_ready_samples": [false,false,false,false,false,false,false],
+  "observed_poll_count": 7,
+  "bounded_poll_limit": 7,
+  "heartbeat_before_timeout": 0,
+  "heartbeat_after_timeout": 1,
+  "timeout_stage_value": 57601,
+  "stage_at_uart_config": "C003",
+  "stage_after_uart_config": "C004",
+  "stage_at_first_tx_poll": "C005"
+}

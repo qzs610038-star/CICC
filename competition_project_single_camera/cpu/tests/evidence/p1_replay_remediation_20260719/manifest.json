@@ -1,0 +1,41 @@
+{
+    "schema":  "p1-host-replay-bundle-v1",
+    "status":  "AWAITING_QZS_REVIEW",
+    "implementation_git_sha":  "2564f146fede84383be0ff607aa63408b2889f37",
+    "governance_git_sha":  "e282a95fcef306c87e4015385c9fcd0041f5a722",
+    "compiler_policy":  "MSVC C11 /W4 /WX",
+    "text_hash_policy":  "SHA-256 of file bytes after CRLF byte pairs are normalized to LF; lone CR bytes are preserved",
+    "round_count":  20,
+    "task_counts":  {
+                        "1":  5,
+                        "2":  5,
+                        "3":  5,
+                        "4":  5
+                    },
+    "actual_result_source":  "single_camera_runtime + single_camera_fake_transport counters",
+    "snapshot_hash_source":  "SHA-256(p1-fake-snapshot-le-v1 serialized bytes)",
+    "required_negative_cases":  [
+                                    "ABANDON",
+                                    "TIMEOUT",
+                                    "RESET",
+                                    "NO_SECOND_RESULT",
+                                    "SNAPSHOT_TAMPER"
+                                ],
+    "arm_enabled":  0,
+    "board_verified":  false,
+    "files_sha256":  {
+                         "rounds.jsonl":  "2D32393E9F20B7B01137DCFCADC3BD93AF152A77674F4242B9ABC3CDA56A6BC1",
+                         "runner.txt":  "8C4CCF1071B134326445B9BDC3193BC5A19787E442243147FB9DE1CF7D66E73F",
+                         "compile.txt":  "DFABC3264C3062CB6A3019BE66BECBE030E35EA67E3CA1F4CCF5B6232F520065",
+                         "tamper.jsonl":  "0C830B89CBBDBCB21A7FFA75D7BFEC404C9A01A69BA0A15FF07D6E825F8F5CA9",
+                         "test_source_lf":  "D2C5DDA45E193CF026E93569AC20B676E965A08191E5AD633FFDE59867150FE1",
+                         "host_model_source_lf":  "EE312CA8143598187D0B88177A661499219D9AD72F1F27B86CCE57B62F461618",
+                         "runtime_source_lf":  "AA961659EC028C20A5234C72273D4743DAB94985DCB27CF976A878BC51C293E0",
+                         "fake_transport_source_lf":  "D0BDD9FEC51B27250A82DECFFBFCDB5A0EBEA97AD0EC545267539C30FD1758E9",
+                         "adapter_source_lf":  "1AEA059F70714D1E43DBD22832E7D7782BE95DB0FA07D37E0A88ABDB5E43409B",
+                         "classifier_source_lf":  "A80D87B8A1F3D3C3E0974ACFBB0A3CDDD98BFE38EB922CC8C2AEE0402AA4E862",
+                         "f1_source_lf":  "2124476129CED7162919CBC3FA5727FD10D29DA05E1852B24EE824D7C75AA3D8",
+                         "vector_file_lf":  "97163158EB26231277EA2321D5A2931DC6590B36E34AD7B59CE45A7859820BE0",
+                         "schema_file_lf":  "8FF954DD103E243CEB9EDDDC4857826B757526B56EBD7DFB3C7F811FB6A68794"
+                     }
+}

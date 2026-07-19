@@ -1,0 +1,90 @@
+{
+    "schema":  "p0-a-reproducibility-v2",
+    "status":  "PASS_AWAITING_QZS_REVIEW",
+    "generated_by":  "compare_reproducibility.ps1",
+    "manifest_a":  {
+                       "label":  "fresh_detached_a",
+                       "sha256":  "841C5C03965DE439B5B579939658F5807801A728423FA86173838FA79DB97A7C"
+                   },
+    "manifest_b":  {
+                       "label":  "fresh_detached_b",
+                       "sha256":  "841C5C03965DE439B5B579939658F5807801A728423FA86173838FA79DB97A7C"
+                   },
+    "artifact_hashes_validated":  true,
+    "compared_fields":  [
+                            {
+                                "field":  "implementation_git_sha",
+                                "value_a":  "2564f146fede84383be0ff607aa63408b2889f37",
+                                "value_b":  "2564f146fede84383be0ff607aa63408b2889f37",
+                                "match":  true
+                            },
+                            {
+                                "field":  "normalized_input_sha256",
+                                "value_a":  "14D5F966E7EA61369EA9247FA96C1ABF50D45311ED7E71A6F3EC34AA0C89CA5C",
+                                "value_b":  "14D5F966E7EA61369EA9247FA96C1ABF50D45311ED7E71A6F3EC34AA0C89CA5C",
+                                "match":  true
+                            },
+                            {
+                                "field":  "build_id_hex",
+                                "value_a":  "0x14D5F966",
+                                "value_b":  "0x14D5F966",
+                                "match":  true
+                            },
+                            {
+                                "field":  "stripped_diagnostic_elf_sha256",
+                                "value_a":  "341D902E00A44B099D6BDBC0872873153E37DDB80D22D04FAFADF3F65E490C3A",
+                                "value_b":  "341D902E00A44B099D6BDBC0872873153E37DDB80D22D04FAFADF3F65E490C3A",
+                                "match":  true
+                            },
+                            {
+                                "field":  "loadable_layout_map_sha256",
+                                "value_a":  "69443007F8DAAC349E123785777F280CF2F84ACB72564861D69D582AB762B6E3",
+                                "value_b":  "69443007F8DAAC349E123785777F280CF2F84ACB72564861D69D582AB762B6E3",
+                                "match":  true
+                            },
+                            {
+                                "field":  "readelf_sha256",
+                                "value_a":  "9EF233C951E93079E332F1450B5E81E755A21E6EB72F8F825B11882DDCE78740",
+                                "value_b":  "9EF233C951E93079E332F1450B5E81E755A21E6EB72F8F825B11882DDCE78740",
+                                "match":  true
+                            },
+                            {
+                                "field":  "objdump_sha256",
+                                "value_a":  "4986D71AE5C2C50C385E33D0C7F8BF45C28762F23A7EDD155C1C792CC2135EEF",
+                                "value_b":  "4986D71AE5C2C50C385E33D0C7F8BF45C28762F23A7EDD155C1C792CC2135EEF",
+                                "match":  true
+                            },
+                            {
+                                "field":  "strict_build_log_sha256",
+                                "value_a":  "19FCB034DE11BAEED91F2C6C6C7B1223DAE5ECCBFD195AEB202C81E2D2A16731",
+                                "value_b":  "19FCB034DE11BAEED91F2C6C6C7B1223DAE5ECCBFD195AEB202C81E2D2A16731",
+                                "match":  true
+                            },
+                            {
+                                "field":  "tx_never_ready_sha256",
+                                "value_a":  "07E7C0F90A490F418838F8B0021FDE71657524F34BEB181F9932DDE6B12539E9",
+                                "value_b":  "07E7C0F90A490F418838F8B0021FDE71657524F34BEB181F9932DDE6B12539E9",
+                                "match":  true
+                            },
+                            {
+                                "field":  "memory_json",
+                                "value_a":  "{\"base\":\"0xF9000000\",\"size_bytes\":16384,\"regions\":[{\"name\":\"text_data_bss\",\"start\":\"0xF9000000\",\"end\":\"0xF9000370\"},{\"name\":\"canary\",\"start\":\"0xF9000370\",\"end\":\"0xF9000398\"},{\"name\":\"stack\",\"start\":\"0xF90003A0\",\"end\":\"0xF9000BA0\"}]}",
+                                "value_b":  "{\"base\":\"0xF9000000\",\"size_bytes\":16384,\"regions\":[{\"name\":\"text_data_bss\",\"start\":\"0xF9000000\",\"end\":\"0xF9000370\"},{\"name\":\"canary\",\"start\":\"0xF9000370\",\"end\":\"0xF9000398\"},{\"name\":\"stack\",\"start\":\"0xF90003A0\",\"end\":\"0xF9000BA0\"}]}",
+                                "match":  true
+                            },
+                            {
+                                "field":  "canary_json",
+                                "value_a":  "{\"symbol\":\"g_p0a_canary\",\"size_bytes\":40,\"build_id\":\"0x14D5F966\"}",
+                                "value_b":  "{\"symbol\":\"g_p0a_canary\",\"size_bytes\":40,\"build_id\":\"0x14D5F966\"}",
+                                "match":  true
+                            },
+                            {
+                                "field":  "disassembly_order_json",
+                                "value_a":  "{\"artifact\":\"objdump\",\"canary_write_offsets\":[\"0xf90002bc\",\"0xf90002cc\",\"0xf90002d4\"],\"uart_wait_offsets\":[\"0xf90002da\"],\"semantic_order\":[\"C003\",\"UART_CONFIG_WRITES\",\"C004\",\"C005\",\"FIRST_TX_POLL\"]}",
+                                "value_b":  "{\"artifact\":\"objdump\",\"canary_write_offsets\":[\"0xf90002bc\",\"0xf90002cc\",\"0xf90002d4\"],\"uart_wait_offsets\":[\"0xf90002da\"],\"semantic_order\":[\"C003\",\"UART_CONFIG_WRITES\",\"C004\",\"C005\",\"FIRST_TX_POLL\"]}",
+                                "match":  true
+                            }
+                        ],
+    "all_compared_fields_match":  true,
+    "debug_elf_policy":  "local non-identity artifact; never committed"
+}

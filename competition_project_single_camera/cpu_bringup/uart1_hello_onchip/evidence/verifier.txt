@@ -1,0 +1,5 @@
+P0_A_EVIDENCE=PASS
+firmware_git_sha=6e9475ff6678c289160b3374cd98b6fda88c8455
+elf_entry=0xF9000000
+canary_symbol=g_p0a_canary address=0xF9000370
+board_status=NOT_VERIFIED
