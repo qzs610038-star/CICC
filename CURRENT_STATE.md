@@ -71,19 +71,23 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 2. idle-drain 仅 Host 验证；真实 I1 单槽、ACK、overrun、CDC 和 APB ABI 未冻结。
 3. I0 UART1 只有同批离线构建与制品身份；USER2、板上 CPU 取指、Type-C UART1 Hello/回显和 APB MAGIC 尚未执行。
 4. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
+5. libaoxun 已确认其证据主机实际 clone 为 `C:\Users\20306\Desktop\赛题资料\CICC`，Git 顶层、origin 与 clean status 均通过，结论为 `READY_PATH`；这只关闭路径阻塞，集合分支同步、原始制品预检和全部板级项仍未执行。
+6. WSC 已确认 clone `D:\CICC w` 与 origin 身份，但原 `dev/claude-cpu-plan-status-0717` 含 tracked 修改 `final_project/cpu/CPU_MODULE_PLAN.txt`，已在 fetch/switch 前安全停止。该修改必须保留；WSC 后续改用 detached 固定 SHA 独立 worktree，不在原 dirty 工作树切分支。
 
 ## NEXT_GATE
 
-1. 提交 qzs 最终刷新与用户授权的 PPT 大纲清理，固定并推送集合分支 SHA；提交后复核静态门与远端 SHA。
-2. 由用户确认匹配 bitstream/ELF、板卡、Type-C UART1、失败停止策略和批准窗口。
-3. 同一批准窗口内连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认，不回退 UART0。
-4. I0-SMOKE PASS 后进入受审 I1-I4；UART2/J52、机械臂接线、myCobot 帧和动作继续独立 `NO-GO`。
+1. libaoxun 已完成 Stage 0；下一步只在已确认的 `$RepoRoot` 上精确 fetch 集合 ref、ff-only 切换，并提交固定 SHA 与原始制品只读预检报告。WSC 已完成路径确认，但须保留原 dirty，改在新建 detached 固定 SHA worktree 中审查。
+2. libaoxun 与 wsc 分别安全拉取并独立提交 READY/BLOCKED；两人 HEAD 必须为 `e72fb6a3ce1b7999f61cae1e0ed7b2773f1e4fda`。
+3. qzs 比对两份 READY、固定板卡/制品/接线/停止责任与窗口，再请求用户明确批准；批准前不执行任何硬件动作。
+4. 批准后由 libaoxun 作为唯一上板执行者，在 wsc CPU 判读支持下连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认，不回退 UART0。
+5. I0-SMOKE PASS 后进入受审 I1-I4；UART2/J52、机械臂接线、myCobot 帧和动作继续独立 `NO-GO`。
 
 ## PENDING_DECISIONS
 
 - 任务二圆柱/锥体真实标定方案与混淆矩阵验收阈值。
 - idle-drain 在真实单槽 I1 中的 wire ACK/flush 编码和跨轮调度规则。
 - I0-SMOKE 的实际 Type-C UART1 枚举端口、板卡/制品批准窗口和失败停止责任人。
+- libaoxun 的板卡/原始制品 READY 报告与 WSC 的 CPU/Hello READY 报告尚未返回；WSC 需先完成 dirty 隔离 worktree。
 
 ## DEPRECATED_ROUTES
 

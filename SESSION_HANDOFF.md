@@ -1,4 +1,4 @@
-# SESSION HANDOFF — 2026-07-19 Goal 1/2 固定 SHA 集合与 Goal 3 准备
+# SESSION HANDOFF — 2026-07-19 Goal 4 队友派工准备
 
 ## 恢复入口
 
@@ -54,6 +54,14 @@
 5. `final_project/cpu/CPU_MODULE_PLAN.txt`
 
 三人确认已经完成。下一步先读取 Goal 1/2 审查记录和本次 Goal 3 总门结果；只有集合 SHA、bitstream/ELF hash 与用户批准窗口完全匹配，才连续执行 USER2、UART1 Hello/回显与 APB MAGIC。相同输入 hash 不重复确认，任何 hash、接线或失败现象变化都重开对应 Gate。
+
+Goal 4 已形成可直接转发的双人提示词与任务矩阵：`docs/agent_context/GOAL4_LIBAOXUN_WSC_PULL_AND_TASK_DISPATCH_20260719.md`。libaoxun 是唯一上板执行者；wsc 只做 CPU/Hello 预检和实时日志判读；qzs 在两份 READY 到齐后才请求用户批准并负责证据收口。当前仍为 `HARDWARE WINDOW NOT YET APPROVED`。
+
+2026-07-19 12:27:31 +08:00，libaoxun 正确报告 qzs 来源路径在其证据主机上不存在，并在任何 Git/硬件动作前停止。该问题归类为 `PATH_RESOLUTION_BLOCKED`，不是 I0 或 Git 失败。派工文档已改为先解析实际 `$RepoRoot`、验证 Git 顶层和 origin，再用 `git -C "$RepoRoot"` 执行全部 repo-relative 检查；不得扫描整盘或猜路径。
+
+随后 libaoxun 回传 `$RepoRoot = 'C:\Users\20306\Desktop\赛题资料\CICC'`：目录存在，Git 顶层为同一 clone，origin 为 `https://github.com/qzs610038-star/CICC.git`，当前 `dev/libaoxun688-uart1-i0-20260719` 未报告 dirty，结论 `READY_PATH`。路径阻塞已关闭；尚未执行 fetch/switch/merge、原始 82/21 证据预检、构建或任何硬件动作。下一步只推进固定集合 SHA 同步与只读预检。
+
+WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu-plan-status-0717` 含 tracked 修改 `final_project/cpu/CPU_MODULE_PLAN.txt`，因此在 fetch/switch 前停止；未执行任何 Git 同步或硬件动作。根因是原工作树承载需保护的 CPU 工作，不是集合 ref 失败。解阻方式固定为：保持原 dirty 原样，精确 fetch 后在不存在的新 sibling 目录执行 `git worktree add --detach <new-root> e72fb6a...`，WSC 只在该 clean 固定 SHA worktree 做 CPU/Hello 只读审查；禁止 stash/reset/clean/prune/remove。
 
 ## 下一执行者必须保留的标注
 
