@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "purpose": "final static integration identity; checkout bytes are authoritative for execution",
-  "source_commit": "9c006928a770b06faee213a1b99b2af7bfa261a0",
+  "source_commit": "020f47f6dbc2a13294f957e79d2d00bbe04e1968",
   "clean_checkout_verified": true,
   "eol_policy": {
     "ps1": "CRLF",
