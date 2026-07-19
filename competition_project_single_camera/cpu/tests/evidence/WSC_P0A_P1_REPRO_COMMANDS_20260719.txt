@@ -1,41 +1,41 @@
 STATUS=AWAITING_QZS_REVIEW
-IMPLEMENTATION_SHA=6e9475ff6678c289160b3374cd98b6fda88c8455
-GOVERNANCE_SHA=f027c6ff7b087e4dff5c23b5d76edd8286172f1f
+READY=NO
+IMPLEMENTATION_SHA=2564f146fede84383be0ff607aa63408b2889f37
+GOVERNANCE_SHA=e282a95fcef306c87e4015385c9fcd0041f5a722
 
 Prerequisites:
-- clean checkout at IMPLEMENTATION_SHA
-- read-only governance checkout at GOVERNANCE_SHA
+- two distinct clean detached worktrees at IMPLEMENTATION_SHA
+- qzs governance schema/verifier read from GOVERNANCE_SHA
 - Efinity RISC-V IDE 2025.2 toolchain root
-- bundled Python executable
+- Python 3 and MSVC C11
 
-P0-A Host negative:
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\run_host_tests.ps1 -WitnessPath <absolute-output>\tx-never-ready.json
-Expected: p0a_uart_timeout: 10/10 passed
+R1 fresh build, run once in each clean detached worktree:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\build_evidence.ps1 -ToolchainRoot <efinity-riscv-ide-root> -FirmwareGitSha 2564f146fede84383be0ff607aa63408b2889f37 -PythonExe <python.exe> -VerifierPath <qzs-governance-root>\competition_project_single_camera\tools\p0_a_evidence_verifier.py
+Expected for each: exit 0; evidence\verifier.txt contains P0_A_EVIDENCE=PASS and board_status=NOT_VERIFIED.
 
-P0-A fresh build and qzs verifier:
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\build_evidence.ps1 -ToolchainRoot <efinity-riscv-ide-root> -FirmwareGitSha 6e9475ff6678c289160b3374cd98b6fda88c8455 -PythonExe <python.exe> -VerifierPath <governance-root>\competition_project_single_camera\tools\p0_a_evidence_verifier.py
-Expected: evidence\verifier.txt contains P0_A_EVIDENCE=PASS and board_status=NOT_VERIFIED
+R1 automatic fail-closed comparison:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\compare_reproducibility.ps1 -ManifestA <fresh-a>\evidence\manifest.json -ManifestB <fresh-b>\evidence\manifest.json -OutputPath <output>\reproducibility.json -BundleLabelA fresh_detached_a -BundleLabelB fresh_detached_b
+Expected: exit 0; P0_A_REPRODUCIBILITY=PASS compared=12. The script checks each manifest hash against its actual artifact before comparing fields; any mismatch throws before PASS output.
 
-P1 unit and adapter checks:
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_host_model.ps1
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_feature_adapter_host.ps1
-Expected: 37/37 and 39/39 passed
+R2 executable runtime replay bundle:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_replay_bundle.ps1 -RunDir <absolute-output>\p1-replay -SchemaPath <qzs-governance-root>\competition_project_single_camera\docs\evidence_manifests\p1_feature_vector.schema.json -ImplementationGitSha 2564f146fede84383be0ff607aa63408b2889f37 -GovernanceGitSha e282a95fcef306c87e4015385c9fcd0041f5a722
+Expected: exit 0; P1_VECTOR_SCHEMA=PASS count=11; P1_REPLAY_SCHEMA=PASS rounds=20 ARM=0; P1_TAMPER_NEGATIVE=PASS hash_mismatch=1 result_mismatch=1; P1_REPLAY_BUNDLE=PASS status=AWAITING_QZS_REVIEW.
 
-P1 existing regression:
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_classifier_host.ps1
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_f1_host.ps1
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_g2_host_evidence.ps1 -RunDir <absolute-output>\g2 -PythonExe <python.exe> -CompilerPreference Msvc
-Expected: 54/54, 213/213, 648/648 and VALIDATION_PASS
+R2 validator checks:
+- recompute SHA-256 from each round's 33-byte snapshot_bytes_hex
+- require runtime_result_submit_count=1 and result_commit_count=1
+- require second_result_count=0 and feature_ack_count=1
+- require TIMEOUT terminal_cause to be separate from host_release_event
+- require ABANDON, TIMEOUT, RESET, duplicate/stale/invalid ACK witnesses
+- require tampered snapshot hash and runtime result to differ from expected
 
-P1 executable 20-round bundle:
-powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_replay_bundle.ps1 -RunDir <absolute-output>\p1-replay -SchemaPath <governance-root>\competition_project_single_camera\docs\evidence_manifests\p1_feature_vector.schema.json -ImplementationGitSha 6e9475ff6678c289160b3374cd98b6fda88c8455 -GovernanceGitSha f027c6ff7b087e4dff5c23b5d76edd8286172f1f
-Expected: P1_VECTOR_SCHEMA=PASS count=11; P1_REPLAY_SCHEMA=PASS rounds=20 ARM=0; P1_REPLAY_BUNDLE=PASS status=AWAITING_QZS_REVIEW
+Only manifest.json binds current bundle artifacts. Legacy compile.log and runner.log are retained as unbound historical copies.
 
 Final repository checks:
 git diff --check
 git status --short --branch
 git diff --name-only 0e5ab490559c58642734b0095753c6cf8787c709..HEAD -- competition_project_single_camera/cpu/include competition_project_single_camera/integration competition_project_single_camera/src competition_project_single_camera/ip competition_project_single_camera/mem_test.xml competition_project_single_camera/mem_test.peri.xml competition_project_single_camera/constrain.sdc
-Expected: diff --check exit 0; final scoped hardware/frozen-path diff has no output.
+Expected: diff --check exit 0; frozen/hardware diff has no output.
 
 Non-claims:
 P0_A_READY=NO

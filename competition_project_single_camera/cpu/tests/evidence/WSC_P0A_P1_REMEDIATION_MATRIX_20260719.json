@@ -1,22 +1,40 @@
 {
-  "schema": "wsc-p0a-p1-remediation-matrix-v1",
+  "schema": "wsc-p0a-p1-remediation-matrix-v2",
   "status": "AWAITING_QZS_REVIEW",
-  "implementation_git_sha": "6e9475ff6678c289160b3374cd98b6fda88c8455",
-  "governance_git_sha": "f027c6ff7b087e4dff5c23b5d76edd8286172f1f",
+  "ready": false,
+  "implementation_git_sha": "2564f146fede84383be0ff607aa63408b2889f37",
+  "governance_git_sha": "e282a95fcef306c87e4015385c9fcd0041f5a722",
+  "scope": "R1_R2_ONLY",
   "items": [
-    {"id":"P0-A-1","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/disassembly-order.json","../../../cpu_bringup/uart1_hello_onchip/evidence/tx-never-ready.json"]},
-    {"id":"P0-A-2","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/manifest.json","../../../cpu_bringup/uart1_hello_onchip/evidence/input_hashes.sha256"]},
-    {"id":"P0-A-3","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/manifest.json","../../../cpu_bringup/uart1_hello_onchip/evidence/verifier.txt"]},
-    {"id":"P0-A-4","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/reproducibility.json","../../../cpu_bringup/uart1_hello_onchip/evidence/diagnostic-map.txt"]},
-    {"id":"P1-1","closed_by_wsc":true,"evidence":["../../vectors/p1/p1_contract_vectors.jsonl","../p1_replay_remediation_20260719/manifest.json"]},
-    {"id":"P1-2","closed_by_wsc":true,"evidence":["../p1_replay_remediation_20260719/rounds.jsonl","../p1_replay_remediation_20260719/runner.txt"]},
-    {"id":"P1-3","closed_by_wsc":true,"evidence":["../../test_single_camera_feature_adapter.c","../../vectors/p1/p1_contract_vectors.jsonl"]},
-    {"id":"P1-4","closed_by_wsc":true,"evidence":["../../test_p1_host_model.c","../p1_replay_remediation_20260719/runner.txt"]}
+    {
+      "id": "R1",
+      "closed_by_wsc_candidate": true,
+      "change": "two fresh manifests are artifact-hash validated and compared by script; PASS is derived fail-closed",
+      "evidence": [
+        "../../../cpu_bringup/uart1_hello_onchip/compare_reproducibility.ps1",
+        "../../../cpu_bringup/uart1_hello_onchip/evidence/reproducibility.json"
+      ],
+      "result": "P0_A_REPRODUCIBILITY=PASS compared=12"
+    },
+    {
+      "id": "R2",
+      "closed_by_wsc_candidate": true,
+      "change": "snapshot hash is recomputed from serialized fake bytes; actual decision/reason/submits/commits/ACKs come from runtime, fake transport, and packer calls",
+      "evidence": [
+        "../../p1_replay_runner.c",
+        "../p1_replay_remediation_20260719/rounds.jsonl",
+        "../p1_replay_remediation_20260719/tamper.jsonl",
+        "../p1_replay_remediation_20260719/runner.txt",
+        "../p1_replay_remediation_20260719/manifest.json"
+      ],
+      "result": "20/20 rounds; tamper hash/result mismatch PASS; ARM=0"
+    }
   ],
   "claims": {
     "p0_a_ready": false,
     "p1_host_ready": false,
     "board_verified": false,
-    "arm_enabled": 0
+    "arm_enabled": 0,
+    "awaiting_qzs_review": true
   }
 }
