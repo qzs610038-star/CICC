@@ -3,9 +3,12 @@
 
 #include <stdint.h>
 
+#ifndef P0A_BUILD_ID
+#error "P0A_BUILD_ID must be injected from the normalized firmware input SHA-256"
+#endif
+
 #define P0A_CANARY_MAGIC 0x50304143u
 #define P0A_CANARY_SCHEMA 1u
-#define P0A_BUILD_ID 0x0719A001u
 #define P0A_UART_POLL_BUDGET 4096u
 
 #define P0A_STAGE_C001 0xC001u
@@ -38,6 +41,7 @@ typedef struct {
 
 typedef uint32_t (*p0a_read32_fn)(void *context, uint32_t address);
 typedef void (*p0a_write32_fn)(void *context, uint32_t address, uint32_t value);
+typedef void (*p0a_uart_init_fn)(void *context);
 
 typedef struct {
     p0a_read32_fn read32;
@@ -56,5 +60,7 @@ void p0a_canary_set_uart(uint32_t status, uint32_t error, uint32_t pc_tag);
 void p0a_canary_heartbeat(uint32_t pc_tag);
 int p0a_uart_putc_bounded(const p0a_uart_t *uart, uint8_t value);
 int p0a_uart_write_bounded(const p0a_uart_t *uart, const char *text);
+int p0a_run_uart_probe(const p0a_uart_t *uart, p0a_uart_init_fn init_fn,
+                       void *init_context, const char *text);
 
 #endif

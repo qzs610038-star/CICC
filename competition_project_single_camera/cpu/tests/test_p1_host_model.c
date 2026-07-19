@@ -41,22 +41,32 @@ static void test_input_events(void)
 
     p1_input_init(&model);
     p1_input_stage_config(&model, &config);
+    ack = 77u;
     CHECK(p1_input_event(&model, P1_INPUT_APPLY, 0xFFFEu, &ack) == P1_EVENT_ACCEPTED);
-    CHECK(ack == 0xFFFEu && model.config_active == 1u);
+    CHECK(ack == 0xFFFEu && model.config_pending == 1u && model.config_active == 0u);
+    CHECK(p1_input_event(&model, P1_INPUT_PLACE, 0xFFFFu, &ack) == P1_EVENT_INVALID_STATE);
+    CHECK(ack == 0xFFFEu);
+    CHECK(p1_input_frame_boundary(&model) == P1_EVENT_ACCEPTED);
+    CHECK(model.config_pending == 0u && model.config_active == 1u);
     CHECK(p1_input_event(&model, P1_INPUT_PLACE, 0xFFFFu, &ack) == P1_EVENT_ACCEPTED);
     CHECK(model.object_present == 1u && model.round_id == 1u);
+    CHECK(p1_input_latch_result(&model, 1u) == P1_EVENT_ACCEPTED);
+    CHECK(model.result_latched == 1u);
+    CHECK(p1_input_latch_result(&model, 1u) == P1_EVENT_INVALID_STATE);
     CHECK(p1_input_event(&model, P1_INPUT_PLACE, 0xFFFFu, &ack) == P1_EVENT_DUPLICATE);
+    CHECK(ack == 0xFFFFu);
     CHECK(model.round_id == 1u);
     CHECK(p1_input_event(&model, P1_INPUT_REMOVE, 0xFFFDu, &ack) == P1_EVENT_STALE);
     CHECK(model.object_present == 1u);
     CHECK(p1_input_event(&model, P1_INPUT_REMOVE, 0u, &ack) == P1_EVENT_ACCEPTED);
-    CHECK(model.object_present == 0u);
+    CHECK(model.object_present == 0u && model.result_latched == 0u);
     CHECK(p1_input_event(&model, P1_INPUT_PLACE, 1u, &ack) == P1_EVENT_ACCEPTED);
     CHECK(p1_input_event(&model, P1_INPUT_ABANDON, 2u, &ack) == P1_EVENT_ACCEPTED);
     CHECK(model.object_present == 0u && model.round_id == 2u);
     CHECK(p1_input_event(&model, P1_INPUT_RESET, 3u, &ack) == P1_EVENT_ACCEPTED);
     CHECK(model.config_active == 0u && model.result_latched == 0u);
     CHECK(p1_input_event(&model, P1_INPUT_PLACE, 4u, &ack) == P1_EVENT_INVALID_STATE);
+    CHECK(ack == 3u);
     CHECK(model.last_event_seq == 3u);
 }
 

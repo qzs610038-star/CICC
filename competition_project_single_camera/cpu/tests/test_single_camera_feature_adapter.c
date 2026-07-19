@@ -74,6 +74,20 @@ static void test_required_flags_and_empty_roi_rejected(void)
     CHECK(sc_feature_snapshot_to_observation(&snapshot, 0, &observation) == -1);
 }
 
+static void test_reserved_bit_is_fail_closed(void)
+{
+    sc_feature_snapshot_t snapshot = valid_red_cube();
+    sc_observation_t observation;
+
+    CHECK(snapshot.source_flags == 0x47u);
+    CHECK(sc_feature_snapshot_is_usable(&snapshot) == 0);
+    snapshot.source_flags |= 0x80u;
+    CHECK(snapshot.source_flags == 0xC7u);
+    CHECK(sc_feature_snapshot_is_usable(&snapshot) == -1);
+    CHECK(sc_feature_snapshot_to_observation(&snapshot, 0, &observation) == -1);
+    CHECK(!observation.stable);
+}
+
 static void test_frame_id_wraparound_and_zero(void)
 {
     /* frame_id=0 is valid (post-reset first frame). */
@@ -127,6 +141,7 @@ int main(void)
     test_valid_snapshot_reaches_classifier();
     test_contract_rejection_flags();
     test_required_flags_and_empty_roi_rejected();
+    test_reserved_bit_is_fail_closed();
     test_frame_id_wraparound_and_zero();
     test_all_required_flags_missing_singly();
     test_custom_config_acceptance();

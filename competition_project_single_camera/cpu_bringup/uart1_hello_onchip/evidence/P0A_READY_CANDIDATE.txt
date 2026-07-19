@@ -1,8 +1,0 @@
-P0-A-READY CANDIDATE / OFFLINE ONLY / BOARD NOT VERIFIED
-entry=0xF9000000
-ram=0xF9000000..0xF9004000 (16 KiB)
-canary=resolved from current ELF/map; see symbols.txt
-stack=resolved from current ELF/map; see symbols.txt
-uart_poll=bounded; TX timeout records E101 and continues memory heartbeat
-ARM_ENABLED=0
-non_claims=RISC-V execution, MMIO, APB, UART1 terminal, OSD, USER2, board PASS

@@ -91,3 +91,20 @@ int p0a_uart_write_bounded(const p0a_uart_t *uart, const char *text)
     }
     return 0;
 }
+
+int p0a_run_uart_probe(const p0a_uart_t *uart, p0a_uart_init_fn init_fn,
+                       void *init_context, const char *text)
+{
+    p0a_canary_mark(P0A_STAGE_C003, 0x0003u);
+    if (init_fn != 0) init_fn(init_context);
+    p0a_canary_mark(P0A_STAGE_C004, 0x0004u);
+    p0a_canary_mark(P0A_STAGE_C005, 0x0005u);
+    if (p0a_uart_write_bounded(uart, text) != 0) {
+        p0a_canary_mark(P0A_STAGE_E101, 0x0101u);
+        p0a_canary_set_uart(P0A_UART_STATUS_TX_TIMEOUT,
+                            P0A_ERROR_UART_TX_TIMEOUT, 0x0102u);
+        return -1;
+    }
+    p0a_canary_set_uart(P0A_UART_STATUS_TX_READY, P0A_ERROR_NONE, 0x0006u);
+    return 0;
+}

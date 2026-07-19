@@ -73,14 +73,13 @@ p1_event_status_t p1_input_event(p1_input_model_t *model,
     p1_event_status_t status;
 
     if (model == 0 || acked_event_seq == 0) return P1_EVENT_INVALID_STATE;
-    *acked_event_seq = event_seq;
     status = classify_seq(model, event_seq);
     if (status != P1_EVENT_ACCEPTED) return status;
 
     switch (kind) {
     case P1_INPUT_APPLY:
-        model->active_config = model->staging_config;
-        model->config_active = 1u;
+        model->pending_config = model->staging_config;
+        model->config_pending = 1u;
         break;
     case P1_INPUT_PLACE:
         if (!model->config_active || model->object_present) return P1_EVENT_INVALID_STATE;
@@ -99,6 +98,7 @@ p1_event_status_t p1_input_event(p1_input_model_t *model,
         model->result_latched = 0u;
         break;
     case P1_INPUT_RESET:
+        model->config_pending = 0u;
         model->config_active = 0u;
         model->object_present = 0u;
         model->result_latched = 0u;
@@ -109,5 +109,24 @@ p1_event_status_t p1_input_event(p1_input_model_t *model,
 
     model->last_event_seq = event_seq;
     model->has_event_seq = 1u;
+    *acked_event_seq = event_seq;
+    return P1_EVENT_ACCEPTED;
+}
+
+p1_event_status_t p1_input_frame_boundary(p1_input_model_t *model)
+{
+    if (model == 0 || !model->config_pending) return P1_EVENT_INVALID_STATE;
+    model->active_config = model->pending_config;
+    model->config_pending = 0u;
+    model->config_active = 1u;
+    return P1_EVENT_ACCEPTED;
+}
+
+p1_event_status_t p1_input_latch_result(p1_input_model_t *model,
+                                        uint16_t round_id)
+{
+    if (model == 0 || !model->object_present || model->result_latched ||
+        model->round_id != round_id) return P1_EVENT_INVALID_STATE;
+    model->result_latched = 1u;
     return P1_EVENT_ACCEPTED;
 }

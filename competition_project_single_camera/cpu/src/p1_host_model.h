@@ -51,10 +51,12 @@ typedef struct {
 
 typedef struct {
     p1_config_t staging_config;
+    p1_config_t pending_config;
     p1_config_t active_config;
     uint16_t last_event_seq;
     uint16_t round_id;
     uint8_t has_event_seq;
+    uint8_t config_pending;
     uint8_t config_active;
     uint8_t object_present;
     uint8_t result_latched;
@@ -65,6 +67,9 @@ int p1_result_stage(p1_result_packer_t *packer, const p1_result_t *result);
 int p1_result_commit(p1_result_packer_t *packer, uint16_t round_id);
 void p1_input_init(p1_input_model_t *model);
 void p1_input_stage_config(p1_input_model_t *model, const p1_config_t *config);
+p1_event_status_t p1_input_frame_boundary(p1_input_model_t *model);
+p1_event_status_t p1_input_latch_result(p1_input_model_t *model,
+                                        uint16_t round_id);
 p1_event_status_t p1_input_event(p1_input_model_t *model,
                                  p1_input_kind_t kind,
                                  uint16_t event_seq,
