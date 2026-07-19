@@ -1,0 +1,4 @@
+interface:
+  display_name: "集创赛 PPT 与技术文档"
+  short_description: "为集创赛项目撰写可追溯、事实边界清晰的PPT与技术文档"
+  default_prompt: "Use $cicc-ppt-tech-docs to draft a source-grounded PPT outline or technical document for this repository."

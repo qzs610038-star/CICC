@@ -76,6 +76,8 @@ Review Packet 至少包含目标、文件/diff、模块与信号、时钟/复位
 
 ## Skill 路由
 
+- PPT、答辩大纲、技术文档、参考资料索引与溯源：.agents/skills/cicc-ppt-tech-docs/SKILL.md。
+
 - FPGA/RTL/XML/SDC/Efinity：`.agents/skills/fpga_vision/SKILL.md`。
 - CPU/UART/myCobot：`.agents/skills/cpu_mycobot/SKILL.md`。
 - Skill 只承载模块稳定规则，不能覆盖官方细则、本文件或 `CURRENT_STATE.md`。
