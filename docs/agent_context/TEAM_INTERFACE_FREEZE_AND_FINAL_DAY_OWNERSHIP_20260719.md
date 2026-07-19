@@ -40,12 +40,32 @@
 |---|---|---|---|
 | wsc | `competition_project_single_camera/cpu/src/**`、`cpu/tests/**`、`cpu/README.md`、新 `cpu_bringup/uart1_hello_onchip/**` | 修复 classifier `C4127`；重跑 Host；在新 `soc.h` 到位后构建 UART1 Hello 与 CPU MMIO | 冻结头文件、RTL/XML/SDC/IP、状态/治理文档、myCobot |
 | libaoxun | `competition_project_single_camera/src/**`、`tests/rtl/**`、`mem_test.xml`、`mem_test.peri.xml`、`constrain.sdc`、Hard SoC IP/BSP 原子树 | 用 Efinity 正式生成 UART1；完成 I0-BUILD；之后实现受审 I1/I2/I4 硬件侧 | CPU 业务代码、qzs 工具/状态文档、冻结接口语义、机械臂 |
-| qzs | `AGENTS.md`、`CLAUDE.md`、`CURRENT_STATE.md`、`SESSION_HANDOFF.md`、`.agents/skills/**`、`docs/**`、`final_project/docs/**`、`competition_project_single_camera/{README.md,docs/**,integration/**,tools/**}`、根 `tools/**`、`learning_guides/**` | 维护冻结清单、Gate、证据、范围检查、最终集成和技术报告/PPT索引 | CPU/RTL/Hard SoC 实现；无口令修改冻结接口；机械臂动作 |
+| qzs | `.gitattributes`、`.gitignore`、`AGENTS.md`、`CLAUDE.md`、`CURRENT_STATE.md`、`SESSION_HANDOFF.md`、`.agents/skills/**`、`docs/**`、`final_project/docs/**`、`competition_project_single_camera/{README.md,docs/**,integration/**,tools/**}`、根 `tools/**`、`learning_guides/**`、`ppt_doc_outlines/**` | 维护冻结清单、Gate、证据、范围检查、最终集成 manifest 和技术报告/PPT索引 | CPU/RTL/Hard SoC 实现；无口令修改冻结接口；机械臂动作 |
 
 任何文件不在对应允许范围内即视为越界。需要跨范围时，先由 qzs 在 Review Packet
 登记临时所有权、固定 SHA 和回收时间，不能直接“帮队友顺手改”。
 
 `cpu_bringup/uart1_hello_onchip/README.md` 是本次接口搭建的一次性空骨架例外；从本基线起，该目录全部归 wsc。冻结 `integration/**` 虽在 qzs 治理范围内，也只能在用户给出完整口令后更新 manifest。
+
+### 3.1 最终集成归属与来源保真
+
+qzs 接管的是最终集成层的 manifest、静态 Gate 转录和治理文档；其新
+`competition_project_single_camera/integration/FINAL_STATIC_INTEGRATION_MANIFEST_20260719.json`
+只读取上游固定 SHA 的文件，不复制或重提交上游源码。它不改变以下唯一来源归属：
+
+- libaoxun 保有 `embedded_sw/uart1_hello_onchip/**` 的构建 manifest、输入清单、重建与
+  verifier；qzs 只把它们作为只读、可哈希的集成输入。
+- wsc 保有 `cpu/src/**`、`cpu/tests/**` 及其 CPU probe；WSC probe 源码与其 Review Packet
+  必须标注 `dev/wsc6090-uart1-cpu-20260719@13419d9922f3f8e7585bd43b77491b81b4bc0681`，
+  不得由 libaoxun 复制同名文件后重新声明来源。
+- qzs 保有 I0 operation card、接口冻结检查、team-scope Gate、最终 manifest/Packet 与
+  `CURRENT_STATE.md`/`SESSION_HANDOFF.md`。这些是治理产物，不是 CPU 或 Hard SoC 实现。
+
+最终集成审查不得把全量三方差分交给单一角色判定。`team_scope_check.ps1` 必须用
+`-BaseRef` 和 `-TargetRef` 按固定来源分别运行：libaoxun
+`f47af29..72cc281`、wsc `f47af29..13419d9`，以及 qzs 的独立治理片段
+`0c7530f..018ced2`、`f10cbd3..bb34856` 与最终 qzs 补丁。若新增跨范围文件，先更新
+本表和 Packet；不得以“治理例外”掩盖。
 
 ## 4. 当前完成/未完成/需重测分配
 
