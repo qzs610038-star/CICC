@@ -1,0 +1,35 @@
+{
+  "schema": "qzs-wsc-p0a-p1-final-acceptance-v1",
+  "wsc_fixed_sha": "aaf2058e7e05b8cda905b8096db309c65e0da5ef",
+  "implementation_sha": "2564f146fede84383be0ff607aa63408b2889f37",
+  "clean_checkout": {
+    "manifest_hashes": "PASS",
+    "files": 4,
+    "policy": "LF_NORMALIZED",
+    "tamper_negative": "PASS",
+    "tamper_file": "rounds.jsonl",
+    "tamper_expected_exit": 1
+  },
+  "fresh_bundle": {
+    "vector_schema_count": 11,
+    "rounds": 20,
+    "arm_enabled": 0,
+    "snapshot_tamper": "PASS",
+    "manifest_hashes": "PASS",
+    "committed_hashes_equal_fresh": true
+  },
+  "hashes": {
+    "rounds.jsonl": "2D32393E9F20B7B01137DCFCADC3BD93AF152A77674F4242B9ABC3CDA56A6BC1",
+    "runner.txt": "8C4CCF1071B134326445B9BDC3193BC5A19787E442243147FB9DE1CF7D66E73F",
+    "compile.txt": "DFABC3264C3062CB6A3019BE66BECBE030E35EA67E3CA1F4CCF5B6232F520065",
+    "tamper.jsonl": "0C830B89CBBDBCB21A7FFA75D7BFEC404C9A01A69BA0A15FF07D6E825F8F5CA9"
+  },
+  "verdict": {
+    "p0_a_ready": true,
+    "p1_host_ready": true,
+    "source_ready_for_integration_review": true,
+    "merge_performed": false,
+    "board_verified": false,
+    "arm_enabled": 0
+  }
+}

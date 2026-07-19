@@ -8,6 +8,8 @@
 >
 > 裁定：`PARTIAL ACCEPT / P0-A-READY / P1-HOST CHANGES_REQUESTED / DO NOT MERGE`
 
+> 后续状态：wsc 已在 `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 关闭最后的 clean-checkout hash 封装问题，qzs 已签发 `P1-HOST-READY`。最终验收见 `WSC_P0_A_P1_HOST_FINAL_ACCEPTANCE_20260720.md`。
+
 ## 1. 固定范围
 
 - 远端 ref 实读为 `a74b21d19e9a81d315456e106e9d23cc5402243a`，且 `328f115c1716023d2c10c4276c80cd2833291551` 是其祖先。

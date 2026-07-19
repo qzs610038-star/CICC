@@ -122,6 +122,10 @@ wsc 后续提交 `328f115c1716023d2c10c4276c80cd2833291551`，实现固定为 `6
 
 wsc `a74b21d19e9a81d315456e106e9d23cc5402243a` 的 R1 经 qzs 两个 clean `2564f146...` 工作树 fresh 构建、verifier、12 字段自动比对与篡改负例通过，现签发 `P0-A-READY`；它不等于板上 CPU 执行。R2 runner 已真实驱动 snapshot/runtime/fake transport/packer，20 轮与 tamper 通过；但 clean checkout 的三份 P1 bundle 文本 hash 与 manifest 不一致，命令卡还含两个脚本不接受的参数。因此 P1 仅剩 evidence-packaging 修复，`P1-HOST-READY=NO / MERGE=NO`。下一轮不再重跑 P0 双构建。详见 `docs/review_packets/WSC_P0_A_P1_HOST_R1_R2_FINAL_AUDIT_20260719.md`。USER2 板级 Gate 仅可另行排期，本轮未运行；P0-B HOLD，libaoxun 不受影响。
 
+### WSC P0-A / P1 Host 最终验收
+
+wsc evidence-only SHA `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 经 qzs clean-checkout manifest verifier、单文件 tamper、fresh P1 bundle 与 committed-vs-fresh 四 hash 比较全部通过；相对已接受实现没有 C/H 或硬件输入差分。现签发 `P0-A-READY=YES / P1-HOST-READY=YES / SOURCE_READY_FOR_INTEGRATION_REVIEW=YES`。尚未执行合并、USER2、上板或机械臂动作；BOARD 继续 NOT VERIFIED，P0-B HOLD。完整证据见 `docs/review_packets/WSC_P0_A_P1_HOST_FINAL_ACCEPTANCE_20260720.md`。
+
 ### qzs P0-A/P1 治理 checkpoint — kickoff `0e5ab490` 后
 
 - qzs 个人分支：`codex/qzs-p0a-p1-host-governance-20260719`，固定起点 `0e5ab490559c58642734b0095753c6cf8787c709`。
