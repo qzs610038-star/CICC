@@ -2,6 +2,12 @@
 
 Status: `STATIC REVIEW ONLY / HARDWARE NOT AUTHORIZED / BOARD NOT VERIFIED`.
 
+```text
+PATCH_CHAIN_BASE=9949e6e
+IMMEDIATE_PARENT=0a686ab3
+CANDIDATE_SHA=11d4580
+```
+
 This card describes a future single controlled window. It was updated offline
 on base `9949e6ed737f25db82111cc38250dfc15bdb54c9`. QZS temporary ownership for
 `tools/run_i0_uart1_execution_chain.ps1` is recorded at
@@ -10,13 +16,20 @@ a clean checkout fixed at `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`.
 
 ## Approval Record
 
-Live mode has no generic token. A separately issued JSON record must bind one
-tuple: final runner commit SHA, board ID, exact UART1
+Live mode has no generic token. A separately issued schema v2 JSON record must
+bind one tuple: final runner commit SHA, board ID, exact UART1
 `VID/PID/serial/instance`, window ID and UTC start/end, stop strategy
 `FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT`, authoritative manifest SHA-256,
 and hashes for the bitstream, Hello ELF, probe ELF, `soc.h`, FTDI cfg, target
-cfg, and the three WSC contract files. Any mismatch or non-unique PnP result
-fails before OpenOCD starts.
+cfg, and the three WSC contract files. It must also include
+`tools.openocd` and `tools.gdb`, each with `normalized_path`, `sha256`, and
+`version`. Any mismatch or non-unique PnP result fails before OpenOCD starts.
+
+`normalized_path` is the exact execution-host path after `Resolve-Path`.
+`sha256` is compared to both the approval record and manifest. `version` is a
+fixed label in the manifest and approval record; actual binary identity is
+enforced by the SHA-256 of the resolved executable. Windows file-version
+metadata is empty for these selected executables and is not used as identity.
 
 Before creating a live log, opening serial, launching OpenOCD, or starting GDB,
 the runner must require a RunDir outside its checkout, verify that HEAD equals
@@ -101,6 +114,7 @@ No automatic retry, TAP/cable change, UART0 fallback, address scan, debugger
 direct APB access, APB write, Flash, DDR, UART2/J52, or mechanical-arm route is
 permitted.
 
-OpenOCDExe/GdbExe normalized paths, versions, and SHA-256 are not yet bound to
-the manifest or approval record. That omission remains a hard live-execution
-blocker and cannot be waived by this static card.
+OpenOCD/GDB identity is statically bound in the manifest and schema v2 approval
+fields. This static binding does not authorize a hardware window: USER2, PC,
+UART1 Hello/Echo, and APB MAGIC remain `NOT VERIFIED` and still require an
+independent, time-bounded hardware approval record.

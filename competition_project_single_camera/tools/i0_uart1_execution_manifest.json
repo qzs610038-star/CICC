@@ -6,6 +6,11 @@
   "qzs_authorization_path": "docs/agent_context/GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md",
   "wsc_contract_sha": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
   "design_sha": "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
+  "patch_chain": {
+    "patch_chain_base": "9949e6e",
+    "immediate_parent": "0a686ab3",
+    "candidate_sha": "11d4580"
+  },
   "fixed_artifacts": {
     "bitstream_sha256": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
     "hello_elf_sha256": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
@@ -86,12 +91,12 @@
     },
     {
       "path": "competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md",
-      "sha256": "9DC91375AFD3F05DA07DA924514FE245D2EC49EDF87A1075721146974AB65DE8",
+      "sha256": "746DF4A0634D8569C84771980B6C1C25130CBC226491E405FE4123B660017618",
       "eol": "lf"
     },
     {
       "path": "competition_project_single_camera/docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md",
-      "sha256": "526F56B59DB29F6CBFBE0103D722396B9887A29513D8E539370DE98F57D8B1F2",
+      "sha256": "8BEF17D9DA3F61D547AB741F315E0959FF917C25F473635DDDB3122689C536C1",
       "eol": "lf"
     }
   ]

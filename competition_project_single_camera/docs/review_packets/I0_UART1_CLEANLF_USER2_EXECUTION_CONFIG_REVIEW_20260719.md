@@ -1,6 +1,6 @@
 # I0 UART1 Goal 4 Two-Phase Execution Review Packet
 
-Status: `READY FOR QZS RE-REVIEW / BASE 9949e6ed ONLY / HARDWARE NOT AUTHORIZED`.
+Status: `READY FOR QZS FINAL STATIC ACCEPTANCE / HARDWARE NOT AUTHORIZED`.
 
 ## Provenance And Scope
 
@@ -11,6 +11,12 @@ Status: `READY FOR QZS RE-REVIEW / BASE 9949e6ed ONLY / HARDWARE NOT AUTHORIZED`
 - WSC contract source, consumed read-only from a clean checkout:
   `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`.
 - Fixed design source: `6effdc3685d696cb4d33f3fbb1c449729ed72e33`.
+
+```text
+PATCH_CHAIN_BASE=9949e6e
+IMMEDIATE_PARENT=0a686ab3
+CANDIDATE_SHA=11d4580
+```
 
 This is one minimal follow-up on the same libaoxun branch. It does not merge,
 rebase, cherry-pick, or migrate the histories of `a840f08`, `5a61c4c`,
@@ -48,6 +54,15 @@ halt PC, timeout, RAM addresses/values, probe ELF hash, and `soc.h` hash from
 that source. It does not keep a second driftable copy of those constants. After
 launch it waits for the fixed GDB-listener readiness line; exit or bounded
 readiness timeout fails without retry.
+
+The schema v2 approval record now also binds `tools.openocd` and `tools.gdb`.
+Each tool entry contains `normalized_path`, `sha256`, and `version`. The runner
+resolves the supplied executable path and requires its normalized path, SHA-256,
+and version label to agree with both approval and manifest before it creates a
+live run directory or starts any process. `version` is a fixed manifest/approval
+label; SHA-256 of the resolved executable is the enforced binary identity.
+Windows file-version metadata is empty for the selected executables and is not
+used as identity.
 
 The target argument path remains exactly:
 
@@ -145,7 +160,11 @@ APB=NOT_VERIFIED
 No Efinity Programmer, OpenOCD, GDB, JTAG, UART, APB, wiring, Flash, DDR,
 UART2/J52, or mechanical-arm session was started.
 
-OpenOCDExe/GdbExe normalization, version, and SHA-256 are intentionally not
-yet approval-bound. This remains an explicit live-execution blocker; the runner
-will not silently treat either executable as approved until a later minimal
-reviewed manifest and approval extension binds both paths and hashes.
+OpenOCD/GDB identity is statically bound in the manifest and schema v2 approval
+fields. This clears only the prior static tool-identity blocker. It does not
+authorize a hardware window: USER2, PC, UART1 Hello/Echo, and APB MAGIC remain
+`NOT VERIFIED` and require an independent, time-bounded hardware approval.
+
+```text
+VERDICT=READY_FOR_QZS_FINAL_STATIC_ACCEPTANCE
+```
