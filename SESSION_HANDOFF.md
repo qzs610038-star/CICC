@@ -103,3 +103,9 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 - 临时所有权新增唯一 `competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1`，只授权 libaoxun 离线实现和 mock fixture；不授权启动 OpenOCD/GDB/串口/JTAG/APB。
 
 保持：`GOAL4=BLOCKED_EXECUTION_TOOLCHAIN`、`HARDWARE_ACTIONS=NONE`、USER2/PC/UART1/APB 全部 `NOT_VERIFIED`。
+
+## P0/P1 qzs + wsc 并行开工交接 — 2026-07-19
+
+用户已裁定“批准 P0-A 与 P1 并行推进，同时仅准备 P0-B Review Packet”，并进一步明确本轮只启动 qzs 与 wsc。libaoxun 不接收新提示词、不需要拉取或审阅，继续其既有 UART1/USER2 攻坚。
+
+本机/队友新对话统一从 `docs/agent_context/P0_P1_PARALLEL_KICKOFF_INDEX_20260719.md` 恢复，并读取 `docs/agent_context/prompts/` 下 qzs 或 wsc 提示词。已准备 Host 契约/证据前置包与 P0-B HOLD Packet；没有修改冻结接口、CPU/RTL/Hard SoC 真源，也没有构建、上板或机械臂动作。

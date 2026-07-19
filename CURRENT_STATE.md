@@ -120,3 +120,12 @@ UART1_HELLO_ECHO=NOT_VERIFIED
 APB_MAGIC=NOT_VERIFIED
 I3=BLOCKED_CONTRACT_NOT_FROZEN
 ```
+
+## P0/P1 PARALLEL KICKOFF — 2026-07-19
+
+- 用户已批准立即开展 `P0-A + P1 Host`，并批准 qzs 仅准备 P0-B Review Packet；未授权 P0-B 构建/上板、冻结接口修改或纯 FPGA 分类迁移。
+- 本轮实际派工只包含 qzs 与 wsc。libaoxun 不接收新提示词、不需要拉取或审阅，继续其既有 UART1/USER2 攻坚。
+- 开工入口：`docs/agent_context/P0_P1_PARALLEL_KICKOFF_INDEX_20260719.md`；qzs/wsc 两份直接开工提示词位于 `docs/agent_context/prompts/`。
+- P1 不变量、向量、采集、OSD/输入与证据分层见 `docs/agent_context/P1_HOST_CONTRACT_AND_EVIDENCE_PREWORK_20260719.md`。
+- P0-B Packet 已准备但固定为 `HOLD / NOT APPROVED FOR IMPLEMENTATION, BUILD OR BOARD ACTION`。
+- 当前状态不因该裁定升级：`GOAL4=BLOCKED_EXECUTION_TOOLCHAIN`，USER2/PC/UART1/APB 仍全部 `NOT_VERIFIED`，P1 尚未达到 `P1-HOST-READY`。
