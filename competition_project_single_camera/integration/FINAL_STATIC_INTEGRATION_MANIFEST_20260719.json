@@ -1,0 +1,99 @@
+{
+    "schema_version":  1,
+    "purpose":  "final static integration identity; checkout bytes are authoritative for execution",
+    "source_commit":  "6e15b92e5ff5171f1942d1f80ee1c846fd68ff71",
+    "clean_checkout_verified":  true,
+    "eol_policy":  {
+                       "ps1":  "CRLF",
+                       "gdb":  "LF",
+                       "cfg":  "LF",
+                       "docs_json_source":  "repository existing .gitattributes rule"
+                   },
+    "ownership_input_audit":  {
+                                  "claimed_exception_count":  7,
+                                  "actual_acmr_cross_owner_input_count":  11,
+                                  "interpretation":  "Eleven fixed upstream inputs are audited by their source role; they are not qzs write exceptions.",
+                                  "libaoxun_inputs":  5,
+                                  "wsc_inputs":  2,
+                                  "qzs_gate_and_governance_inputs":  4
+                              },
+    "execution_files":  [
+                            {
+                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_MANIFEST.json",
+                                "checkout_sha256":  "8670838BF1AEC381134AF2D9DC60D6F75C4F55B990D8B68587E723318B3A417F",
+                                "git_blob_sha1":  "7ac63165e0f1e70d33dd22dc32f44c378c423356",
+                                "eol_attribute":  "lf",
+                                "required_eol":  "repository_existing_rule"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_INPUTS.sha256",
+                                "checkout_sha256":  "A7752E24BFA3EB3780CE60FA28FFFD23FA449E20DAC3FA9F06F6EA4B6767F5C5",
+                                "git_blob_sha1":  "b0fd65ba8ee414865ac252f2a28d882c221766e3",
+                                "eol_attribute":  "unspecified",
+                                "required_eol":  "repository_existing_rule"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/I0_UART1_BUILD_EVIDENCE.md",
+                                "checkout_sha256":  "EF64F81C16700C34329F84B925B15DF95B0BBBC6A2790EA448C3947ACBCD147B",
+                                "git_blob_sha1":  "59fc23e6f50b6f0ebfb34a15c39415d45b0f110a",
+                                "eol_attribute":  "lf",
+                                "required_eol":  "repository_existing_rule"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/rebuild_i0_uart1_clean.ps1",
+                                "checkout_sha256":  "0281C036AF56B692B4C9E70EF137BA0C688D77481EE53EB17469D8159633B23D",
+                                "git_blob_sha1":  "c773dc4fa9ba6303052ce6781409e50b855c7bd6",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/embedded_sw/uart1_hello_onchip/verify_i0_uart1_build_evidence.ps1",
+                                "checkout_sha256":  "94461531DC7927BEF3324F5F8C2A408832F34231B47BC8EAFD025DC4BAA54A4A",
+                                "git_blob_sha1":  "c35736a1432d2bdc089ce411363b6633a8fff9f3",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/cpu/tests/run_g2_host_evidence.ps1",
+                                "checkout_sha256":  "00791AA3B5F42CBBF1B918491CEBB8F8BBC53AD08B1D6ADD73AE6A71D8A99B76",
+                                "git_blob_sha1":  "818bf36e56ada60556e9860e1d7e4db4e924de41",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/cpu/tests/test_single_camera_classifier.c",
+                                "checkout_sha256":  "18A17AC487BB166010C5DBF11CB95A12D82BE574285B3492EF663B24A97D6B69",
+                                "git_blob_sha1":  "b339fa3caeea8ee132df7a20ec8a95b39ff70ac4",
+                                "eol_attribute":  "lf",
+                                "required_eol":  "repository_existing_rule"
+                            },
+                            {
+                                "path":  "tools/interface_freeze_check.ps1",
+                                "checkout_sha256":  "F5DFC5C5121D047DE5C3A851C2FEFC0E02C6D92811BCE6C34DE70986CC6C4C10",
+                                "git_blob_sha1":  "267c8629922bd65dbce76509206ba83f843d4cef",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "tools/team_scope_check.ps1",
+                                "checkout_sha256":  "261FAD391CC093573570D2E86931965F23610DF62016C03FE049860AA2B333CF",
+                                "git_blob_sha1":  "9e8aaaff0dc6d67d63e64c8f8b7183c061170c85",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "competition_project_single_camera/docs/debug_sessions/I0_SMOKE_OPERATION_CARD_DRAFT_20260718.md",
+                                "checkout_sha256":  "BD012C2B9E9E32FF82DC0F494852D3A338FCBE283C4628FA9CC370488460E69F",
+                                "git_blob_sha1":  "1ecd83586826ecd9fdc7edcca2843b84cfa4feba",
+                                "eol_attribute":  "lf",
+                                "required_eol":  "repository_existing_rule"
+                            },
+                            {
+                                "path":  "docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md",
+                                "checkout_sha256":  "E012E71DE0F5532ED0864334CBB2CBA346EF60758EE0714D1437BE5B21B88B29",
+                                "git_blob_sha1":  "44cca13f0408b1042abfbd204081f6d4ad1e2973",
+                                "eol_attribute":  "lf",
+                                "required_eol":  "repository_existing_rule"
+                            }
+                        ]
+}

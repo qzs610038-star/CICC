@@ -46,7 +46,7 @@
 | myCobot 非动作 QEMU skeleton | `PASS`；仅断言执行，不授权 UART2/J52、接线或动作；完整矩阵仍未重跑 |
 | freshness / context budget / handoff health | `PASS`；freshness `WARN=8 / FAIL=0`，context budget 与 handoff health PASS |
 | 接口冻结 / `git diff --check` | `PASS`；接口 route=`UART1_TYPEC`，当前工作区无空白错误 |
-| qzs 范围检查 | 工具结果 `FAIL`：仅 3 个 `ppt_doc_outlines/**` 文件不在旧白名单；用户已明确授权本轮一起提交，记录为治理例外，不授权任何冻结接口/硬件/动作扩展 |
+| qzs 范围检查 | `PASS`：工具现支持 `-BaseRef/-TargetRef`，按 libaoxun、wsc 与 qzs 固定来源分别审查；`.gitattributes`、`.gitignore` 与 `ppt_doc_outlines/**` 已重冻结为 qzs 治理范围，不再以“例外”掩盖 |
 | PowerShell fail-closed 负例 | 本次未单独重跑 |
 
 Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
@@ -73,13 +73,14 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 4. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
 5. libaoxun 已确认其证据主机实际 clone 为 `C:\Users\20306\Desktop\赛题资料\CICC`，Git 顶层、origin 与 clean status 均通过，结论为 `READY_PATH`；这只关闭路径阻塞，集合分支同步、原始制品预检和全部板级项仍未执行。
 6. WSC 已确认 clone `D:\CICC w` 与 origin 身份，但原 `dev/claude-cpu-plan-status-0717` 含 tracked 修改 `final_project/cpu/CPU_MODULE_PLAN.txt`，已在 fetch/switch 前安全停止。该修改必须保留；WSC 后续改用 detached 固定 SHA 独立 worktree，不在原 dirty 工作树切分支。
+7. 最终静态集成仍不能给出新窗口请求：libaoxun 总 verifier 的 `evidence/work/Efinity` 原始 roots 不在本集合 checkout，无法在最终 HEAD 本机复跑；同名远端尚未回读本次最终 SHA。
 
 ## NEXT_GATE
 
-1. libaoxun 已完成 Stage 0；下一步只在已确认的 `$RepoRoot` 上精确 fetch 集合 ref、ff-only 切换，并提交固定 SHA 与原始制品只读预检报告。WSC 已完成路径确认，但须保留原 dirty，改在新建 detached 固定 SHA worktree 中审查。
-2. libaoxun 与 wsc 分别安全拉取并独立提交 READY/BLOCKED；两人 HEAD 必须为 `e72fb6a3ce1b7999f61cae1e0ed7b2773f1e4fda`。
-3. qzs 比对两份 READY、固定板卡/制品/接线/停止责任与窗口，再请求用户明确批准；批准前不执行任何硬件动作。
-4. 批准后由 libaoxun 作为唯一上板执行者，在 wsc CPU 判读支持下连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认，不回退 UART0。
+1. 在 libaoxun 证据主机的 clean fixed-SHA worktree 复跑总 verifier，回传实际 roots、命令、exit 与 `inputs=82 artifacts=21`；缺失时保持 `NOT_RERUN_LOCAL`。
+2. 提交最终 manifest/Packet/状态，确认 qzs worktree clean，并推送后以 `git ls-remote --heads origin` 回读最终 SHA。
+3. 仅当 libaoxun、WSC、qzs 三角色的静态目标全 PASS，qzs 才可给出 `VERDICT=READY_FOR_NEW_WINDOW_REQUEST`；该结论不等于硬件授权。
+4. 之后仍须用户明确批准，才可由 libaoxun 作为唯一上板执行者连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认，不回退 UART0。
 5. I0-SMOKE PASS 后进入受审 I1-I4；UART2/J52、机械臂接线、myCobot 帧和动作继续独立 `NO-GO`。
 
 ## PENDING_DECISIONS
@@ -103,4 +104,14 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ## POST_MERGE_REFRESH_REQUIRED
 
-2026-07-19 已按 `libaoxun 72cc281 → WSC 13419d9 → QZS 018ced2` 的固定输入顺序形成集合树并刷新本文件。Goal 3 离线总门为 `PASS_WITH_WARNINGS`；qzs 范围工具的 3 项 PPT violation 由用户显式授权形成治理例外。待提交后静态门与远端 SHA 核对完成才可交给下一步；本状态仍不是正式 `main` 或板级 PASS。
+2026-07-19 已按 `libaoxun 72cc281 → WSC 13419d9 → QZS 018ced2` 的固定输入顺序形成集合树并刷新本文件。最终静态 manifest 已从 clean `6e15b92` checkout 生成；“7 项例外”已纠正为 11 个跨所有者输入并按来源复核。WSC verifier、接口冻结、分段 team-scope 与 `git diff --check` 已 PASS；libaoxun 总 verifier 当前仅有来源主机 PASS 记录，本机因原始 roots 缺失为 `NOT_RERUN_LOCAL`。因此不得申请新窗口；本状态仍不是正式 `main` 或板级 PASS。
+
+## FINAL_GATE_STATUS
+
+```text
+USER2=NOT_VERIFIED
+PC=NOT_VERIFIED
+UART1_HELLO_ECHO=NOT_VERIFIED
+APB_MAGIC=NOT_VERIFIED
+I3=BLOCKED_CONTRACT_NOT_FROZEN
+```

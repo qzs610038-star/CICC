@@ -1,4 +1,4 @@
-# SESSION HANDOFF — 2026-07-19 Goal 4 队友派工准备
+# SESSION HANDOFF — 2026-07-19 qzs 最终静态集成审查
 
 ## 恢复入口
 
@@ -56,6 +56,29 @@
 三人确认已经完成。下一步先读取 Goal 1/2 审查记录和本次 Goal 3 总门结果；只有集合 SHA、bitstream/ELF hash 与用户批准窗口完全匹配，才连续执行 USER2、UART1 Hello/回显与 APB MAGIC。相同输入 hash 不重复确认，任何 hash、接线或失败现象变化都重开对应 Gate。
 
 Goal 4 已形成可直接转发的双人提示词与任务矩阵：`docs/agent_context/GOAL4_LIBAOXUN_WSC_PULL_AND_TASK_DISPATCH_20260719.md`。libaoxun 是唯一上板执行者；wsc 只做 CPU/Hello 预检和实时日志判读；qzs 在两份 READY 到齐后才请求用户批准并负责证据收口。当前仍为 `HARDWARE WINDOW NOT YET APPROVED`。
+
+## qzs 最终静态集成状态
+
+- 所有权已重新冻结：qzs 接管最终集成 manifest、Gate 与治理文档；上游 libaoxun
+  build manifest 和 WSC CPU probe 仍保持各自来源归属，禁止复制后改写来源。
+- 旧“7 项例外”已更正为 11 个跨所有者 ACMR 输入（libaoxun 5、WSC 2、qzs Gate/治理 4），
+  并按来源 SHA 分段 `team_scope_check -BaseRef/-TargetRef` 全部 PASS。
+- EOL 策略固定为 `*.ps1=CRLF`、`*.gdb=LF`、`*.cfg=LF`；docs/JSON/source 延续
+  `.gitattributes` 既有规则。clean `6e15b92` checkout 已生成最终 manifest，记录 checkout
+  SHA-256 和 Git blob SHA-1。
+- `git diff --check`、接口冻结、WSC G2 `648/648`、classifier `54/54` 均 PASS；危险路由
+  扫描未发现 Flash 或 direct-APB 写入，APB `PWDATA` 未连接。
+- libaoxun 总 verifier 本机为 `NOT_RERUN_LOCAL`：集合 checkout 缺 `evidence/work/Efinity`
+  原始 roots；只能引用固定 SHA 的历史 `inputs=82 artifacts=21 PASS`，不得将其写成当前复跑。
+  因此当前 `VERDICT=NOT_READY_FOR_NEW_WINDOW_REQUEST`，并且远端仍为 `e72fb6a`，未回读最终 SHA。
+
+```text
+USER2=NOT_VERIFIED
+PC=NOT_VERIFIED
+UART1_HELLO_ECHO=NOT_VERIFIED
+APB_MAGIC=NOT_VERIFIED
+I3=BLOCKED_CONTRACT_NOT_FROZEN
+```
 
 2026-07-19 12:27:31 +08:00，libaoxun 正确报告 qzs 来源路径在其证据主机上不存在，并在任何 Git/硬件动作前停止。该问题归类为 `PATH_RESOLUTION_BLOCKED`，不是 I0 或 Git 失败。派工文档已改为先解析实际 `$RepoRoot`、验证 Git 顶层和 origin，再用 `git -C "$RepoRoot"` 执行全部 repo-relative 检查；不得扫描整盘或猜路径。
 
