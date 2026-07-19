@@ -148,12 +148,12 @@
                   },
                   {
                       "path": "competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1",
-                      "sha256": "406F1AB83B759F631D25C6C4ECE5346FB57B40A90927D32AD782DDC97BE100DB",
+                      "sha256": "4A69D1951E2D5C3E971AA3E75E6E90C0BA71D337B368C486C5292A9940B53FDD",
                       "eol": "crlf"
                   },
                   {
                       "path": "competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1",
-                      "sha256": "3FB6C6F50DC1B26CA4FAFC717EB57142727D56FD252C45650EFF85B53A258C37",
+                      "sha256": "551D80B5D7BEA21B6EE63B94F07B7ACCDDBB244D0C9CF8E8010DE7C38C707136",
                       "eol": "crlf"
                   },
                   {

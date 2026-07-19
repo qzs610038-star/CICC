@@ -87,7 +87,7 @@ $helloSource = Get-Content -LiteralPath $helloSourcePath -Raw
 foreach ($line in @('I0 UART1 HELLO', 'UART1=115200 8N1 RX=GPIOR_96 TX=GPIOR_100', 'Type characters to verify echo.')) { Assert-Contains $helloSource $line 'fixed Hello source line' }
 Assert-Contains $helloSource 'uart1_puts("\r\nI0 UART1 HELLO\r\n");' 'fixed leading CRLF transcript'
 
-$runner = Get-Content -LiteralPath $runnerPath -Raw
+$runner = Get-Content -LiteralPath $runnerPath -Raw -Encoding UTF8
 foreach ($clause in @(
     "if (`$Scenario -eq 'all') { throw 'Live mode rejects Scenario=all before any external action.' }",
     'ApprovalRecordPath', 'schema_version -ne 2', 'approved_commit', 'board_id', 'uart1_pnp_key', 'window_start_utc', 'window_end_utc',
@@ -97,7 +97,8 @@ foreach ($clause in @(
     'WRONG_POST_LOAD_PC_NEGATIVE=PASS', 'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
     'Assert-ExternalRunDirectory', 'Assert-ExecutionCheckoutIntegrity', 'git -C $RepoRoot status --porcelain --untracked-files=all',
     'LIVE_CHECKOUT_HEAD_MISMATCH', 'LIVE_CHECKOUT_DIRTY', 'manifest_file=', 'HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0',
-    'Resolve-ApprovedTool', 'Resolve-Path -LiteralPath $CandidatePath', 'WRONG_OPENOCD_PATH', 'WRONG_OPENOCD_HASH', 'WRONG_GDB_PATH', 'WRONG_GDB_HASH',
+    'Resolve-ApprovedTool', 'Resolve-Path -LiteralPath $CandidatePath', 'NONPORTABLE_OPENOCD_PATH_BINDING', 'WRONG_OPENOCD_HASH', 'WRONG_GDB_HASH',
+    'Get-Content -LiteralPath $ApprovalRecordPath -Raw -Encoding UTF8', 'Get-PnpDevice -Class Ports -PresentOnly', 'FTDIBUS\\VID_', '[&+]PID_',
     'Invoke-ApprovedToolFixtures -FixtureDirectory $fixtureDirectory', '$Manifest.live_tools.openocd', '$Manifest.live_tools.gdb',
     "foreach (`$name in @('hello_timeout', 'line_mismatch', 'echo_mismatch', 'halt_unconfirmed'))", 'Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory',
     '"$Phase`_RESUME_ONCE.marker"', "Write-PhaseResumeMarker `$directory `$runId 'HELLO'", "Write-PhaseResumeMarker `$directory `$runId 'APB'",
@@ -182,9 +183,9 @@ foreach ($marker in @(
     'MOCK_HELLO_LINE_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
     'MOCK_HELLO_ECHO_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
     'MOCK_HELLO_HALT_UNCONFIRMED=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
-    'WRONG_OPENOCD_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'PORTABLE_OPENOCD_PATH=PASS same_hash_different_path=true approval_path_binding=false',
+    'NONPORTABLE_OPENOCD_PATH_BINDING_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'WRONG_OPENOCD_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
-    'WRONG_GDB_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'WRONG_GDB_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WRONG_EFX_RUN_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'PROGRAM_MODE_DEFAULT_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_MODE_SPI_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_MODE_JTAG_BRIDGE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_SOURCE_WRONG_BIT=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_SOURCE_WRONG_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_ZERO_TARGET=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_MULTIPLE_TARGETS=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_WRONG_SERIAL=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WINDOW_NOT_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'MANIFEST_OR_TOOL_HASH_DRIFT=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WINDOW_BOUNDED_RETRY_MODEL=PASS', 'SEVERE_BLOCKER_MODEL=PASS',
     'MOCK_SUCCESS=PASS RESULT=SUCCESS RAM_READ_COUNT=4 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
@@ -253,10 +254,10 @@ Assert-Contains $packet 'exit_code=0' 'raw evidence exit code'
 'MANIFEST_FILES_RUNTIME_BOUND=PASS runner=true cfg=true verifier=true operation_card=true review_packet=true'
 'DIRTY_RUNNER_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'PRE_EXTERNAL_PROCESS_FAIL_CLOSED=PASS dirty_cfg=true wrong_head=true manifest_file_hash_mismatch=true external_process_start_count=0'
-'LIVE_TOOL_BINDING=PASS openocd=true gdb=true path_hash_version=true'
-'WRONG_OPENOCD_PATH=PASS EXTERNAL_PROCESS_START_COUNT=0'
+'LIVE_TOOL_BINDING=PASS openocd=true gdb=true runtime_path_portable=true hash_version_bound=true'
+'PORTABLE_OPENOCD_PATH=PASS same_hash_different_path=true approval_path_binding=false'
+'NONPORTABLE_OPENOCD_PATH_BINDING=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'WRONG_OPENOCD_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0'
-'WRONG_GDB_PATH=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'WRONG_GDB_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'OPENOCD_ARGUMENT_FLOW=PASS cputapid=0x006A0EF3 width=6 type=1 outer_ir=0x09 USER2=NOT_VERIFIED'
 'LIVE_SCENARIO_ALL_REJECTED=PASS'

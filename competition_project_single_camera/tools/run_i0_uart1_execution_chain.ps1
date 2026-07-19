@@ -46,7 +46,7 @@ $HelloLines = @(
     'Type characters to verify echo.'
 )
 $ManifestPath = Join-Path $PSScriptRoot 'i0_uart1_execution_manifest.json'
-$Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+$Manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 function Get-IsoTime { (Get-Date).ToUniversalTime().ToString('o') }
 
@@ -109,9 +109,9 @@ function Assert-ExecutionCheckoutIntegrity {
 function Resolve-ApprovedTool {
     param([string]$CandidatePath, $ApprovalTool, $ManifestTool, [string]$Label)
     if ($null -eq $ApprovalTool -or $null -eq $ManifestTool) { throw "MISSING_${Label}_TOOL_BINDING" }
+    if ($ApprovalTool.PSObject.Properties.Name -contains 'normalized_path') { throw "NONPORTABLE_${Label}_PATH_BINDING" }
     $resolved = (Resolve-Path -LiteralPath $CandidatePath -ErrorAction Stop).ProviderPath
     $normalized = [IO.Path]::GetFullPath($resolved)
-    if ($normalized -cne [string]$ApprovalTool.normalized_path) { throw "WRONG_${Label}_PATH" }
     if ([string]$ApprovalTool.version -cne [string]$ManifestTool.version) { throw "WRONG_${Label}_VERSION" }
     if ([string]$ApprovalTool.sha256 -cne [string]$ManifestTool.sha256) { throw "WRONG_${Label}_HASH" }
     $actualHash = Get-Sha256 $normalized
@@ -362,9 +362,10 @@ function Read-WscContract {
 function Get-UartIdentityKey {
     param($SerialPort, $PnpEntity)
     $instance = [string]$SerialPort.PNPDeviceID
-    $match = [regex]::Match($instance, '(?i)VID_([0-9A-F]{4})&PID_([0-9A-F]{4})')
+    $match = [regex]::Match($instance, '(?i)VID_([0-9A-F]{4})[&+]PID_([0-9A-F]{4})')
     if (-not $match.Success) { throw "PnP identity has no VID/PID: $instance" }
-    $serial = ($instance -split '\\')[-1]
+    $ftdi = [regex]::Match($instance, '(?i)^FTDIBUS\\VID_[0-9A-F]{4}\+PID_[0-9A-F]{4}\+(?<serial>[^\\]+)\\[^\\]+$')
+    $serial = if ($ftdi.Success) { $ftdi.Groups['serial'].Value } else { ($instance -split '\\')[-1] }
     [pscustomobject]@{
         Port = [string]$SerialPort.DeviceID
         VID = $match.Groups[1].Value.ToUpperInvariant()
@@ -392,9 +393,21 @@ function Select-UniqueUart1Identity {
 function Resolve-UniqueUart1Identity {
     param([string]$Port, [string]$ExpectedKey)
     $identities = @()
-    foreach ($serialPort in @(Get-CimInstance Win32_SerialPort)) {
-        $pnp = Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -eq $serialPort.PNPDeviceID } | Select-Object -First 1
-        try { $identities += Get-UartIdentityKey $serialPort $pnp } catch { }
+    $pnpCommand = Get-Command Get-PnpDevice -ErrorAction SilentlyContinue
+    if ($null -ne $pnpCommand) {
+        foreach ($pnp in @(Get-PnpDevice -Class Ports -PresentOnly -ErrorAction Stop)) {
+            $portMatch = [regex]::Match([string]$pnp.FriendlyName, '\((?<port>COM[0-9]+)\)')
+            if (-not $portMatch.Success) { continue }
+            $serialPort = [pscustomobject]@{ DeviceID = $portMatch.Groups['port'].Value; PNPDeviceID = [string]$pnp.InstanceId }
+            $pnpEntity = [pscustomobject]@{ Name = [string]$pnp.FriendlyName }
+            try { $identities += Get-UartIdentityKey $serialPort $pnpEntity } catch { }
+        }
+    }
+    if ($identities.Count -eq 0) {
+        foreach ($serialPort in @(Get-CimInstance Win32_SerialPort)) {
+            $pnp = Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -eq $serialPort.PNPDeviceID } | Select-Object -First 1
+            try { $identities += Get-UartIdentityKey $serialPort $pnp } catch { }
+        }
     }
     Select-UniqueUart1Identity -Identities $identities -Port $Port -ExpectedKey $ExpectedKey
 }
@@ -413,7 +426,7 @@ function Test-ApprovalRecord {
     }
     foreach ($tool in $ToolBindings.GetEnumerator()) {
         $approvedTool = $Approval.tools.PSObject.Properties[$tool.Key].Value
-        if ($null -eq $approvedTool -or [string]$approvedTool.normalized_path -cne $tool.Value.NormalizedPath -or [string]$approvedTool.sha256 -cne $tool.Value.Sha256 -or [string]$approvedTool.version -cne $tool.Value.Version) {
+        if ($null -eq $approvedTool -or $approvedTool.PSObject.Properties.Name -contains 'normalized_path' -or [string]$approvedTool.sha256 -cne $tool.Value.Sha256 -or [string]$approvedTool.version -cne $tool.Value.Version) {
             throw "APPROVAL_TUPLE_MISMATCH tool=$($tool.Key)"
         }
     }
@@ -423,7 +436,7 @@ function Test-ApprovalRecord {
 function Get-LiveApproval {
     param([string]$Path, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [hashtable]$ArtifactHashes, [hashtable]$ToolBindings)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Live mode requires an external approval record.' }
-    $approval = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $approval = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
     Test-ApprovalRecord -Approval $approval -Commit $Commit -ExpectedBoard $ExpectedBoard -ExpectedPnp $ExpectedPnp -ManifestSha (Get-Sha256 $ManifestPath) -ArtifactHashes $ArtifactHashes -ToolBindings $ToolBindings -Now ([DateTimeOffset]::UtcNow) | Out-Null
     $approval
 }
@@ -626,7 +639,10 @@ function Write-FailedClosedLog {
 }
 
 function Invoke-Uart1PnPFixtures {
-    $uart1 = [pscustomobject]@{ Port = 'COM10'; VID = '10C4'; PID = 'EA60'; Serial = 'UART1_FIXED'; Instance = 'USB\VID_10C4&PID_EA60\UART1_FIXED'; FriendlyName = 'USB Serial Port'; Key = 'VID=10C4;PID=EA60;SERIAL=UART1_FIXED;INSTANCE=USB\VID_10C4&PID_EA60\UART1_FIXED' }
+    $uart1Port = [pscustomobject]@{ DeviceID = 'COM10'; PNPDeviceID = 'FTDIBUS\VID_0403+PID_6011+FTBI7G42C\0000' }
+    $uart1Pnp = [pscustomobject]@{ Name = 'USB Serial Port (COM10)' }
+    $uart1 = Get-UartIdentityKey $uart1Port $uart1Pnp
+    if ($uart1.Key -cne 'VID=0403;PID=6011;SERIAL=FTBI7G42C;INSTANCE=FTDIBUS\VID_0403+PID_6011+FTBI7G42C\0000') { throw 'FTDIBUS UART1 identity parser fixture failed.' }
     $programmer = [pscustomobject]@{ Port = 'COM13'; VID = '0403'; PID = '6010'; Serial = 'J44_PROGRAMMER'; Instance = 'USB\VID_0403&PID_6010\J44_PROGRAMMER'; FriendlyName = 'J44 UART0 Programmer'; Key = 'VID=0403;PID=6010;SERIAL=J44_PROGRAMMER;INSTANCE=USB\VID_0403&PID_6010\J44_PROGRAMMER' }
     $ch340 = [pscustomobject]@{ Port = 'COM17'; VID = '1A86'; PID = '7523'; Serial = 'CH340'; Instance = 'USB\VID_1A86&PID_7523\CH340'; FriendlyName = 'USB-SERIAL CH340'; Key = 'VID=1A86;PID=7523;SERIAL=CH340;INSTANCE=USB\VID_1A86&PID_7523\CH340' }
     $selected = Select-UniqueUart1Identity -Identities @($uart1, $programmer, $ch340) -Port 'COM10' -ExpectedKey $uart1.Key
@@ -636,7 +652,7 @@ function Invoke-Uart1PnPFixtures {
         try { Select-UniqueUart1Identity -Identities @($uart1, $programmer, $ch340) -Port $fixture[1] -ExpectedKey $fixture[0].Key | Out-Null } catch { $closed = $true }
         if (-not $closed) { throw 'UART0/programmer PnP exclusion fixture failed.' }
     }
-    'UART1_PNP_ALLOWLIST=PASS exact_vid_pid_serial_instance=true excludes_com17_ch340_j44_uart0=true'
+    'UART1_PNP_ALLOWLIST=PASS provider=Get-PnpDevice_fallback_Win32_SerialPort exact_vid_pid_serial_instance=true ftdibus_plus_syntax=true excludes_com17_ch340_j44_uart0=true'
 }
 
 function Invoke-MockApbScenario {
@@ -744,6 +760,7 @@ function Invoke-PreExternalIntegrityFixtures {
 function Invoke-ApprovedToolFixtures {
     param([string]$FixtureDirectory)
     $openOcd = Join-Path $FixtureDirectory 'openocd.exe'
+    $openOcdPortable = Join-Path $FixtureDirectory 'relocated-openocd.exe'
     $gdb = Join-Path $FixtureDirectory 'gdb.exe'
     $setup = Join-Path $FixtureDirectory 'setup.bat'
     $efxRun = Join-Path $FixtureDirectory 'efx_run.bat'
@@ -752,6 +769,7 @@ function Invoke-ApprovedToolFixtures {
     $usbResolver = Join-Path $FixtureDirectory 'usb_resolver.py'
     $python = Join-Path $FixtureDirectory 'python.exe'
     [IO.File]::WriteAllText($openOcd, 'openocd fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($openOcdPortable, 'openocd fixture', [Text.Encoding]::ASCII)
     [IO.File]::WriteAllText($gdb, 'gdb fixture', [Text.Encoding]::ASCII)
     [IO.File]::WriteAllText($setup, 'setup fixture', [Text.Encoding]::ASCII)
     [IO.File]::WriteAllText($efxRun, 'efx_run fixture', [Text.Encoding]::ASCII)
@@ -770,14 +788,14 @@ function Invoke-ApprovedToolFixtures {
         efinity_python = [pscustomobject]@{ sha256 = Get-Sha256 $python; version = 'python fixture 1' }
     }
     $approval = [pscustomobject]@{ tools = [pscustomobject]@{
-        openocd = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($openOcd); sha256 = $manifestTools.openocd.sha256; version = $manifestTools.openocd.version }
-        gdb = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($gdb); sha256 = $manifestTools.gdb.sha256; version = $manifestTools.gdb.version }
-        efinity_setup = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($setup); sha256 = $manifestTools.efinity_setup.sha256; version = $manifestTools.efinity_setup.version }
-        efx_run = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($efxRun); sha256 = $manifestTools.efx_run.sha256; version = $manifestTools.efx_run.version }
-        efx_run_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($efxRunPy); sha256 = $manifestTools.efx_run_py.sha256; version = $manifestTools.efx_run_py.version }
-        ftdi_program_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($ftdiProgram); sha256 = $manifestTools.ftdi_program_py.sha256; version = $manifestTools.ftdi_program_py.version }
-        usb_resolver_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($usbResolver); sha256 = $manifestTools.usb_resolver_py.sha256; version = $manifestTools.usb_resolver_py.version }
-        efinity_python = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($python); sha256 = $manifestTools.efinity_python.sha256; version = $manifestTools.efinity_python.version }
+        openocd = [pscustomobject]@{ sha256 = $manifestTools.openocd.sha256; version = $manifestTools.openocd.version }
+        gdb = [pscustomobject]@{ sha256 = $manifestTools.gdb.sha256; version = $manifestTools.gdb.version }
+        efinity_setup = [pscustomobject]@{ sha256 = $manifestTools.efinity_setup.sha256; version = $manifestTools.efinity_setup.version }
+        efx_run = [pscustomobject]@{ sha256 = $manifestTools.efx_run.sha256; version = $manifestTools.efx_run.version }
+        efx_run_py = [pscustomobject]@{ sha256 = $manifestTools.efx_run_py.sha256; version = $manifestTools.efx_run_py.version }
+        ftdi_program_py = [pscustomobject]@{ sha256 = $manifestTools.ftdi_program_py.sha256; version = $manifestTools.ftdi_program_py.version }
+        usb_resolver_py = [pscustomobject]@{ sha256 = $manifestTools.usb_resolver_py.sha256; version = $manifestTools.usb_resolver_py.version }
+        efinity_python = [pscustomobject]@{ sha256 = $manifestTools.efinity_python.sha256; version = $manifestTools.efinity_python.version }
     } }
     Resolve-ApprovedTool -CandidatePath $openOcd -ApprovalTool $approval.tools.openocd -ManifestTool $manifestTools.openocd -Label 'OPENOCD' | Out-Null
     Resolve-ApprovedTool -CandidatePath $gdb -ApprovalTool $approval.tools.gdb -ManifestTool $manifestTools.gdb -Label 'GDB' | Out-Null
@@ -787,16 +805,16 @@ function Invoke-ApprovedToolFixtures {
     Resolve-ApprovedTool -CandidatePath $ftdiProgram -ApprovalTool $approval.tools.ftdi_program_py -ManifestTool $manifestTools.ftdi_program_py -Label 'FTDI_PROGRAM_PY' | Out-Null
     Resolve-ApprovedTool -CandidatePath $usbResolver -ApprovalTool $approval.tools.usb_resolver_py -ManifestTool $manifestTools.usb_resolver_py -Label 'USB_RESOLVER_PY' | Out-Null
     Resolve-ApprovedTool -CandidatePath $python -ApprovalTool $approval.tools.efinity_python -ManifestTool $manifestTools.efinity_python -Label 'EFINITY_PYTHON' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $openOcdPortable -ApprovalTool $approval.tools.openocd -ManifestTool $manifestTools.openocd -Label 'OPENOCD' | Out-Null
+    'PORTABLE_OPENOCD_PATH=PASS same_hash_different_path=true approval_path_binding=false'
     foreach ($fixture in @(
-        [pscustomobject]@{ Name = 'WRONG_OPENOCD_PATH'; Tool = 'openocd'; Property = 'normalized_path'; Value = $gdb },
         [pscustomobject]@{ Name = 'WRONG_OPENOCD_HASH'; Tool = 'openocd'; Property = 'sha256'; Value = ('0' * 64) },
-        [pscustomobject]@{ Name = 'WRONG_GDB_PATH'; Tool = 'gdb'; Property = 'normalized_path'; Value = $openOcd },
         [pscustomobject]@{ Name = 'WRONG_GDB_HASH'; Tool = 'gdb'; Property = 'sha256'; Value = ('0' * 64) },
         [pscustomobject]@{ Name = 'WRONG_EFX_RUN_HASH'; Tool = 'efx_run'; Property = 'sha256'; Value = ('0' * 64) }
     )) {
-        $approval.tools.openocd.normalized_path = [IO.Path]::GetFullPath($openOcd); $approval.tools.openocd.sha256 = $manifestTools.openocd.sha256
-        $approval.tools.gdb.normalized_path = [IO.Path]::GetFullPath($gdb); $approval.tools.gdb.sha256 = $manifestTools.gdb.sha256
-        $approval.tools.efx_run.normalized_path = [IO.Path]::GetFullPath($efxRun); $approval.tools.efx_run.sha256 = $manifestTools.efx_run.sha256
+        $approval.tools.openocd.sha256 = $manifestTools.openocd.sha256
+        $approval.tools.gdb.sha256 = $manifestTools.gdb.sha256
+        $approval.tools.efx_run.sha256 = $manifestTools.efx_run.sha256
         $approval.tools.($fixture.Tool).($fixture.Property) = $fixture.Value
         $closed = $false
         $candidate = switch ($fixture.Tool) { 'openocd' { $openOcd } 'gdb' { $gdb } 'efx_run' { $efxRun } }
@@ -804,6 +822,12 @@ function Invoke-ApprovedToolFixtures {
         if (-not $closed) { throw "$($fixture.Name) fixture did not fail closed." }
         "$($fixture.Name)_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0"
     }
+    $approval.tools.openocd.sha256 = $manifestTools.openocd.sha256
+    $nonportable = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($openOcd); sha256 = $manifestTools.openocd.sha256; version = $manifestTools.openocd.version }
+    $closed = $false
+    try { Resolve-ApprovedTool -CandidatePath $openOcd -ApprovalTool $nonportable -ManifestTool $manifestTools.openocd -Label 'OPENOCD' | Out-Null } catch { $closed = $_.Exception.Message.Contains('NONPORTABLE_OPENOCD_PATH_BINDING') }
+    if (-not $closed) { throw 'NONPORTABLE_OPENOCD_PATH_BINDING fixture did not fail closed.' }
+    'NONPORTABLE_OPENOCD_PATH_BINDING_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0'
 }
 
 function Invoke-VolatilePreflightFixtures {
@@ -877,7 +901,7 @@ function Invoke-MockFixtures {
     $approval = [pscustomobject]@{
         schema_version = 2; approved_commit = 'fixed'; board_id = 'BOARD'; uart1_pnp_key = 'PNP'; window_id = 'WINDOW'
         window_start_utc = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString('o'); window_end_utc = [DateTimeOffset]::UtcNow.AddMinutes(1).ToString('o')
-        stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes; tools = [pscustomobject]@{ openocd = [pscustomobject]@{ normalized_path = $toolBindings.openocd.NormalizedPath; sha256 = $toolBindings.openocd.Sha256; version = $toolBindings.openocd.Version }; gdb = [pscustomobject]@{ normalized_path = $toolBindings.gdb.NormalizedPath; sha256 = $toolBindings.gdb.Sha256; version = $toolBindings.gdb.Version } }
+        stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes; tools = [pscustomobject]@{ openocd = [pscustomobject]@{ sha256 = $toolBindings.openocd.Sha256; version = $toolBindings.openocd.Version }; gdb = [pscustomobject]@{ sha256 = $toolBindings.gdb.Sha256; version = $toolBindings.gdb.Version } }
     }
     Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes $toolBindings ([DateTimeOffset]::UtcNow) | Out-Null
     $postApprovalLog = Join-Path $fixtureDirectory 'post-approval-pre-openocd.execution.log'
@@ -966,7 +990,7 @@ $ramReadCount = 0
 $finalLogged = $false
 $counts = @{ Rx = 0; Tx = 0 }
 try {
-    $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw | ConvertFrom-Json
+    $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest
     $toolBindings = @{
         openocd = Resolve-ApprovedTool -CandidatePath $OpenOcdExe -ApprovalTool $approvalObject.tools.openocd -ManifestTool $Manifest.live_tools.openocd -Label 'OPENOCD'
