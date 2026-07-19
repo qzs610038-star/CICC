@@ -1,0 +1,23 @@
+{
+  "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
+  "handoff_sha": "fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c",
+  "patch_base_sha": "182fd6f5c4d628379760d6f4fc74e3b342e30083",
+  "wsc_final_sha": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
+  "fixed_artifacts": {
+    "bitstream_sha256": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
+    "hello_elf_sha256": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
+    "soc_h_sha256": "25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B",
+    "wsc_probe_elf_sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC"
+  },
+  "files": [
+    { "path": "competition_project_single_camera/tools/capture_i0_uart1_raw.ps1", "sha256": "9DD6E84349A146228441D47861C70267700DBD3B7CCE42BDD69ECD39CD3D49D6" },
+    { "path": "competition_project_single_camera/tools/i0_uart1_cleanlf_ram_halt.gdb", "sha256": "DAC1650FABB3F7CDA6E04261C05F5D458E03884162B924257F91FD3A589CC11F" },
+    { "path": "competition_project_single_camera/tools/i0_uart1_cleanlf_user2.cfg", "sha256": "1627F844B48A49116B69BF186036F4C789AB6CF56838AAAF2420AAE9BEC9AAA1" },
+    { "path": "competition_project_single_camera/tools/i0_uart1_wsc_apb_probe.gdb", "sha256": "E0F1DE50F9C6F9774C38ED353695FC0CB8B8A5F6FBFAF35953A10A3D601433B8" },
+    { "path": "competition_project_single_camera/tools/i0_uart1_wsc_probe_gate.ps1", "sha256": "97582AE715AA43E495F815E0E2EACF7918C16CEE265C98CE4B7C324E67E18BEF" },
+    { "path": "competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1", "sha256": "4D820FC3BEC8A21AE5CC06597090C0E40FF32B819E0863D571CAB0B90F6416B9" },
+    { "path": "competition_project_single_camera/tools/wsc_i0_apb_probe_contract.json", "sha256": "F29AEF9D7E6A0BAF44CC7892E134FDE1C82EAC28B6A1DAB200BF4AF20D333C3E" },
+    { "path": "competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md", "sha256": "6DD321BEECCAE0855B424A8A30EE3B1E698C16083C85140DDE89CD08F0D31ECB" },
+    { "path": "competition_project_single_camera/docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md", "sha256": "8BA91AFE5EB244F06CA8A0077F4B9911560CE5FC5038E0C51122124829FF000D" }
+  ]
+}

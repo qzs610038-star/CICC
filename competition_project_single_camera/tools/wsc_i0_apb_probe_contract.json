@@ -1,0 +1,30 @@
+{
+  "owner": "WSC",
+  "status": "READY_STATIC",
+  "source_commit": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
+  "handoff_sha": "fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c",
+  "patch_baseline": "182fd6f5c4d628379760d6f4fc74e3b342e30083",
+  "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
+  "contract_paths": {
+    "document": "competition_project_single_camera/embedded_sw/apb_magic_onchip/APB_PROBE_DEBUGGER_CONTRACT.md",
+    "summary": "competition_project_single_camera/embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.contract.txt",
+    "verifier": "competition_project_single_camera/embedded_sw/apb_magic_onchip/verify_apb_probe_contract.ps1"
+  },
+  "source_blob_sha1": {
+    "document": "b302a548612138fa90752842461ddcf080ccbd6e",
+    "summary": "a5db7bd319465fab5101f31551bff786b787aad3",
+    "verifier": "fb62bb88255c80f56b526bc75690033e78a1f1e0"
+  },
+  "probe_elf_sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
+  "entry_pc": "0xF9000000",
+  "halt_pc": "0xF90000C4",
+  "apb_address": "0xE8100000",
+  "apb_offset": "0x000",
+  "expected_value": "0x375A0001",
+  "cpu_lw_count": 1,
+  "apb_write_count": 0,
+  "timeout_ms": 1000,
+  "success_ram_read_count": 4,
+  "failure_ram_read_count": 0,
+  "hardware_actions": "NONE"
+}
