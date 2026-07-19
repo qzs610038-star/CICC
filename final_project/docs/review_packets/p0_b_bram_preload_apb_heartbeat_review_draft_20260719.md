@@ -70,3 +70,5 @@
 4. 是否收到用户对本 Packet 固定差分的单独批准？若涉及冻结接口，是否收到完整口令？
 
 上述四项关闭前，结论固定为 `HOLD`。
+
+2026-07-19 更新：wsc `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d` 经 qzs 复审为 `CHANGES_REQUESTED / P0-A NOT READY`，因此 P0-B 触发前提尚未满足；本 Packet 继续 HOLD，且不联系或占用正在推进 UART1/USER2 的 libaoxun。

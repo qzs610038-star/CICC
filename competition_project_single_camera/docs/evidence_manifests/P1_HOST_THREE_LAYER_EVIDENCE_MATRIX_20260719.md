@@ -36,3 +36,7 @@
 | `APPLY/PLACE/REMOVE/ABANDON` | event_seq 与 ACK | 重复、乱序、抖动、长按拒绝重复消费 | 不定义按键/寄存器 ABI |
 
 `P1-HOST-READY` 只能在严格 Host 编译、全部协议负例、20 轮 replay、如实的标定状态和本表都完整时评定；不等于 RISC-V、APB、OSD、CDC 或板级 PASS。
+
+## 2026-07-19 WSC 首批候选状态
+
+`dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d` 的 fresh Host 计数通过，但 JSONL 不符合本目录 schema，静态 20 行 replay 未携带本表要求的逐轮 snapshot/ACK/commit/elapsed/release 证据，reserved bit 向量还与真实 adapter 行为相反。因此本表整体状态为 `PARTIAL / CHANGES_REQUESTED`，不是 `P1-HOST-READY`。详见 `docs/review_packets/WSC_P0_A_P1_HOST_CANDIDATE_AUDIT_20260719.md`。

@@ -110,6 +110,10 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 
 本机/队友新对话统一从 `docs/agent_context/P0_P1_PARALLEL_KICKOFF_INDEX_20260719.md` 恢复，并读取 `docs/agent_context/prompts/` 下 qzs 或 wsc 提示词。已准备 Host 契约/证据前置包与 P0-B HOLD Packet；没有修改冻结接口、CPU/RTL/Hard SoC 真源，也没有构建、上板或机械臂动作。
 
+### WSC 首批固定 SHA 复审
+
+wsc 已提交 `codex/wsc-p0a-p1-host-20260719@dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d`。qzs 在独立 detached worktree 反向审查并 fresh 复跑，确认范围、冻结面、P0-A Host/严格构建及 P1/既有 Host 计数通过；但正式 READY 条件仍有实质缺口，结论为 `CHANGES_REQUESTED / DO NOT MERGE`。完整 findings 与最小修复清单见 `docs/review_packets/WSC_P0_A_P1_HOST_CANDIDATE_AUDIT_20260719.md`。P0-B 保持 HOLD，USER2/板级 canary Gate 未打开，libaoxun 不受本轮影响。
+
 ### qzs P0-A/P1 治理 checkpoint — kickoff `0e5ab490` 后
 
 - qzs 个人分支：`codex/qzs-p0a-p1-host-governance-20260719`，固定起点 `0e5ab490559c58642734b0095753c6cf8787c709`。

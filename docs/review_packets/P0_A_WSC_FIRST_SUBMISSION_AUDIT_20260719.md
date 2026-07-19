@@ -1,6 +1,8 @@
 # P0-A WSC 首批提交审查记录
 
-> 结论：`BLOCKED / NO_SUBMISSION_VISIBLE`
+> 原结论：`BLOCKED / NO_SUBMISSION_VISIBLE`
+>
+> 后续状态：已收到 `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d`，本记录的“未见提交”结论已被固定 SHA 复审取代；新裁定见 [WSC P0-A / P1 Host 固定 SHA 候选审查](WSC_P0_A_P1_HOST_CANDIDATE_AUDIT_20260719.md)。
 >
 > 审查者：qzs；基线：`codex/qzs-wsc-libaoxun-integration-20260718@0e5ab490559c58642734b0095753c6cf8787c709`
 
