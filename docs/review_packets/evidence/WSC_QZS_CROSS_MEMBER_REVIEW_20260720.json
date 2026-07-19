@@ -1,0 +1,37 @@
+{
+  "schema": "wsc-qzs-cross-member-review-v1",
+  "qzs_sha": "fce2cf461ea9bc48f786a70f3276c7e4a84658e7",
+  "wsc_sha": "aaf2058e7e05b8cda905b8096db309c65e0da5ef",
+  "merge_base": "0e5ab490559c58642734b0095753c6cf8787c709",
+  "divergence": {"qzs_only_commits": 7, "wsc_only_commits": 10},
+  "merge_tree": "e689cd5395bcd8b65b0fa1b59f3b491c52c8d08a",
+  "qzs_changed_paths": 21,
+  "wsc_changed_paths": 41,
+  "path_overlap": 0,
+  "unmerged_paths": 0,
+  "scope": {"qzs": "PASS", "wsc": "PASS"},
+  "frozen_interface_diff": 0,
+  "tests": {
+    "p0_a_host": "10/10",
+    "p1_host_model": "37/37",
+    "feature_adapter": "39/39",
+    "classifier": "54/54",
+    "f1": "213/213",
+    "runtime_g2": "648/648",
+    "p1_manifest": "PASS",
+    "p1_manifest_tamper": "PASS",
+    "p1_replay_rounds": 20,
+    "p1_replay_arm_enabled": 0,
+    "interface_freeze": "PASS",
+    "offline_presubmit": "PASS_WITH_WARNINGS"
+  },
+  "verdict": {
+    "cross_member_review": "APPROVE_FOR_MERGE",
+    "merge_performed": false,
+    "p0_a_ready": true,
+    "p1_host_ready": true,
+    "board_verified": false,
+    "p0_b": "HOLD",
+    "arm_enabled": 0
+  }
+}

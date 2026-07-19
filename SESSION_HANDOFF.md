@@ -126,6 +126,10 @@ wsc `a74b21d19e9a81d315456e106e9d23cc5402243a` 的 R1 经 qzs 两个 clean `2564
 
 wsc evidence-only SHA `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 经 qzs clean-checkout manifest verifier、单文件 tamper、fresh P1 bundle 与 committed-vs-fresh 四 hash 比较全部通过；相对已接受实现没有 C/H 或硬件输入差分。现签发 `P0-A-READY=YES / P1-HOST-READY=YES / SOURCE_READY_FOR_INTEGRATION_REVIEW=YES`。尚未执行合并、USER2、上板或机械臂动作；BOARD 继续 NOT VERIFIED，P0-B HOLD。完整证据见 `docs/review_packets/WSC_P0_A_P1_HOST_FINAL_ACCEPTANCE_20260720.md`。
 
+### WSC / QZS 跨成员集成审查
+
+qzs `fce2cf461ea9bc48f786a70f3276c7e4a84658e7` 与 wsc `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 已完成固定 SHA no-commit 集成审查。两侧直接基于 kickoff，分别 21/41 个文件且零交集；merge-tree 和独立工作树合成树均为 `e689cd5395bcd8b65b0fa1b59f3b491c52c8d08a`。组合 P0-A `10/10`、P1 `37/39/54/213`、runtime `648/648`、20 轮 replay、manifest/tamper、QEMU、接口冻结和 offline presubmit 全部通过。结论 `APPROVE_FOR_MERGE / MERGE_NOT_PERFORMED`，见 `docs/review_packets/WSC_QZS_CROSS_MEMBER_INTEGRATION_REVIEW_20260720.md`。libaoxun 的分支、工作区和 UART1/USER2 实验未被触碰或通知。
+
 ### qzs P0-A/P1 治理 checkpoint — kickoff `0e5ab490` 后
 
 - qzs 个人分支：`codex/qzs-p0a-p1-host-governance-20260719`，固定起点 `0e5ab490559c58642734b0095753c6cf8787c709`。
