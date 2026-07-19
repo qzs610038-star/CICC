@@ -30,7 +30,9 @@ $elf = Join-Path $build 'f1_selftest_profile.elf'
 $map = Join-Path $build 'f1_selftest_profile.map'
 $normalizedMap = Join-Path $build 'map.normalized.txt'
 $readelfOut = Join-Path $build 'readelf.txt'
+$normalizedReadelf = Join-Path $build 'readelf.normalized.txt'
 $objdumpOut = Join-Path $build 'objdump.txt'
+$normalizedObjdump = Join-Path $build 'objdump.normalized.txt'
 $symbolsOut = Join-Path $build 'symbols.txt'
 $identityOut = Join-Path $build 'identity.json'
 $include = Join-Path $cpu 'include'
@@ -54,9 +56,15 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $nm -n $elf | Set-Content -Encoding ascii $symbolsOut
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $mapText = Get-Content -Raw -LiteralPath $map
+$buildPattern = [regex]::Escape($build)
+$mapText = $mapText -replace $buildPattern,'<OUTPUT_DIR>'
 $mapText = $mapText -replace '(?i)[A-Z]:\\[^\r\n ]*\\Temp\\cc[A-Za-z0-9]+\.o','<TMP_OBJECT>'
 $mapText = $mapText -replace '(?i)[A-Z]:/[^\r\n ]*/Temp/cc[A-Za-z0-9]+\.o','<TMP_OBJECT>'
 $mapText | Set-Content -NoNewline -Encoding ascii $normalizedMap
+$readelfText = (Get-Content -Raw -LiteralPath $readelfOut) -replace $buildPattern,'<OUTPUT_DIR>'
+$readelfText | Set-Content -NoNewline -Encoding ascii $normalizedReadelf
+$objdumpText = (Get-Content -Raw -LiteralPath $objdumpOut) -replace $buildPattern,'<OUTPUT_DIR>'
+$objdumpText | Set-Content -NoNewline -Encoding ascii $normalizedObjdump
 
 function Symbol([string]$name) {
     $line = Get-Content $symbolsOut | Where-Object { $_ -match ("\s" + [regex]::Escape($name) + '$') } | Select-Object -First 1
@@ -72,7 +80,7 @@ $imageEnd = Symbol '__image_end'
 if ($entry -ne 0 -or $imageEnd -gt 16384 -or ($stackTop - $stackBottom) -ne 2048) {
     throw 'PROFILE_BUDGET_OR_LAYOUT_FAILED'
 }
-$objdumpText = Get-Content -Raw $objdumpOut
+$objdumpText = Get-Content -Raw $normalizedObjdump
 foreach ($forbidden in @('e801','f900','uart','mycobot','soc.h')) {
     if ($objdumpText -match [regex]::Escape($forbidden)) { throw "PROFILE_FORBIDDEN_REFERENCE: $forbidden" }
 }
@@ -96,8 +104,10 @@ $identity = [ordered]@{
     raw_map_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $map).Hash
     map_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $normalizedMap).Hash
     map_identity='map.normalized.txt; compiler temporary object names replaced with <TMP_OBJECT>'
-    readelf_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $readelfOut).Hash
-    objdump_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $objdumpOut).Hash
+    readelf_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $normalizedReadelf).Hash
+    readelf_identity='readelf.normalized.txt; output directory replaced with <OUTPUT_DIR>'
+    objdump_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $normalizedObjdump).Hash
+    objdump_identity='objdump.normalized.txt; output directory replaced with <OUTPUT_DIR>'
     inputs=$inputHashes
 }
 $identity | ConvertTo-Json -Depth 6 | Set-Content -Encoding ascii $identityOut
