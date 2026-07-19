@@ -9,7 +9,8 @@ function Invoke-StrictCHostTest {
         [Parameter(Mandatory = $true)]
         [string]$TestFile,
         [Parameter(Mandatory = $true)]
-        [string[]]$Sources
+        [string[]]$Sources,
+        [string]$AdditionalIncludeDir
     )
 
     $script:HostTestExitCode = 1
@@ -19,7 +20,9 @@ function Invoke-StrictCHostTest {
     $gcc = Get-Command gcc -ErrorAction SilentlyContinue
 
     if ($null -ne $gcc) {
-        & $gcc.Source -std=c11 -Wall -Wextra -Werror "-I$IncludeDir" $TestFile @Sources -o $exe
+        $includeArgs = @("-I$IncludeDir")
+        if ($AdditionalIncludeDir) { $includeArgs += "-I$AdditionalIncludeDir" }
+        & $gcc.Source -std=c11 -Wall -Wextra -Werror @includeArgs $TestFile @Sources -o $exe
         if ($LASTEXITCODE -ne 0) {
             $script:HostTestExitCode = $LASTEXITCODE
             return
@@ -34,7 +37,9 @@ function Invoke-StrictCHostTest {
         if (-not $vs) { throw 'HOST_TEST_BLOCKED_COMPILER: VS2022 C++ tools not found' }
         $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
         if (-not (Test-Path -LiteralPath $vcvars)) { throw 'HOST_TEST_BLOCKED_COMPILER: vcvarsall.bat not found' }
-        $compileArgs = @('/nologo', '/utf-8', '/std:c11', '/W4', '/WX', "/I$IncludeDir", "/Fe$exe", $TestFile) + $Sources
+        $compileArgs = @('/nologo', '/utf-8', '/std:c11', '/W4', '/WX', "/I$IncludeDir")
+        if ($AdditionalIncludeDir) { $compileArgs += "/I$AdditionalIncludeDir" }
+        $compileArgs += @("/Fe$exe", $TestFile) + $Sources
         $compileLine = 'pushd "' + $build + '" && call "' + $vcvars + '" x64 >nul && cl.exe ' +
             (($compileArgs | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' && popd'
         cmd.exe /d /s /c $compileLine

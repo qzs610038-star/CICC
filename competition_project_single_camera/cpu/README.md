@@ -67,3 +67,27 @@ Remediation status: `AWAITING_QZS_REVIEW / NOT READY`.
 - P0-A uses `build_evidence.ps1` to derive the canary build ID from normalized
   firmware input hashes and generate a local verifier bundle. Generated ELF/map
   files remain ignored local artifacts and must not be committed.
+# F1 preboard selftest
+
+`cpu/tests/run_f1_board_selftest_host.ps1` runs the platform-independent
+`QW-F1-BOARD-SELFTEST-v1` core through the existing classifier, feature adapter and runtime.
+It contains no MMIO/UART address and keeps `ARM_ENABLED=0`.
+
+`cpu/tests/run_f1_riscv_profile.ps1` builds a profile-only RV32IM freestanding ELF with a
+16 KiB budget. Its origin `0x00000000` is an offline layout placeholder, not a board address.
+After an immutable UART1 full-chain PASS package is delivered, B0 must rebuild against the
+same-batch BSP/linker and create a new firmware identity. See
+`cpu/tests/f1_board_selftest/B0_UART1_ADAPTER_TEMPLATE.md`.
+
+Real calibration replay remains fail-closed until qzs publishes a fixed
+`QW-CALIBRATION-SAMPLE-v1` batch and hashes.
+
+Current preboard checkpoint from seed `40b42ddcbd5f9bb52ea0482203aa78e0d446aaad`:
+
+- selftest: 8/8, digest `28593E16`, `ARM_ENABLED=0`;
+- RV32IM/ILP32 profile: entry/origin `0x00000000` (offline only), image 9824 bytes,
+  stack 2048 bytes, 16 KiB budget PASS;
+- profile ELF SHA-256: `D5934D13762723F48266B8AFA9EDF56CCC531FB1E32C740747FA6DCD29771291`;
+- qzs calibration batch/hash: `NOT_PUBLISHED`, so W3/W4 remain
+  `WAITING_FOR_QZS_BATCH` and no production thresholds are claimed;
+- board, feature/APB/CDC/OSD, UART1 adapter and myCobot remain `NOT_VERIFIED`.
