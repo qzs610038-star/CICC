@@ -1,0 +1,150 @@
+
+D:\CICC w\.codex\worktrees\wsc6090-uart1-cpu-20260719\competition_project_single_camera\embedded_sw\apb_magic_onchip\artifacts\apb_magic_onchip.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+f9000000 <_start>:
+
+_start:
+#ifdef USE_GP
+.option push
+.option norelax
+	la gp, __global_pointer$
+f9000000:	00001197          	auipc	gp,0x1
+f9000004:	8c018193          	addi	gp,gp,-1856 # f90008c0 <__global_pointer$>
+
+f9000008 <init>:
+	sw a0, smp_lottery_lock, a1
+    ret
+#endif
+
+init:
+	la sp, _sp
+f9000008:	03018113          	addi	sp,gp,48 # f90008f0 <__freertos_irq_stack_top>
+
+	/* Load data section */
+	la a0, _data_lma
+f900000c:	81018513          	addi	a0,gp,-2032 # f90000d0 <g_apb_probe_expected>
+	la a1, _data
+f9000010:	81018593          	addi	a1,gp,-2032 # f90000d0 <g_apb_probe_expected>
+	la a2, _edata
+f9000014:	82418613          	addi	a2,gp,-2012 # f90000e4 <g_apb_probe_status>
+	bgeu a1, a2, 2f
+f9000018:	00c5fa63          	bgeu	a1,a2,f900002c <init+0x24>
+1:
+	lw t0, (a0)
+f900001c:	00052283          	lw	t0,0(a0)
+	sw t0, (a1)
+f9000020:	0055a023          	sw	t0,0(a1)
+	addi a0, a0, 4
+f9000024:	0511                	addi	a0,a0,4
+	addi a1, a1, 4
+f9000026:	0591                	addi	a1,a1,4
+	bltu a1, a2, 1b
+f9000028:	fec5eae3          	bltu	a1,a2,f900001c <init+0x14>
+2:
+
+	/* Clear bss section */
+	la a0, __bss_start
+f900002c:	82418513          	addi	a0,gp,-2012 # f90000e4 <g_apb_probe_status>
+	la a1, _end
+f9000030:	83018593          	addi	a1,gp,-2000 # f90000f0 <_end>
+	bgeu a0, a1, 2f
+f9000034:	00b57763          	bgeu	a0,a1,f9000042 <init+0x3a>
+1:
+	sw zero, (a0)
+f9000038:	00052023          	sw	zero,0(a0)
+	addi a0, a0, 4
+f900003c:	0511                	addi	a0,a0,4
+	bltu a0, a1, 1b
+f900003e:	feb56de3          	bltu	a0,a1,f9000038 <init+0x30>
+2:
+
+#ifndef NO_LIBC_INIT_ARRAY
+	call __libc_init_array
+f9000042:	2021                	jal	f900004a <__libc_init_array>
+#endif
+
+	call main
+f9000044:	2085                	jal	f90000a4 <main>
+
+f9000046 <mainDone>:
+mainDone:
+    j mainDone
+f9000046:	a001                	j	f9000046 <mainDone>
+
+f9000048 <_init>:
+
+
+	.globl _init
+_init:
+    ret
+f9000048:	8082                	ret
+
+Disassembly of section .text:
+
+f900004a <__libc_init_array>:
+f900004a:	1141                	addi	sp,sp,-16
+f900004c:	c422                	sw	s0,8(sp)
+f900004e:	c04a                	sw	s2,0(sp)
+f9000050:	81018413          	addi	s0,gp,-2032 # f90000d0 <g_apb_probe_expected>
+f9000054:	81018913          	addi	s2,gp,-2032 # f90000d0 <g_apb_probe_expected>
+f9000058:	40890933          	sub	s2,s2,s0
+f900005c:	c606                	sw	ra,12(sp)
+f900005e:	c226                	sw	s1,4(sp)
+f9000060:	40295913          	srai	s2,s2,0x2
+f9000064:	00090963          	beqz	s2,f9000076 <__libc_init_array+0x2c>
+f9000068:	4481                	li	s1,0
+f900006a:	401c                	lw	a5,0(s0)
+f900006c:	0485                	addi	s1,s1,1
+f900006e:	0411                	addi	s0,s0,4
+f9000070:	9782                	jalr	a5
+f9000072:	fe991ce3          	bne	s2,s1,f900006a <__libc_init_array+0x20>
+f9000076:	81018413          	addi	s0,gp,-2032 # f90000d0 <g_apb_probe_expected>
+f900007a:	81018913          	addi	s2,gp,-2032 # f90000d0 <g_apb_probe_expected>
+f900007e:	40890933          	sub	s2,s2,s0
+f9000082:	40295913          	srai	s2,s2,0x2
+f9000086:	00090963          	beqz	s2,f9000098 <__libc_init_array+0x4e>
+f900008a:	4481                	li	s1,0
+f900008c:	401c                	lw	a5,0(s0)
+f900008e:	0485                	addi	s1,s1,1
+f9000090:	0411                	addi	s0,s0,4
+f9000092:	9782                	jalr	a5
+f9000094:	fe991ce3          	bne	s2,s1,f900008c <__libc_init_array+0x42>
+f9000098:	40b2                	lw	ra,12(sp)
+f900009a:	4422                	lw	s0,8(sp)
+f900009c:	4492                	lw	s1,4(sp)
+f900009e:	4902                	lw	s2,0(sp)
+f90000a0:	0141                	addi	sp,sp,16
+f90000a2:	8082                	ret
+
+f90000a4 <main>:
+
+int main(void)
+{
+    const volatile uint32_t *const magic_register =
+        (const volatile uint32_t *)(uintptr_t)IO_APB_SLAVE_0_INPUT;
+    const uint32_t observed = *magic_register;
+f90000a4:	e81007b7          	lui	a5,0xe8100
+f90000a8:	4398                	lw	a4,0(a5)
+
+    g_apb_probe_observed = observed;
+f90000aa:	82e1a423          	sw	a4,-2008(gp) # f90000e8 <g_apb_probe_observed>
+    g_apb_probe_status =
+        (observed == APB_MAGIC_EXPECTED) ? APB_PROBE_PASS : APB_PROBE_FAIL;
+f90000ae:	375a07b7          	lui	a5,0x375a0
+f90000b2:	0785                	addi	a5,a5,1
+f90000b4:	00f70963          	beq	a4,a5,f90000c6 <main+0x22>
+f90000b8:	464157b7          	lui	a5,0x46415
+f90000bc:	94c78793          	addi	a5,a5,-1716 # 4641494c <__stack_size+0x4641414c>
+    g_apb_probe_status =
+f90000c0:	82f1a223          	sw	a5,-2012(gp) # f90000e4 <g_apb_probe_status>
+
+    for (;;) {
+        __asm__ volatile ("" ::: "memory");
+f90000c4:	a001                	j	f90000c4 <main+0x20>
+        (observed == APB_MAGIC_EXPECTED) ? APB_PROBE_PASS : APB_PROBE_FAIL;
+f90000c6:	504157b7          	lui	a5,0x50415
+f90000ca:	35378793          	addi	a5,a5,851 # 50415353 <__stack_size+0x50414b53>
+f90000ce:	bfcd                	j	f90000c0 <main+0x1c>
