@@ -505,6 +505,23 @@ function Write-PhaseResumeMarker {
     [pscustomobject]@{ Path = $path; Time = $resumeTime }
 }
 
+function Write-FailedClosedLog {
+    param(
+        [string]$LogPath,
+        $Counts,
+        [int]$HelloResumeCount,
+        [int]$ApbResumeCount,
+        [int]$RetryCount,
+        [int]$RamReadCount,
+        [bool]$FinalLogged,
+        [string]$ErrorMessage
+    )
+    if ((Test-Path -LiteralPath $LogPath) -and (-not $FinalLogged)) {
+        Write-RunLog $LogPath "BYTE_COUNTS RX=$($Counts.Rx) TX=$($Counts.Tx)" | Out-Null
+        Write-RunLog $LogPath "FINAL_STATE=FAILED_CLOSED ERROR=$ErrorMessage HELLO_RESUME_COUNT=$HelloResumeCount APB_RESUME_COUNT=$ApbResumeCount RETRY_COUNT=$RetryCount RAM_READ_COUNT=$RamReadCount" | Out-Null
+    }
+}
+
 function Invoke-Uart1PnPFixtures {
     $uart1 = [pscustomobject]@{ Port = 'COM10'; VID = '10C4'; PID = 'EA60'; Serial = 'UART1_FIXED'; Instance = 'USB\VID_10C4&PID_EA60\UART1_FIXED'; FriendlyName = 'USB Serial Port'; Key = 'VID=10C4;PID=EA60;SERIAL=UART1_FIXED;INSTANCE=USB\VID_10C4&PID_EA60\UART1_FIXED' }
     $programmer = [pscustomobject]@{ Port = 'COM13'; VID = '0403'; PID = '6010'; Serial = 'J44_PROGRAMMER'; Instance = 'USB\VID_0403&PID_6010\J44_PROGRAMMER'; FriendlyName = 'J44 UART0 Programmer'; Key = 'VID=0403;PID=6010;SERIAL=J44_PROGRAMMER;INSTANCE=USB\VID_0403&PID_6010\J44_PROGRAMMER' }
@@ -699,6 +716,19 @@ function Invoke-MockFixtures {
         stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes; tools = [pscustomobject]@{ openocd = [pscustomobject]@{ normalized_path = $toolBindings.openocd.NormalizedPath; sha256 = $toolBindings.openocd.Sha256; version = $toolBindings.openocd.Version }; gdb = [pscustomobject]@{ normalized_path = $toolBindings.gdb.NormalizedPath; sha256 = $toolBindings.gdb.Sha256; version = $toolBindings.gdb.Version } }
     }
     Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes $toolBindings ([DateTimeOffset]::UtcNow) | Out-Null
+    $postApprovalLog = Join-Path $fixtureDirectory 'post-approval-pre-openocd.execution.log'
+    [IO.File]::WriteAllText($postApprovalLog, 'AUTHORIZATION_TUPLE=PASS' + "`r`n", [Text.Encoding]::ASCII)
+    $postApprovalCounts = @{ Rx = 0; Tx = 0 }
+    try {
+        throw 'FIXTURE_POST_APPROVAL_PRE_OPENOCD_FAILURE'
+    } catch {
+        Write-FailedClosedLog -LogPath $postApprovalLog -Counts $postApprovalCounts -HelloResumeCount 0 -ApbResumeCount 0 -RetryCount 0 -RamReadCount 0 -FinalLogged $false -ErrorMessage $_.Exception.Message
+    }
+    $postApprovalText = Get-Content -LiteralPath $postApprovalLog -Raw
+    if ($postApprovalText -notmatch 'AUTHORIZATION_TUPLE=PASS' -or $postApprovalText -notmatch 'FINAL_STATE=FAILED_CLOSED ERROR=FIXTURE_POST_APPROVAL_PRE_OPENOCD_FAILURE HELLO_RESUME_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0 RAM_READ_COUNT=0') {
+        throw 'Post-approval pre-OpenOCD failure fixture did not fail closed.'
+    }
+    'POST_APPROVAL_PRE_OPENOCD_FAIL_CLOSED=PASS authorization_tuple=true external_process_start_count=0'
     $approval.board_id = 'WRONG'
     $badApprovalClosed = $false
     try { Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes $toolBindings ([DateTimeOffset]::UtcNow) | Out-Null } catch { $badApprovalClosed = $true }
@@ -868,10 +898,7 @@ try {
     Write-RunLog $executionLog "FINAL_STATE=SUCCESS HELLO_RESUME_COUNT=$helloResumeCount APB_RESUME_COUNT=$apbResumeCount RETRY_COUNT=$retryCount RAM_READ_COUNT=$ramReadCount"
     $finalLogged = $true
 } catch {
-    if (Test-Path -LiteralPath $executionLog -and -not $finalLogged) {
-        Write-RunLog $executionLog "BYTE_COUNTS RX=$($counts.Rx) TX=$($counts.Tx)" | Out-Null
-        Write-RunLog $executionLog "FINAL_STATE=FAILED_CLOSED ERROR=$($_.Exception.Message) HELLO_RESUME_COUNT=$helloResumeCount APB_RESUME_COUNT=$apbResumeCount RETRY_COUNT=$retryCount RAM_READ_COUNT=$ramReadCount"
-    }
+    Write-FailedClosedLog -LogPath $executionLog -Counts $counts -HelloResumeCount $helloResumeCount -ApbResumeCount $apbResumeCount -RetryCount $retryCount -RamReadCount $ramReadCount -FinalLogged $finalLogged -ErrorMessage $_.Exception.Message
     throw
 } finally {
     if ($null -ne $serial) { if ($serial.IsOpen) { $serial.Close() }; $serial.Dispose() }
