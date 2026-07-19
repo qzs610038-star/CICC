@@ -1,0 +1,27 @@
+{
+  "schema": "qzs-wsc-two-person-integration-v1",
+  "date": "2026-07-20",
+  "branch": "codex/qzs-wsc-p0a-p1-integration-20260720",
+  "qzs_base_sha": "7e0149e7becb3a57767a868c1720aecba34157ae",
+  "wsc_source_sha": "aaf2058e7e05b8cda905b8096db309c65e0da5ef",
+  "merge_commit": "8cadb77dc409e5cb9f311a784148dc4bc44facae",
+  "merge_conflicts": 0,
+  "wsc_changed_paths": 41,
+  "wsc_scope": "PASS",
+  "frozen_hardware_diff_paths": 0,
+  "results": {
+    "p0a_host": "10/10 PASS",
+    "p1_host_model": "37/37 PASS",
+    "feature_adapter": "39/39 PASS",
+    "classifier": "54/54 PASS",
+    "f1": "213/213 PASS",
+    "runtime_g2": "648/648 PASS",
+    "p1_replay": "20/20 PASS ARM=0",
+    "offline_presubmit": "PASS_WITH_WARNINGS WARN=8 FAIL=0"
+  },
+  "board_verified": false,
+  "p0_b": "HOLD",
+  "arm_enabled": false,
+  "main_merged": false,
+  "libaoxun_touched": false
+}

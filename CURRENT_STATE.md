@@ -136,3 +136,12 @@ I3=BLOCKED_CONTRACT_NOT_FROZEN
 - qzs 已快速复审 wsc R1/R2 SHA `a74b21d19e9a81d315456e106e9d23cc5402243a`：两个独立 `2564f146...` 工作树严格构建/verifier PASS，自动比较 12 项 PASS，objdump 篡改 fail-closed，因此签发 `P0-A-READY`，但仍为 `BOARD NOT VERIFIED`。P1 runner 已真实驱动 33 字节 fake snapshot、runtime/fake transport/packer，20 轮与篡改负例 PASS；然而 clean checkout 中 `rounds.jsonl`、`compile.txt`、`tamper.jsonl` 的实际 hash 与 manifest 不符，且命令卡含两个不存在的 R1 参数。因此 `P1-HOST-READY=NO / DO NOT MERGE`，只剩 evidence-packaging 修复，见 `docs/review_packets/WSC_P0_A_P1_HOST_R1_R2_FINAL_AUDIT_20260719.md`。
 - wsc 最终 evidence-only SHA `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 已由 qzs 在 clean checkout 验收：committed manifest 四项 LF-normalized hash PASS，`rounds.jsonl` 篡改负例 exit 1；fresh bundle 的 schema `11/11`、runtime replay `20/20`、snapshot tamper 与 manifest verifier PASS，四项 fresh hash 与 committed manifest 全部相同。现签发 `P1-HOST-READY`，与既有 `P0-A-READY` 一并进入固定 SHA 集成审查；不代表 RISC-V/APB/CDC/OSD/板级完成，见 `docs/review_packets/WSC_P0_A_P1_HOST_FINAL_ACCEPTANCE_20260720.md`。
 - wsc/qzs 固定 SHA 跨成员集成审查已通过：qzs `fce2cf461ea9bc48f786a70f3276c7e4a84658e7` 与 wsc `aaf2058e7e05b8cda905b8096db309c65e0da5ef` 的路径交集、文本冲突和冻结接口差分均为 0，merge-tree 与独立 no-commit 合成树同为 `e689cd5395bcd8b65b0fa1b59f3b491c52c8d08a`；组合 P0/P1/648/QEMU/interface/offline Gate PASS。裁定 `APPROVE_FOR_MERGE / MERGE_NOT_PERFORMED`，见 `docs/review_packets/WSC_QZS_CROSS_MEMBER_INTEGRATION_REVIEW_20260720.md`。libaoxun 未被拉取、通知或要求暂停 UART1/USER2 实验。
+
+## qzs + wsc 双人专用集成 — 2026-07-20
+
+- 分支 `codex/qzs-wsc-p0a-p1-integration-20260720` 显式区别于三人分支。
+- qzs `7e0149e7...` 与 WSC `aaf2058e...` 形成 merge commit `8cadb77dc409e5cb9f311a784148dc4bc44facae`；正式 `main` 未修改。
+- fresh 复验：P0-A `10/10`；P1 `37/39/54/213`；runtime `648/648`；replay `20/20 ARM=0`；manifest/tamper、冻结接口、offline presubmit 均通过。
+- 裁定：`P0_A_READY=YES / P1_HOST_READY=YES / BOARD_VERIFIED=NO / USER2_BOARD_GATE=NOT_OPENED / P0_B=HOLD / ARM_ENABLED=0`。
+- libaoxun 的活动分支、工作区和 UART1/USER2 实验未被切换、合并、通知或要求同步；未来三方集成须等待其固定 SHA 并另开原子批次审查。
+- 记录：`docs/merge_governance/records/2026-07-20_qzs_wsc_p0a_p1_integration.md`。

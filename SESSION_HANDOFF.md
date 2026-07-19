@@ -137,3 +137,13 @@ qzs `fce2cf461ea9bc48f786a70f3276c7e4a84658e7` 与 wsc `aaf2058e7e05b8cda905b809
 - 新增 P1 三层矩阵、JSONL schema/样例、采集 CSV、OSD/输入状态表和 20 轮 bundle manifest 模板，入口为 `competition_project_single_camera/docs/evidence_manifests/P1_HOST_THREE_LAYER_EVIDENCE_MATRIX_20260719.md`。全部为 `TEMPLATE/NOT RUN`，不冻结 APB/PSTRB/IRQ/CDC/OSD wire ABI。
 - qzs 已审查本机可见 wsc refs：最新 `origin/dev/wsc6090-goal4-contract-after-qzs-20260719@48548f47...` 早于 kickoff 且无 P0-A/P1 实现 diff；本轮 verdict=`P0-A=BLOCKED / NO_SUBMISSION_VISIBLE`。未运行任何 wsc Host runner 或 P0-A 工具链，旧 Host PASS 不继承。
 - P0-B review draft 已同步此事实并保持 `HOLD`；没有向 libaoxun 发送任务/同步/审阅请求。`ARM_ENABLED=0`，USER2/PC/UART1/APB/OSD/board 均保持 `NOT VERIFIED`。
+
+## 双人集成恢复入口 — 2026-07-20
+
+- 分支：`codex/qzs-wsc-p0a-p1-integration-20260720`
+- qzs 第一父提交：`7e0149e7becb3a57767a868c1720aecba34157ae`
+- wsc 第二父提交：`aaf2058e7e05b8cda905b8096db309c65e0da5ef`
+- merge commit：`8cadb77dc409e5cb9f311a784148dc4bc44facae`
+- 状态：`P0_A_READY=YES / P1_HOST_READY=YES / BOARD_VERIFIED=NO / P0_B=HOLD / ARM=0`。
+- 这不是三人集成，也没有触碰 libaoxun 的 UART1/USER2 工作；其后续固定 SHA 必须另开三方审查。
+- 恢复后先读 `docs/merge_governance/records/2026-07-20_qzs_wsc_p0a_p1_integration.md`，再核对 `git show -s --format=%H%n%P HEAD`。

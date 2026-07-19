@@ -67,3 +67,20 @@ ARM_ENABLED=0
 本裁定允许下一步在专用集成分支合并这两个固定 SHA；不允许动态跟随分支头，也不授权直接合入 `main`、USER2、上板、UART2/J52 或机械臂动作。若真实合并前任一来源 SHA 变化，必须重跑差分审查；若固定 SHA 不变，可复用本次冲突与组合回归结果。
 
 libaoxun 继续其现有 UART1/USER2 关键实验。本次 wsc/qzs 合并不需要其拉取、审阅或协调；涉及其 Hard SoC 原子输入的后续三方集成必须等其主动提供固定 SHA 后另行审查。
+
+## 5. 实际合并落地 — 2026-07-20
+
+上述批准已在双人专用分支 `codex/qzs-wsc-p0a-p1-integration-20260720` 落地。qzs
+实际基线为在原审查固定 SHA 之后仅增加本审查文档的 `7e0149e...`；WSC 来源保持
+`aaf2058...`。ort 无冲突生成 merge commit `8cadb77...`，合并后范围、冻结接口、
+P0-A、P1、648 runtime、20 轮 replay、manifest/tamper 和 offline presubmit 均通过。
+
+```text
+MERGE_PERFORMED=YES
+INTEGRATION_BRANCH=codex/qzs-wsc-p0a-p1-integration-20260720
+MERGE_COMMIT=8cadb77dc409e5cb9f311a784148dc4bc44facae
+MAIN_MERGED=NO
+LIBAOXUN_TOUCHED=NO
+```
+
+详见 `docs/merge_governance/records/2026-07-20_qzs_wsc_p0a_p1_integration.md`。
