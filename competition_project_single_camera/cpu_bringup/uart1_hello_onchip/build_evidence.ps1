@@ -72,7 +72,7 @@ try {
     $debugStart = [Array]::FindIndex($mapLines, [Predicate[string]]{ param($line) $line -match '^\.debug_' })
     if ($debugStart -gt 0) { $mapLines = @($mapLines[0..($debugStart - 1)]) }
     (($mapLines | ForEach-Object { $_.TrimEnd() }) -join "`n") |
-        Set-Content -NoNewline -Encoding ascii (Join-Path $evidence 'diagnostic.map')
+        Set-Content -NoNewline -Encoding ascii (Join-Path $evidence 'diagnostic-map.txt')
 
     $witness = Join-Path $evidence 'tx-never-ready.json'
     & (Join-Path $root 'run_host_tests.ps1') -WitnessPath $witness 2>&1 |
@@ -125,7 +125,7 @@ try {
     $orderDetails | ConvertTo-Json | Set-Content -Encoding ascii (Join-Path $evidence 'disassembly-order.json')
 
     $artifactPaths = [ordered]@{
-        elf='diagnostic.elf'; map='diagnostic.map'; readelf='readelf-lW.txt';
+        elf='diagnostic.elf'; map='diagnostic-map.txt'; readelf='readelf-lW.txt';
         objdump='objdump-d.txt'; build_log='strict-build.txt'; tx_never_ready='tx-never-ready.json'
     }
     $artifacts = [ordered]@{}
