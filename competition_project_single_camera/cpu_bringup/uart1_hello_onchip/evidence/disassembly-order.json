@@ -1,0 +1,10 @@
+{
+    "schema":  "p0-a-disassembly-order-v1",
+    "function":  "p0a_run_uart_probe",
+    "c003_mark":  "0xf90002bc",
+    "uart_config_call":  "0xf90002c2",
+    "c004_mark":  "0xf90002cc",
+    "c005_mark":  "0xf90002d4",
+    "first_tx_call":  "0xf90002da",
+    "relation":  "C003 \u003c UART_CONFIG \u003c C004 \u003c C005 \u003c FIRST_TX"
+}

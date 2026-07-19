@@ -1,0 +1,15 @@
+{
+  "schema": "p0-a-reproducibility-v1",
+  "status": "PASS_AWAITING_QZS_REVIEW",
+  "implementation_git_sha": "6e9475ff6678c289160b3374cd98b6fda88c8455",
+  "worktree_a": "developer_worktree",
+  "worktree_b": "clean_detached_worktree",
+  "normalized_input_sha256": "14D5F966E7EA61369EA9247FA96C1ABF50D45311ED7E71A6F3EC34AA0C89CA5C",
+  "build_id_hex": "0x14D5F966",
+  "stripped_diagnostic_elf_sha256": "341D902E00A44B099D6BDBC0872873153E37DDB80D22D04FAFADF3F65E490C3A",
+  "loadable_layout_map_sha256": "69443007F8DAAC349E123785777F280CF2F84ACB72564861D69D582AB762B6E3",
+  "readelf_sha256": "9EF233C951E93079E332F1450B5E81E755A21E6EB72F8F825B11882DDCE78740",
+  "objdump_sha256": "8820B8D14ABBE265A066F12073BCE98B35A4E75C0AD8B8C4D3CB336396056F30",
+  "all_compared_fields_match": true,
+  "debug_elf_policy": "local non-identity artifact; never committed"
+}

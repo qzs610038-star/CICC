@@ -1,0 +1,46 @@
+STATUS=AWAITING_QZS_REVIEW
+IMPLEMENTATION_SHA=6e9475ff6678c289160b3374cd98b6fda88c8455
+GOVERNANCE_SHA=f027c6ff7b087e4dff5c23b5d76edd8286172f1f
+
+Prerequisites:
+- clean checkout at IMPLEMENTATION_SHA
+- read-only governance checkout at GOVERNANCE_SHA
+- Efinity RISC-V IDE 2025.2 toolchain root
+- bundled Python executable
+
+P0-A Host negative:
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\run_host_tests.ps1 -WitnessPath <absolute-output>\tx-never-ready.json
+Expected: p0a_uart_timeout: 10/10 passed
+
+P0-A fresh build and qzs verifier:
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu_bringup\uart1_hello_onchip\build_evidence.ps1 -ToolchainRoot <efinity-riscv-ide-root> -FirmwareGitSha 6e9475ff6678c289160b3374cd98b6fda88c8455 -PythonExe <python.exe> -VerifierPath <governance-root>\competition_project_single_camera\tools\p0_a_evidence_verifier.py
+Expected: evidence\verifier.txt contains P0_A_EVIDENCE=PASS and board_status=NOT_VERIFIED
+
+P1 unit and adapter checks:
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_host_model.ps1
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_feature_adapter_host.ps1
+Expected: 37/37 and 39/39 passed
+
+P1 existing regression:
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_classifier_host.ps1
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_single_camera_f1_host.ps1
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_g2_host_evidence.ps1 -RunDir <absolute-output>\g2 -PythonExe <python.exe> -CompilerPreference Msvc
+Expected: 54/54, 213/213, 648/648 and VALIDATION_PASS
+
+P1 executable 20-round bundle:
+powershell -ExecutionPolicy Bypass -File .\competition_project_single_camera\cpu\tests\run_p1_replay_bundle.ps1 -RunDir <absolute-output>\p1-replay -SchemaPath <governance-root>\competition_project_single_camera\docs\evidence_manifests\p1_feature_vector.schema.json -ImplementationGitSha 6e9475ff6678c289160b3374cd98b6fda88c8455 -GovernanceGitSha f027c6ff7b087e4dff5c23b5d76edd8286172f1f
+Expected: P1_VECTOR_SCHEMA=PASS count=11; P1_REPLAY_SCHEMA=PASS rounds=20 ARM=0; P1_REPLAY_BUNDLE=PASS status=AWAITING_QZS_REVIEW
+
+Final repository checks:
+git diff --check
+git status --short --branch
+git diff --name-only 0e5ab490559c58642734b0095753c6cf8787c709..HEAD -- competition_project_single_camera/cpu/include competition_project_single_camera/integration competition_project_single_camera/src competition_project_single_camera/ip competition_project_single_camera/mem_test.xml competition_project_single_camera/mem_test.peri.xml competition_project_single_camera/constrain.sdc
+Expected: diff --check exit 0; final scoped hardware/frozen-path diff has no output.
+
+Non-claims:
+P0_A_READY=NO
+P1_HOST_READY=NO
+BOARD_VERIFIED=NO
+USER2_BOARD_GATE=NOT_OPENED
+P0_B=HOLD
+ARM_ENABLED=0

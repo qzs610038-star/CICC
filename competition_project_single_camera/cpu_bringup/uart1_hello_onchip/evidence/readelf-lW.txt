@@ -1,0 +1,94 @@
+ELF Header:
+  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              EXEC (Executable file)
+  Machine:                           RISC-V
+  Version:                           0x1
+  Entry point address:               0xf9000000
+  Start of program headers:          52 (bytes into file)
+  Start of section headers:          6288 (bytes into file)
+  Flags:                             0x5, RVC, double-float ABI
+  Size of this header:               52 (bytes)
+  Size of program headers:           32 (bytes)
+  Number of program headers:         1
+  Size of section headers:           40 (bytes)
+  Number of section headers:         11
+  Section header string table index: 10
+
+Section Headers:
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+  [ 1] .init             PROGBITS        f9000000 001000 000052 00  AX  0   0  1
+  [ 2] .text             PROGBITS        f9000052 001052 0002c2 00  AX  0   0  2
+  [ 3] .data             PROGBITS        f9000314 001314 00004e 00  WA  0   0  4
+  [ 4] .p0a_canary       NOBITS          f9000370 001362 000028 00  WA  0   0 16
+  [ 5] .bss              NOBITS          f9000398 001362 000000 00  WA  0   0  1
+  [ 6] .stack            NOBITS          f90003a0 001362 000800 00  WA  0   0 16
+  [ 7] .comment          PROGBITS        00000000 001362 000033 01  MS  0   0  1
+  [ 8] .symtab           SYMTAB          00000000 001398 0002c0 10      9  18  4
+  [ 9] .strtab           STRTAB          00000000 001658 0001e9 00      0   0  1
+  [10] .shstrtab         STRTAB          00000000 001841 00004e 00      0   0  1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+  L (link order), O (extra OS processing required), G (group), T (TLS),
+  C (compressed), x (unknown), o (OS specific), E (exclude),
+  p (processor specific)
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x001000 0xf9000000 0xf9000000 0x00362 0x00ba0 RWE 0x1000
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .init .text .data .p0a_canary .bss .stack
+
+Symbol table '.symtab' contains 44 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: f9000008     0 NOTYPE  LOCAL  DEFAULT    1 init
+     2: f900004e     0 NOTYPE  LOCAL  DEFAULT    1 mainDone
+     3: f90000bc     4 FUNC    LOCAL  DEFAULT    2 mmio_read32
+     4: f90000c0     4 FUNC    LOCAL  DEFAULT    2 mmio_write32
+     5: f90000c4    40 FUNC    LOCAL  DEFAULT    2 uart1_init
+     6: f9000174    32 FUNC    LOCAL  DEFAULT    2 canary_commit
+     7: f9000314     0 NOTYPE  LOCAL  DEFAULT    3 __init_array_end
+     8: f9000314     0 NOTYPE  LOCAL  DEFAULT    3 __preinit_array_end
+     9: f9000314     0 NOTYPE  LOCAL  DEFAULT    3 __init_array_start
+    10: f9000314     0 NOTYPE  LOCAL  DEFAULT    3 __preinit_array_start
+    11: f9000000     0 SECTION LOCAL  DEFAULT    1
+    12: f9000052     0 SECTION LOCAL  DEFAULT    2
+    13: f9000314     0 SECTION LOCAL  DEFAULT    3
+    14: f9000370     0 SECTION LOCAL  DEFAULT    4
+    15: f9000398     0 SECTION LOCAL  DEFAULT    5
+    16: f90003a0     0 SECTION LOCAL  DEFAULT    6
+    17: 00000000     0 SECTION LOCAL  DEFAULT    7
+    18: f9000b48     0 NOTYPE  GLOBAL DEFAULT    3 __global_pointer$
+    19: 00000800     0 NOTYPE  GLOBAL DEFAULT  ABS __stack_size
+    20: f9000216    90 FUNC    GLOBAL DEFAULT    2 p0a_uart_putc_bounded
+    21: f9000370     0 NOTYPE  GLOBAL DEFAULT    4 __p0a_canary_start
+    22: f9000ba0     0 NOTYPE  GLOBAL DEFAULT    6 __freertos_irq_stack_top
+    23: f9000270    50 FUNC    GLOBAL DEFAULT    2 p0a_uart_write_bounded
+    24: f90001d4    20 FUNC    GLOBAL DEFAULT    2 p0a_canary_mark
+    25: f9000052   106 FUNC    GLOBAL DEFAULT    2 __libc_init_array
+    26: f9000050     0 NOTYPE  GLOBAL DEFAULT    1 _init
+    27: f9000370    40 OBJECT  GLOBAL DEFAULT    4 g_p0a_canary
+    28: f9000ba0     0 NOTYPE  GLOBAL DEFAULT    6 __stack_top
+    29: f9000ba0     0 NOTYPE  GLOBAL DEFAULT    6 _sp
+    30: f9000000     0 FUNC    GLOBAL DEFAULT    1 _start
+    31: f9000146    46 FUNC    GLOBAL DEFAULT    2 p0a_canary_checksum
+    32: f9000398     0 NOTYPE  GLOBAL DEFAULT    4 __p0a_canary_end
+    33: f9000398     0 NOTYPE  GLOBAL DEFAULT    5 __bss_start
+    34: f90000ec    90 FUNC    GLOBAL DEFAULT    2 main
+    35: f90001fe    24 FUNC    GLOBAL DEFAULT    2 p0a_canary_heartbeat
+    36: f90001e8    22 FUNC    GLOBAL DEFAULT    2 p0a_canary_set_uart
+    37: f90003a0     0 NOTYPE  GLOBAL DEFAULT    6 __stack_bottom
+    38: f9000314     0 NOTYPE  GLOBAL DEFAULT    3 _data
+    39: f9000364     0 NOTYPE  GLOBAL DEFAULT    4 _edata
+    40: f9000398     0 NOTYPE  GLOBAL DEFAULT    5 _end
+    41: f9000314     0 NOTYPE  GLOBAL DEFAULT    3 _data_lma
+    42: f90002a2   114 FUNC    GLOBAL DEFAULT    2 p0a_run_uart_probe
+    43: f9000194    64 FUNC    GLOBAL DEFAULT    2 p0a_canary_init

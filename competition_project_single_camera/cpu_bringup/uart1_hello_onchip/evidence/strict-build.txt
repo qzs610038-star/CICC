@@ -1,0 +1,6 @@
+CC src/main.c
+CC src/p0a_diag.c
+CC ../../embedded_sw/efx_hard_soc/software/standalone/common/start.S
+LD p0a_uart1_diag
+Memory region         Used Size  Region Size  %age Used
+             ram:        2976 B        16 KB     18.16%

@@ -1,0 +1,22 @@
+{
+  "schema": "wsc-p0a-p1-remediation-matrix-v1",
+  "status": "AWAITING_QZS_REVIEW",
+  "implementation_git_sha": "6e9475ff6678c289160b3374cd98b6fda88c8455",
+  "governance_git_sha": "f027c6ff7b087e4dff5c23b5d76edd8286172f1f",
+  "items": [
+    {"id":"P0-A-1","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/disassembly-order.json","../../../cpu_bringup/uart1_hello_onchip/evidence/tx-never-ready.json"]},
+    {"id":"P0-A-2","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/manifest.json","../../../cpu_bringup/uart1_hello_onchip/evidence/input_hashes.sha256"]},
+    {"id":"P0-A-3","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/manifest.json","../../../cpu_bringup/uart1_hello_onchip/evidence/verifier.txt"]},
+    {"id":"P0-A-4","closed_by_wsc":true,"evidence":["../../../cpu_bringup/uart1_hello_onchip/evidence/reproducibility.json","../../../cpu_bringup/uart1_hello_onchip/evidence/diagnostic-map.txt"]},
+    {"id":"P1-1","closed_by_wsc":true,"evidence":["../../vectors/p1/p1_contract_vectors.jsonl","../p1_replay_remediation_20260719/manifest.json"]},
+    {"id":"P1-2","closed_by_wsc":true,"evidence":["../p1_replay_remediation_20260719/rounds.jsonl","../p1_replay_remediation_20260719/runner.txt"]},
+    {"id":"P1-3","closed_by_wsc":true,"evidence":["../../test_single_camera_feature_adapter.c","../../vectors/p1/p1_contract_vectors.jsonl"]},
+    {"id":"P1-4","closed_by_wsc":true,"evidence":["../../test_p1_host_model.c","../p1_replay_remediation_20260719/runner.txt"]}
+  ],
+  "claims": {
+    "p0_a_ready": false,
+    "p1_host_ready": false,
+    "board_verified": false,
+    "arm_enabled": 0
+  }
+}

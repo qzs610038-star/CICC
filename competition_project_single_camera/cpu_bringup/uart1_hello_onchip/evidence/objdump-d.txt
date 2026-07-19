@@ -1,0 +1,366 @@
+
+diagnostic.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .init:
+
+f9000000 <_start>:
+f9000000:	00001197          	auipc	gp,0x1
+f9000004:	b4818193          	addi	gp,gp,-1208 # f9000b48 <__global_pointer$>
+
+f9000008 <init>:
+f9000008:	05818113          	addi	sp,gp,88 # f9000ba0 <__freertos_irq_stack_top>
+f900000c:	00000517          	auipc	a0,0x0
+f9000010:	30850513          	addi	a0,a0,776 # f9000314 <_data>
+f9000014:	00000597          	auipc	a1,0x0
+f9000018:	30058593          	addi	a1,a1,768 # f9000314 <_data>
+f900001c:	81c18613          	addi	a2,gp,-2020 # f9000364 <_edata>
+f9000020:	00c5fa63          	bgeu	a1,a2,f9000034 <init+0x2c>
+f9000024:	00052283          	lw	t0,0(a0)
+f9000028:	0055a023          	sw	t0,0(a1)
+f900002c:	0511                	addi	a0,a0,4
+f900002e:	0591                	addi	a1,a1,4
+f9000030:	fec5eae3          	bltu	a1,a2,f9000024 <init+0x1c>
+f9000034:	85018513          	addi	a0,gp,-1968 # f9000398 <__p0a_canary_end>
+f9000038:	85018593          	addi	a1,gp,-1968 # f9000398 <__p0a_canary_end>
+f900003c:	00b57763          	bgeu	a0,a1,f900004a <init+0x42>
+f9000040:	00052023          	sw	zero,0(a0)
+f9000044:	0511                	addi	a0,a0,4
+f9000046:	feb56de3          	bltu	a0,a1,f9000040 <init+0x38>
+f900004a:	2021                	jal	f9000052 <__libc_init_array>
+f900004c:	2045                	jal	f90000ec <main>
+
+f900004e <mainDone>:
+f900004e:	a001                	j	f900004e <mainDone>
+
+f9000050 <_init>:
+f9000050:	8082                	ret
+
+Disassembly of section .text:
+
+f9000052 <__libc_init_array>:
+f9000052:	1141                	addi	sp,sp,-16
+f9000054:	c422                	sw	s0,8(sp)
+f9000056:	c04a                	sw	s2,0(sp)
+f9000058:	00000417          	auipc	s0,0x0
+f900005c:	2bc40413          	addi	s0,s0,700 # f9000314 <_data>
+f9000060:	00000917          	auipc	s2,0x0
+f9000064:	2b490913          	addi	s2,s2,692 # f9000314 <_data>
+f9000068:	40890933          	sub	s2,s2,s0
+f900006c:	c606                	sw	ra,12(sp)
+f900006e:	c226                	sw	s1,4(sp)
+f9000070:	40295913          	srai	s2,s2,0x2
+f9000074:	00090963          	beqz	s2,f9000086 <__libc_init_array+0x34>
+f9000078:	4481                	li	s1,0
+f900007a:	401c                	lw	a5,0(s0)
+f900007c:	0485                	addi	s1,s1,1
+f900007e:	0411                	addi	s0,s0,4
+f9000080:	9782                	jalr	a5
+f9000082:	fe991ce3          	bne	s2,s1,f900007a <__libc_init_array+0x28>
+f9000086:	00000417          	auipc	s0,0x0
+f900008a:	28e40413          	addi	s0,s0,654 # f9000314 <_data>
+f900008e:	00000917          	auipc	s2,0x0
+f9000092:	28690913          	addi	s2,s2,646 # f9000314 <_data>
+f9000096:	40890933          	sub	s2,s2,s0
+f900009a:	40295913          	srai	s2,s2,0x2
+f900009e:	00090963          	beqz	s2,f90000b0 <__libc_init_array+0x5e>
+f90000a2:	4481                	li	s1,0
+f90000a4:	401c                	lw	a5,0(s0)
+f90000a6:	0485                	addi	s1,s1,1
+f90000a8:	0411                	addi	s0,s0,4
+f90000aa:	9782                	jalr	a5
+f90000ac:	fe991ce3          	bne	s2,s1,f90000a4 <__libc_init_array+0x52>
+f90000b0:	40b2                	lw	ra,12(sp)
+f90000b2:	4422                	lw	s0,8(sp)
+f90000b4:	4492                	lw	s1,4(sp)
+f90000b6:	4902                	lw	s2,0(sp)
+f90000b8:	0141                	addi	sp,sp,16
+f90000ba:	8082                	ret
+
+f90000bc <mmio_read32>:
+f90000bc:	4188                	lw	a0,0(a1)
+f90000be:	8082                	ret
+
+f90000c0 <mmio_write32>:
+f90000c0:	c190                	sw	a2,0(a1)
+f90000c2:	8082                	ret
+
+f90000c4 <uart1_init>:
+f90000c4:	1141                	addi	sp,sp,-16
+f90000c6:	c606                	sw	ra,12(sp)
+f90000c8:	c422                	sw	s0,8(sp)
+f90000ca:	0d800613          	li	a2,216
+f90000ce:	e8011437          	lui	s0,0xe8011
+f90000d2:	00840593          	addi	a1,s0,8 # e8011008 <__freertos_irq_stack_top+0xef010468>
+f90000d6:	4501                	li	a0,0
+f90000d8:	37e5                	jal	f90000c0 <mmio_write32>
+f90000da:	461d                	li	a2,7
+f90000dc:	00c40593          	addi	a1,s0,12
+f90000e0:	4501                	li	a0,0
+f90000e2:	3ff9                	jal	f90000c0 <mmio_write32>
+f90000e4:	40b2                	lw	ra,12(sp)
+f90000e6:	4422                	lw	s0,8(sp)
+f90000e8:	0141                	addi	sp,sp,16
+f90000ea:	8082                	ret
+
+f90000ec <main>:
+f90000ec:	7179                	addi	sp,sp,-48
+f90000ee:	d606                	sw	ra,44(sp)
+f90000f0:	d422                	sw	s0,40(sp)
+f90000f2:	f90007b7          	lui	a5,0xf9000
+f90000f6:	31478793          	addi	a5,a5,788 # f9000314 <__freertos_irq_stack_top+0xfffff774>
+f90000fa:	438c                	lw	a1,0(a5)
+f90000fc:	43d0                	lw	a2,4(a5)
+f90000fe:	4794                	lw	a3,8(a5)
+f9000100:	47d8                	lw	a4,12(a5)
+f9000102:	4b9c                	lw	a5,16(a5)
+f9000104:	c62e                	sw	a1,12(sp)
+f9000106:	c832                	sw	a2,16(sp)
+f9000108:	ca36                	sw	a3,20(sp)
+f900010a:	cc3a                	sw	a4,24(sp)
+f900010c:	ce3e                	sw	a5,28(sp)
+f900010e:	4505                	li	a0,1
+f9000110:	2051                	jal	f9000194 <p0a_canary_init>
+f9000112:	4589                	li	a1,2
+f9000114:	6431                	lui	s0,0xc
+f9000116:	00240513          	addi	a0,s0,2 # c002 <__stack_size+0xb802>
+f900011a:	286d                	jal	f90001d4 <p0a_canary_mark>
+f900011c:	f90006b7          	lui	a3,0xf9000
+f9000120:	32868693          	addi	a3,a3,808 # f9000328 <__freertos_irq_stack_top+0xfffff788>
+f9000124:	4601                	li	a2,0
+f9000126:	f90005b7          	lui	a1,0xf9000
+f900012a:	0c458593          	addi	a1,a1,196 # f90000c4 <__freertos_irq_stack_top+0xfffff524>
+f900012e:	0068                	addi	a0,sp,12
+f9000130:	2a8d                	jal	f90002a2 <p0a_run_uart_probe>
+f9000132:	0ff00593          	li	a1,255
+f9000136:	0ff40513          	addi	a0,s0,255
+f900013a:	2869                	jal	f90001d4 <p0a_canary_mark>
+f900013c:	6505                	lui	a0,0x1
+f900013e:	f0050513          	addi	a0,a0,-256 # f00 <__stack_size+0x700>
+f9000142:	2875                	jal	f90001fe <p0a_canary_heartbeat>
+f9000144:	bfe5                	j	f900013c <main+0x50>
+
+f9000146 <p0a_canary_checksum>:
+f9000146:	411c                	lw	a5,0(a0)
+f9000148:	4158                	lw	a4,4(a0)
+f900014a:	8fb9                	xor	a5,a5,a4
+f900014c:	4518                	lw	a4,8(a0)
+f900014e:	8fb9                	xor	a5,a5,a4
+f9000150:	4558                	lw	a4,12(a0)
+f9000152:	8fb9                	xor	a5,a5,a4
+f9000154:	4918                	lw	a4,16(a0)
+f9000156:	8fb9                	xor	a5,a5,a4
+f9000158:	4958                	lw	a4,20(a0)
+f900015a:	8fb9                	xor	a5,a5,a4
+f900015c:	4d18                	lw	a4,24(a0)
+f900015e:	8fb9                	xor	a5,a5,a4
+f9000160:	4d58                	lw	a4,28(a0)
+f9000162:	8fb9                	xor	a5,a5,a4
+f9000164:	5108                	lw	a0,32(a0)
+f9000166:	8fa9                	xor	a5,a5,a0
+f9000168:	a5a56537          	lui	a0,0xa5a56
+f900016c:	a5a50513          	addi	a0,a0,-1446 # a5a55a5a <__freertos_irq_stack_top+0xaca54eba>
+f9000170:	8d3d                	xor	a0,a0,a5
+f9000172:	8082                	ret
+
+f9000174 <canary_commit>:
+f9000174:	1141                	addi	sp,sp,-16
+f9000176:	c606                	sw	ra,12(sp)
+f9000178:	c422                	sw	s0,8(sp)
+f900017a:	82818413          	addi	s0,gp,-2008 # f9000370 <g_p0a_canary>
+f900017e:	445c                	lw	a5,12(s0)
+f9000180:	0785                	addi	a5,a5,1
+f9000182:	c45c                	sw	a5,12(s0)
+f9000184:	82818513          	addi	a0,gp,-2008 # f9000370 <g_p0a_canary>
+f9000188:	3f7d                	jal	f9000146 <p0a_canary_checksum>
+f900018a:	d048                	sw	a0,36(s0)
+f900018c:	40b2                	lw	ra,12(sp)
+f900018e:	4422                	lw	s0,8(sp)
+f9000190:	0141                	addi	sp,sp,16
+f9000192:	8082                	ret
+
+f9000194 <p0a_canary_init>:
+f9000194:	1141                	addi	sp,sp,-16
+f9000196:	c606                	sw	ra,12(sp)
+f9000198:	82818793          	addi	a5,gp,-2008 # f9000370 <g_p0a_canary>
+f900019c:	50304737          	lui	a4,0x50304
+f90001a0:	14370713          	addi	a4,a4,323 # 50304143 <__stack_size+0x50303943>
+f90001a4:	c398                	sw	a4,0(a5)
+f90001a6:	4705                	li	a4,1
+f90001a8:	c3d8                	sw	a4,4(a5)
+f90001aa:	14d60737          	lui	a4,0x14d60
+f90001ae:	96670713          	addi	a4,a4,-1690 # 14d5f966 <__stack_size+0x14d5f166>
+f90001b2:	c798                	sw	a4,8(a5)
+f90001b4:	0007a623          	sw	zero,12(a5)
+f90001b8:	6731                	lui	a4,0xc
+f90001ba:	0705                	addi	a4,a4,1
+f90001bc:	cb98                	sw	a4,16(a5)
+f90001be:	cbc8                	sw	a0,20(a5)
+f90001c0:	0007ac23          	sw	zero,24(a5)
+f90001c4:	0007ae23          	sw	zero,28(a5)
+f90001c8:	0207a023          	sw	zero,32(a5)
+f90001cc:	3765                	jal	f9000174 <canary_commit>
+f90001ce:	40b2                	lw	ra,12(sp)
+f90001d0:	0141                	addi	sp,sp,16
+f90001d2:	8082                	ret
+
+f90001d4 <p0a_canary_mark>:
+f90001d4:	1141                	addi	sp,sp,-16
+f90001d6:	c606                	sw	ra,12(sp)
+f90001d8:	82818793          	addi	a5,gp,-2008 # f9000370 <g_p0a_canary>
+f90001dc:	cb88                	sw	a0,16(a5)
+f90001de:	cbcc                	sw	a1,20(a5)
+f90001e0:	3f51                	jal	f9000174 <canary_commit>
+f90001e2:	40b2                	lw	ra,12(sp)
+f90001e4:	0141                	addi	sp,sp,16
+f90001e6:	8082                	ret
+
+f90001e8 <p0a_canary_set_uart>:
+f90001e8:	1141                	addi	sp,sp,-16
+f90001ea:	c606                	sw	ra,12(sp)
+f90001ec:	82818793          	addi	a5,gp,-2008 # f9000370 <g_p0a_canary>
+f90001f0:	cf88                	sw	a0,24(a5)
+f90001f2:	cfcc                	sw	a1,28(a5)
+f90001f4:	cbd0                	sw	a2,20(a5)
+f90001f6:	3fbd                	jal	f9000174 <canary_commit>
+f90001f8:	40b2                	lw	ra,12(sp)
+f90001fa:	0141                	addi	sp,sp,16
+f90001fc:	8082                	ret
+
+f90001fe <p0a_canary_heartbeat>:
+f90001fe:	1141                	addi	sp,sp,-16
+f9000200:	c606                	sw	ra,12(sp)
+f9000202:	82818793          	addi	a5,gp,-2008 # f9000370 <g_p0a_canary>
+f9000206:	5398                	lw	a4,32(a5)
+f9000208:	0705                	addi	a4,a4,1
+f900020a:	d398                	sw	a4,32(a5)
+f900020c:	cbc8                	sw	a0,20(a5)
+f900020e:	379d                	jal	f9000174 <canary_commit>
+f9000210:	40b2                	lw	ra,12(sp)
+f9000212:	0141                	addi	sp,sp,16
+f9000214:	8082                	ret
+
+f9000216 <p0a_uart_putc_bounded>:
+f9000216:	c539                	beqz	a0,f9000264 <p0a_uart_putc_bounded+0x4e>
+f9000218:	411c                	lw	a5,0(a0)
+f900021a:	c7b9                	beqz	a5,f9000268 <p0a_uart_putc_bounded+0x52>
+f900021c:	415c                	lw	a5,4(a0)
+f900021e:	c7b9                	beqz	a5,f900026c <p0a_uart_putc_bounded+0x56>
+f9000220:	1141                	addi	sp,sp,-16
+f9000222:	c606                	sw	ra,12(sp)
+f9000224:	c422                	sw	s0,8(sp)
+f9000226:	c226                	sw	s1,4(sp)
+f9000228:	c04a                	sw	s2,0(sp)
+f900022a:	892e                	mv	s2,a1
+f900022c:	842a                	mv	s0,a0
+f900022e:	4904                	lw	s1,16(a0)
+f9000230:	c09d                	beqz	s1,f9000256 <p0a_uart_putc_bounded+0x40>
+f9000232:	401c                	lw	a5,0(s0)
+f9000234:	444c                	lw	a1,12(s0)
+f9000236:	0591                	addi	a1,a1,4
+f9000238:	4408                	lw	a0,8(s0)
+f900023a:	9782                	jalr	a5
+f900023c:	8141                	srli	a0,a0,0x10
+f900023e:	0ff57513          	andi	a0,a0,255
+f9000242:	e119                	bnez	a0,f9000248 <p0a_uart_putc_bounded+0x32>
+f9000244:	14fd                	addi	s1,s1,-1
+f9000246:	b7ed                	j	f9000230 <p0a_uart_putc_bounded+0x1a>
+f9000248:	405c                	lw	a5,4(s0)
+f900024a:	864a                	mv	a2,s2
+f900024c:	444c                	lw	a1,12(s0)
+f900024e:	4408                	lw	a0,8(s0)
+f9000250:	9782                	jalr	a5
+f9000252:	4501                	li	a0,0
+f9000254:	a011                	j	f9000258 <p0a_uart_putc_bounded+0x42>
+f9000256:	557d                	li	a0,-1
+f9000258:	40b2                	lw	ra,12(sp)
+f900025a:	4422                	lw	s0,8(sp)
+f900025c:	4492                	lw	s1,4(sp)
+f900025e:	4902                	lw	s2,0(sp)
+f9000260:	0141                	addi	sp,sp,16
+f9000262:	8082                	ret
+f9000264:	557d                	li	a0,-1
+f9000266:	8082                	ret
+f9000268:	557d                	li	a0,-1
+f900026a:	8082                	ret
+f900026c:	557d                	li	a0,-1
+f900026e:	8082                	ret
+
+f9000270 <p0a_uart_write_bounded>:
+f9000270:	1141                	addi	sp,sp,-16
+f9000272:	c606                	sw	ra,12(sp)
+f9000274:	c422                	sw	s0,8(sp)
+f9000276:	c226                	sw	s1,4(sp)
+f9000278:	84aa                	mv	s1,a0
+f900027a:	842e                	mv	s0,a1
+f900027c:	cd99                	beqz	a1,f900029a <p0a_uart_write_bounded+0x2a>
+f900027e:	00044583          	lbu	a1,0(s0)
+f9000282:	c591                	beqz	a1,f900028e <p0a_uart_write_bounded+0x1e>
+f9000284:	8526                	mv	a0,s1
+f9000286:	3f41                	jal	f9000216 <p0a_uart_putc_bounded>
+f9000288:	e919                	bnez	a0,f900029e <p0a_uart_write_bounded+0x2e>
+f900028a:	0405                	addi	s0,s0,1
+f900028c:	bfcd                	j	f900027e <p0a_uart_write_bounded+0xe>
+f900028e:	4501                	li	a0,0
+f9000290:	40b2                	lw	ra,12(sp)
+f9000292:	4422                	lw	s0,8(sp)
+f9000294:	4492                	lw	s1,4(sp)
+f9000296:	0141                	addi	sp,sp,16
+f9000298:	8082                	ret
+f900029a:	557d                	li	a0,-1
+f900029c:	bfd5                	j	f9000290 <p0a_uart_write_bounded+0x20>
+f900029e:	557d                	li	a0,-1
+f90002a0:	bfc5                	j	f9000290 <p0a_uart_write_bounded+0x20>
+
+f90002a2 <p0a_run_uart_probe>:
+f90002a2:	1101                	addi	sp,sp,-32
+f90002a4:	ce06                	sw	ra,28(sp)
+f90002a6:	cc22                	sw	s0,24(sp)
+f90002a8:	ca26                	sw	s1,20(sp)
+f90002aa:	c84a                	sw	s2,16(sp)
+f90002ac:	c64e                	sw	s3,12(sp)
+f90002ae:	84aa                	mv	s1,a0
+f90002b0:	842e                	mv	s0,a1
+f90002b2:	89b2                	mv	s3,a2
+f90002b4:	8936                	mv	s2,a3
+f90002b6:	458d                	li	a1,3
+f90002b8:	6531                	lui	a0,0xc
+f90002ba:	050d                	addi	a0,a0,3
+f90002bc:	3f21                	jal	f90001d4 <p0a_canary_mark>
+f90002be:	c019                	beqz	s0,f90002c4 <p0a_run_uart_probe+0x22>
+f90002c0:	854e                	mv	a0,s3
+f90002c2:	9402                	jalr	s0
+f90002c4:	4591                	li	a1,4
+f90002c6:	6431                	lui	s0,0xc
+f90002c8:	00440513          	addi	a0,s0,4 # c004 <__stack_size+0xb804>
+f90002cc:	3721                	jal	f90001d4 <p0a_canary_mark>
+f90002ce:	4595                	li	a1,5
+f90002d0:	00540513          	addi	a0,s0,5
+f90002d4:	3701                	jal	f90001d4 <p0a_canary_mark>
+f90002d6:	85ca                	mv	a1,s2
+f90002d8:	8526                	mv	a0,s1
+f90002da:	3f59                	jal	f9000270 <p0a_uart_write_bounded>
+f90002dc:	842a                	mv	s0,a0
+f90002de:	ed09                	bnez	a0,f90002f8 <p0a_run_uart_probe+0x56>
+f90002e0:	4619                	li	a2,6
+f90002e2:	4581                	li	a1,0
+f90002e4:	4505                	li	a0,1
+f90002e6:	3709                	jal	f90001e8 <p0a_canary_set_uart>
+f90002e8:	8522                	mv	a0,s0
+f90002ea:	40f2                	lw	ra,28(sp)
+f90002ec:	4462                	lw	s0,24(sp)
+f90002ee:	44d2                	lw	s1,20(sp)
+f90002f0:	4942                	lw	s2,16(sp)
+f90002f2:	49b2                	lw	s3,12(sp)
+f90002f4:	6105                	addi	sp,sp,32
+f90002f6:	8082                	ret
+f90002f8:	10100593          	li	a1,257
+f90002fc:	6439                	lui	s0,0xe
+f90002fe:	10140513          	addi	a0,s0,257 # e101 <__stack_size+0xd901>
+f9000302:	3dc9                	jal	f90001d4 <p0a_canary_mark>
+f9000304:	10200613          	li	a2,258
+f9000308:	10140593          	addi	a1,s0,257
+f900030c:	4509                	li	a0,2
+f900030e:	3de9                	jal	f90001e8 <p0a_canary_set_uart>
+f9000310:	547d                	li	s0,-1
+f9000312:	bfd9                	j	f90002e8 <p0a_run_uart_probe+0x46>
