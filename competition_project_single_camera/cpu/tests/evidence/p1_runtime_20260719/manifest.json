@@ -1,0 +1,23 @@
+{
+  "schema": "p1-host-evidence-v1",
+  "kickoff_sha": "0e5ab490559c58642734b0095753c6cf8787c709",
+  "source": "host_fixture_or_fake_transport",
+  "compiler_policy": "MSVC C11 /W4 /WX",
+  "exit_code": 0,
+  "assertions": {"passed": 648, "failed": 0},
+  "events": {"total": 101, "ack": 20, "malformed": 0},
+  "arm": {"enabled": false, "requests": 0, "sends": 0},
+  "files_sha256": {
+    "raw.log": "E5C87C661283011D075B0E5350A6D69266059C82FD5E2CABC0D487B1CA756A09",
+    "events.jsonl": "763B9DCB316F0228A2F4FB858EAF871B51CE42EF6CBA5FC194F4C2B383518EC5",
+    "summary.md": "CADFA91969BB0EF1981709048C633AD433448FD3AEC1B56B4995E255E5DE2719",
+    "../../vectors/p1/p1_contract_vectors.jsonl": "422A1BA9CC29FB92E8902C65CA2460A1276056144D7F98815569961155626B91",
+    "../../vectors/p1/twenty_round_arm0_replay.jsonl": "4B2B777BE8A6751C1212B31805DB3723B54956847A2B0025F4D872C48F649BA0"
+  },
+  "non_claims": [
+    "P1 RISC-V business ELF not built",
+    "MMIO/APB/CDC/OSD not implemented or verified",
+    "UART1, USER2, and board execution not verified",
+    "UART2/J52 and myCobot remain disabled"
+  ]
+}

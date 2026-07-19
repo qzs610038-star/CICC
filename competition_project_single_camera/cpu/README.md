@@ -41,3 +41,15 @@
 - runtime seam 的 `source=fake_transport` 仅证明 Host/fake 事务；它不证明 RISC-V ELF、
   APB、UART 或板级能力。真实 APB ABI 经过独立审核后，才可新增 production backend。
 - 同次 Efinity GUI 生成 `soc.h`、linker 和合法 SoC 资源后，才添加平台适配层。
+
+P1 Host additions are intentionally address-free:
+
+- `src/p1_host_model.*` implements an abstract eight-word 32-bit result
+  staging/commit model with serial `round_id` rejection of stale results.
+- The same module models `APPLY/PLACE/REMOVE/ABANDON/RESET` event semantics,
+  event ACK, duplicate rejection, out-of-order rejection, wraparound, and reset.
+- `tests/vectors/p1/` contains JSONL vectors and a 20-round `ARM=0` replay.
+  Task 2 non-cube evidence remains `BLOCKED/PROVISIONAL`; Tasks 3/4 remain
+  `SIZE_UNAVAILABLE/BLOCKED`.
+- These Host artifacts define no APB offsets, PSTRB, IRQ, CDC, pin, or OSD wire
+  ABI and do not prove RISC-V, MMIO, APB, UART, OSD, USER2, or board execution.
