@@ -1,0 +1,1 @@
+sample_id,object_id,color,shape,nominal_size_cm_x10,lighting_id,position_id,frame_id,config_seq,red_area,blue_area,yellow_area,foreground_area,roi_pixel_count,sum_luma,bbox_width,bbox_height,source_flags,expected_label,observed_label,decision,reason,artifact_hash,evidence_level

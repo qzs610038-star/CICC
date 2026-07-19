@@ -100,3 +100,8 @@ OSD 最小字段顺序固定为：`ROUND/FRAME/CONFIG`、`COLOR/SHAPE/SIZE`、`T
 - wsc 交给 qzs：固定 SHA、变更文件、向量、runner、原始 Host 日志、20 轮 bundle、明确未验证项。
 - qzs 先在本轮内部准备未来 H1 交接所需的一次性 Review Packet、向量 hash、OSD/输入表和三层证据矩阵；未到 `P1-HOST-READY` 不对外派 H1。
 - libaoxun 不参与本轮、不需要同步或审阅；继续其既有 UART1/USER2 攻坚。
+
+## 8. qzs 治理工件（2026-07-19 kickoff 后）
+
+- 三层不变量矩阵、JSONL schema/样例、采集 CSV、OSD/输入状态表及 20 轮 bundle 模板已统一放在 [`competition_project_single_camera/docs/evidence_manifests/`](../../competition_project_single_camera/docs/evidence_manifests/)；入口为 [`P1_HOST_THREE_LAYER_EVIDENCE_MATRIX_20260719.md`](../../competition_project_single_camera/docs/evidence_manifests/P1_HOST_THREE_LAYER_EVIDENCE_MATRIX_20260719.md)。
+- 上述工件全部是 `TEMPLATE` 或 `NOT RUN`，不含 APB 地址、PSTRB、IRQ、CDC、按键管脚或 OSD wire ABI。它们不得替代 wsc 的 Host runner、RTL TB 或任何板级证据。

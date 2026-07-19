@@ -4,6 +4,13 @@
 >
 > 触发前提：`P0-A-READY`，且 USER2 选择链经过两次有新证据的修正仍不能可靠 halt/read；随后用户另行批准 P0-B。
 
+## 2026-07-19 qzs checkpoint（保持 HOLD）
+
+- kickoff 基线为 `0e5ab490559c58642734b0095753c6cf8787c709`。qzs 已准备不假设工具链或路径的 P0-A manifest template 与 verifier：`competition_project_single_camera/docs/evidence_manifests/p0_a_evidence_manifest.template.json`、`competition_project_single_camera/tools/p0_a_evidence_verifier.py`。
+- verifier 只接受未来 wsc 提供并哈希绑定的 ELF/map/readelf/objdump/build log/TX-never-ready 负例；会检查 ELF entry/PT_LOAD、canary 符号、16 KiB RAM、stack/section 非重叠、有界 `E101` 及停止条件。模板不是 P0-A 证据。
+- 本 checkpoint 可见 refs 中没有 kickoff 后的 wsc P0-A 实现 diff，故 P0-A 当前为 `BLOCKED / NO_SUBMISSION_VISIBLE`，USER2 的两次有新证据修正也未发生。所有触发条件均未满足，Packet 继续为 `HOLD`。
+- `ARM_ENABLED=0`；没有构建、上板、冻结接口修改、UART2/J52 或机械臂操作。
+
 ## 任务目标与当前结论
 
 当 P0-A 无法经 USER2 读取 PC/RAM canary 时，通过“同批 BRAM 预加载诊断固件 → CPU 周期写最小 APB heartbeat → FPGA 锁存 → 现有安全可见输出”证明 CPU 执行。当前仅完成审查输入准备；不授权修改 `APP_OVERWRITE`、固件、APB/RTL、IP、XML/peri.xml/SDC、bitstream 或板卡。

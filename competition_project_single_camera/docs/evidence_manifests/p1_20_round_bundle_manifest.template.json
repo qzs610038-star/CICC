@@ -1,0 +1,16 @@
+{
+  "schema": "p1-20-round-host-bundle-v1",
+  "status": "TEMPLATE_NOT_RUN",
+  "git_sha": "REPLACE_WITH_WSC_FIXED_40_CHAR_SHA",
+  "arm_enabled": 0,
+  "artifacts": {
+    "runner_log": {"path": "REPLACE/runner.log", "sha256": "REPLACE"},
+    "round_records_jsonl": {"path": "REPLACE/rounds.jsonl", "sha256": "REPLACE"},
+    "feature_vectors_jsonl": {"path": "REPLACE/vectors.jsonl", "sha256": "REPLACE"},
+    "compiler_version": {"path": "REPLACE/compiler-version.txt", "sha256": "REPLACE"}
+  },
+  "required_per_round": ["round_id", "event_seq", "snapshot_hash", "ack_sequence", "decision", "reason", "result_commit_count", "elapsed_ms", "terminal_release", "arm_enabled"],
+  "required_scenarios": ["TASK1", "TASK2", "TASK3", "TASK4", "ABANDON", "TIMEOUT", "RESET"],
+  "negative_assertions": ["no_second_result", "no_duplicate_event", "no_infinite_wait", "old_round_cannot_overwrite_new_round"],
+  "not_verified": ["RISC-V", "MMIO", "APB", "CDC", "OSD_BOARD", "UART2/J52", "myCobot"]
+}

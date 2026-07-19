@@ -1,0 +1,37 @@
+{
+  "schema": "p0-a-evidence-v1",
+  "status": "TEMPLATE_NOT_RUN",
+  "firmware": {
+    "git_sha": "REPLACE_WITH_WSC_FIXED_40_CHAR_SHA",
+    "input_sha256": "REPLACE_WITH_FIRMWARE_INPUT_SHA256"
+  },
+  "artifacts": {
+    "elf": {"path": "REPLACE/diagnostic.elf", "sha256": "REPLACE"},
+    "map": {"path": "REPLACE/diagnostic.map", "sha256": "REPLACE"},
+    "readelf": {"path": "REPLACE/readelf-lW.txt", "sha256": "REPLACE"},
+    "objdump": {"path": "REPLACE/objdump-d.txt", "sha256": "REPLACE"},
+    "build_log": {"path": "REPLACE/strict-build.log", "sha256": "REPLACE"},
+    "tx_never_ready": {"path": "REPLACE/tx-never-ready.json", "sha256": "REPLACE"}
+  },
+  "memory": {
+    "base": "REPLACE_WITH_CURRENT_LINKER_RAM_BASE",
+    "size_bytes": 16384,
+    "regions": [
+      {"name": "text_data_bss", "start": "REPLACE", "end": "REPLACE"},
+      {"name": "canary", "start": "REPLACE_WITH_ELF_CANARY_ADDRESS", "end": "REPLACE"},
+      {"name": "stack", "start": "REPLACE", "end": "REPLACE"}
+    ]
+  },
+  "canary": {"symbol": "REPLACE_WITH_WSC_SYMBOL", "size_bytes": "REPLACE"},
+  "disassembly_order_witness": {
+    "artifact": "objdump",
+    "canary_write_offsets": ["REPLACE"],
+    "uart_wait_offsets": ["REPLACE"]
+  },
+  "stop_conditions": {
+    "same_failure_max_attempts": 2,
+    "requires_new_evidence_per_attempt": true,
+    "third_attempt_requires_review": true
+  },
+  "safety": {"arm_enabled": 0, "forbidden": ["UART2/J52", "myCobot"]}
+}

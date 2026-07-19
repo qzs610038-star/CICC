@@ -128,4 +128,6 @@ I3=BLOCKED_CONTRACT_NOT_FROZEN
 - 开工入口：`docs/agent_context/P0_P1_PARALLEL_KICKOFF_INDEX_20260719.md`；qzs/wsc 两份直接开工提示词位于 `docs/agent_context/prompts/`。
 - P1 不变量、向量、采集、OSD/输入与证据分层见 `docs/agent_context/P1_HOST_CONTRACT_AND_EVIDENCE_PREWORK_20260719.md`。
 - P0-B Packet 已准备但固定为 `HOLD / NOT APPROVED FOR IMPLEMENTATION, BUILD OR BOARD ACTION`。
+- qzs 已在 kickoff SHA `0e5ab490559c58642734b0095753c6cf8787c709` 上准备 P0-A fail-closed manifest/verifier（`competition_project_single_camera/docs/evidence_manifests/p0_a_evidence_manifest.template.json`、`competition_project_single_camera/tools/p0_a_evidence_verifier.py`）及 P1 三层矩阵/JSONL/CSV/OSD-输入/20轮 bundle 模板；全部为 `TEMPLATE`/`NOT RUN`，不定义 wire ABI。
+- 首轮 wsc 审查：本机可见 refs 中没有 kickoff 后的 P0-A/P1 Host 实现提交，故结论为 `P0-A=BLOCKED / NO_SUBMISSION_VISIBLE`；未运行 wsc 编译、ELF、map、readelf、objdump 或 TX 永不 ready 负例，不能写 `P0-A-READY` 或 `P1-HOST-READY`。
 - 当前状态不因该裁定升级：`GOAL4=BLOCKED_EXECUTION_TOOLCHAIN`，USER2/PC/UART1/APB 仍全部 `NOT_VERIFIED`，P1 尚未达到 `P1-HOST-READY`。

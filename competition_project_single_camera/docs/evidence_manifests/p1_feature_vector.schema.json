@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P1 feature vector JSONL line",
+  "type": "object",
+  "required": ["schema", "case_id", "category", "input", "expected", "evidence_level"],
+  "properties": {
+    "schema": {"const": "p1-feature-vector-v1"},
+    "case_id": {"type": "string", "minLength": 1},
+    "category": {"enum": ["pixel_order", "roi", "frame_boundary", "flag", "overflow", "snapshot", "input", "result"]},
+    "input": {"type": "object", "required": ["frame_id", "config_seq", "source_flags"]},
+    "expected": {"type": "object", "required": ["accept", "ack", "decision", "reason"]},
+    "evidence_level": {"enum": ["HOST_ONLY", "HOST_CALIBRATION_PROVISIONAL", "SAME_BATCH_FPGA_SNAPSHOT"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}

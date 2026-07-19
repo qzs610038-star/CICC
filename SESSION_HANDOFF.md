@@ -109,3 +109,11 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 用户已裁定“批准 P0-A 与 P1 并行推进，同时仅准备 P0-B Review Packet”，并进一步明确本轮只启动 qzs 与 wsc。libaoxun 不接收新提示词、不需要拉取或审阅，继续其既有 UART1/USER2 攻坚。
 
 本机/队友新对话统一从 `docs/agent_context/P0_P1_PARALLEL_KICKOFF_INDEX_20260719.md` 恢复，并读取 `docs/agent_context/prompts/` 下 qzs 或 wsc 提示词。已准备 Host 契约/证据前置包与 P0-B HOLD Packet；没有修改冻结接口、CPU/RTL/Hard SoC 真源，也没有构建、上板或机械臂动作。
+
+### qzs P0-A/P1 治理 checkpoint — kickoff `0e5ab490` 后
+
+- qzs 个人分支：`codex/qzs-p0a-p1-host-governance-20260719`，固定起点 `0e5ab490559c58642734b0095753c6cf8787c709`。
+- 新增 P0-A fail-closed artifact contract：`competition_project_single_camera/tools/p0_a_evidence_verifier.py` 与 `competition_project_single_camera/docs/evidence_manifests/p0_a_evidence_manifest.template.json`。它不猜工具链、BSP、RAM base 或 wsc 文件路径；未来 bundle 必须显式提供并哈希绑定 ELF/map/readelf/objdump/build log/TX-never-ready witness。通过前仍为 `BOARD NOT VERIFIED`。
+- 新增 P1 三层矩阵、JSONL schema/样例、采集 CSV、OSD/输入状态表和 20 轮 bundle manifest 模板，入口为 `competition_project_single_camera/docs/evidence_manifests/P1_HOST_THREE_LAYER_EVIDENCE_MATRIX_20260719.md`。全部为 `TEMPLATE/NOT RUN`，不冻结 APB/PSTRB/IRQ/CDC/OSD wire ABI。
+- qzs 已审查本机可见 wsc refs：最新 `origin/dev/wsc6090-goal4-contract-after-qzs-20260719@48548f47...` 早于 kickoff 且无 P0-A/P1 实现 diff；本轮 verdict=`P0-A=BLOCKED / NO_SUBMISSION_VISIBLE`。未运行任何 wsc Host runner 或 P0-A 工具链，旧 Host PASS 不继承。
+- P0-B review draft 已同步此事实并保持 `HOLD`；没有向 libaoxun 发送任务/同步/审阅请求。`ARM_ENABLED=0`，USER2/PC/UART1/APB/OSD/board 均保持 `NOT VERIFIED`。
