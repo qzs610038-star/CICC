@@ -8,6 +8,8 @@
 >
 > qzs 裁定：`CHANGES_REQUESTED / DO NOT MERGE / P0-A NOT READY / P1-HOST NOT READY`
 
+> 后续状态：wsc 已提交整改 SHA `328f115c1716023d2c10c4276c80cd2833291551`；本文件保留首次候选审查。最新复审见 `WSC_P0_A_P1_HOST_REMEDIATION_AUDIT_20260719.md`。
+
 ## 1. 范围与安全边界
 
 - 远端 ref 实读为 `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d`；该提交以 kickoff 为 merge-base，仅领先 2 个提交。

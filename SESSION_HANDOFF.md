@@ -114,6 +114,10 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 
 wsc 已提交 `codex/wsc-p0a-p1-host-20260719@dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d`。qzs 在独立 detached worktree 反向审查并 fresh 复跑，确认范围、冻结面、P0-A Host/严格构建及 P1/既有 Host 计数通过；但正式 READY 条件仍有实质缺口，结论为 `CHANGES_REQUESTED / DO NOT MERGE`。完整 findings 与最小修复清单见 `docs/review_packets/WSC_P0_A_P1_HOST_CANDIDATE_AUDIT_20260719.md`。P0-B 保持 HOLD，USER2/板级 canary Gate 未打开，libaoxun 不受本轮影响。
 
+### WSC 整改固定 SHA 复审
+
+wsc 后续提交 `328f115c1716023d2c10c4276c80cd2833291551`，实现固定为 `6e9475ff6678c289160b3374cd98b6fda88c8455`。qzs fresh 复跑确认首次阻断中的阶段顺序、build_id、P0 manifest/verifier、制品治理、P1 schema/reserved-bit/ACK 与生命周期均已关闭；两个独立工作树 P0 身份制品实际同 hash。仍有两个最小阻断：提交的 `reproducibility.json` 保留旧 objdump hash；P1 20 轮 runner 仍将 decision/reason/snapshot hash/commit count 预置打印，没有以 fake snapshot 驱动 runtime/参考模型。最新结论仍为 `CHANGES_REQUESTED / DO NOT MERGE / P0-A READY NO / P1-HOST READY NO`，详见 `docs/review_packets/WSC_P0_A_P1_HOST_REMEDIATION_AUDIT_20260719.md`。P0-B 与 USER2 Gate 不打开，libaoxun 不受影响。
+
 ### qzs P0-A/P1 治理 checkpoint — kickoff `0e5ab490` 后
 
 - qzs 个人分支：`codex/qzs-p0a-p1-host-governance-20260719`，固定起点 `0e5ab490559c58642734b0095753c6cf8787c709`。

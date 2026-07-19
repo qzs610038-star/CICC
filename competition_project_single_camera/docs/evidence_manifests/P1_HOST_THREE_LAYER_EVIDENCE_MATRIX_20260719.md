@@ -40,3 +40,7 @@
 ## 2026-07-19 WSC 首批候选状态
 
 `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d` 的 fresh Host 计数通过，但 JSONL 不符合本目录 schema，静态 20 行 replay 未携带本表要求的逐轮 snapshot/ACK/commit/elapsed/release 证据，reserved bit 向量还与真实 adapter 行为相反。因此本表整体状态为 `PARTIAL / CHANGES_REQUESTED`，不是 `P1-HOST-READY`。详见 `docs/review_packets/WSC_P0_A_P1_HOST_CANDIDATE_AUDIT_20260719.md`。
+
+## 2026-07-19 WSC 整改候选状态
+
+`328f115c1716023d2c10c4276c80cd2833291551` 已 fresh 通过 P1 model `37/37`、adapter `39/39`、classifier `54/54`、F1 `213/213`、runtime `648/648` 与 schema `11/11`；ACK、frame-boundary、result latch 和 reserved bit 阻断关闭。但 20 轮 runner 把 decision/reason、snapshot hash 与 commit count 写在预置表中，只执行输入事务模型，没有从 fake snapshot 驱动 runtime/参考模型得到 actual 结果。因此本表仍为 `PARTIAL / CHANGES_REQUESTED`，不是 `P1-HOST-READY`。详见 `docs/review_packets/WSC_P0_A_P1_HOST_REMEDIATION_AUDIT_20260719.md`。
