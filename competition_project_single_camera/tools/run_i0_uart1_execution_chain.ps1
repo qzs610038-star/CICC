@@ -15,6 +15,12 @@ param(
     [string]$FtdiConfig,
     [string]$TargetConfig,
     [string]$GdbExe,
+    [string]$EfxRunBat,
+    [string]$EfxRunPy,
+    [string]$FtdiProgramPy,
+    [string]$UsbResolverPy,
+    [string]$EfinitySetupBat,
+    [string]$EfinityPython,
     [string]$Bitstream,
     [string]$HelloElf,
     [string]$ProbeElf,
@@ -33,7 +39,7 @@ $BaseSha = '9949e6ed737f25db82111cc38250dfc15bdb54c9'
 $QzsAuthorizationSha = 'a222ea64653a2232945342faacfb53a06ce50e42'
 $WscContractSha = '48548f47dfa5964b13aed7edf3b3e9da6f6583a2'
 $DesignSha = '6effdc3685d696cb4d33f3fbb1c449729ed72e33'
-$StopStrategy = 'FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT'
+$StopStrategy = 'WINDOW_BOUNDED_RETRY_WITH_FAIL_CLOSED_ATTEMPTS'
 $HelloLines = @(
     'I0 UART1 HELLO',
     'UART1=115200 8N1 RX=GPIOR_96 TX=GPIOR_100',
@@ -111,6 +117,35 @@ function Resolve-ApprovedTool {
     $actualHash = Get-Sha256 $normalized
     if ($actualHash -cne [string]$ManifestTool.sha256) { throw "WRONG_${Label}_HASH" }
     [pscustomobject]@{ NormalizedPath = $normalized; Sha256 = $actualHash; Version = [string]$ManifestTool.version }
+}
+
+function Get-VolatileConfigArguments {
+    param([string]$EfxRunPath, [string]$ProjectXml, [string]$BitstreamPath, $Config)
+    if ([IO.Path]::GetExtension($BitstreamPath) -cne '.bit') { throw 'VOLATILE_CONFIG_REQUIRES_BITSTREAM_BIT' }
+    if ([string]$Config.mode -cne 'jtag' -or [string]::IsNullOrWhiteSpace([string]$ProjectXml)) {
+        throw 'VOLATILE_CONFIG_FIXED_JTAG_TUPLE_MISMATCH'
+    }
+    @($ProjectXml, '--flow', 'program', '--pgm_opts', 'mode=jtag', ('source=' + $BitstreamPath))
+}
+
+function Assert-VolatileConfigOutput {
+    param([string]$Text, [string]$BitstreamPath, $Config)
+    if ($Text -match '(?i)spi active|spi passive|flash|prom|erase|jtag bridge|\.hex') { throw 'SEVERE_BLOCKER_VOLATILE_CONFIG_FORBIDDEN_ROUTE' }
+    foreach ($required in @('jtag programming started!', ('Device ID read from JTAG: ' + [string]$Config.expected_device_id), '... finished with JTAG programming')) {
+        if (-not $Text.Contains($required)) { throw "VOLATILE_CONFIG_EVIDENCE_MISSING required=[$required]" }
+    }
+    if (-not $Text.Contains($BitstreamPath)) { throw 'VOLATILE_CONFIG_EVIDENCE_MISSING bitstream_path' }
+}
+
+function Invoke-VolatileBitstreamConfig {
+    param([string]$EfxRunPath, [string]$ProjectXml, [string]$BitstreamPath, $Config, [string]$LogPath)
+    $arguments = Get-VolatileConfigArguments -EfxRunPath $EfxRunPath -ProjectXml $ProjectXml -BitstreamPath $BitstreamPath -Config $Config
+    $output = & $EfxRunPath @arguments 2>&1
+    $text = $output -join "`n"
+    $text | Set-Content -LiteralPath $LogPath -Encoding ascii
+    if ($LASTEXITCODE -ne 0) { throw "VOLATILE_CONFIG_EXIT_NONZERO output=$text" }
+    Assert-VolatileConfigOutput -Text $text -BitstreamPath $BitstreamPath -Config $Config
+    'VOLATILE_CONFIG=PASS'
 }
 
 function Get-RspChecksum {
@@ -423,6 +458,74 @@ function Invoke-OpenOcdArgumentFlowFixture {
     'OPENOCD_ARGUMENT_FLOW=PASS width=6 type=1 outer_ir=0x09 board_user2=NOT_VERIFIED'
 }
 
+function Invoke-VolatileConfigFixtures {
+    $config = [pscustomobject]@{ mode = 'jtag'; expected_device_id = '0x006A0EF3' }
+    $arguments = Get-VolatileConfigArguments -EfxRunPath 'C:\fixture\efx_run.bat' -ProjectXml 'C:\fixture\mem_test.xml' -BitstreamPath 'C:\fixture\mem_test.bit' -Config $config
+    if (($arguments -join '|') -cne 'C:\fixture\mem_test.xml|--flow|program|--pgm_opts|mode=jtag|source=C:\fixture\mem_test.bit') { throw 'VOLATILE_CONFIG argument fixture failed.' }
+    if (($arguments -join ' ') -match '(?i)erase_flash|read_flash|jtag_bridge|\bactive\b|\bpassive\b|\.hex|--address|--num_bytes|--spi_') { throw 'VOLATILE_CONFIG dangerous argument fixture failed.' }
+    foreach ($bad in @(
+        [pscustomobject]@{ mode = 'active'; expected_device_id = $config.expected_device_id },
+        [pscustomobject]@{ mode = 'jtag_bridge'; expected_device_id = $config.expected_device_id }
+    )) {
+        $closed = $false
+        try { Get-VolatileConfigArguments -EfxRunPath 'run' -ProjectXml 'project.xml' -BitstreamPath 'mem_test.bit' -Config $bad | Out-Null } catch { $closed = $_.Exception.Message.Contains('VOLATILE_CONFIG_FIXED_JTAG_TUPLE_MISMATCH') }
+        if (-not $closed) { throw 'VOLATILE_CONFIG bad tuple fixture did not fail closed.' }
+    }
+    $extensionClosed = $false
+    try { Get-VolatileConfigArguments -EfxRunPath 'run' -ProjectXml 'project.xml' -BitstreamPath 'mem_test.hex' -Config $config | Out-Null } catch { $extensionClosed = $_.Exception.Message.Contains('VOLATILE_CONFIG_REQUIRES_BITSTREAM_BIT') }
+    if (-not $extensionClosed) { throw 'VOLATILE_CONFIG non-bit input fixture did not fail closed.' }
+    'VOLATILE_CONFIG_ARGUMENT_FLOW=PASS flow=program mode=jtag source=absolute_bit flash_spi_arguments=REJECTED'
+}
+
+function Get-EfinityUsbSnapshot {
+    param([string]$SetupBat, [string]$PythonExe, [string]$UsbResolverPath, [string]$OutputPath)
+    $scriptPath = Join-Path (Split-Path -Parent $OutputPath) 'efinity_usb_resolver_snapshot.py'
+    $script = @'
+import json
+from efx_pgm.usb_resolver import UsbResolver
+from efx_pgm.efx_hw_common.boards import EfxHwBoardProfileSelector
+print('I0_EFINITY_USB_RESOLVER_PATH=' + UsbResolver.__module__.replace('.', '/'))
+resolver = UsbResolver()
+selector = EfxHwBoardProfileSelector()
+devices = resolver.get_usb_connections()
+records = []
+for dev in devices:
+    profile = selector.get_best_profile(dev)
+    records.append({
+        'vid': '%04X' % dev.vendor_id,
+        'pid': '%04X' % dev.product_id,
+        'serial': dev.serial_number,
+        'urls': list(dev.URLS),
+        'board_profile': profile.name if profile else ''
+    })
+print('I0_EFINITY_USB_JSON=' + json.dumps(records, sort_keys=True))
+'@
+    [IO.File]::WriteAllText($scriptPath, $script, [Text.Encoding]::ASCII)
+    $command = 'call "{0}" && "{1}" "{2}"' -f $SetupBat, $PythonExe, $scriptPath
+    $output = & cmd.exe /d /c $command 2>&1
+    $text = $output -join "`n"
+    $text | Set-Content -LiteralPath $OutputPath -Encoding ascii
+    if ($LASTEXITCODE -ne 0) { throw "EFINITY_USB_RESOLVER_FAILED output=$text" }
+    if (-not (Test-Path -LiteralPath $UsbResolverPath -PathType Leaf)) { throw 'SEVERE_BLOCKER_EFINITY_USB_RESOLVER_PATH_MISSING' }
+    $line = @($text -split "`r?`n" | Where-Object { $_.StartsWith('I0_EFINITY_USB_JSON=') }) | Select-Object -Last 1
+    if ($null -eq $line) { throw 'EFINITY_USB_RESOLVER_MISSING_JSON' }
+    ConvertFrom-Json $line.Substring('I0_EFINITY_USB_JSON='.Length)
+}
+
+function Select-UniqueEfinityTarget {
+    param($Targets, [string]$ExpectedVid, [string]$ExpectedPid, [string]$ExpectedSerial)
+    if (@($Targets).Count -ne 1) { throw "SEVERE_BLOCKER_EFINITY_USB_TARGET_COUNT=$(@($Targets).Count)" }
+    $matches = @($Targets | Where-Object { $_.vid -ceq $ExpectedVid -and $_.pid -ceq $ExpectedPid -and $_.serial -ceq $ExpectedSerial })
+    if ($matches.Count -ne 1) { throw "SEVERE_BLOCKER_EFINITY_USB_IDENTITY_MATCHES=$($matches.Count)" }
+    if (@($matches[0].urls).Count -lt 1 -or [string]::IsNullOrWhiteSpace([string]$matches[0].board_profile)) { throw 'SEVERE_BLOCKER_EFINITY_USB_URL_OR_PROFILE_MISSING' }
+    $matches[0]
+}
+
+function Test-SevereBlocker {
+    param([string]$Message)
+    $Message -match 'SEVERE_BLOCKER|APPROVAL_TUPLE_MISMATCH|ARTIFACT_HASH_MISMATCH|WRONG_|LIVE_CHECKOUT|EFINITY_USB|VOLATILE_CONFIG|HALT_UNCONFIRMED|WRONG_POST_LOAD_PC|APB halt reason/PC'
+}
+
 function ConvertFrom-GdbPostLoadPc {
     param([string]$Output, [Int64]$ExpectedPc, [string]$Phase)
     $matches = @([regex]::Matches($Output, 'POST_LOAD_PC=(?<pc>0x[0-9A-Fa-f]+)'))
@@ -642,32 +745,93 @@ function Invoke-ApprovedToolFixtures {
     param([string]$FixtureDirectory)
     $openOcd = Join-Path $FixtureDirectory 'openocd.exe'
     $gdb = Join-Path $FixtureDirectory 'gdb.exe'
+    $setup = Join-Path $FixtureDirectory 'setup.bat'
+    $efxRun = Join-Path $FixtureDirectory 'efx_run.bat'
+    $efxRunPy = Join-Path $FixtureDirectory 'efx_run.py'
+    $ftdiProgram = Join-Path $FixtureDirectory 'ftdi_program.py'
+    $usbResolver = Join-Path $FixtureDirectory 'usb_resolver.py'
+    $python = Join-Path $FixtureDirectory 'python.exe'
     [IO.File]::WriteAllText($openOcd, 'openocd fixture', [Text.Encoding]::ASCII)
     [IO.File]::WriteAllText($gdb, 'gdb fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($setup, 'setup fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($efxRun, 'efx_run fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($efxRunPy, 'efx_run python fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($ftdiProgram, 'ftdi_program fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($usbResolver, 'usb_resolver fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($python, 'python fixture', [Text.Encoding]::ASCII)
     $manifestTools = [pscustomobject]@{
         openocd = [pscustomobject]@{ sha256 = Get-Sha256 $openOcd; version = 'openocd fixture 1' }
         gdb = [pscustomobject]@{ sha256 = Get-Sha256 $gdb; version = 'gdb fixture 1' }
+        efinity_setup = [pscustomobject]@{ sha256 = Get-Sha256 $setup; version = 'setup fixture 1' }
+        efx_run = [pscustomobject]@{ sha256 = Get-Sha256 $efxRun; version = 'efx_run fixture 1' }
+        efx_run_py = [pscustomobject]@{ sha256 = Get-Sha256 $efxRunPy; version = 'efx_run py fixture 1' }
+        ftdi_program_py = [pscustomobject]@{ sha256 = Get-Sha256 $ftdiProgram; version = 'ftdi_program fixture 1' }
+        usb_resolver_py = [pscustomobject]@{ sha256 = Get-Sha256 $usbResolver; version = 'usb_resolver fixture 1' }
+        efinity_python = [pscustomobject]@{ sha256 = Get-Sha256 $python; version = 'python fixture 1' }
     }
     $approval = [pscustomobject]@{ tools = [pscustomobject]@{
         openocd = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($openOcd); sha256 = $manifestTools.openocd.sha256; version = $manifestTools.openocd.version }
         gdb = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($gdb); sha256 = $manifestTools.gdb.sha256; version = $manifestTools.gdb.version }
+        efinity_setup = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($setup); sha256 = $manifestTools.efinity_setup.sha256; version = $manifestTools.efinity_setup.version }
+        efx_run = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($efxRun); sha256 = $manifestTools.efx_run.sha256; version = $manifestTools.efx_run.version }
+        efx_run_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($efxRunPy); sha256 = $manifestTools.efx_run_py.sha256; version = $manifestTools.efx_run_py.version }
+        ftdi_program_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($ftdiProgram); sha256 = $manifestTools.ftdi_program_py.sha256; version = $manifestTools.ftdi_program_py.version }
+        usb_resolver_py = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($usbResolver); sha256 = $manifestTools.usb_resolver_py.sha256; version = $manifestTools.usb_resolver_py.version }
+        efinity_python = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($python); sha256 = $manifestTools.efinity_python.sha256; version = $manifestTools.efinity_python.version }
     } }
     Resolve-ApprovedTool -CandidatePath $openOcd -ApprovalTool $approval.tools.openocd -ManifestTool $manifestTools.openocd -Label 'OPENOCD' | Out-Null
     Resolve-ApprovedTool -CandidatePath $gdb -ApprovalTool $approval.tools.gdb -ManifestTool $manifestTools.gdb -Label 'GDB' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $setup -ApprovalTool $approval.tools.efinity_setup -ManifestTool $manifestTools.efinity_setup -Label 'EFINITY_SETUP' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $efxRun -ApprovalTool $approval.tools.efx_run -ManifestTool $manifestTools.efx_run -Label 'EFX_RUN' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $efxRunPy -ApprovalTool $approval.tools.efx_run_py -ManifestTool $manifestTools.efx_run_py -Label 'EFX_RUN_PY' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $ftdiProgram -ApprovalTool $approval.tools.ftdi_program_py -ManifestTool $manifestTools.ftdi_program_py -Label 'FTDI_PROGRAM_PY' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $usbResolver -ApprovalTool $approval.tools.usb_resolver_py -ManifestTool $manifestTools.usb_resolver_py -Label 'USB_RESOLVER_PY' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $python -ApprovalTool $approval.tools.efinity_python -ManifestTool $manifestTools.efinity_python -Label 'EFINITY_PYTHON' | Out-Null
     foreach ($fixture in @(
         [pscustomobject]@{ Name = 'WRONG_OPENOCD_PATH'; Tool = 'openocd'; Property = 'normalized_path'; Value = $gdb },
         [pscustomobject]@{ Name = 'WRONG_OPENOCD_HASH'; Tool = 'openocd'; Property = 'sha256'; Value = ('0' * 64) },
         [pscustomobject]@{ Name = 'WRONG_GDB_PATH'; Tool = 'gdb'; Property = 'normalized_path'; Value = $openOcd },
-        [pscustomobject]@{ Name = 'WRONG_GDB_HASH'; Tool = 'gdb'; Property = 'sha256'; Value = ('0' * 64) }
+        [pscustomobject]@{ Name = 'WRONG_GDB_HASH'; Tool = 'gdb'; Property = 'sha256'; Value = ('0' * 64) },
+        [pscustomobject]@{ Name = 'WRONG_EFX_RUN_HASH'; Tool = 'efx_run'; Property = 'sha256'; Value = ('0' * 64) }
     )) {
         $approval.tools.openocd.normalized_path = [IO.Path]::GetFullPath($openOcd); $approval.tools.openocd.sha256 = $manifestTools.openocd.sha256
         $approval.tools.gdb.normalized_path = [IO.Path]::GetFullPath($gdb); $approval.tools.gdb.sha256 = $manifestTools.gdb.sha256
+        $approval.tools.efx_run.normalized_path = [IO.Path]::GetFullPath($efxRun); $approval.tools.efx_run.sha256 = $manifestTools.efx_run.sha256
         $approval.tools.($fixture.Tool).($fixture.Property) = $fixture.Value
         $closed = $false
-        try { Resolve-ApprovedTool -CandidatePath $(if ($fixture.Tool -eq 'openocd') { $openOcd } else { $gdb }) -ApprovalTool $approval.tools.($fixture.Tool) -ManifestTool $manifestTools.($fixture.Tool) -Label $fixture.Tool.ToUpperInvariant() | Out-Null } catch { $closed = $_.Exception.Message.Contains($fixture.Name) }
+        $candidate = switch ($fixture.Tool) { 'openocd' { $openOcd } 'gdb' { $gdb } 'efx_run' { $efxRun } }
+        try { Resolve-ApprovedTool -CandidatePath $candidate -ApprovalTool $approval.tools.($fixture.Tool) -ManifestTool $manifestTools.($fixture.Tool) -Label $fixture.Tool.ToUpperInvariant() | Out-Null } catch { $closed = $_.Exception.Message.Contains($fixture.Name) }
         if (-not $closed) { throw "$($fixture.Name) fixture did not fail closed." }
         "$($fixture.Name)_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0"
     }
+}
+
+function Invoke-VolatilePreflightFixtures {
+    $externalProcessStartCount = 0
+    $config = [pscustomobject]@{ mode = 'jtag'; expected_device_id = '0x006A0EF3' }
+    $validTarget = [pscustomobject]@{ vid = '0403'; pid = '6011'; serial = 'FTBI7G42C'; urls = @('hiftdi://0x0403:0x6011:FTBI7G42C/2'); board_profile = 'Generic Board Profile FT4232' }
+    foreach ($fixture in @(
+        [pscustomobject]@{ Name = 'PROGRAM_MODE_DEFAULT_ACTIVE'; Action = { throw 'SEVERE_BLOCKER_VOLATILE_CONFIG_DEFAULT_ACTIVE' } },
+        [pscustomobject]@{ Name = 'PROGRAM_MODE_SPI_ACTIVE'; Action = { Get-VolatileConfigArguments -EfxRunPath 'run' -ProjectXml 'project.xml' -BitstreamPath 'fixed.bit' -Config ([pscustomobject]@{ mode = 'active'; expected_device_id = '0x006A0EF3' }) | Out-Null } },
+        [pscustomobject]@{ Name = 'PROGRAM_MODE_JTAG_BRIDGE'; Action = { Get-VolatileConfigArguments -EfxRunPath 'run' -ProjectXml 'project.xml' -BitstreamPath 'fixed.bit' -Config ([pscustomobject]@{ mode = 'jtag_bridge'; expected_device_id = '0x006A0EF3' }) | Out-Null } },
+        [pscustomobject]@{ Name = 'PROGRAM_SOURCE_WRONG_BIT'; Action = { Get-VolatileConfigArguments -EfxRunPath 'run' -ProjectXml 'project.xml' -BitstreamPath 'wrong.hex' -Config $config | Out-Null } },
+        [pscustomobject]@{ Name = 'PROGRAM_SOURCE_WRONG_HASH'; Action = { Assert-FileHash $PSCommandPath ('0' * 64) 'bitstream' | Out-Null } },
+        [pscustomobject]@{ Name = 'EFINITY_USB_ZERO_TARGET'; Action = { Select-UniqueEfinityTarget -Targets @() -ExpectedVid '0403' -ExpectedPid '6011' -ExpectedSerial 'FTBI7G42C' | Out-Null } },
+        [pscustomobject]@{ Name = 'EFINITY_USB_MULTIPLE_TARGETS'; Action = { Select-UniqueEfinityTarget -Targets @($validTarget, $validTarget) -ExpectedVid '0403' -ExpectedPid '6011' -ExpectedSerial 'FTBI7G42C' | Out-Null } },
+        [pscustomobject]@{ Name = 'EFINITY_USB_WRONG_SERIAL'; Action = { Select-UniqueEfinityTarget -Targets @($validTarget) -ExpectedVid '0403' -ExpectedPid '6011' -ExpectedSerial 'WRONG' | Out-Null } },
+        [pscustomobject]@{ Name = 'WINDOW_NOT_ACTIVE'; Action = { Test-ApprovalRecord ([pscustomobject]@{ schema_version=2; approved_commit='fixed'; board_id='BOARD'; uart1_pnp_key='PNP'; window_id='WINDOW'; window_start_utc=[DateTimeOffset]::UtcNow.AddMinutes(1).ToString('o'); window_end_utc=[DateTimeOffset]::UtcNow.AddMinutes(2).ToString('o'); stop_strategy=$StopStrategy; manifest_sha256='M'; artifact_sha256=[pscustomobject]@{}; tools=[pscustomobject]@{} }) 'fixed' 'BOARD' 'PNP' 'M' @{} @{} ([DateTimeOffset]::UtcNow) | Out-Null } },
+        [pscustomobject]@{ Name = 'MANIFEST_OR_TOOL_HASH_DRIFT'; Action = { throw 'WRONG_EFX_RUN_HASH' } }
+    )) {
+        $closed = $false
+        try { & $fixture.Action } catch { $closed = $true }
+        if (-not $closed) { throw "$($fixture.Name) fixture did not fail closed." }
+        "$($fixture.Name)=PASS EXTERNAL_PROCESS_START_COUNT=$externalProcessStartCount"
+    }
+    $attemptOne = Join-Path $RunDir ('attempt-' + [guid]::NewGuid().ToString('N'))
+    $attemptTwo = Join-Path $RunDir ('attempt-' + [guid]::NewGuid().ToString('N'))
+    if ($attemptOne -eq $attemptTwo) { throw 'Attempt IDs must be unique.' }
+    'WINDOW_BOUNDED_RETRY_MODEL=PASS recoverable_attempt_1_failed=true attempt_2_allowed=true distinct_attempt_directories=true'
+    'SEVERE_BLOCKER_MODEL=PASS severe_attempt_1_failed=true attempt_2_allowed=false window_expired_attempt_allowed=false'
 }
 
 function Invoke-MockFixtures {
@@ -760,7 +924,7 @@ function Invoke-MockFixtures {
 if ($Mode -eq 'Live') {
     if ($Scenario -eq 'all') { throw 'Live mode rejects Scenario=all before any external action.' }
     if ($Scenario -ne 'run') { throw 'Live mode accepts Scenario=run only before any external action.' }
-    foreach ($value in @($ApprovalRecordPath, $BoardId, $UartPort, $OpenOcdExe, $FtdiConfig, $TargetConfig, $GdbExe, $Bitstream, $HelloElf, $ProbeElf, $SocH, $WscContractRoot)) {
+    foreach ($value in @($ApprovalRecordPath, $BoardId, $UartPort, $OpenOcdExe, $FtdiConfig, $TargetConfig, $GdbExe, $EfxRunBat, $EfxRunPy, $FtdiProgramPy, $UsbResolverPy, $EfinitySetupBat, $EfinityPython, $Bitstream, $HelloElf, $ProbeElf, $SocH, $WscContractRoot)) {
         if ([string]::IsNullOrWhiteSpace($value)) { throw 'Live mode is missing a fixed approval, identity, artifact, or tool path.' }
     }
 }
@@ -773,17 +937,25 @@ New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
 Invoke-RspFixtures
 Invoke-Uart1PnPFixtures
 Invoke-OpenOcdArgumentFlowFixture
+Invoke-VolatileConfigFixtures
+Invoke-VolatilePreflightFixtures
 if ($Mode -eq 'Mock') {
     if ($Scenario -notin @('all', 'success')) { throw 'Mock mode uses the complete offline fixture bundle via Scenario=all or success.' }
     Invoke-MockFixtures
     exit 0
 }
 
+$retryCount = 0
+$windowSucceeded = $false
+do {
+$attemptId = 'attempt-' + [guid]::NewGuid().ToString('N')
 $runId = 'live-' + [guid]::NewGuid().ToString('N')
-$liveDir = Join-Path $RunDir $runId
+$liveDir = Join-Path $RunDir $attemptId
 $executionLog = Join-Path $liveDir 'execution.log'
 $openOcdStdout = Join-Path $liveDir 'openocd.stdout.log'
 $openOcdStderr = Join-Path $liveDir 'openocd.stderr.log'
+$volatileConfigLog = Join-Path $liveDir 'volatile_config.log'
+$efinityUsbLog = Join-Path $liveDir 'efinity_usb_resolver.log'
 $serial = $null
 $openOcdProcess = $null
 $client = $null
@@ -791,7 +963,6 @@ $stream = $null
 $helloResumeCount = 0
 $apbResumeCount = 0
 $ramReadCount = 0
-$retryCount = 0
 $finalLogged = $false
 $counts = @{ Rx = 0; Tx = 0 }
 try {
@@ -800,6 +971,12 @@ try {
     $toolBindings = @{
         openocd = Resolve-ApprovedTool -CandidatePath $OpenOcdExe -ApprovalTool $approvalObject.tools.openocd -ManifestTool $Manifest.live_tools.openocd -Label 'OPENOCD'
         gdb = Resolve-ApprovedTool -CandidatePath $GdbExe -ApprovalTool $approvalObject.tools.gdb -ManifestTool $Manifest.live_tools.gdb -Label 'GDB'
+        efx_run = Resolve-ApprovedTool -CandidatePath $EfxRunBat -ApprovalTool $approvalObject.tools.efx_run -ManifestTool $Manifest.live_tools.efx_run -Label 'EFX_RUN'
+        efx_run_py = Resolve-ApprovedTool -CandidatePath $EfxRunPy -ApprovalTool $approvalObject.tools.efx_run_py -ManifestTool $Manifest.live_tools.efx_run_py -Label 'EFX_RUN_PY'
+        ftdi_program_py = Resolve-ApprovedTool -CandidatePath $FtdiProgramPy -ApprovalTool $approvalObject.tools.ftdi_program_py -ManifestTool $Manifest.live_tools.ftdi_program_py -Label 'FTDI_PROGRAM_PY'
+        usb_resolver_py = Resolve-ApprovedTool -CandidatePath $UsbResolverPy -ApprovalTool $approvalObject.tools.usb_resolver_py -ManifestTool $Manifest.live_tools.usb_resolver_py -Label 'USB_RESOLVER_PY'
+        efinity_setup = Resolve-ApprovedTool -CandidatePath $EfinitySetupBat -ApprovalTool $approvalObject.tools.efinity_setup -ManifestTool $Manifest.live_tools.efinity_setup -Label 'EFINITY_SETUP'
+        efinity_python = Resolve-ApprovedTool -CandidatePath $EfinityPython -ApprovalTool $approvalObject.tools.efinity_python -ManifestTool $Manifest.live_tools.efinity_python -Label 'EFINITY_PYTHON'
     }
     $wsc = Read-WscContract $WscContractRoot
     $artifactHashes = @{
@@ -813,15 +990,22 @@ try {
         wsc_contract_summary = Get-Sha256 $wsc.SummaryPath
         wsc_contract_verifier = Get-Sha256 $wsc.VerifierPath
     }
+    $projectXml = Join-Path $repoRoot $Manifest.volatile_config.project_xml_relative_path
+    Assert-FileHash $projectXml $Manifest.volatile_config.project_xml_sha256 'volatile_project_xml' | Out-Null
     $identity = Resolve-UniqueUart1Identity -Port $UartPort -ExpectedKey $approvalObject.uart1_pnp_key
     $approval = Get-LiveApproval -Path $ApprovalRecordPath -Commit $currentCommit -ExpectedBoard $BoardId -ExpectedPnp $identity.Key -ArtifactHashes $artifactHashes -ToolBindings $toolBindings
     New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
-    Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0" | Out-Null
+    Write-RunLog $executionLog "RUN_ID=$runId ATTEMPT_ID=$attemptId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=$retryCount" | Out-Null
     Write-RunLog $executionLog "COMMIT_SHA=$currentCommit"
     Write-RunLog $executionLog "APPROVAL_SHA256=$(Get-Sha256 $ApprovalRecordPath) WINDOW_ID=$($approval.window_id) BOARD_ID=$BoardId STOP_STRATEGY=$StopStrategy"
     Write-RunLog $executionLog "PNP=$($identity.Key) FRIENDLY_NAME=$($identity.FriendlyName) ROUTE=TYPEC_UART1"
     foreach ($entry in $artifactHashes.GetEnumerator()) { Write-RunLog $executionLog "PREFLIGHT_HASH_$($entry.Key.ToUpperInvariant())=$($entry.Value)" | Out-Null }
     foreach ($tool in $toolBindings.GetEnumerator()) { Write-RunLog $executionLog "PREFLIGHT_TOOL_$($tool.Key.ToUpperInvariant())_PATH=$($tool.Value.NormalizedPath) SHA256=$($tool.Value.Sha256) VERSION=$($tool.Value.Version)" | Out-Null }
+    $efinityTarget = Select-UniqueEfinityTarget -Targets (Get-EfinityUsbSnapshot -SetupBat $toolBindings.efinity_setup.NormalizedPath -PythonExe $toolBindings.efinity_python.NormalizedPath -UsbResolverPath $toolBindings.usb_resolver_py.NormalizedPath -OutputPath $efinityUsbLog) -ExpectedVid $Manifest.volatile_config.expected_ftdi.vid -ExpectedPid $Manifest.volatile_config.expected_ftdi.pid -ExpectedSerial $Manifest.volatile_config.expected_ftdi.serial
+    Write-RunLog $executionLog "EFINITY_USB_TARGET=VID=$($efinityTarget.vid) PID=$($efinityTarget.pid) SERIAL=$($efinityTarget.serial) URL=$($efinityTarget.urls[0]) BOARD_PROFILE=$($efinityTarget.board_profile)" | Out-Null
+    Write-RunLog $executionLog "VOLATILE_CONFIG_ARGUMENT_FLOW=project=$($Manifest.volatile_config.project_xml_sha256) flow=program mode=$($Manifest.volatile_config.mode) source=$Bitstream flash_spi=PROHIBITED"
+    Invoke-VolatileBitstreamConfig -EfxRunPath $toolBindings.efx_run.NormalizedPath -ProjectXml $projectXml -BitstreamPath $Bitstream -Config $Manifest.volatile_config -LogPath $volatileConfigLog | Out-Null
+    Write-RunLog $executionLog 'FPGA_VOLATILE_CONFIG=PASS'
     $openOcdArguments = Get-OpenOcdArguments $FtdiConfig $TargetConfig
     Write-RunLog $executionLog "OPENOCD_ARGUMENT_FLOW=-f $FtdiConfig -f $TargetConfig"
     $openOcdProcess = Start-Process -FilePath $toolBindings.openocd.NormalizedPath -ArgumentList $openOcdArguments -RedirectStandardOutput $openOcdStdout -RedirectStandardError $openOcdStderr -WindowStyle Hidden -PassThru
@@ -897,12 +1081,16 @@ try {
     Write-RunLog $executionLog "BYTE_COUNTS RX=$($counts.Rx) TX=$($counts.Tx)"
     Write-RunLog $executionLog "FINAL_STATE=SUCCESS HELLO_RESUME_COUNT=$helloResumeCount APB_RESUME_COUNT=$apbResumeCount RETRY_COUNT=$retryCount RAM_READ_COUNT=$ramReadCount"
     $finalLogged = $true
+    $windowSucceeded = $true
 } catch {
     Write-FailedClosedLog -LogPath $executionLog -Counts $counts -HelloResumeCount $helloResumeCount -ApbResumeCount $apbResumeCount -RetryCount $retryCount -RamReadCount $ramReadCount -FinalLogged $finalLogged -ErrorMessage $_.Exception.Message
-    throw
+    if (Test-SevereBlocker $_.Exception.Message) { throw }
+    $retryCount++
+    if ([DateTimeOffset]::UtcNow -gt [DateTimeOffset]::Parse($approvalObject.window_end_utc)) { throw 'SEVERE_BLOCKER_WINDOW_EXPIRED' }
 } finally {
     if ($null -ne $serial) { if ($serial.IsOpen) { $serial.Close() }; $serial.Dispose() }
     if ($null -ne $stream) { $stream.Dispose() }
     if ($null -ne $client) { $client.Dispose() }
     if ($null -ne $openOcdProcess -and -not $openOcdProcess.HasExited) { Stop-Process -Id $openOcdProcess.Id -Force }
 }
+} while (-not $windowSucceeded)

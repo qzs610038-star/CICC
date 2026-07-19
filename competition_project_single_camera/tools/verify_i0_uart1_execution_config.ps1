@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $BaseSha = '9949e6ed737f25db82111cc38250dfc15bdb54c9'
 $QzsAuthorizationSha = 'a222ea64653a2232945342faacfb53a06ce50e42'
 $WscContractSha = '48548f47dfa5964b13aed7edf3b3e9da6f6583a2'
+$EfinityRoot = 'D:\Efinity\2025.2'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = Split-Path -Parent $projectRoot
 $manifestPath = Join-Path $PSScriptRoot 'i0_uart1_execution_manifest.json'
@@ -54,7 +55,7 @@ function Assert-Ordered([string]$Text, [string]$Earlier, [string]$Later, [string
 if ($manifest.schema_version -ne 3 -or $manifest.batch -ne 'I0_UART1_20260719_CLEAN_LF_FINAL') { throw 'Manifest schema or batch mismatch.' }
 if ($manifest.base_sha -cne $BaseSha -or $manifest.qzs_authorization_sha -cne $QzsAuthorizationSha -or $manifest.wsc_contract_sha -cne $WscContractSha) { throw 'Manifest provenance SHA mismatch.' }
 if ($manifest.PSObject.Properties.Name -contains 'packet_sha256' -or $manifest.PSObject.Properties.Name -contains 'manifest_sha256') { throw 'Packet/manifest circular hash dependency is prohibited.' }
-foreach ($toolName in @('openocd', 'gdb')) {
+foreach ($toolName in @('openocd', 'gdb', 'efx_run', 'efx_run_py', 'ftdi_program_py', 'usb_resolver_py', 'efinity_setup', 'efinity_python')) {
     $tool = $manifest.live_tools.PSObject.Properties[$toolName].Value
     if ($null -eq $tool -or [string]::IsNullOrWhiteSpace([string]$tool.sha256) -or [string]::IsNullOrWhiteSpace([string]$tool.version)) { throw "Manifest live tool binding missing: $toolName" }
 }
@@ -90,7 +91,7 @@ $runner = Get-Content -LiteralPath $runnerPath -Raw
 foreach ($clause in @(
     "if (`$Scenario -eq 'all') { throw 'Live mode rejects Scenario=all before any external action.' }",
     'ApprovalRecordPath', 'schema_version -ne 2', 'approved_commit', 'board_id', 'uart1_pnp_key', 'window_start_utc', 'window_end_utc',
-    'FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT', 'TIMEOUT_HALT_UNCONFIRMED',
+    'WINDOW_BOUNDED_RETRY_WITH_FAIL_CLOSED_ATTEMPTS', 'TIMEOUT_HALT_UNCONFIRMED',
     'RSP_FIXTURES=PASS', 'UART1_PNP_ALLOWLIST=PASS', 'WSC_CONTRACT_CONSUMED=PASS',
     'HELLO_THREE_LINES_FIXTURE=PASS', 'UART_TX_ECHO_FIXTURE=PASS', 'UART_ECHO_MISMATCH_NEGATIVE=PASS',
     'WRONG_POST_LOAD_PC_NEGATIVE=PASS', 'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
@@ -100,13 +101,16 @@ foreach ($clause in @(
     'Invoke-ApprovedToolFixtures -FixtureDirectory $fixtureDirectory', '$Manifest.live_tools.openocd', '$Manifest.live_tools.gdb',
     "foreach (`$name in @('hello_timeout', 'line_mismatch', 'echo_mismatch', 'halt_unconfirmed'))", 'Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory',
     '"$Phase`_RESUME_ONCE.marker"', "Write-PhaseResumeMarker `$directory `$runId 'HELLO'", "Write-PhaseResumeMarker `$directory `$runId 'APB'",
-    'HELLO_RESUME_COUNT=1', 'APB_RESUME_COUNT=1', 'RETRY_COUNT=0',
+    'HELLO_RESUME_COUNT=1', 'APB_RESUME_COUNT=1', 'ATTEMPT_ID=',
     '$Serial.Write([byte[]]@($TxByte), 0, 1)', 'Assert-EchoByte -Expected $TxByte -Actual $echoValue',
     'Wait-OpenOcdReady -Process $openOcdProcess', 'OpenOCD RSP qSupported negotiation failed; retry is prohibited.',
     'APB_PHASE_STARTED_AFTER_HELLO_PASS=true', '$wsc.HaltPc', '$wsc.TimeoutMs', '$wsc.Ram.GetEnumerator()',
-    'Start-Process -FilePath $toolBindings.openocd.NormalizedPath -ArgumentList $openOcdArguments'
+    'Start-Process -FilePath $toolBindings.openocd.NormalizedPath -ArgumentList $openOcdArguments',
+    'Get-EfinityUsbSnapshot', 'Select-UniqueEfinityTarget', 'EFINITY_USB_TARGET=',
+    'Invoke-VolatileBitstreamConfig', 'mode=jtag', '--flow', '--pgm_opts', 'source=',
+    'SEVERE_BLOCKER_VOLATILE_CONFIG_FORBIDDEN_ROUTE', 'WINDOW_BOUNDED_RETRY_MODEL=PASS', 'SEVERE_BLOCKER_MODEL=PASS'
 )) { Assert-Contains $runner $clause 'runner fail-closed clause' }
-if ($runner -match 'ApprovalToken|I0_EXECUTION_WINDOW_APPROVED|WriteLine\(|(?i)prepare_m2|softtap|\bUSER1\b|\bUART0\b.*fallback|tap scan|cable scan|retry_count=[1-9]') { throw 'Generic authorization, automatic CR/LF, or dangerous fallback route detected.' }
+if ($runner -match 'ApprovalToken|I0_EXECUTION_WINDOW_APPROVED|WriteLine\(|(?i)prepare_m2|softtap|\bUSER1\b|\bUART0\b.*fallback|tap scan|cable scan|ftdi_pgm\.bat') { throw 'Generic authorization, automatic CR/LF, or dangerous fallback route detected.' }
 
 $startProcessIndex = $runner.IndexOf('Start-Process -FilePath $toolBindings.openocd.NormalizedPath', [StringComparison]::Ordinal)
 foreach ($preflight in @(
@@ -133,6 +137,24 @@ Assert-Ordered $runner '$serial.Open()' 'Invoke-GdbRamOnlyLoad $toolBindings.gdb
 Assert-Ordered $runner "openocd = Resolve-ApprovedTool -CandidatePath `$OpenOcdExe" 'New-Item -ItemType Directory -Path $liveDir' 'OpenOCD binding before live directory'
 Assert-Ordered $runner "gdb = Resolve-ApprovedTool -CandidatePath `$GdbExe" 'New-Item -ItemType Directory -Path $liveDir' 'GDB binding before live directory'
 Assert-Ordered $runner "openocd = Resolve-ApprovedTool -CandidatePath `$OpenOcdExe" 'Start-Process -FilePath $toolBindings.openocd.NormalizedPath' 'OpenOCD binding before process'
+Assert-Ordered $runner '$efinityTarget = Select-UniqueEfinityTarget' 'Invoke-VolatileBitstreamConfig -EfxRunPath $toolBindings.efx_run.NormalizedPath' 'unique Efinity identity before volatile config'
+Assert-Ordered $runner 'Invoke-VolatileBitstreamConfig -EfxRunPath $toolBindings.efx_run.NormalizedPath' 'Start-Process -FilePath $toolBindings.openocd.NormalizedPath' 'volatile config before OpenOCD'
+
+$efinityFiles = @{
+    efx_run = Join-Path $EfinityRoot 'bin\efx_run.bat'
+    efx_run_py = Join-Path $EfinityRoot 'scripts\efx_run.py'
+    ftdi_program_py = Join-Path $EfinityRoot 'pgm\bin\efx_pgm\ftdi_program.py'
+    usb_resolver_py = Join-Path $EfinityRoot 'pgm\bin\efx_pgm\usb_resolver.py'
+}
+foreach ($entry in $efinityFiles.GetEnumerator()) {
+    if ((Get-Sha256 $entry.Value) -cne $manifest.live_tools.($entry.Key).sha256) { throw "Efinity tool hash mismatch: $($entry.Key)" }
+}
+$efxRun = Get-Content -LiteralPath $efinityFiles.efx_run -Raw
+if ($efxRun -notmatch 'scripts\\efx_run\.py') { throw 'efx_run.bat does not invoke scripts/efx_run.py.' }
+$efxRunPy = Get-Content -LiteralPath $efinityFiles.efx_run_py -Raw
+foreach ($clause in @("optmode = 'active'", "prog_mode = 'SPI Active'", "'jtag' : {'display_name':'JTAG', 'allowed':'.bit'}", 'prog.jtag_program()', 'prog.spi_flash_program(', 'prog.jtag_bridge(')) { Assert-Contains $efxRunPy $clause 'official Efinity programming route' }
+if ($manifest.volatile_config.mode -cne 'jtag' -or $manifest.volatile_config.expected_ftdi.vid -cne '0403' -or $manifest.volatile_config.expected_ftdi.pid -cne '6011' -or $manifest.volatile_config.expected_ftdi.serial -cne 'FTBI7G42C') { throw 'Volatile config identity tuple mismatch.' }
+if ($manifest.volatile_config.project_xml_sha256 -cne (Get-Sha256 (Join-Path $repoRoot $manifest.volatile_config.project_xml_relative_path))) { throw 'Volatile project XML hash mismatch.' }
 
 $wscHead = (& git -C $WscContractRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $wscHead -cne $WscContractSha -or @(& git -C $WscContractRoot status --porcelain).Count -ne 0) { throw 'WSC contract checkout must be clean at the fixed SHA.' }
@@ -152,7 +174,7 @@ $mockOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runnerP
 if ($LASTEXITCODE -ne 0) { throw "Runner fixtures failed: $mockOutput" }
 $mockText = $mockOutput -join "`n"
 foreach ($marker in @(
-    'RSP_FIXTURES=PASS', 'UART1_PNP_ALLOWLIST=PASS', 'OPENOCD_ARGUMENT_FLOW=PASS', 'WSC_CONTRACT_CONSUMED=PASS',
+    'RSP_FIXTURES=PASS', 'UART1_PNP_ALLOWLIST=PASS', 'OPENOCD_ARGUMENT_FLOW=PASS', 'VOLATILE_CONFIG_ARGUMENT_FLOW=PASS', 'WSC_CONTRACT_CONSUMED=PASS',
     'HELLO_THREE_LINES_FIXTURE=PASS', 'UART_TX_ECHO_FIXTURE=PASS printable=true crlf=false same_byte=true',
     'UART_ECHO_MISMATCH_NEGATIVE=PASS', 'HELLO_BAD_LINE_NEGATIVE=PASS', 'WRONG_POST_LOAD_PC_NEGATIVE=PASS',
     'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
@@ -163,7 +185,8 @@ foreach ($marker in @(
     'WRONG_OPENOCD_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'WRONG_OPENOCD_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'WRONG_GDB_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
-    'WRONG_GDB_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'WRONG_GDB_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WRONG_EFX_RUN_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'PROGRAM_MODE_DEFAULT_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_MODE_SPI_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_MODE_JTAG_BRIDGE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_SOURCE_WRONG_BIT=PASS EXTERNAL_PROCESS_START_COUNT=0', 'PROGRAM_SOURCE_WRONG_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_ZERO_TARGET=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_MULTIPLE_TARGETS=PASS EXTERNAL_PROCESS_START_COUNT=0', 'EFINITY_USB_WRONG_SERIAL=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WINDOW_NOT_ACTIVE=PASS EXTERNAL_PROCESS_START_COUNT=0', 'MANIFEST_OR_TOOL_HASH_DRIFT=PASS EXTERNAL_PROCESS_START_COUNT=0', 'WINDOW_BOUNDED_RETRY_MODEL=PASS', 'SEVERE_BLOCKER_MODEL=PASS',
     'MOCK_SUCCESS=PASS RESULT=SUCCESS RAM_READ_COUNT=4 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TIMEOUT=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TRAP=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',

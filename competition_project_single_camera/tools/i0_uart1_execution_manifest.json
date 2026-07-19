@@ -1,103 +1,170 @@
 {
-  "schema_version": 3,
-  "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
-  "base_sha": "9949e6ed737f25db82111cc38250dfc15bdb54c9",
-  "qzs_authorization_sha": "a222ea64653a2232945342faacfb53a06ce50e42",
-  "qzs_authorization_path": "docs/agent_context/GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md",
-  "wsc_contract_sha": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
-  "design_sha": "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
-  "patch_chain": {
-    "patch_chain_base": "9949e6e",
-    "immediate_parent": "0a686ab3",
-    "candidate_sha": "11d4580"
-  },
-  "fixed_artifacts": {
-    "bitstream_sha256": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
-    "hello_elf_sha256": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
-    "hello_entry_pc": "0xF9000000",
-    "soc_h_sha256": "25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B",
-    "wsc_probe_elf_sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
-    "ftdi_cfg_sha256": "934FF4B47010461DB627A74BF8D5124CCD21CDAB64FE9080B06CEB395C9298FE",
-    "target_cfg_sha256": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83"
-  },
-  "live_tools": {
-    "openocd": {
-      "sha256": "FD8F9242B8BA34C33A22409103F0DFA9798070BEC64F3549F11CB911B312151A",
-      "version": "Open On-Chip Debugger 0.11.0+dev-04060-g967f8f6f0-dirty (2026-03-24-19:56)"
-    },
-    "gdb": {
-      "sha256": "BF89D58E62CDFAF4729518FA19AC6626B3219F3FF26F5A981593723F5EF3DFCB",
-      "version": "GNU gdb (xPack GNU RISC-V Embedded GCC, 64-bit) 8.3"
-    }
-  },
-  "wsc_contract_files": {
-    "document_sha256": "590F3CB6CDE347EF9C55EE5F2E70A915DFAD1D053AC537CB0F706B6A8331B5FC",
-    "summary_sha256": "4B843432A4C86B200F888D1255EEBE8BB0DD5D926BE37412655674610F52C83A",
-    "verifier_sha256": "6EE50C587B9135D4BEA537104F8632AF24E90B9C833D78C15815C6F9226346F2"
-  },
-  "openocd_argument_flow": {
-    "interface_first": true,
-    "target_second": true,
-    "use_bscan_tunnel": "6 1",
-    "set_bscan_tunnel_ir": "0x09",
-    "board_user2_status": "NOT_VERIFIED"
-  },
-  "raw_build_evidence": {
-    "verdict": "PASS",
-    "evidence_commit": "72cc281bd104726d9db1e88cb2894facb1d5fd1a",
-    "design_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4",
+    "schema_version": 3,
+    "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
+    "base_sha": "9949e6ed737f25db82111cc38250dfc15bdb54c9",
+    "qzs_authorization_sha": "a222ea64653a2232945342faacfb53a06ce50e42",
+    "qzs_authorization_path": "docs/agent_context/GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md",
+    "wsc_contract_sha": "48548f47dfa5964b13aed7edf3b3e9da6f6583a2",
     "design_sha": "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
-    "evidence_root": "C:\\cicc_i0_uart1_stage_20260719_v4",
-    "outflow_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\outflow_i0_uart1_20260719_cleanlf_v4",
-    "work_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\work_i0_uart1_20260719_cleanlf_v4",
-    "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\cicc_i0_uart1_evidence_lf_20260719_v2\\competition_project_single_camera\\embedded_sw\\uart1_hello_onchip\\verify_i0_uart1_build_evidence.ps1 -DesignRoot C:\\cicc_i0_uart1_design_lf_20260719_v4 -EvidenceRoot C:\\cicc_i0_uart1_stage_20260719_v4 -OutflowRoot C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\outflow_i0_uart1_20260719_cleanlf_v4 -WorkRoot C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\work_i0_uart1_20260719_cleanlf_v4 -EfinityRoot D:\\Efinity\\2025.2 -RiscvToolchainBin D:\\Efinity\\efinity-riscv-ide-2025.2\\toolchain\\bin -MakePath D:\\Efinity\\efinity-riscv-ide-2025.2\\build_tools\\bin\\make.exe",
-    "key_output": "I0_UART1_BUILD_EVIDENCE=PASS batch=I0_UART1_20260719_CLEAN_LF_FINAL design_sha=6effdc3685d696cb4d33f3fbb1c449729ed72e33 inputs=82 artifacts=21",
-    "restored_evidence_files": [
-      { "name": "efinity_console.log", "sha256": "4DD0C40BAF660B440B08B6668617D37ED01476B192663155385CF24F421655B4" },
-      { "name": "uart1_hello_build.log", "sha256": "83CAAC75485C8C0098DFE2379C9CA329CE75429C1257F88A29E38CF4EF08B939" },
-      { "name": "uart1_hello_readelf.txt", "sha256": "43C7825F6FEAC3086E17B57772D2469BD53EA9831528001DBC8771CF2C3277F3" },
-      { "name": "uart1_hello_undefined.txt", "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" },
-      { "name": "preflight.txt", "sha256": "9DC15B0661CF43C3C2877946A989D89D53751F58E5F5B70A53BF7A2964F53CEF" },
-      { "name": "postflight.txt", "sha256": "A502C8C5CD0437E379C957838FAD61FC0F48FEFE1D236C3DBBC97E9DCCE03D9F" }
-    ],
-    "inputs": 82,
-    "artifacts": 21,
-    "exit_code": 0
-  },
-  "offline_validation": {
-    "rsp_fixtures": "PASS",
-    "timeout_fail_closed": "PASS",
-    "uart1_pnp_allowlist": "PASS",
-    "resume_count_model": "HELLO=1 APB=1 RETRY=0",
-    "wsc_contract_verifier": "PASS",
-    "wsc_g2_host_msvc": "648/648 PASS",
-    "hardware_actions": "NONE"
-  },
-  "files": [
-    {
-      "path": "competition_project_single_camera/tools/i0_uart1_cleanlf_user2.cfg",
-      "sha256": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83",
-      "eol": "lf"
-    },
-    {
-      "path": "competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1",
-      "sha256": "4A9059DBE5126716E68BB045B8C523F7DFC2F1FBF0D94E9CA65A53F31B1AF4D3",
-      "eol": "crlf"
-    },
-    {
-      "path": "competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1",
-      "sha256": "6DAF04402E161F382956B813B26947AA7B32F3FE5B10F3BBB7C5605BEB45C936",
-      "eol": "crlf"
-    },
-    {
-      "path": "competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md",
-      "sha256": "746DF4A0634D8569C84771980B6C1C25130CBC226491E405FE4123B660017618",
-      "eol": "lf"
-    },
-    {
-      "path": "competition_project_single_camera/docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md",
-      "sha256": "8BEF17D9DA3F61D547AB741F315E0959FF917C25F473635DDDB3122689C536C1",
-      "eol": "lf"
-    }
-  ]
+    "patch_chain": {
+                        "patch_chain_base": "9949e6e",
+                        "immediate_parent": "0a686ab3",
+                        "candidate_sha": "11d4580"
+                    },
+    "fixed_artifacts": {
+                            "bitstream_sha256": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
+                            "hello_elf_sha256": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
+                            "hello_entry_pc": "0xF9000000",
+                            "soc_h_sha256": "25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B",
+                            "wsc_probe_elf_sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
+                            "ftdi_cfg_sha256": "934FF4B47010461DB627A74BF8D5124CCD21CDAB64FE9080B06CEB395C9298FE",
+                            "target_cfg_sha256": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83"
+                        },
+    "live_tools": {
+                       "openocd": {
+                                       "sha256": "FD8F9242B8BA34C33A22409103F0DFA9798070BEC64F3549F11CB911B312151A",
+                                       "version": "Open On-Chip Debugger 0.11.0+dev-04060-g967f8f6f0-dirty (2026-03-24-19:56)"
+                                   },
+                       "gdb": {
+                                   "sha256": "BF89D58E62CDFAF4729518FA19AC6626B3219F3FF26F5A981593723F5EF3DFCB",
+                                   "version": "GNU gdb (xPack GNU RISC-V Embedded GCC, 64-bit) 8.3"
+                               },
+                       "efx_run": {
+                                       "sha256": "46CCF2D36DB0FB6CAA50778E69E11391687DEB5B5BDA079B6541482853A1BE1A",
+                                       "version": "Efinity 2025.2 efx_run.bat"
+                                   },
+                       "efx_run_py": {
+                                          "sha256": "011290D1DFD51CAA8262FCF2517BF83FB42D555097D1AD1A03AD81CCA612BB39",
+                                          "version": "Efinity 2025.2 scripts/efx_run.py"
+                                      },
+                       "ftdi_program_py": {
+                                               "sha256": "BA1FB1017A59ABFCD30A251C68F61DE834A60084E636E372CE78E76C016E7C99",
+                                               "version": "Efinity 2025.2 ftdi_program.py"
+                                           },
+                       "usb_resolver_py": {
+                                               "sha256": "0C964241AE013EB0EE9378AA41C5553649AE4792D443BCB75748520566D4ABF0",
+                                               "version": "Efinity 2025.2 usb_resolver.py"
+                                           },
+                       "efinity_setup": {
+                                             "sha256": "B86C405AF93FFF604BB4B6EF1B5DE009D18C52C95D250D2307AA6BF53655A5BE",
+                                             "version": "Efinity 2025.2 setup.bat"
+                                         },
+                       "efinity_python": {
+                                              "sha256": "7BD970DF77D294629C78D4906FAB512D07CB9F52587D4896CADD307BAC09C346",
+                                              "version": "Efinity 2025.2 Python 3.11"
+                                          }
+                   },
+    "volatile_config": {
+                            "mode": "jtag",
+                            "expected_device_id": "0x006A0EF3",
+                            "project_xml_relative_path": "competition_project_single_camera/mem_test.xml",
+                            "project_xml_sha256": "C41D57F35C0D2B6AE82B1BF647C47A8DAC0EBFB46C9B5ECBE2AD5D65F6730A00",
+                            "expected_ftdi": {
+                                                  "vid": "0403",
+                                                  "pid": "6011",
+                                                  "serial": "FTBI7G42C"
+                                              },
+                            "allowed_command": "efx_run.bat \u003cabsolute-project.xml\u003e --flow program --pgm_opts mode=jtag source=\u003cabsolute-fixed.bit\u003e",
+                            "prohibited_modes": [
+                                                     "active",
+                                                     "passive",
+                                                     "jtag_bridge",
+                                                     "jtag_bridge_x8"
+                                                 ],
+                            "prohibited_routes": [
+                                                      "hex",
+                                                      "flash",
+                                                      "prom",
+                                                      "spi",
+                                                      "erase"
+                                                  ]
+                        },
+    "wsc_contract_files": {
+                               "document_sha256": "590F3CB6CDE347EF9C55EE5F2E70A915DFAD1D053AC537CB0F706B6A8331B5FC",
+                               "summary_sha256": "4B843432A4C86B200F888D1255EEBE8BB0DD5D926BE37412655674610F52C83A",
+                               "verifier_sha256": "6EE50C587B9135D4BEA537104F8632AF24E90B9C833D78C15815C6F9226346F2"
+                           },
+    "openocd_argument_flow": {
+                                  "interface_first": true,
+                                  "target_second": true,
+                                  "use_bscan_tunnel": "6 1",
+                                  "set_bscan_tunnel_ir": "0x09",
+                                  "board_user2_status": "NOT_VERIFIED"
+                              },
+    "raw_build_evidence": {
+                               "verdict": "PASS",
+                               "evidence_commit": "72cc281bd104726d9db1e88cb2894facb1d5fd1a",
+                               "design_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4",
+                               "design_sha": "6effdc3685d696cb4d33f3fbb1c449729ed72e33",
+                               "evidence_root": "C:\\cicc_i0_uart1_stage_20260719_v4",
+                               "outflow_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\outflow_i0_uart1_20260719_cleanlf_v4",
+                               "work_root": "C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\work_i0_uart1_20260719_cleanlf_v4",
+                               "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\cicc_i0_uart1_evidence_lf_20260719_v2\\competition_project_single_camera\\embedded_sw\\uart1_hello_onchip\\verify_i0_uart1_build_evidence.ps1 -DesignRoot C:\\cicc_i0_uart1_design_lf_20260719_v4 -EvidenceRoot C:\\cicc_i0_uart1_stage_20260719_v4 -OutflowRoot C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\outflow_i0_uart1_20260719_cleanlf_v4 -WorkRoot C:\\cicc_i0_uart1_design_lf_20260719_v4\\competition_project_single_camera\\work_i0_uart1_20260719_cleanlf_v4 -EfinityRoot D:\\Efinity\\2025.2 -RiscvToolchainBin D:\\Efinity\\efinity-riscv-ide-2025.2\\toolchain\\bin -MakePath D:\\Efinity\\efinity-riscv-ide-2025.2\\build_tools\\bin\\make.exe",
+                               "key_output": "I0_UART1_BUILD_EVIDENCE=PASS batch=I0_UART1_20260719_CLEAN_LF_FINAL design_sha=6effdc3685d696cb4d33f3fbb1c449729ed72e33 inputs=82 artifacts=21",
+                               "restored_evidence_files": [
+                                                               {
+                                                                   "name": "efinity_console.log",
+                                                                   "sha256": "4DD0C40BAF660B440B08B6668617D37ED01476B192663155385CF24F421655B4"
+                                                               },
+                                                               {
+                                                                   "name": "uart1_hello_build.log",
+                                                                   "sha256": "83CAAC75485C8C0098DFE2379C9CA329CE75429C1257F88A29E38CF4EF08B939"
+                                                               },
+                                                               {
+                                                                   "name": "uart1_hello_readelf.txt",
+                                                                   "sha256": "43C7825F6FEAC3086E17B57772D2469BD53EA9831528001DBC8771CF2C3277F3"
+                                                               },
+                                                               {
+                                                                   "name": "uart1_hello_undefined.txt",
+                                                                   "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+                                                               },
+                                                               {
+                                                                   "name": "preflight.txt",
+                                                                   "sha256": "9DC15B0661CF43C3C2877946A989D89D53751F58E5F5B70A53BF7A2964F53CEF"
+                                                               },
+                                                               {
+                                                                   "name": "postflight.txt",
+                                                                   "sha256": "A502C8C5CD0437E379C957838FAD61FC0F48FEFE1D236C3DBBC97E9DCCE03D9F"
+                                                               }
+                                                           ],
+                               "inputs": 82,
+                               "artifacts": 21,
+                               "exit_code": 0
+                           },
+    "offline_validation": {
+                               "rsp_fixtures": "PASS",
+                               "timeout_fail_closed": "PASS",
+                               "uart1_pnp_allowlist": "PASS",
+                               "resume_count_model": "HELLO=1 APB=1 RETRY=0",
+                               "wsc_contract_verifier": "PASS",
+                               "wsc_g2_host_msvc": "648/648 PASS",
+                               "hardware_actions": "NONE"
+                           },
+    "files": [
+                  {
+                      "path": "competition_project_single_camera/tools/i0_uart1_cleanlf_user2.cfg",
+                      "sha256": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83",
+                      "eol": "lf"
+                  },
+                  {
+                      "path": "competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1",
+                      "sha256": "406F1AB83B759F631D25C6C4ECE5346FB57B40A90927D32AD782DDC97BE100DB",
+                      "eol": "crlf"
+                  },
+                  {
+                      "path": "competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1",
+                      "sha256": "3FB6C6F50DC1B26CA4FAFC717EB57142727D56FD252C45650EFF85B53A258C37",
+                      "eol": "crlf"
+                  },
+                  {
+                      "path": "competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md",
+                      "sha256": "746DF4A0634D8569C84771980B6C1C25130CBC226491E405FE4123B660017618",
+                      "eol": "lf"
+                  },
+                  {
+                      "path": "competition_project_single_camera/docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md",
+                      "sha256": "8BEF17D9DA3F61D547AB741F315E0959FF917C25F473635DDDB3122689C536C1",
+                      "eol": "lf"
+                  }
+              ]
 }
