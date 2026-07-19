@@ -6,68 +6,75 @@ Status: `STATIC CONTRACT ONLY / HARDWARE NOT AUTHORIZED / BOARD NOT VERIFIED`.
 
 | Item | Value |
 | --- | --- |
-| Handoff SHA | `fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c` |
-| Patch baseline | `182fd6f5c4d628379760d6f4fc74e3b342e30083` |
-| WSC contract SHA | `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` |
+| Patch base | `2d713b80a41185e472837abaec3a10c01383c70f` |
+| QZS authorization | `a222ea64653a2232945342faacfb53a06ce50e42` |
+| WSC contract | `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` |
+| Design SHA | `6effdc3685d696cb4d33f3fbb1c449729ed72e33` |
 | Batch | `I0_UART1_20260719_CLEAN_LF_FINAL` |
 | Bitstream SHA-256 | `D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544` |
 | Hello ELF SHA-256 | `919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA` |
 | `soc.h` SHA-256 | `25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B` |
 
-## Static Selection Chain
+The only authoritative tool/document hash inventory is
+`tools/i0_uart1_execution_manifest.json`.
 
-The local Efinity 2025.2 debugger API maps Titanium `USER2` to five-bit
-`01001` (`0x09`). The packaged Ti375C529 Hard SoC `debug_ti.cfg` configures
-`CPUTAPID=0x006A0A79`, BSCAN tunnel `6 1`, tunnel IR width `8`, and RAM work
-area `0xF9000000`. `i0_uart1_cleanlf_user2.cfg` records that chain and begins
-with an initial halt. `i0_uart1_cleanlf_ram_halt.gdb` loads the fixed Hello ELF,
-halts again, and rejects a PC outside `0xF9000000..0xF9003FFF`.
+## Static Chain
 
-Efinity's API proves the real Titanium outer-IR mapping and its `write_ir()`
-selection behavior, but this static OpenOCD configuration has no traceable call
-bridge to that API. The variable and tunnel settings alone are insufficient
-evidence of real outer-IR selection. Therefore
-`USER2_SELECTION_CHAIN=BLOCKED`; no USER2 session is authorized.
-
-## Future Approved-Window Sequence
+The approved target config contains:
 
 ```text
-CPU halted
-  -> Hello ELF load
-  -> halt and PC range gate
-  -> Type-C UART1 PnP identity allowlist bind
-  -> CAPTURE_READY
-  -> resume once
-  -> fixed Hello
-  -> one printable ASCII byte only
-  -> exact one-byte echo
-  -> silent window and complete raw TX/RX evidence
+riscv use_bscan_tunnel 6 1
+riscv set_bscan_tunnel_ir 0x09
 ```
 
-UART1 is Type-C UART1 at `115200 8N1`. The capture tool rejects COM17, CH340,
-unallowlisted PnP identity, control bytes, and automatic CR/LF behavior. It logs
-`CAPTURE_READY`, a separate `RESUME_ONCE=<ISO-8601>` marker that cannot predate
-capture readiness, every RX/TX byte timestamp and hexadecimal value, counts,
-full byte transcript, and the silent-window end. The first failure ends the
-session; no retry or fallback is permitted.
+The future orchestrator must pass the approved FTDI config first and this
+target config second. Static argument-flow PASS does not prove FPGA USER2
+selection. `USER2=NOT_VERIFIED` until a separately approved board window.
 
-## WSC APB Consumption
+## Future Window Preconditions
 
-Only WSC's contract at `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` is consumed.
-The CPU performs exactly one 32-bit read of `0xE8100000 + 0x000`; debugger APB
-reads, APB writes, other offsets, scans, and retry are prohibited. After the
-single resume, only a `BREAKPOINT` at `0xF90000C4` before `1000 ms` permits four
-on-chip RAM evidence reads. Timeout, trap, wrong reason, or wrong PC records
-the failure and leaves `RAM_READ_COUNT=0`.
+Do not execute this card without a new user approval tied to the exact files,
+artifacts, board, and cabling. Before any external process starts:
 
-The baseline has no `i0_uart1_cleanlf_apb_read.gdb`; no direct APB route has
-been created. WSC's own Review Packet remains solely at its source SHA because
-that Packet is absent from the `182fd6f` baseline.
+1. The programmer must have exited and released JTAG.
+2. J44/UART0 remains excluded from UART1 capture.
+3. Type-C UART1 must uniquely match the approved VID/PID/serial/instance
+   allowlist. COM17, CH340, J44/UART0, and programmer identities are rejected.
+4. Live mode must use `Scenario=run`, one process, one run ID, and one resume.
+   `Scenario=all`, fixture outcome labels, and automatic retry are prohibited.
+5. Tool, config, ELF, and artifact identities must match the manifest and fixed
+   batch before the window starts.
 
-## Exclusions
+## Future Single-Run Sequence
 
-No `prepare_m2`, G1/R0/M2 operation card, UART0 checkpoint, COM approval JSON,
-USER1, SoftTap, Flash, SPI, PROM, DDR, other TAP, cable scan, address scan, or
-mechanical-arm route is part of this static contract.
+```text
+fixed volatile bitstream
+  -> OpenOCD with approved FTDI cfg then fixed target cfg
+  -> RAM-only probe load and entry PC gate
+  -> exact Type-C UART1 identity bind
+  -> CAPTURE_READY_TIME
+  -> persistent RESUME_ONCE marker
+  -> RESUME_ONCE_TIME and RESUME_COUNT=1
+  -> one asynchronous stop wait with 1000 ms watchdog
+  -> timeout: active halt request
+  -> halt reason and PC gate
+  -> success only: four fixed RAM evidence reads
+  -> final persistent log and byte counts
+```
 
-`HARDWARE_ACTIONS=NONE`
+Only confirmed `BREAKPOINT` at `0xF90000C4` before timeout permits RAM reads.
+Timeout, trap, wrong reason, wrong PC, or `TIMEOUT_HALT_UNCONFIRMED` ends the
+window with `RAM_READ_COUNT=0` and `RETRY_COUNT=0`.
+
+## Prohibited Routes
+
+No TAP/cable replacement, address scan, debugger APB read, APB write, UART0
+fallback, G1/R0/M2 operation card, USER1, SoftTap, Flash, SPI, PROM, DDR,
+UART2/J52, or mechanical-arm route is permitted.
+
+```text
+HARDWARE_ACTIONS=NONE
+USER2=NOT_VERIFIED
+UART1=NOT_VERIFIED
+APB=NOT_VERIFIED
+```
