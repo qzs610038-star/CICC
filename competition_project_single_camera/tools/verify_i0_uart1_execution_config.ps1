@@ -54,6 +54,10 @@ function Assert-Ordered([string]$Text, [string]$Earlier, [string]$Later, [string
 if ($manifest.schema_version -ne 3 -or $manifest.batch -ne 'I0_UART1_20260719_CLEAN_LF_FINAL') { throw 'Manifest schema or batch mismatch.' }
 if ($manifest.base_sha -cne $BaseSha -or $manifest.qzs_authorization_sha -cne $QzsAuthorizationSha -or $manifest.wsc_contract_sha -cne $WscContractSha) { throw 'Manifest provenance SHA mismatch.' }
 if ($manifest.PSObject.Properties.Name -contains 'packet_sha256' -or $manifest.PSObject.Properties.Name -contains 'manifest_sha256') { throw 'Packet/manifest circular hash dependency is prohibited.' }
+foreach ($toolName in @('openocd', 'gdb')) {
+    $tool = $manifest.live_tools.PSObject.Properties[$toolName].Value
+    if ($null -eq $tool -or [string]::IsNullOrWhiteSpace([string]$tool.sha256) -or [string]::IsNullOrWhiteSpace([string]$tool.version)) { throw "Manifest live tool binding missing: $toolName" }
+}
 
 $allowedPaths = @(
     'competition_project_single_camera/docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md',
@@ -85,26 +89,30 @@ Assert-Contains $helloSource 'uart1_puts("\r\nI0 UART1 HELLO\r\n");' 'fixed lead
 $runner = Get-Content -LiteralPath $runnerPath -Raw
 foreach ($clause in @(
     "if (`$Scenario -eq 'all') { throw 'Live mode rejects Scenario=all before any external action.' }",
-    'ApprovalRecordPath', 'approved_commit', 'board_id', 'uart1_pnp_key', 'window_start_utc', 'window_end_utc',
+    'ApprovalRecordPath', 'schema_version -ne 2', 'approved_commit', 'board_id', 'uart1_pnp_key', 'window_start_utc', 'window_end_utc',
     'FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT', 'TIMEOUT_HALT_UNCONFIRMED',
     'RSP_FIXTURES=PASS', 'UART1_PNP_ALLOWLIST=PASS', 'WSC_CONTRACT_CONSUMED=PASS',
     'HELLO_THREE_LINES_FIXTURE=PASS', 'UART_TX_ECHO_FIXTURE=PASS', 'UART_ECHO_MISMATCH_NEGATIVE=PASS',
     'WRONG_POST_LOAD_PC_NEGATIVE=PASS', 'BAD_ARTIFACT_HASH_NEGATIVE=PASS', 'BAD_APPROVAL_TUPLE_NEGATIVE=PASS',
     'Assert-ExternalRunDirectory', 'Assert-ExecutionCheckoutIntegrity', 'git -C $RepoRoot status --porcelain --untracked-files=all',
     'LIVE_CHECKOUT_HEAD_MISMATCH', 'LIVE_CHECKOUT_DIRTY', 'manifest_file=', 'HELLO_HALT_UNCONFIRMED RAM_READ_COUNT=0 APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    'Resolve-ApprovedTool', 'Resolve-Path -LiteralPath $CandidatePath', 'WRONG_OPENOCD_PATH', 'WRONG_OPENOCD_HASH', 'WRONG_GDB_PATH', 'WRONG_GDB_HASH',
+    'Invoke-ApprovedToolFixtures -FixtureDirectory $fixtureDirectory', '$Manifest.live_tools.openocd', '$Manifest.live_tools.gdb',
     "foreach (`$name in @('hello_timeout', 'line_mismatch', 'echo_mismatch', 'halt_unconfirmed'))", 'Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory',
     '"$Phase`_RESUME_ONCE.marker"', "Write-PhaseResumeMarker `$directory `$runId 'HELLO'", "Write-PhaseResumeMarker `$directory `$runId 'APB'",
     'HELLO_RESUME_COUNT=1', 'APB_RESUME_COUNT=1', 'RETRY_COUNT=0',
     '$Serial.Write([byte[]]@($TxByte), 0, 1)', 'Assert-EchoByte -Expected $TxByte -Actual $echoValue',
     'Wait-OpenOcdReady -Process $openOcdProcess', 'OpenOCD RSP qSupported negotiation failed; retry is prohibited.',
     'APB_PHASE_STARTED_AFTER_HELLO_PASS=true', '$wsc.HaltPc', '$wsc.TimeoutMs', '$wsc.Ram.GetEnumerator()',
-    'Start-Process -FilePath $OpenOcdExe -ArgumentList $openOcdArguments'
+    'Start-Process -FilePath $toolBindings.openocd.NormalizedPath -ArgumentList $openOcdArguments'
 )) { Assert-Contains $runner $clause 'runner fail-closed clause' }
 if ($runner -match 'ApprovalToken|I0_EXECUTION_WINDOW_APPROVED|WriteLine\(|(?i)prepare_m2|softtap|\bUSER1\b|\bUART0\b.*fallback|tap scan|cable scan|retry_count=[1-9]') { throw 'Generic authorization, automatic CR/LF, or dangerous fallback route detected.' }
 
-$startProcessIndex = $runner.IndexOf('Start-Process -FilePath $OpenOcdExe', [StringComparison]::Ordinal)
+$startProcessIndex = $runner.IndexOf('Start-Process -FilePath $toolBindings.openocd.NormalizedPath', [StringComparison]::Ordinal)
 foreach ($preflight in @(
     '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest',
+    'Resolve-ApprovedTool -CandidatePath $OpenOcdExe -ApprovalTool $approvalObject.tools.openocd -ManifestTool $Manifest.live_tools.openocd -Label ''OPENOCD''',
+    'Resolve-ApprovedTool -CandidatePath $GdbExe -ApprovalTool $approvalObject.tools.gdb -ManifestTool $Manifest.live_tools.gdb -Label ''GDB''',
     "Assert-FileHash `$Bitstream `$Manifest.fixed_artifacts.bitstream_sha256",
     "Assert-FileHash `$HelloElf `$Manifest.fixed_artifacts.hello_elf_sha256",
     "Assert-FileHash `$ProbeElf `$wsc.ProbeElfSha256",
@@ -116,12 +124,15 @@ foreach ($preflight in @(
     $index = $runner.IndexOf($preflight, [StringComparison]::Ordinal)
     if ($index -lt 0 -or $index -ge $startProcessIndex) { throw "Preflight does not precede OpenOCD start: $preflight" }
 }
-Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Start-Process -FilePath $OpenOcdExe' 'checkout integrity before external process'
+Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Start-Process -FilePath $toolBindings.openocd.NormalizedPath' 'checkout integrity before external process'
 Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' '$serial.Open()' 'checkout integrity before serial open'
-Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Invoke-GdbRamOnlyLoad $GdbExe' 'checkout integrity before GDB load'
-Assert-Ordered $runner 'Invoke-GdbRamOnlyLoad $GdbExe $HelloElf' "Write-RunLog `$executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'" 'Hello load before APB phase'
+Assert-Ordered $runner '$currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest' 'Invoke-GdbRamOnlyLoad $toolBindings.gdb.NormalizedPath' 'checkout integrity before GDB load'
+Assert-Ordered $runner 'Invoke-GdbRamOnlyLoad $toolBindings.gdb.NormalizedPath $HelloElf' "Write-RunLog `$executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'" 'Hello load before APB phase'
 Assert-Ordered $runner 'Complete-HelloEcho $serial' "Write-RunLog `$executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'" 'Hello/echo PASS before APB phase'
-Assert-Ordered $runner '$serial.Open()' 'Invoke-GdbRamOnlyLoad $GdbExe $HelloElf' 'UART capture before Hello load'
+Assert-Ordered $runner '$serial.Open()' 'Invoke-GdbRamOnlyLoad $toolBindings.gdb.NormalizedPath $HelloElf' 'UART capture before Hello load'
+Assert-Ordered $runner "openocd = Resolve-ApprovedTool -CandidatePath `$OpenOcdExe" 'New-Item -ItemType Directory -Path $liveDir' 'OpenOCD binding before live directory'
+Assert-Ordered $runner "gdb = Resolve-ApprovedTool -CandidatePath `$GdbExe" 'New-Item -ItemType Directory -Path $liveDir' 'GDB binding before live directory'
+Assert-Ordered $runner "openocd = Resolve-ApprovedTool -CandidatePath `$OpenOcdExe" 'Start-Process -FilePath $toolBindings.openocd.NormalizedPath' 'OpenOCD binding before process'
 
 $wscHead = (& git -C $WscContractRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $wscHead -cne $WscContractSha -or @(& git -C $WscContractRoot status --porcelain).Count -ne 0) { throw 'WSC contract checkout must be clean at the fixed SHA.' }
@@ -149,6 +160,10 @@ foreach ($marker in @(
     'MOCK_HELLO_LINE_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
     'MOCK_HELLO_ECHO_MISMATCH=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
     'MOCK_HELLO_HALT_UNCONFIRMED=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0',
+    'WRONG_OPENOCD_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'WRONG_OPENOCD_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'WRONG_GDB_PATH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
+    'WRONG_GDB_HASH_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0',
     'MOCK_SUCCESS=PASS RESULT=SUCCESS RAM_READ_COUNT=4 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TIMEOUT=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
     'MOCK_TRAP=PASS RESULT=FAILED_CLOSED RAM_READ_COUNT=0 HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0',
@@ -215,6 +230,11 @@ Assert-Contains $packet 'exit_code=0' 'raw evidence exit code'
 'MANIFEST_FILES_RUNTIME_BOUND=PASS runner=true cfg=true verifier=true operation_card=true review_packet=true'
 'DIRTY_RUNNER_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'PRE_EXTERNAL_PROCESS_FAIL_CLOSED=PASS dirty_cfg=true wrong_head=true manifest_file_hash_mismatch=true external_process_start_count=0'
+'LIVE_TOOL_BINDING=PASS openocd=true gdb=true path_hash_version=true'
+'WRONG_OPENOCD_PATH=PASS EXTERNAL_PROCESS_START_COUNT=0'
+'WRONG_OPENOCD_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0'
+'WRONG_GDB_PATH=PASS EXTERNAL_PROCESS_START_COUNT=0'
+'WRONG_GDB_HASH=PASS EXTERNAL_PROCESS_START_COUNT=0'
 'OPENOCD_ARGUMENT_FLOW=PASS cputapid=0x006A0EF3 width=6 type=1 outer_ir=0x09 USER2=NOT_VERIFIED'
 'LIVE_SCENARIO_ALL_REJECTED=PASS'
 'RSP_FIXTURES=PASS'

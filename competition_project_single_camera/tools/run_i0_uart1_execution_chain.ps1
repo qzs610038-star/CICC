@@ -100,6 +100,19 @@ function Assert-ExecutionCheckoutIntegrity {
     $commit
 }
 
+function Resolve-ApprovedTool {
+    param([string]$CandidatePath, $ApprovalTool, $ManifestTool, [string]$Label)
+    if ($null -eq $ApprovalTool -or $null -eq $ManifestTool) { throw "MISSING_${Label}_TOOL_BINDING" }
+    $resolved = (Resolve-Path -LiteralPath $CandidatePath -ErrorAction Stop).ProviderPath
+    $normalized = [IO.Path]::GetFullPath($resolved)
+    if ($normalized -cne [string]$ApprovalTool.normalized_path) { throw "WRONG_${Label}_PATH" }
+    if ([string]$ApprovalTool.version -cne [string]$ManifestTool.version) { throw "WRONG_${Label}_VERSION" }
+    if ([string]$ApprovalTool.sha256 -cne [string]$ManifestTool.sha256) { throw "WRONG_${Label}_HASH" }
+    $actualHash = Get-Sha256 $normalized
+    if ($actualHash -cne [string]$ManifestTool.sha256) { throw "WRONG_${Label}_HASH" }
+    [pscustomobject]@{ NormalizedPath = $normalized; Sha256 = $actualHash; Version = [string]$ManifestTool.version }
+}
+
 function Get-RspChecksum {
     param([string]$Payload)
     $sum = 0
@@ -352,8 +365,8 @@ function Resolve-UniqueUart1Identity {
 }
 
 function Test-ApprovalRecord {
-    param($Approval, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [string]$ManifestSha, [hashtable]$ArtifactHashes, [DateTimeOffset]$Now)
-    if ($Approval.schema_version -ne 1 -or $Approval.approved_commit -cne $Commit -or $Approval.board_id -cne $ExpectedBoard -or $Approval.uart1_pnp_key -cne $ExpectedPnp) { throw 'APPROVAL_TUPLE_MISMATCH identity' }
+    param($Approval, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [string]$ManifestSha, [hashtable]$ArtifactHashes, [hashtable]$ToolBindings, [DateTimeOffset]$Now)
+    if ($Approval.schema_version -ne 2 -or $Approval.approved_commit -cne $Commit -or $Approval.board_id -cne $ExpectedBoard -or $Approval.uart1_pnp_key -cne $ExpectedPnp) { throw 'APPROVAL_TUPLE_MISMATCH identity' }
     if ([string]::IsNullOrWhiteSpace([string]$Approval.window_id) -or $Approval.stop_strategy -cne $StopStrategy) { throw 'APPROVAL_TUPLE_MISMATCH window_or_stop_strategy' }
     $start = [DateTimeOffset]::Parse($Approval.window_start_utc)
     $end = [DateTimeOffset]::Parse($Approval.window_end_utc)
@@ -363,14 +376,20 @@ function Test-ApprovalRecord {
         $property = $Approval.artifact_sha256.PSObject.Properties[$entry.Key]
         if ($null -eq $property -or [string]$property.Value -cne $entry.Value) { throw "APPROVAL_TUPLE_MISMATCH artifact=$($entry.Key)" }
     }
+    foreach ($tool in $ToolBindings.GetEnumerator()) {
+        $approvedTool = $Approval.tools.PSObject.Properties[$tool.Key].Value
+        if ($null -eq $approvedTool -or [string]$approvedTool.normalized_path -cne $tool.Value.NormalizedPath -or [string]$approvedTool.sha256 -cne $tool.Value.Sha256 -or [string]$approvedTool.version -cne $tool.Value.Version) {
+            throw "APPROVAL_TUPLE_MISMATCH tool=$($tool.Key)"
+        }
+    }
     $true
 }
 
 function Get-LiveApproval {
-    param([string]$Path, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [hashtable]$ArtifactHashes)
+    param([string]$Path, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [hashtable]$ArtifactHashes, [hashtable]$ToolBindings)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Live mode requires an external approval record.' }
     $approval = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-    Test-ApprovalRecord -Approval $approval -Commit $Commit -ExpectedBoard $ExpectedBoard -ExpectedPnp $ExpectedPnp -ManifestSha (Get-Sha256 $ManifestPath) -ArtifactHashes $ArtifactHashes -Now ([DateTimeOffset]::UtcNow) | Out-Null
+    Test-ApprovalRecord -Approval $approval -Commit $Commit -ExpectedBoard $ExpectedBoard -ExpectedPnp $ExpectedPnp -ManifestSha (Get-Sha256 $ManifestPath) -ArtifactHashes $ArtifactHashes -ToolBindings $ToolBindings -Now ([DateTimeOffset]::UtcNow) | Out-Null
     $approval
 }
 
@@ -602,6 +621,38 @@ function Invoke-PreExternalIntegrityFixtures {
     }
 }
 
+function Invoke-ApprovedToolFixtures {
+    param([string]$FixtureDirectory)
+    $openOcd = Join-Path $FixtureDirectory 'openocd.exe'
+    $gdb = Join-Path $FixtureDirectory 'gdb.exe'
+    [IO.File]::WriteAllText($openOcd, 'openocd fixture', [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText($gdb, 'gdb fixture', [Text.Encoding]::ASCII)
+    $manifestTools = [pscustomobject]@{
+        openocd = [pscustomobject]@{ sha256 = Get-Sha256 $openOcd; version = 'openocd fixture 1' }
+        gdb = [pscustomobject]@{ sha256 = Get-Sha256 $gdb; version = 'gdb fixture 1' }
+    }
+    $approval = [pscustomobject]@{ tools = [pscustomobject]@{
+        openocd = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($openOcd); sha256 = $manifestTools.openocd.sha256; version = $manifestTools.openocd.version }
+        gdb = [pscustomobject]@{ normalized_path = [IO.Path]::GetFullPath($gdb); sha256 = $manifestTools.gdb.sha256; version = $manifestTools.gdb.version }
+    } }
+    Resolve-ApprovedTool -CandidatePath $openOcd -ApprovalTool $approval.tools.openocd -ManifestTool $manifestTools.openocd -Label 'OPENOCD' | Out-Null
+    Resolve-ApprovedTool -CandidatePath $gdb -ApprovalTool $approval.tools.gdb -ManifestTool $manifestTools.gdb -Label 'GDB' | Out-Null
+    foreach ($fixture in @(
+        [pscustomobject]@{ Name = 'WRONG_OPENOCD_PATH'; Tool = 'openocd'; Property = 'normalized_path'; Value = $gdb },
+        [pscustomobject]@{ Name = 'WRONG_OPENOCD_HASH'; Tool = 'openocd'; Property = 'sha256'; Value = ('0' * 64) },
+        [pscustomobject]@{ Name = 'WRONG_GDB_PATH'; Tool = 'gdb'; Property = 'normalized_path'; Value = $openOcd },
+        [pscustomobject]@{ Name = 'WRONG_GDB_HASH'; Tool = 'gdb'; Property = 'sha256'; Value = ('0' * 64) }
+    )) {
+        $approval.tools.openocd.normalized_path = [IO.Path]::GetFullPath($openOcd); $approval.tools.openocd.sha256 = $manifestTools.openocd.sha256
+        $approval.tools.gdb.normalized_path = [IO.Path]::GetFullPath($gdb); $approval.tools.gdb.sha256 = $manifestTools.gdb.sha256
+        $approval.tools.($fixture.Tool).($fixture.Property) = $fixture.Value
+        $closed = $false
+        try { Resolve-ApprovedTool -CandidatePath $(if ($fixture.Tool -eq 'openocd') { $openOcd } else { $gdb }) -ApprovalTool $approval.tools.($fixture.Tool) -ManifestTool $manifestTools.($fixture.Tool) -Label $fixture.Tool.ToUpperInvariant() | Out-Null } catch { $closed = $_.Exception.Message.Contains($fixture.Name) }
+        if (-not $closed) { throw "$($fixture.Name) fixture did not fail closed." }
+        "$($fixture.Name)_NEGATIVE=PASS EXTERNAL_PROCESS_START_COUNT=0"
+    }
+}
+
 function Invoke-MockFixtures {
     $wsc = Read-WscContract $WscContractRoot
     'WSC_CONTRACT_CONSUMED=PASS sha=48548f47dfa5964b13aed7edf3b3e9da6f6583a2 hashes=3 constants=source_parsed'
@@ -641,15 +692,16 @@ function Invoke-MockFixtures {
     'BAD_ARTIFACT_HASH_NEGATIVE=PASS'
 
     $artifactHashes = @{ bitstream = 'A'; hello_elf = 'B'; probe_elf = 'C'; soc_h = 'D'; ftdi_cfg = 'E'; target_cfg = 'F'; wsc_contract_document = 'G'; wsc_contract_summary = 'H'; wsc_contract_verifier = 'I' }
+    $toolBindings = @{ openocd = [pscustomobject]@{ NormalizedPath = 'C:\fixture\openocd.exe'; Sha256 = 'J'; Version = 'openocd fixture 1' }; gdb = [pscustomobject]@{ NormalizedPath = 'C:\fixture\gdb.exe'; Sha256 = 'K'; Version = 'gdb fixture 1' } }
     $approval = [pscustomobject]@{
-        schema_version = 1; approved_commit = 'fixed'; board_id = 'BOARD'; uart1_pnp_key = 'PNP'; window_id = 'WINDOW'
+        schema_version = 2; approved_commit = 'fixed'; board_id = 'BOARD'; uart1_pnp_key = 'PNP'; window_id = 'WINDOW'
         window_start_utc = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString('o'); window_end_utc = [DateTimeOffset]::UtcNow.AddMinutes(1).ToString('o')
-        stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes
+        stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes; tools = [pscustomobject]@{ openocd = [pscustomobject]@{ normalized_path = $toolBindings.openocd.NormalizedPath; sha256 = $toolBindings.openocd.Sha256; version = $toolBindings.openocd.Version }; gdb = [pscustomobject]@{ normalized_path = $toolBindings.gdb.NormalizedPath; sha256 = $toolBindings.gdb.Sha256; version = $toolBindings.gdb.Version } }
     }
-    Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes ([DateTimeOffset]::UtcNow) | Out-Null
+    Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes $toolBindings ([DateTimeOffset]::UtcNow) | Out-Null
     $approval.board_id = 'WRONG'
     $badApprovalClosed = $false
-    try { Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes ([DateTimeOffset]::UtcNow) | Out-Null } catch { $badApprovalClosed = $true }
+    try { Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes $toolBindings ([DateTimeOffset]::UtcNow) | Out-Null } catch { $badApprovalClosed = $true }
     if (-not $badApprovalClosed) { throw 'Bad approval tuple fixture did not fail closed.' }
     'BAD_APPROVAL_TUPLE_NEGATIVE=PASS'
 
@@ -660,6 +712,7 @@ function Invoke-MockFixtures {
         "MOCK_HELLO_$($name.ToUpperInvariant())=PASS RESULT=FAILED_CLOSED APB_RESUME_COUNT=0 RETRY_COUNT=0"
     }
     Invoke-PreExternalIntegrityFixtures -FixtureDirectory $fixtureDirectory
+    Invoke-ApprovedToolFixtures -FixtureDirectory $fixtureDirectory
 
     foreach ($name in @('success', 'timeout', 'trap', 'wrong_pc', 'wrong_reason', 'halt_unconfirmed')) {
         $outcome = Invoke-MockApbScenario -Name $name -Wsc $wsc
@@ -714,6 +767,10 @@ $counts = @{ Rx = 0; Tx = 0 }
 try {
     $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw | ConvertFrom-Json
     $currentCommit = Assert-ExecutionCheckoutIntegrity -RepoRoot $repoRoot -Approval $approvalObject -RuntimeManifest $Manifest
+    $toolBindings = @{
+        openocd = Resolve-ApprovedTool -CandidatePath $OpenOcdExe -ApprovalTool $approvalObject.tools.openocd -ManifestTool $Manifest.live_tools.openocd -Label 'OPENOCD'
+        gdb = Resolve-ApprovedTool -CandidatePath $GdbExe -ApprovalTool $approvalObject.tools.gdb -ManifestTool $Manifest.live_tools.gdb -Label 'GDB'
+    }
     $wsc = Read-WscContract $WscContractRoot
     $artifactHashes = @{
         bitstream = Assert-FileHash $Bitstream $Manifest.fixed_artifacts.bitstream_sha256 'bitstream'
@@ -727,16 +784,17 @@ try {
         wsc_contract_verifier = Get-Sha256 $wsc.VerifierPath
     }
     $identity = Resolve-UniqueUart1Identity -Port $UartPort -ExpectedKey $approvalObject.uart1_pnp_key
-    $approval = Get-LiveApproval -Path $ApprovalRecordPath -Commit $currentCommit -ExpectedBoard $BoardId -ExpectedPnp $identity.Key -ArtifactHashes $artifactHashes
+    $approval = Get-LiveApproval -Path $ApprovalRecordPath -Commit $currentCommit -ExpectedBoard $BoardId -ExpectedPnp $identity.Key -ArtifactHashes $artifactHashes -ToolBindings $toolBindings
     New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
     Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0" | Out-Null
     Write-RunLog $executionLog "COMMIT_SHA=$currentCommit"
     Write-RunLog $executionLog "APPROVAL_SHA256=$(Get-Sha256 $ApprovalRecordPath) WINDOW_ID=$($approval.window_id) BOARD_ID=$BoardId STOP_STRATEGY=$StopStrategy"
     Write-RunLog $executionLog "PNP=$($identity.Key) FRIENDLY_NAME=$($identity.FriendlyName) ROUTE=TYPEC_UART1"
     foreach ($entry in $artifactHashes.GetEnumerator()) { Write-RunLog $executionLog "PREFLIGHT_HASH_$($entry.Key.ToUpperInvariant())=$($entry.Value)" | Out-Null }
+    foreach ($tool in $toolBindings.GetEnumerator()) { Write-RunLog $executionLog "PREFLIGHT_TOOL_$($tool.Key.ToUpperInvariant())_PATH=$($tool.Value.NormalizedPath) SHA256=$($tool.Value.Sha256) VERSION=$($tool.Value.Version)" | Out-Null }
     $openOcdArguments = Get-OpenOcdArguments $FtdiConfig $TargetConfig
     Write-RunLog $executionLog "OPENOCD_ARGUMENT_FLOW=-f $FtdiConfig -f $TargetConfig"
-    $openOcdProcess = Start-Process -FilePath $OpenOcdExe -ArgumentList $openOcdArguments -RedirectStandardOutput $openOcdStdout -RedirectStandardError $openOcdStderr -WindowStyle Hidden -PassThru
+    $openOcdProcess = Start-Process -FilePath $toolBindings.openocd.NormalizedPath -ArgumentList $openOcdArguments -RedirectStandardOutput $openOcdStdout -RedirectStandardError $openOcdStderr -WindowStyle Hidden -PassThru
     Wait-OpenOcdReady -Process $openOcdProcess -StdoutPath $openOcdStdout -StderrPath $openOcdStderr -Port $OpenOcdPort
 
     $serial = [IO.Ports.SerialPort]::new($identity.Port, 115200, [IO.Ports.Parity]::None, 8, [IO.Ports.StopBits]::One)
@@ -746,7 +804,7 @@ try {
     $serial.Open()
     $captureReady = [DateTimeOffset]::UtcNow
     Write-RunLog $executionLog "CAPTURE_READY_TIME=$($captureReady.ToString('o')) PNP=$($identity.Key) AUTO_CRLF=DISABLED"
-    Invoke-GdbRamOnlyLoad $GdbExe $HelloElf $OpenOcdHost $OpenOcdPort $Manifest.fixed_artifacts.hello_entry_pc 'HELLO' $executionLog | Out-Null
+    Invoke-GdbRamOnlyLoad $toolBindings.gdb.NormalizedPath $HelloElf $OpenOcdHost $OpenOcdPort $Manifest.fixed_artifacts.hello_entry_pc 'HELLO' $executionLog | Out-Null
     $client = [Net.Sockets.TcpClient]::new($OpenOcdHost, $OpenOcdPort)
     $stream = $client.GetStream()
     $rspState = New-RspState
@@ -776,7 +834,7 @@ try {
     if ($null -ne $helloFailure) { throw $helloFailure }
     $stream.Dispose(); $stream = $null; $client.Dispose(); $client = $null
 
-    Invoke-GdbRamOnlyLoad $GdbExe $ProbeElf $OpenOcdHost $OpenOcdPort $wsc.EntryPc 'APB' $executionLog | Out-Null
+    Invoke-GdbRamOnlyLoad $toolBindings.gdb.NormalizedPath $ProbeElf $OpenOcdHost $OpenOcdPort $wsc.EntryPc 'APB' $executionLog | Out-Null
     Write-RunLog $executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'
     $client = [Net.Sockets.TcpClient]::new($OpenOcdHost, $OpenOcdPort)
     $stream = $client.GetStream()
