@@ -42,7 +42,8 @@ try {
     $mapText = $mapText -replace [regex]::Escape($root), '<WORKTREE>'
     $toolchainPattern = [regex]::Escape($ToolchainRoot) -replace '\\\\', '[\\/]'
     $mapText = $mapText -replace $toolchainPattern, '<TOOLCHAIN>'
-    $mapText | Set-Content -Encoding ascii (Join-Path $evidence 'p0a_uart1_diag.map')
+    (($mapText -split "`r?`n") | ForEach-Object { $_.TrimEnd() }) -join "`n" |
+        Set-Content -NoNewline -Encoding ascii (Join-Path $evidence 'p0a_uart1_diag.map')
     $evidenceElf = Join-Path $evidence 'p0a_uart1_diag.elf'
     Copy-Item -LiteralPath $elf -Destination $evidenceElf -Force
 
