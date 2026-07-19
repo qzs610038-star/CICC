@@ -45,6 +45,7 @@ $files = @(
     'competition_project_single_camera/cpu/tests/test_single_camera_classifier.c',
     'tools/interface_freeze_check.ps1',
     'tools/team_scope_check.ps1',
+    'tools/verify_final_static_integration_manifest.ps1',
     'competition_project_single_camera/docs/debug_sessions/I0_SMOKE_OPERATION_CARD_DRAFT_20260718.md',
     'docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md'
 )
