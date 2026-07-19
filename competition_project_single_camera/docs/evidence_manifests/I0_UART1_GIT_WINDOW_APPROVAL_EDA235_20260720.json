@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "template_status": "ISSUED_APPROVAL",
+  "authorization_transport": "GIT_FIXED_COMMIT",
+  "authorization_policy": "TIME_WINDOW_ONLY_RETRY_LIMIT",
+  "approved_commit": "eda235a1a0a1470cab2e166b1a388e87954b922b",
+  "board_id": "YLS_4232DL",
+  "execution_host_role": "libaoxun_hardware_host_only",
+  "qzs_host_hardware_enumeration": "PROHIBITED_NOT_CONNECTED_TO_BOARD",
+  "uart1_pnp_key": "VID=0403;PID=6011;SERIAL=FTBI7G42C;INSTANCE=FTDIBUS\\VID_0403+PID_6011+FTBI7G42C\\0000",
+  "com_port": "COM10",
+  "window_id": "GOAL4-I0-UART1-EDA235-20260720T0135CST",
+  "window_start_utc": "2026-07-19T17:35:00Z",
+  "window_end_utc": "2026-07-19T20:45:00Z",
+  "window_start_cst": "2026-07-20T01:35:00+08:00",
+  "window_end_cst": "2026-07-20T04:45:00+08:00",
+  "stop_strategy": "WINDOW_BOUNDED_RETRY_WITH_FAIL_CLOSED_ATTEMPTS",
+  "retry_policy": {
+    "attempt_count_limit": null,
+    "limiter": "window_end_utc_or_severe_blocker_or_user_ctrl_c",
+    "each_attempt": "independent_fail_closed_log_directory",
+    "operator_attendance_required": true,
+    "same_failure_guidance": "Ctrl-C, inspect the completed attempt log, correct only transient host/session state, then invoke again under the same fixed tuple while the window remains active"
+  },
+  "manifest_sha256": "72622BEDFCCFD914D5B70C9D51C67B4EDDB0CE3A77642A01BC4712B432D6EF70",
+  "artifact_sha256": {
+    "bitstream": "D05EFD4EC91FDB51F2997483BA7F4A3634C3E50FF1C65DD7239B41E19E2BC544",
+    "hello_elf": "919B291A2B980F02507D1591EFBE5D8E395DC53F4A480AE5A8C577D74CF5F7FA",
+    "probe_elf": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
+    "soc_h": "25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B",
+    "ftdi_cfg": "934FF4B47010461DB627A74BF8D5124CCD21CDAB64FE9080B06CEB395C9298FE",
+    "target_cfg": "85FA27C1C05406E295B41201EE64C68A366BEAC045444775A9804DB33877FD83",
+    "wsc_contract_document": "590F3CB6CDE347EF9C55EE5F2E70A915DFAD1D053AC537CB0F706B6A8331B5FC",
+    "wsc_contract_summary": "4B843432A4C86B200F888D1255EEBE8BB0DD5D926BE37412655674610F52C83A",
+    "wsc_contract_verifier": "6EE50C587B9135D4BEA537104F8632AF24E90B9C833D78C15815C6F9226346F2"
+  },
+  "tools": {
+    "openocd": {
+      "normalized_path": "C:\\Users\\20306\\Desktop\\赛题资料\\CICC\\赛方提供材料\\efinity-2025.2.288.4.15-windows-x64-patch\\files\\debugger\\openocd\\bin\\openocd.exe",
+      "sha256": "FD8F9242B8BA34C33A22409103F0DFA9798070BEC64F3549F11CB911B312151A",
+      "version": "Open On-Chip Debugger 0.11.0+dev-04060-g967f8f6f0-dirty (2026-03-24-19:56)"
+    },
+    "gdb": {
+      "normalized_path": "D:\\Efinity\\efinity-riscv-ide-2025.2\\toolchain\\bin\\riscv-none-embed-gdb.exe",
+      "sha256": "BF89D58E62CDFAF4729518FA19AC6626B3219F3FF26F5A981593723F5EF3DFCB",
+      "version": "GNU gdb (xPack GNU RISC-V Embedded GCC, 64-bit) 8.3"
+    },
+    "efx_run": {
+      "normalized_path": "D:\\Efinity\\2025.2\\bin\\efx_run.bat",
+      "sha256": "46CCF2D36DB0FB6CAA50778E69E11391687DEB5B5BDA079B6541482853A1BE1A",
+      "version": "Efinity 2025.2 efx_run.bat"
+    },
+    "efx_run_py": {
+      "normalized_path": "D:\\Efinity\\2025.2\\scripts\\efx_run.py",
+      "sha256": "011290D1DFD51CAA8262FCF2517BF83FB42D555097D1AD1A03AD81CCA612BB39",
+      "version": "Efinity 2025.2 scripts/efx_run.py"
+    },
+    "ftdi_program_py": {
+      "normalized_path": "D:\\Efinity\\2025.2\\pgm\\bin\\efx_pgm\\ftdi_program.py",
+      "sha256": "BA1FB1017A59ABFCD30A251C68F61DE834A60084E636E372CE78E76C016E7C99",
+      "version": "Efinity 2025.2 ftdi_program.py"
+    },
+    "usb_resolver_py": {
+      "normalized_path": "D:\\Efinity\\2025.2\\pgm\\bin\\efx_pgm\\usb_resolver.py",
+      "sha256": "0C964241AE013EB0EE9378AA41C5553649AE4792D443BCB75748520566D4ABF0",
+      "version": "Efinity 2025.2 usb_resolver.py"
+    },
+    "efinity_setup": {
+      "normalized_path": "D:\\Efinity\\2025.2\\bin\\setup.bat",
+      "sha256": "B86C405AF93FFF604BB4B6EF1B5DE009D18C52C95D250D2307AA6BF53655A5BE",
+      "version": "Efinity 2025.2 setup.bat"
+    },
+    "efinity_python": {
+      "normalized_path": "D:\\Efinity\\2025.2\\python311\\bin\\python.exe",
+      "sha256": "7BD970DF77D294629C78D4906FAB512D07CB9F52587D4896CADD307BAC09C346",
+      "version": "Efinity 2025.2 Python 3.11"
+    }
+  },
+  "authorized_scope": [
+    "window-bounded repeated independent attempts on the libaoxun hardware host",
+    "volatile JTAG FPGA configuration using only the fixed .bit",
+    "USER2 on-chip RAM Hello load with the fixed PC gate",
+    "Type-C UART1 three-line Hello and one printable U echo without CR/LF",
+    "WSC APB probe only after Hello and echo PASS",
+    "four on-chip RAM evidence reads only after the fixed breakpoint halt"
+  ],
+  "operator_precheck": [
+    "board is stably powered and cooling is unobstructed",
+    "USB Type-C UART1 and JTAG cables are firmly seated without hubs or loose adapters",
+    "no Efinity Programmer, OpenOCD, GDB, terminal, serial monitor, or stale runner process owns the FTDI device",
+    "COM10 still identifies exactly VID 0403 PID 6011 serial FTBI7G42C instance 0000 on the libaoxun host",
+    "COM17, CH340, J44 UART0, UART2 J52, and mechanical-arm wiring are not selected or used",
+    "the operator can remove board power or stop the process immediately if abnormal heat, odor, repeated disconnect, or unstable supply appears"
+  ],
+  "severe_blockers": [
+    "window expiry or user Ctrl-C",
+    "artifact, manifest, checkout, tool, project XML, or device identity drift",
+    "zero or multiple Efinity targets",
+    "Flash, PROM, SPI Active, JTAG Bridge, .hex, erase, or persistent programming route",
+    "unconfirmed CPU halt or PC outside fixed on-chip RAM",
+    "APB write, APB scan, unexpected halt reason, or unexpected APB address",
+    "UART0, COM17, CH340, UART2 J52, cable, TAP, or artifact substitution",
+    "abnormal heat, odor, unstable power, repeated USB disconnect, or suspected electrical fault"
+  ],
+  "board_results_before_execution": {
+    "USER2": "NOT_VERIFIED",
+    "PC": "NOT_VERIFIED",
+    "UART1_HELLO_ECHO": "NOT_VERIFIED",
+    "APB_MAGIC": "NOT_VERIFIED"
+  }
+}
