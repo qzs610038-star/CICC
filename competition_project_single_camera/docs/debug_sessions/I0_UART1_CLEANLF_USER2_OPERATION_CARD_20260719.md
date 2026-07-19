@@ -24,7 +24,9 @@ hashes in the new window and stop before hardware activity on any mismatch.
 
 - Repository target config: `tools/i0_uart1_cleanlf_user2.cfg`
 - GDB RAM/halt/PC gate: `tools/i0_uart1_cleanlf_ram_halt.gdb`
-- GDB APB final read: `tools/i0_uart1_cleanlf_apb_read.gdb`
+- WSC APB probe binding: `tools/wsc_i0_apb_probe_contract.json`
+- WSC APB binding gate: `tools/i0_uart1_wsc_probe_gate.ps1`
+- WSC APB RAM-evidence GDB consumer: `tools/i0_uart1_wsc_apb_probe.gdb`
 - UART1 raw capture: `tools/capture_i0_uart1_raw.ps1`
 - Static verifier: `tools/verify_i0_uart1_execution_config.ps1`
 
@@ -56,11 +58,21 @@ starts.
 3. Start OpenOCD only with the official Efinity Ti375 FTDI interface file and
    `tools/i0_uart1_cleanlf_user2.cfg`; then run
    `tools/i0_uart1_cleanlf_ram_halt.gdb`. This performs RAM-only ELF load,
-   halts after load, and rejects a PC outside `0xF9000000..0xF9003FFF`.
-4. Open Type-C UART1 at `115200 8N1` with `capture_i0_uart1_raw.ps1`.
-   Record the enumerated unique identity, complete RX/TX transcript and byte
-   counts. After Hello and one-character echo PASS, run the APB GDB script:
-   it reads only `0xE8100000`; accept only `0x375A0001`.
+   halts after load, rejects a PC outside `0xF9000000..0xF9003FFF`, and issues
+   one controlled `continue` only after that PASS. Keep this GDB session open.
+4. In a second terminal, run `capture_i0_uart1_raw.ps1` at Type-C UART1
+   `115200 8N1`. It must first
+   obtain the complete three-line Hello, then send exactly one printable
+   `0x20..0x7E` byte, and accept only that exact echoed byte. It obtains the
+   COM/VID/PID/serial/location identity from live PnP enumeration, records
+   timestamped RX/TX bytes and cumulative counters, and rejects CH340/COM17.
+5. After UART PASS, issue one GDB interrupt to halt the Hello ELF, record the
+   resulting PC/reason, then close that GDB session. Do not resume again.
+6. Only after UART PASS, run the hash-locked WSC binding gate, then load the
+   WSC APB probe ELF with `tools/i0_uart1_wsc_apb_probe.gdb`. The CPU, not the
+   debugger, performs its exactly-one `0xE8100000` read. The debugger must not
+   inspect the APB window: after the `0xF90000C4` breakpoint it may read only
+   WSC's four specified RAM evidence words.
 
 At the first failure, preserve the raw log and stop the window. Do not retry,
 fall back to UART0, or continue to APB after UART failure.
@@ -73,7 +85,8 @@ Use a new directory under `debug_records/i0_uart1_cleanlf/<new-window-id>/`:
   UART1 enumeration identity.
 - `programmer_volatile.log`: UI screenshot or native log proving volatile FPGA
   configuration only.
-- `openocd_user2.log`, `gdb_ram_halt_pc.log`, and `gdb_apb_read.log`.
+- `openocd_user2.log`, `gdb_ram_halt_pc.log`, `wsc_probe_gate.log`, and
+  `gdb_wsc_apb_probe.log`.
 - `uart1_raw.log`: timestamped bytes plus `rx_bytes` and `tx_bytes`.
 
 No log means no PASS.

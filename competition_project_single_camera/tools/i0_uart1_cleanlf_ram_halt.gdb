@@ -16,3 +16,6 @@ if (($pc < 0xF9000000) || ($pc > 0xF9003FFF))
   quit
 end
 printf "I0_PC_RANGE_PASS\n"
+printf "I0_RESUME_CONTROLLED=AFTER_PC_RANGE_PASS\n"
+continue
+printf "I0_RESUME_STOPPED=YES\n"

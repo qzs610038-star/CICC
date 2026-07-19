@@ -1,0 +1,38 @@
+{
+  "contract_name": "WSC Goal4-I2 APB MAGIC probe binding",
+  "contract_version": 1,
+  "owner": "WSC",
+  "status": "READY_STATIC",
+  "consumer": "I0_UART1_CLEAN_LF",
+  "source_remote_ref": "origin/dev/wsc6090-goal4-runbook-20260719",
+  "source_contract_commit": "a840f0869c11bab0915757d64c56a167f6d4f917",
+  "source_probe_commit": "15908b32475f6ce80b645a728c25a5e7a2db749f",
+  "wsc_contract_path": "embedded_sw/apb_magic_onchip/APB_PROBE_DEBUGGER_CONTRACT.md",
+  "wsc_contract_sha256": "C4FA7C531526AFCE48F7B503AE8808ECDCB0440B9E97F49B824D33154B095824",
+  "wsc_evidence_path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.contract.txt",
+  "wsc_evidence_sha256": "119C260FEAB1D0A3C6A63E022C141D6FB1D70FF57646F6E40F1F71FBFB1BEFA0",
+  "probe_elf_path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.elf",
+  "probe_elf_sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC",
+  "approved_address": "0xE8100000",
+  "expected_value": "0x375A0001",
+  "mode": "CPU_READ_ONLY_SINGLE_ADDRESS_DEBUGGER_RAM_EVIDENCE",
+  "entry_pc": "0xF9000000",
+  "halt_pc": "0xF90000C4",
+  "timeout_ms": 1000,
+  "ram_evidence_addresses": [
+    "0xF90000D0",
+    "0xF90000D4",
+    "0xF90000E4",
+    "0xF90000E8"
+  ],
+  "prohibited": [
+    "debugger direct APB read",
+    "APB write",
+    "address scan",
+    "UART0 fallback",
+    "USER1",
+    "SoftTap",
+    "Flash/SPI/PROM",
+    "DDR"
+  ]
+}

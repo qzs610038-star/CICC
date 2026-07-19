@@ -1,0 +1,27 @@
+{
+  "batch": "I0_UART1_20260719_CLEAN_LF_FINAL",
+  "manifest_role": "I0 UART1 execution configuration and WSC APB probe binding",
+  "files": [
+    { "path": "embedded_sw/apb_magic_onchip/APB_PROBE_DEBUGGER_CONTRACT.md", "sha256": "C4FA7C531526AFCE48F7B503AE8808ECDCB0440B9E97F49B824D33154B095824" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.contract.txt", "sha256": "119C260FEAB1D0A3C6A63E022C141D6FB1D70FF57646F6E40F1F71FBFB1BEFA0" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.elf", "sha256": "6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.objdump.txt", "sha256": "F00613ED776DB74B74B06BED195524E17F3B9B3A4190616064673EC6980D3A83" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.readelf.txt", "sha256": "C001CABA534C57770DE4D4B25AB59B0A245364274A4AE8F81BB4BB30A9252F63" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.sha256.txt", "sha256": "F67AB5202D7AB697FB5A67BF4A7ABE769B61A5ABC39E9DC435343C787002A1E2" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.symbols.txt", "sha256": "385739A8C3337EE07380C646FD37D8E202A94CE1AC5E0D284FD11537CEA49318" },
+    { "path": "embedded_sw/apb_magic_onchip/artifacts/apb_magic_onchip.undefined.txt", "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" },
+    { "path": "embedded_sw/apb_magic_onchip/build_apb_probe_evidence.ps1", "sha256": "9EB1B4A74C841FD3BDBFFEBEDE4AF7385FE98FEF15AE86C2C185193BE0C2BCCF" },
+    { "path": "embedded_sw/apb_magic_onchip/makefile", "sha256": "5E385A248F4ABF15DCF5FEC203CB8F6E000F163C6A2B0141956154CEFF38559F" },
+    { "path": "embedded_sw/apb_magic_onchip/src/main.c", "sha256": "E6D2BC8045828DC6D78937FDAC203263D8D7B36B29DEE7B460115E9441C2D45F" },
+    { "path": "embedded_sw/apb_magic_onchip/verify_apb_probe_contract.ps1", "sha256": "6BE3760399D805D9E9502B5EF26F8BA3C47EB6A7CAE3D5E0A63A6C86E89CE218" },
+    { "path": "tools/capture_i0_uart1_raw.ps1", "sha256": "26A7445BAD531E5622A400D6B0290DFAC1FAC903BB9F8FB9E4F1BE10549D41E4" },
+    { "path": "tools/i0_uart1_cleanlf_ram_halt.gdb", "sha256": "2FB550EFB7D4C0316A22D77CA73BF1E35FBBADBF1AFBC9E0960C5FC985909BD9" },
+    { "path": "tools/i0_uart1_cleanlf_user2.cfg", "sha256": "85D413A4728DABD264AA6CC13FE5393BBD6A8634422D2BA0638853EE26C7DDD6" },
+    { "path": "tools/i0_uart1_wsc_apb_probe.gdb", "sha256": "37DF08A5D9D7D9005F16CF614EFF1497DC8BD968A6528EC498A5B30FFE803AD2" },
+    { "path": "tools/i0_uart1_wsc_probe_gate.ps1", "sha256": "ADD0BA68582823DC6E7ED9D7E726362161D3769081836D0FAE1A6E9F2C21846B" },
+    { "path": "tools/wsc_i0_apb_probe_contract.json", "sha256": "898E80B9BD821648E0231CA1EE2415BE020E274C988B72FB6451DF7E3C07C013" },
+    { "path": "tools/verify_i0_uart1_execution_config.ps1", "sha256": "874FD231B423B2AE9783435B60D099CDE2D7ACA42B167FA826663137E6D26895" },
+    { "path": "docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md", "sha256": "D00DEE4967D785BA46F43F7E4F3460167D8397AF7DA35AF6D31FFFCE4D3DC713" },
+    { "path": "docs/review_packets/I0_UART1_CLEANLF_USER2_EXECUTION_CONFIG_REVIEW_20260719.md", "sha256": "06B2E604A08E9E36B7E781FE0D44B4E18723C186E36B92753F1E0146A0809CA9" }
+  ]
+}
