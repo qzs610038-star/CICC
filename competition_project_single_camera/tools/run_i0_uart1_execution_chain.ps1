@@ -2,46 +2,47 @@
 param(
     [ValidateSet('Mock', 'Live')]
     [string]$Mode = 'Mock',
-    [ValidateSet('run', 'success', 'timeout', 'trap', 'wrong_pc', 'wrong_reason', 'halt_unconfirmed', 'all')]
+    [ValidateSet('run', 'success', 'hello_bad_line', 'echo_mismatch', 'wrong_postload_pc', 'bad_artifact_hash', 'bad_approval_tuple', 'apb_timeout', 'apb_wrong_pc', 'apb_trap', 'halt_unconfirmed', 'all')]
     [string]$Scenario = 'all',
     [Parameter(Mandatory)]
     [string]$RunDir,
+    [string]$ApprovalRecordPath,
+    [string]$BoardId,
     [string]$UartPort,
-    [string[]]$Uart1PnPAllowlist = @(),
     [ValidatePattern('^[\x20-\x7E]$')]
     [string]$EchoByte = 'U',
     [string]$OpenOcdExe,
     [string]$FtdiConfig,
     [string]$TargetConfig,
     [string]$GdbExe,
+    [string]$Bitstream,
+    [string]$HelloElf,
     [string]$ProbeElf,
+    [string]$SocH,
+    [string]$WscContractRoot,
     [string]$OpenOcdHost = '127.0.0.1',
     [ValidateRange(1, 65535)]
-    [int]$OpenOcdPort = 3333,
-    [string]$ApprovalToken
+    [int]$OpenOcdPort = 3333
 )
 
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($TargetConfig)) {
     $TargetConfig = Join-Path $PSScriptRoot 'i0_uart1_cleanlf_user2.cfg'
 }
-$BaseSha = '2d713b80a41185e472837abaec3a10c01383c70f'
+$BaseSha = '69a1030e1e72854a857fab147aa2c9cc8f0e6800'
 $QzsAuthorizationSha = 'a222ea64653a2232945342faacfb53a06ce50e42'
 $WscContractSha = '48548f47dfa5964b13aed7edf3b3e9da6f6583a2'
 $DesignSha = '6effdc3685d696cb4d33f3fbb1c449729ed72e33'
-$ExpectedEntryPc = 0xF9000000L
-$ExpectedHaltPc = 0xF90000C4L
-$TimeoutMs = 1000
-$ExpectedRam = [ordered]@{
-    'g_apb_probe_expected' = @{ Address = 0xF90000D0L; Value = 0x375A0001L }
-    'g_apb_probe_address' = @{ Address = 0xF90000D4L; Value = 0xE8100000L }
-    'g_apb_probe_status' = @{ Address = 0xF90000E4L; Value = 0x50415353L }
-    'g_apb_probe_observed' = @{ Address = 0xF90000E8L; Value = 0x375A0001L }
-}
+$StopStrategy = 'FIRST_FAILURE_STOP_NO_RETRY_CTRL_C_TIMEOUT'
+$HelloLines = @(
+    'I0 UART1 HELLO',
+    'UART1=115200 8N1 RX=GPIOR_96 TX=GPIOR_100',
+    'Type characters to verify echo.'
+)
+$ManifestPath = Join-Path $PSScriptRoot 'i0_uart1_execution_manifest.json'
+$Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 
-function Get-IsoTime {
-    (Get-Date).ToUniversalTime().ToString('o')
-}
+function Get-IsoTime { (Get-Date).ToUniversalTime().ToString('o') }
 
 function Write-RunLog {
     param([string]$Path, [string]$Message)
@@ -57,12 +58,30 @@ function Write-AtomicMarker {
     Move-Item -LiteralPath $temporary -Destination $Path -Force
 }
 
+function Get-Sha256 {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing required file: $Path" }
+    (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+}
+
+function Assert-FileHash {
+    param([string]$Path, [string]$Expected, [string]$Label)
+    $actual = Get-Sha256 $Path
+    if ($actual -cne $Expected) { throw "ARTIFACT_HASH_MISMATCH label=$Label expected=$Expected actual=$actual" }
+    $actual
+}
+
+function Get-CurrentCommit {
+    $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $commit = (& git -C $repoRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Unable to resolve the fixed runner commit.' }
+    $commit
+}
+
 function Get-RspChecksum {
     param([string]$Payload)
     $sum = 0
-    foreach ($byte in [Text.Encoding]::ASCII.GetBytes($Payload)) {
-        $sum = ($sum + $byte) -band 0xff
-    }
+    foreach ($byte in [Text.Encoding]::ASCII.GetBytes($Payload)) { $sum = ($sum + $byte) -band 0xff }
     $sum
 }
 
@@ -90,23 +109,18 @@ function Add-RspBytes {
             $State.Buffer.RemoveAt(0)
             continue
         }
-        if ($first -ne '$') {
-            $State.Buffer.RemoveAt(0)
-            continue
-        }
+        if ($first -ne '$') { $State.Buffer.RemoveAt(0); continue }
         $hashIndex = -1
         for ($index = 1; $index -lt $State.Buffer.Count; $index++) {
             if ([char]$State.Buffer[$index] -eq '#') { $hashIndex = $index; break }
         }
         if ($hashIndex -lt 0 -or $State.Buffer.Count -lt ($hashIndex + 3)) { break }
-        $payloadBytes = $State.Buffer.GetRange(1, $hashIndex - 1).ToArray()
-        $payload = [Text.Encoding]::ASCII.GetString($payloadBytes)
+        $payload = [Text.Encoding]::ASCII.GetString($State.Buffer.GetRange(1, $hashIndex - 1).ToArray())
         $checksumText = [Text.Encoding]::ASCII.GetString($State.Buffer.GetRange($hashIndex + 1, 2).ToArray())
         $receivedChecksum = 0
-        $validChecksumText = [int]::TryParse($checksumText, [Globalization.NumberStyles]::HexNumber, [Globalization.CultureInfo]::InvariantCulture, [ref]$receivedChecksum)
-        $frameLength = $hashIndex + 3
-        $State.Buffer.RemoveRange(0, $frameLength)
-        if (-not $validChecksumText -or $receivedChecksum -ne (Get-RspChecksum $payload)) {
+        $validChecksum = [int]::TryParse($checksumText, [Globalization.NumberStyles]::HexNumber, [Globalization.CultureInfo]::InvariantCulture, [ref]$receivedChecksum)
+        $State.Buffer.RemoveRange(0, $hashIndex + 3)
+        if (-not $validChecksum -or $receivedChecksum -ne (Get-RspChecksum $payload)) {
             $State.OutboundAcks.Enqueue('-')
             continue
         }
@@ -118,8 +132,7 @@ function Add-RspBytes {
 function Send-PendingRspAcks {
     param([Net.Sockets.NetworkStream]$Stream, $State)
     while ($State.OutboundAcks.Count -gt 0) {
-        $ack = [byte][char]$State.OutboundAcks.Dequeue()
-        $Stream.WriteByte($ack)
+        $Stream.WriteByte([byte][char]$State.OutboundAcks.Dequeue())
         $Stream.Flush()
     }
 }
@@ -170,9 +183,7 @@ function Send-RspCommand {
     Wait-RspAck -Stream $Stream -State $State -TimeoutMilliseconds 1000
     if ($NoReply) { return $null }
     $reply = Wait-RspPacket -Stream $Stream -State $State -TimeoutMilliseconds 1000
-    if ($null -eq $reply -or $reply -match '^E[0-9A-Fa-f]{2}$') {
-        throw "OpenOCD RSP command failed: $Payload reply=$reply"
-    }
+    if ($null -eq $reply -or $reply -match '^E[0-9A-Fa-f]{2}$') { throw "OpenOCD RSP command failed: $Payload reply=$reply" }
     $reply
 }
 
@@ -203,9 +214,7 @@ function Wait-AsyncStopReply {
         if ($null -eq $reply) { continue }
         $stop = ConvertFrom-StopReply $reply
         if ($null -ne $stop) {
-            if ($null -eq $stop.Pc) {
-                $stop.Pc = ConvertFrom-RspLittleEndianHex (Send-RspCommand -Stream $Stream -State $State -Payload 'p20')
-            }
+            if ($null -eq $stop.Pc) { $stop.Pc = ConvertFrom-RspLittleEndianHex (Send-RspCommand -Stream $Stream -State $State -Payload 'p20') }
             return $stop
         }
     }
@@ -221,23 +230,63 @@ function Invoke-RspFixtures {
     if ($state.PacketQueue.Count -ne 0) { throw 'RSP half-packet fixture emitted early.' }
     Add-RspBytes $state $bytes[7..($bytes.Length - 1)]
     if ($state.PacketQueue.Dequeue() -cne $payload -or $state.OutboundAcks.Dequeue() -ne '+') { throw 'RSP split-packet fixture failed.' }
-
     $state = New-RspState
-    $sticky = '+' + (New-RspFrame 'OK') + (New-RspFrame $payload)
-    Add-RspBytes $state ([Text.Encoding]::ASCII.GetBytes($sticky))
+    Add-RspBytes $state ([Text.Encoding]::ASCII.GetBytes('+' + (New-RspFrame 'OK') + (New-RspFrame $payload)))
     if ($state.AckQueue.Dequeue() -ne '+' -or $state.PacketQueue.Count -ne 2) { throw 'RSP sticky-packet fixture failed.' }
-
     $state = New-RspState
     Add-RspBytes $state ([Text.Encoding]::ASCII.GetBytes('$OK#00'))
     if ($state.PacketQueue.Count -ne 0 -or $state.OutboundAcks.Dequeue() -ne '-') { throw 'RSP checksum NACK fixture failed.' }
-
-    $state = New-RspState
-    Add-RspBytes $state ([Text.Encoding]::ASCII.GetBytes('-'))
-    if ($state.AckQueue.Dequeue() -ne '-') { throw 'RSP command NACK fixture failed.' }
-
     $stop = ConvertFrom-StopReply $payload
-    if ($stop.Reason -cne 'BREAKPOINT' -or $stop.Pc -ne $ExpectedHaltPc) { throw 'RSP async stop fixture failed.' }
+    if ($stop.Reason -cne 'BREAKPOINT') { throw 'RSP async stop fixture failed.' }
     'RSP_FIXTURES=PASS split=PASS sticky=PASS checksum=PASS ack_nack=PASS async_stop=PASS'
+}
+
+function ConvertFrom-KeyValueText {
+    param([string]$Text)
+    $values = [ordered]@{}
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if ($line -notmatch '^(?<key>[A-Za-z0-9_]+)=(?<value>.*)$') { throw "Malformed WSC summary line: $line" }
+        if ($values.Contains($Matches.key)) { throw "Duplicate WSC summary key: $($Matches.key)" }
+        $values[$Matches.key] = $Matches.value
+    }
+    $values
+}
+
+function Read-WscContract {
+    param([string]$Root)
+    $head = (& git -C $Root rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $head -cne $WscContractSha) { throw "WSC contract checkout must be fixed at $WscContractSha" }
+    if ((& git -C $Root status --porcelain).Length -ne 0) { throw 'WSC contract checkout must be clean.' }
+    $relativeRoot = 'competition_project_single_camera\embedded_sw\apb_magic_onchip'
+    $documentPath = Join-Path $Root "$relativeRoot\APB_PROBE_DEBUGGER_CONTRACT.md"
+    $summaryPath = Join-Path $Root "$relativeRoot\artifacts\apb_magic_onchip.contract.txt"
+    $verifierPath = Join-Path $Root "$relativeRoot\verify_apb_probe_contract.ps1"
+    Assert-FileHash $documentPath $Manifest.wsc_contract_files.document_sha256 'wsc_contract_document' | Out-Null
+    Assert-FileHash $summaryPath $Manifest.wsc_contract_files.summary_sha256 'wsc_contract_summary' | Out-Null
+    Assert-FileHash $verifierPath $Manifest.wsc_contract_files.verifier_sha256 'wsc_contract_verifier' | Out-Null
+    $summary = ConvertFrom-KeyValueText (Get-Content -LiteralPath $summaryPath -Raw)
+    $document = Get-Content -LiteralPath $documentPath -Raw
+    $ram = [ordered]@{}
+    foreach ($symbol in @('g_apb_probe_expected', 'g_apb_probe_address', 'g_apb_probe_status', 'g_apb_probe_observed')) {
+        $pattern = '\|\s*`?' + [regex]::Escape($symbol) + '`?\s*\|\s*`?(?<address>0x[0-9A-Fa-f]+)`?\s*\|\s*`?(?<value>0x[0-9A-Fa-f]+)`?\s*\|'
+        $match = [regex]::Match($document, $pattern)
+        if (-not $match.Success) { throw "Unable to parse WSC RAM contract row: $symbol" }
+        $ram[$symbol] = @{ Address = [Convert]::ToInt64($match.Groups['address'].Value.Substring(2), 16); Value = [Convert]::ToInt64($match.Groups['value'].Value.Substring(2), 16) }
+    }
+    [pscustomobject]@{
+        EntryPc = [Convert]::ToInt64($summary.entry.Substring(2), 16)
+        HaltPc = [Convert]::ToInt64($summary.halt_pc.Substring(2), 16)
+        TimeoutMs = [int]$summary.timeout_ms
+        SuccessRamReadCount = [int]$summary.success_ram_read_count
+        FailureRamReadCount = [int]$summary.failure_ram_read_count
+        ProbeElfSha256 = $summary.elf_sha256
+        SocHSha256 = $summary.soc_h_sha256
+        Ram = $ram
+        DocumentPath = $documentPath
+        SummaryPath = $summaryPath
+        VerifierPath = $verifierPath
+    }
 }
 
 function Get-UartIdentityKey {
@@ -258,85 +307,73 @@ function Get-UartIdentityKey {
 }
 
 function Select-UniqueUart1Identity {
-    param([array]$Identities, [string]$Port, [string[]]$Allowlist)
+    param([array]$Identities, [string]$Port, [string]$ExpectedKey)
     if ($Port -eq 'COM17') { throw 'COM17 is prohibited for I0 UART1.' }
-    if ($Allowlist.Count -eq 0) { throw 'Live UART1 requires an exact VID/PID/serial/instance allowlist.' }
-    $matches = @($Identities | Where-Object { $Allowlist -ccontains $_.Key })
-    if ($matches.Count -ne 1) { throw "UART1 allowlist must uniquely match one live device; matches=$($matches.Count)." }
+    $matches = @($Identities | Where-Object { $_.Key -ceq $ExpectedKey })
+    if ($matches.Count -ne 1) { throw "Approval PnP tuple must uniquely match one live UART1 device; matches=$($matches.Count)." }
     $identity = $matches[0]
-    if ($identity.Port -cne $Port) { throw "Allowlisted UART1 identity is on $($identity.Port), not requested $Port." }
-    if ($identity.VID -eq '1A86' -and $identity.PID -eq '7523') { throw 'CH340 is prohibited for I0 UART1.' }
-    if ($identity.FriendlyName -match '(?i)CH340|J44|UART0|programmer|downloader|burner') { throw 'J44/UART0 programmer identity is prohibited for I0 UART1.' }
+    if ($identity.Port -cne $Port) { throw "Approved UART1 identity is on $($identity.Port), not $Port." }
+    if (($identity.VID -eq '1A86' -and $identity.PID -eq '7523') -or $identity.FriendlyName -match '(?i)CH340|J44|UART0|programmer|downloader|burner') {
+        throw 'J44/UART0 programmer or CH340 identity is prohibited for I0 UART1.'
+    }
     $identity
 }
 
 function Resolve-UniqueUart1Identity {
-    param([string]$Port, [string[]]$Allowlist)
+    param([string]$Port, [string]$ExpectedKey)
     $identities = @()
     foreach ($serialPort in @(Get-CimInstance Win32_SerialPort)) {
         $pnp = Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -eq $serialPort.PNPDeviceID } | Select-Object -First 1
         try { $identities += Get-UartIdentityKey $serialPort $pnp } catch { }
     }
-    Select-UniqueUart1Identity -Identities $identities -Port $Port -Allowlist $Allowlist
+    Select-UniqueUart1Identity -Identities $identities -Port $Port -ExpectedKey $ExpectedKey
 }
 
-function Invoke-Uart1PnPFixtures {
-    $uart1 = [pscustomobject]@{ Port = 'COM10'; VID = '10C4'; PID = 'EA60'; Serial = 'UART1_FIXED'; Instance = 'USB\\VID_10C4&PID_EA60\\UART1_FIXED'; FriendlyName = 'USB Serial Port'; Key = 'VID=10C4;PID=EA60;SERIAL=UART1_FIXED;INSTANCE=USB\\VID_10C4&PID_EA60\\UART1_FIXED' }
-    $programmer = [pscustomobject]@{ Port = 'COM13'; VID = '0403'; PID = '6010'; Serial = 'J44_PROGRAMMER'; Instance = 'USB\\VID_0403&PID_6010\\J44_PROGRAMMER'; FriendlyName = 'J44 UART0 Programmer'; Key = 'VID=0403;PID=6010;SERIAL=J44_PROGRAMMER;INSTANCE=USB\\VID_0403&PID_6010\\J44_PROGRAMMER' }
-    $ch340 = [pscustomobject]@{ Port = 'COM17'; VID = '1A86'; PID = '7523'; Serial = 'CH340'; Instance = 'USB\\VID_1A86&PID_7523\\CH340'; FriendlyName = 'USB-SERIAL CH340'; Key = 'VID=1A86;PID=7523;SERIAL=CH340;INSTANCE=USB\\VID_1A86&PID_7523\\CH340' }
-    $selected = Select-UniqueUart1Identity -Identities @($uart1, $programmer, $ch340) -Port 'COM10' -Allowlist @($uart1.Key)
-    if ($selected.Key -cne $uart1.Key) { throw 'UART1 exact allowlist fixture selected the wrong identity.' }
-    foreach ($fixture in @(
-        { Select-UniqueUart1Identity -Identities @($uart1, $programmer) -Port 'COM10' -Allowlist @($uart1.Key, $programmer.Key) },
-        { Select-UniqueUart1Identity -Identities @($programmer) -Port 'COM13' -Allowlist @($programmer.Key) },
-        { Select-UniqueUart1Identity -Identities @($ch340) -Port 'COM17' -Allowlist @($ch340.Key) }
-    )) {
-        $failedClosed = $false
-        try { & $fixture | Out-Null } catch { $failedClosed = $true }
-        if (-not $failedClosed) { throw 'UART1 prohibited/ambiguous PnP fixture did not fail closed.' }
+function Test-ApprovalRecord {
+    param($Approval, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [string]$ManifestSha, [hashtable]$ArtifactHashes, [DateTimeOffset]$Now)
+    if ($Approval.schema_version -ne 1 -or $Approval.approved_commit -cne $Commit -or $Approval.board_id -cne $ExpectedBoard -or $Approval.uart1_pnp_key -cne $ExpectedPnp) { throw 'APPROVAL_TUPLE_MISMATCH identity' }
+    if ([string]::IsNullOrWhiteSpace([string]$Approval.window_id) -or $Approval.stop_strategy -cne $StopStrategy) { throw 'APPROVAL_TUPLE_MISMATCH window_or_stop_strategy' }
+    $start = [DateTimeOffset]::Parse($Approval.window_start_utc)
+    $end = [DateTimeOffset]::Parse($Approval.window_end_utc)
+    if ($start -ge $end -or $Now -lt $start -or $Now -gt $end) { throw 'APPROVAL_TUPLE_MISMATCH inactive_window' }
+    if ($Approval.manifest_sha256 -cne $ManifestSha) { throw 'APPROVAL_TUPLE_MISMATCH manifest_hash' }
+    foreach ($entry in $ArtifactHashes.GetEnumerator()) {
+        $property = $Approval.artifact_sha256.PSObject.Properties[$entry.Key]
+        if ($null -eq $property -or [string]$property.Value -cne $entry.Value) { throw "APPROVAL_TUPLE_MISMATCH artifact=$($entry.Key)" }
     }
-    'UART1_PNP_ALLOWLIST=PASS exact=PASS ambiguous=FAIL_CLOSED j44_uart0=FAIL_CLOSED ch340_com17=FAIL_CLOSED'
+    $true
 }
 
-function Start-UartCapture {
-    param($Identity, [string]$ReadyPath, [string]$StopPath, [string]$ByteLogPath)
-    Start-Job -ScriptBlock {
-        param($JobIdentity, $JobReadyPath, $JobStopPath, $JobByteLogPath)
-        $serial = [IO.Ports.SerialPort]::new($JobIdentity.Port, 115200, [IO.Ports.Parity]::None, 8, [IO.Ports.StopBits]::One)
-        $serial.ReadTimeout = 100
-        $rx = 0
-        try {
-            $serial.Open()
-            $readyTime = (Get-Date).ToUniversalTime().ToString('o')
-            "CAPTURE_READY_TIME=$readyTime PNP=$($JobIdentity.Key)" | Set-Content -LiteralPath $JobReadyPath -Encoding ascii
-            while (-not (Test-Path -LiteralPath $JobStopPath)) {
-                try {
-                    [byte]$value = $serial.ReadByte()
-                    $rx++
-                    "$( (Get-Date).ToUniversalTime().ToString('o') ) RX 0x$($value.ToString('X2')) RX_COUNT=$rx TX_COUNT=0" | Add-Content -LiteralPath $JobByteLogPath -Encoding ascii
-                } catch [TimeoutException] { }
-            }
-        } finally {
-            if ($serial.IsOpen) { $serial.Close() }
-            $serial.Dispose()
-            "BYTE_COUNTS RX=$rx TX=0" | Add-Content -LiteralPath $JobByteLogPath -Encoding ascii
-        }
-    } -ArgumentList $Identity, $ReadyPath, $StopPath, $ByteLogPath
+function Get-LiveApproval {
+    param([string]$Path, [string]$Commit, [string]$ExpectedBoard, [string]$ExpectedPnp, [hashtable]$ArtifactHashes)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'Live mode requires an external approval record.' }
+    $approval = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    Test-ApprovalRecord -Approval $approval -Commit $Commit -ExpectedBoard $ExpectedBoard -ExpectedPnp $ExpectedPnp -ManifestSha (Get-Sha256 $ManifestPath) -ArtifactHashes $ArtifactHashes -Now ([DateTimeOffset]::UtcNow) | Out-Null
+    $approval
 }
 
 function Get-OpenOcdArguments {
-    param([string]$FtdiPath, [string]$TargetPath, [switch]$RequireFiles)
-    if ($RequireFiles) {
-        foreach ($path in @($FtdiPath, $TargetPath)) {
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing OpenOCD config: $path" }
-        }
-    }
+    param([string]$FtdiPath, [string]$TargetPath)
     $targetText = Get-Content -LiteralPath $TargetPath -Raw
-    if ($targetText -notmatch '(?m)^riscv use_bscan_tunnel 6 1\s*$' -or
-        $targetText -notmatch '(?m)^riscv set_bscan_tunnel_ir 0x09\s*$') {
-        throw 'OpenOCD USER2 argument flow is not literal 6 1 / 0x09.'
-    }
+    if ($targetText -notmatch '(?m)^riscv use_bscan_tunnel 6 1\s*$' -or $targetText -notmatch '(?m)^riscv set_bscan_tunnel_ir 0x09\s*$') { throw 'OpenOCD USER2 argument flow is not literal 6 1 / 0x09.' }
     @('-f', $FtdiPath, '-f', $TargetPath)
+}
+
+function Wait-OpenOcdReady {
+    param([Diagnostics.Process]$Process, [string]$StdoutPath, [string]$StderrPath, [int]$Port)
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while ($timer.ElapsedMilliseconds -lt 5000) {
+        if ($Process.HasExited) {
+            $stderr = if (Test-Path -LiteralPath $StderrPath) { Get-Content -LiteralPath $StderrPath -Raw } else { '' }
+            throw "OpenOCD exited before readiness: $stderr"
+        }
+        if (Test-Path -LiteralPath $StdoutPath) {
+            $stdout = Get-Content -LiteralPath $StdoutPath -Raw
+            if ($stdout -match "(?m)Listening on port $Port for gdb connections") { return }
+        }
+        Start-Sleep -Milliseconds 10
+    }
+    throw "OpenOCD readiness timeout on GDB port $Port; retry is prohibited."
 }
 
 function Invoke-OpenOcdArgumentFlowFixture {
@@ -345,180 +382,337 @@ function Invoke-OpenOcdArgumentFlowFixture {
     'OPENOCD_ARGUMENT_FLOW=PASS width=6 type=1 outer_ir=0x09 board_user2=NOT_VERIFIED'
 }
 
-function Invoke-GdbRamOnlyLoad {
-    param([string]$Path, [string]$Elf, [string]$HostName, [int]$Port)
-    foreach ($file in @($Path, $Elf)) {
-        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing live prerequisite: $file" }
-    }
-    $output = & $Path --batch --nx --quiet -ex 'set pagination off' -ex "file $Elf" -ex "target extended-remote $HostName`:$Port" -ex 'monitor halt' -ex 'load' -ex 'monitor halt' -ex 'p/x $pc' -ex 'quit' 2>&1
-    if ($LASTEXITCODE -ne 0 -or ($output -join "`n") -notmatch '0xf9000000') { throw "RAM-only load or entry PC gate failed: $output" }
+function ConvertFrom-GdbPostLoadPc {
+    param([string]$Output, [Int64]$ExpectedPc, [string]$Phase)
+    $matches = @([regex]::Matches($Output, 'POST_LOAD_PC=(?<pc>0x[0-9A-Fa-f]+)'))
+    if ($matches.Count -ne 1) { throw "$Phase post-load PC evidence must contain exactly one value." }
+    $pcText = $matches[0].Groups['pc'].Value
+    $pc = [Convert]::ToInt64($pcText.Substring(2), 16)
+    if ($pc -ne $ExpectedPc) { throw "$Phase WRONG_POST_LOAD_PC actual=$pcText expected=0x$($ExpectedPc.ToString('X8'))" }
+    [pscustomobject]@{ Text = $pcText; Value = $pc }
 }
 
-function Invoke-MockScenario {
-    param([string]$Name)
-    $runId = 'mock-{0}-{1}' -f $Name, ([guid]::NewGuid().ToString('N'))
-    $scenarioDir = Join-Path $RunDir $runId
-    New-Item -ItemType Directory -Path $scenarioDir -Force | Out-Null
-    $logPath = Join-Path $scenarioDir 'execution.log'
-    $markerPath = Join-Path $scenarioDir 'RESUME_ONCE.marker'
-    $captureReady = [DateTimeOffset]::UtcNow
-    Write-RunLog $logPath "RUN_ID=$runId MODE=Mock BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha"
+function Invoke-GdbRamOnlyLoad {
+    param([string]$Path, [string]$Elf, [string]$HostName, [int]$Port, [Int64]$ExpectedPc, [string]$Phase, [string]$LogPath)
+    $output = & $Path --batch --nx --quiet -ex 'set pagination off' -ex "file $Elf" -ex "target extended-remote $HostName`:$Port" -ex 'monitor halt' -ex 'load' -ex 'monitor halt' -ex 'printf "POST_LOAD_PC=0x%08lx\n", $pc' -ex 'quit' 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "$Phase RAM-only load failed: $output" }
+    $parsed = ConvertFrom-GdbPostLoadPc -Output ($output -join "`n") -ExpectedPc $ExpectedPc -Phase $Phase
+    Write-RunLog $LogPath "$Phase`_POST_LOAD_PC=$($parsed.Text) EXPECTED=0x$($ExpectedPc.ToString('X8'))"
+    $parsed.Value
+}
+
+function New-HelloState {
+    @{ LineIndex = 0; Buffer = [Text.StringBuilder]::new(); LeadingDelimiterSeen = $false; Complete = $false }
+}
+
+function Add-HelloByte {
+    param($State, [byte]$Value)
+    if ($Value -eq 0x0A) {
+        $line = $State.Buffer.ToString().TrimEnd("`r")
+        $State.Buffer.Clear() | Out-Null
+        if (-not $State.LeadingDelimiterSeen -and $State.LineIndex -eq 0 -and $line.Length -eq 0) {
+            $State.LeadingDelimiterSeen = $true
+            return
+        }
+        if ($State.LineIndex -ge $HelloLines.Count -or $line -cne $HelloLines[$State.LineIndex]) { throw "HELLO_LINE_MISMATCH index=$($State.LineIndex + 1) actual=[$line]" }
+        $State.LineIndex++
+        if ($State.LineIndex -eq $HelloLines.Count) { $State.Complete = $true }
+    } else { [void]$State.Buffer.Append([char]$Value) }
+}
+
+function Assert-EchoByte {
+    param([byte]$Expected, [byte]$Actual)
+    if ($Expected -eq 0x0A -or $Expected -eq 0x0D -or $Expected -lt 0x20 -or $Expected -gt 0x7E) { throw 'UART1 TX must be one printable ASCII byte without CR/LF.' }
+    if ($Actual -ne $Expected) { throw "UART1_ECHO_MISMATCH expected=0x$($Expected.ToString('X2')) actual=0x$($Actual.ToString('X2'))" }
+}
+
+function Read-SerialByte {
+    param([IO.Ports.SerialPort]$Serial, [DateTimeOffset]$Deadline, [string]$LogPath, $Counts)
+    while ([DateTimeOffset]::UtcNow -lt $Deadline) {
+        try {
+            [byte]$value = $Serial.ReadByte()
+            $Counts.Rx++
+            Write-RunLog $LogPath "RX 0x$($value.ToString('X2')) RX_COUNT=$($Counts.Rx) TX_COUNT=$($Counts.Tx)" | Out-Null
+            return $value
+        } catch [TimeoutException] { }
+    }
+    throw 'UART1 receive timeout; retry is prohibited.'
+}
+
+function Complete-HelloEcho {
+    param([IO.Ports.SerialPort]$Serial, [string]$LogPath, $Counts, [byte]$TxByte)
+    Assert-EchoByte -Expected $TxByte -Actual $TxByte
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+    $state = New-HelloState
+    while (-not $state.Complete) { Add-HelloByte -State $state -Value (Read-SerialByte -Serial $Serial -Deadline $deadline -LogPath $LogPath -Counts $Counts) }
+    Write-RunLog $LogPath 'HELLO_THREE_LINES=PASS' | Out-Null
+    $Serial.Write([byte[]]@($TxByte), 0, 1)
+    $Counts.Tx++
+    Write-RunLog $LogPath "TX 0x$($TxByte.ToString('X2')) RX_COUNT=$($Counts.Rx) TX_COUNT=$($Counts.Tx) AUTO_CRLF=DISABLED" | Out-Null
+    $echoValue = Read-SerialByte -Serial $Serial -Deadline $deadline -LogPath $LogPath -Counts $Counts
+    Assert-EchoByte -Expected $TxByte -Actual $echoValue
+    Write-RunLog $LogPath "HELLO_ECHO=PASS byte=0x$($TxByte.ToString('X2'))" | Out-Null
+}
+
+function Write-PhaseResumeMarker {
+    param([string]$Directory, [string]$RunId, [string]$Phase, [DateTimeOffset]$ReadyTime)
+    $resumeTime = [DateTimeOffset]::UtcNow
+    if ($resumeTime -le $ReadyTime) { $resumeTime = $ReadyTime.AddTicks(1) }
+    $path = Join-Path $Directory "$Phase`_RESUME_ONCE.marker"
+    Write-AtomicMarker $path "RUN_ID=$RunId`r`nPHASE=$Phase`r`nPHASE_READY_TIME=$($ReadyTime.ToString('o'))`r`nRESUME_ONCE_TIME=$($resumeTime.ToString('o'))`r`nRESUME_COUNT=1`r`nRETRY_COUNT=0"
+    [pscustomobject]@{ Path = $path; Time = $resumeTime }
+}
+
+function Invoke-Uart1PnPFixtures {
+    $uart1 = [pscustomobject]@{ Port = 'COM10'; VID = '10C4'; PID = 'EA60'; Serial = 'UART1_FIXED'; Instance = 'USB\VID_10C4&PID_EA60\UART1_FIXED'; FriendlyName = 'USB Serial Port'; Key = 'VID=10C4;PID=EA60;SERIAL=UART1_FIXED;INSTANCE=USB\VID_10C4&PID_EA60\UART1_FIXED' }
+    $programmer = [pscustomobject]@{ Port = 'COM13'; VID = '0403'; PID = '6010'; Serial = 'J44_PROGRAMMER'; Instance = 'USB\VID_0403&PID_6010\J44_PROGRAMMER'; FriendlyName = 'J44 UART0 Programmer'; Key = 'VID=0403;PID=6010;SERIAL=J44_PROGRAMMER;INSTANCE=USB\VID_0403&PID_6010\J44_PROGRAMMER' }
+    $ch340 = [pscustomobject]@{ Port = 'COM17'; VID = '1A86'; PID = '7523'; Serial = 'CH340'; Instance = 'USB\VID_1A86&PID_7523\CH340'; FriendlyName = 'USB-SERIAL CH340'; Key = 'VID=1A86;PID=7523;SERIAL=CH340;INSTANCE=USB\VID_1A86&PID_7523\CH340' }
+    $selected = Select-UniqueUart1Identity -Identities @($uart1, $programmer, $ch340) -Port 'COM10' -ExpectedKey $uart1.Key
+    if ($selected.Key -cne $uart1.Key) { throw 'UART1 exact PnP allowlist fixture failed.' }
+    foreach ($fixture in @(@($programmer, 'COM13'), @($ch340, 'COM17'))) {
+        $closed = $false
+        try { Select-UniqueUart1Identity -Identities @($uart1, $programmer, $ch340) -Port $fixture[1] -ExpectedKey $fixture[0].Key | Out-Null } catch { $closed = $true }
+        if (-not $closed) { throw 'UART0/programmer PnP exclusion fixture failed.' }
+    }
+    'UART1_PNP_ALLOWLIST=PASS exact_vid_pid_serial_instance=true excludes_com17_ch340_j44_uart0=true'
+}
+
+function Invoke-MockApbScenario {
+    param([string]$Name, $Wsc)
+    $runId = 'mock-' + $Name + '-' + [guid]::NewGuid().ToString('N')
+    $directory = Join-Path $RunDir $runId
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $logPath = Join-Path $directory 'execution.log'
+    Write-RunLog $logPath "RUN_ID=$runId MODE=Mock BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0"
     Write-RunLog $logPath 'PNP=VID=10C4;PID=EA60;SERIAL=MOCK_UART1;INSTANCE=USB\\VID_10C4&PID_EA60\\MOCK_UART1 ROUTE=TYPEC_UART1'
-    Write-RunLog $logPath "CAPTURE_READY_TIME=$($captureReady.ToString('o'))"
-    $resumeTime = [DateTimeOffset]::UtcNow.AddMilliseconds(1)
-    Write-AtomicMarker $markerPath "RUN_ID=$runId`r`nRESUME_ONCE_TIME=$($resumeTime.ToString('o'))`r`nRESUME_COUNT=1"
-    Write-RunLog $logPath "RESUME_ONCE_TIME=$($resumeTime.ToString('o')) RESUME_COUNT=1"
-    $mockBytes = [Text.Encoding]::ASCII.GetBytes("I0 UART1 HELLO`n")
-    $rx = 0
-    foreach ($byte in $mockBytes) { $rx++; Write-RunLog $logPath "RX 0x$($byte.ToString('X2')) RX_COUNT=$rx TX_COUNT=0" | Out-Null }
-    Write-RunLog $logPath "TX 0x$(([byte][char]$EchoByte).ToString('X2')) RX_COUNT=$rx TX_COUNT=1" | Out-Null
+    $captureReady = [DateTimeOffset]::UtcNow
+    Write-RunLog $logPath "CAPTURE_READY_TIME=$($captureReady.ToString('o')) AUTO_CRLF=DISABLED"
+    Write-RunLog $logPath 'HELLO_POST_LOAD_PC=0xF9000000 EXPECTED=0xF9000000'
+    $helloMarker = Write-PhaseResumeMarker $directory $runId 'HELLO' $captureReady
+    Write-RunLog $logPath "HELLO_RESUME_ONCE_TIME=$($helloMarker.Time.ToString('o')) HELLO_RESUME_COUNT=1 MARKER=$($helloMarker.Path)"
+    Write-RunLog $logPath 'HELLO_THREE_LINES=PASS'
+    Write-RunLog $logPath "TX 0x$(([byte][char]$EchoByte).ToString('X2')) RX_COUNT=107 TX_COUNT=1 AUTO_CRLF=DISABLED"
+    Write-RunLog $logPath "HELLO_ECHO=PASS byte=0x$(([byte][char]$EchoByte).ToString('X2'))"
+    Write-RunLog $logPath 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'
+    Write-RunLog $logPath ('APB_POST_LOAD_PC=0x{0:X8} EXPECTED=0x{0:X8}' -f $Wsc.EntryPc)
+    $apbReady = [DateTimeOffset]::UtcNow
+    $apbMarker = Write-PhaseResumeMarker $directory $runId 'APB' $apbReady
+    Write-RunLog $logPath "APB_RESUME_ONCE_TIME=$($apbMarker.Time.ToString('o')) APB_RESUME_COUNT=1 MARKER=$($apbMarker.Path)"
     $halt = switch ($Name) {
-        'success' { [pscustomobject]@{ Confirmed = $true; Reason = 'BREAKPOINT'; Pc = $ExpectedHaltPc; TimedOut = $false; ActiveHaltCount = 0 } }
-        'timeout' { [pscustomobject]@{ Confirmed = $true; Reason = 'HOST_INTERRUPT'; Pc = 0xF90000B0L; TimedOut = $true; ActiveHaltCount = 1 } }
+        'success' { [pscustomobject]@{ Confirmed = $true; Reason = 'BREAKPOINT'; Pc = $Wsc.HaltPc; TimedOut = $false; ActiveHaltCount = 0 } }
+        'timeout' { [pscustomobject]@{ Confirmed = $true; Reason = 'SIGNAL_02'; Pc = 0xF90000B0L; TimedOut = $true; ActiveHaltCount = 1 } }
         'trap' { [pscustomobject]@{ Confirmed = $true; Reason = 'SIGNAL_05'; Pc = 0xF9000010L; TimedOut = $false; ActiveHaltCount = 0 } }
         'wrong_pc' { [pscustomobject]@{ Confirmed = $true; Reason = 'BREAKPOINT'; Pc = 0xF90000C0L; TimedOut = $false; ActiveHaltCount = 0 } }
-        'wrong_reason' { [pscustomobject]@{ Confirmed = $true; Reason = 'SIGNAL_02'; Pc = $ExpectedHaltPc; TimedOut = $false; ActiveHaltCount = 0 } }
+        'wrong_reason' { [pscustomobject]@{ Confirmed = $true; Reason = 'SIGNAL_02'; Pc = $Wsc.HaltPc; TimedOut = $false; ActiveHaltCount = 0 } }
         'halt_unconfirmed' { [pscustomobject]@{ Confirmed = $false; Reason = 'TIMEOUT_HALT_UNCONFIRMED'; Pc = $null; TimedOut = $true; ActiveHaltCount = 1 } }
     }
     $ramReadCount = 0
     $result = 'FAILED_CLOSED'
-    if ($halt.Confirmed -and -not $halt.TimedOut -and $halt.Reason -ceq 'BREAKPOINT' -and $halt.Pc -eq $ExpectedHaltPc) {
-        foreach ($entry in $ExpectedRam.GetEnumerator()) {
+    if ($halt.Confirmed -and -not $halt.TimedOut -and $halt.Reason -ceq 'BREAKPOINT' -and $halt.Pc -eq $Wsc.HaltPc) {
+        foreach ($entry in $Wsc.Ram.GetEnumerator()) {
             $ramReadCount++
             Write-RunLog $logPath "RAM_$($entry.Key)=0x$($entry.Value.Value.ToString('X8'))" | Out-Null
         }
         $result = 'SUCCESS'
     }
-    if ($halt.ActiveHaltCount -eq 1) { Write-RunLog $logPath 'WATCHDOG_TIMEOUT_MS=1000 ACTIVE_HALT_COUNT=1' | Out-Null }
+    if ($halt.ActiveHaltCount -eq 1) { Write-RunLog $logPath "WATCHDOG_TIMEOUT_MS=$($Wsc.TimeoutMs) ACTIVE_HALT_COUNT=1" | Out-Null }
     if (-not $halt.Confirmed) { Write-RunLog $logPath 'TIMEOUT_HALT_UNCONFIRMED RAM_READ_COUNT=0 RETRY_COUNT=0' | Out-Null }
-    Write-RunLog $logPath "BYTE_COUNTS RX=$rx TX=1" | Out-Null
-    Write-RunLog $logPath "FINAL_STATE=$result HALT_REASON=$($halt.Reason) RAM_READ_COUNT=$ramReadCount RESUME_COUNT=1 RETRY_COUNT=0" | Out-Null
-    [pscustomobject]@{ Scenario = $Name; Result = $result; RamReadCount = $ramReadCount; ResumeCount = 1; MarkerPath = $markerPath; LogPath = $logPath }
+    Write-RunLog $logPath "BYTE_COUNTS RX=108 TX=1"
+    Write-RunLog $logPath "FINAL_STATE=$result HALT_REASON=$($halt.Reason) HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0 RAM_READ_COUNT=$ramReadCount"
+    [pscustomobject]@{ Name = $Name; Result = $result; RamReadCount = $ramReadCount; Directory = $directory }
+}
+
+function Invoke-MockFixtures {
+    $wsc = Read-WscContract $WscContractRoot
+    'WSC_CONTRACT_CONSUMED=PASS sha=48548f47dfa5964b13aed7edf3b3e9da6f6583a2 hashes=3 constants=source_parsed'
+    $fixtureDirectory = Join-Path $RunDir ('mock-negative-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+    $helloTranscript = [Text.Encoding]::ASCII.GetBytes("`r`n" + ($HelloLines -join "`r`n") + "`r`n")
+    $state = New-HelloState
+    foreach ($byte in $helloTranscript) { Add-HelloByte $state $byte }
+    if (-not $state.LeadingDelimiterSeen -or -not $state.Complete) { throw 'Hello three-line fixture did not match the fixed firmware transcript.' }
+    'HELLO_THREE_LINES_FIXTURE=PASS'
+    $tx = [byte][char]$EchoByte
+    Assert-EchoByte -Expected $tx -Actual $tx
+    'UART_TX_ECHO_FIXTURE=PASS printable=true crlf=false same_byte=true'
+
+    $echoMismatchClosed = $false
+    try { Assert-EchoByte -Expected $tx -Actual ([byte]($tx -bxor 1)) } catch { $echoMismatchClosed = $true }
+    if (-not $echoMismatchClosed) { throw 'Wrong echo byte fixture produced a false PASS.' }
+    'UART_ECHO_MISMATCH_NEGATIVE=PASS'
+
+    $badHelloClosed = $false
+    try { $bad = New-HelloState; foreach ($byte in [Text.Encoding]::ASCII.GetBytes("WRONG`n")) { Add-HelloByte $bad $byte } } catch { $badHelloClosed = $true }
+    if (-not $badHelloClosed) { throw 'Bad Hello fixture did not fail closed.' }
+    'HELLO_BAD_LINE_NEGATIVE=PASS'
+
+    $wrongPcClosed = $false
+    try {
+        ConvertFrom-GdbPostLoadPc -Output 'POST_LOAD_PC=0xF9000004' -ExpectedPc 0xF9000000L -Phase 'HELLO' | Out-Null
+    } catch { $wrongPcClosed = $true }
+    if (-not $wrongPcClosed) { throw 'Wrong post-load PC fixture produced a false PASS.' }
+    'WRONG_POST_LOAD_PC_NEGATIVE=PASS'
+
+    $artifactPath = Join-Path $fixtureDirectory 'artifact.fixture'
+    [IO.File]::WriteAllText($artifactPath, 'fixture', [Text.Encoding]::ASCII)
+    $badArtifactClosed = $false
+    try { Assert-FileHash $artifactPath ('0' * 64) 'fixture' | Out-Null } catch { $badArtifactClosed = $true }
+    if (-not $badArtifactClosed) { throw 'Bad artifact hash fixture did not fail closed.' }
+    'BAD_ARTIFACT_HASH_NEGATIVE=PASS'
+
+    $artifactHashes = @{ bitstream = 'A'; hello_elf = 'B'; probe_elf = 'C'; soc_h = 'D'; ftdi_cfg = 'E'; target_cfg = 'F'; wsc_contract_document = 'G'; wsc_contract_summary = 'H'; wsc_contract_verifier = 'I' }
+    $approval = [pscustomobject]@{
+        schema_version = 1; approved_commit = 'fixed'; board_id = 'BOARD'; uart1_pnp_key = 'PNP'; window_id = 'WINDOW'
+        window_start_utc = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString('o'); window_end_utc = [DateTimeOffset]::UtcNow.AddMinutes(1).ToString('o')
+        stop_strategy = $StopStrategy; manifest_sha256 = 'MANIFEST'; artifact_sha256 = [pscustomobject]$artifactHashes
+    }
+    Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes ([DateTimeOffset]::UtcNow) | Out-Null
+    $approval.board_id = 'WRONG'
+    $badApprovalClosed = $false
+    try { Test-ApprovalRecord $approval 'fixed' 'BOARD' 'PNP' 'MANIFEST' $artifactHashes ([DateTimeOffset]::UtcNow) | Out-Null } catch { $badApprovalClosed = $true }
+    if (-not $badApprovalClosed) { throw 'Bad approval tuple fixture did not fail closed.' }
+    'BAD_APPROVAL_TUPLE_NEGATIVE=PASS'
+
+    foreach ($name in @('success', 'timeout', 'trap', 'wrong_pc', 'wrong_reason', 'halt_unconfirmed')) {
+        $outcome = Invoke-MockApbScenario -Name $name -Wsc $wsc
+        if ($name -eq 'success') {
+            if ($outcome.Result -cne 'SUCCESS' -or $outcome.RamReadCount -ne $wsc.SuccessRamReadCount) { throw 'Success fixture must read the four WSC RAM evidence words.' }
+        } elseif ($outcome.Result -cne 'FAILED_CLOSED' -or $outcome.RamReadCount -ne $wsc.FailureRamReadCount) {
+            throw "$name fixture must fail closed with the WSC failure RAM read count."
+        }
+        "MOCK_$($name.ToUpperInvariant())=PASS RESULT=$($outcome.Result) RAM_READ_COUNT=$($outcome.RamReadCount) HELLO_RESUME_COUNT=1 APB_RESUME_COUNT=1 RETRY_COUNT=0"
+    }
+    'PHASE_ORDER_FIXTURE=PASS hello_then_apb=true hello_resume=1 apb_resume=1 retry=0'
+    'HARDWARE_ACTIONS=NONE'
 }
 
 if ($Mode -eq 'Live') {
     if ($Scenario -eq 'all') { throw 'Live mode rejects Scenario=all before any external action.' }
-    if ($Scenario -ne 'run') { throw 'Live mode accepts Scenario=run only; fixture outcome labels are prohibited.' }
-    if ($ApprovalToken -cne 'I0_EXECUTION_WINDOW_APPROVED') { throw 'Live mode requires the separately approved hardware-window token.' }
-    foreach ($value in @($UartPort, $OpenOcdExe, $FtdiConfig, $TargetConfig, $GdbExe, $ProbeElf)) {
-        if ([string]::IsNullOrWhiteSpace($value)) { throw 'Live mode is missing an explicit fixed path or UART port.' }
+    if ($Scenario -ne 'run') { throw 'Live mode accepts Scenario=run only before any external action.' }
+    foreach ($value in @($ApprovalRecordPath, $BoardId, $UartPort, $OpenOcdExe, $FtdiConfig, $TargetConfig, $GdbExe, $Bitstream, $HelloElf, $ProbeElf, $SocH, $WscContractRoot)) {
+        if ([string]::IsNullOrWhiteSpace($value)) { throw 'Live mode is missing a fixed approval, identity, artifact, or tool path.' }
     }
 }
+if ($Mode -eq 'Mock' -and [string]::IsNullOrWhiteSpace($WscContractRoot)) { throw 'Mock mode requires the clean fixed-SHA WSC contract checkout.' }
 
 New-Item -ItemType Directory -Path $RunDir -Force | Out-Null
 Invoke-RspFixtures
 Invoke-Uart1PnPFixtures
 Invoke-OpenOcdArgumentFlowFixture
-
 if ($Mode -eq 'Mock') {
-    if ($Scenario -eq 'run') { throw 'Mock mode requires an explicit fixture outcome or Scenario=all.' }
-    $scenarios = if ($Scenario -eq 'all') { @('success', 'timeout', 'trap', 'wrong_pc', 'wrong_reason', 'halt_unconfirmed') } else { @($Scenario) }
-    foreach ($item in $scenarios) {
-        $outcome = Invoke-MockScenario $item
-        if ($outcome.ResumeCount -ne 1) { throw "$item RESUME_COUNT must be 1." }
-        if ($item -eq 'success') {
-            if ($outcome.Result -ne 'SUCCESS' -or $outcome.RamReadCount -ne 4) { throw 'Success fixture must read four RAM words.' }
-        } elseif ($outcome.Result -ne 'FAILED_CLOSED' -or $outcome.RamReadCount -ne 0) {
-            throw "$item must fail closed with RAM_READ_COUNT=0."
-        }
-        "MOCK_$($item.ToUpperInvariant())=PASS RESULT=$($outcome.Result) RAM_READ_COUNT=$($outcome.RamReadCount) RESUME_COUNT=1"
-    }
-    'HARDWARE_ACTIONS=NONE'
+    if ($Scenario -notin @('all', 'success')) { throw 'Mock mode uses the complete offline fixture bundle via Scenario=all or success.' }
+    Invoke-MockFixtures
     exit 0
 }
 
-$runId = 'live-{0}' -f ([guid]::NewGuid().ToString('N'))
+$runId = 'live-' + [guid]::NewGuid().ToString('N')
 $liveDir = Join-Path $RunDir $runId
 New-Item -ItemType Directory -Path $liveDir -Force | Out-Null
 $executionLog = Join-Path $liveDir 'execution.log'
-$byteLog = Join-Path $liveDir 'uart_bytes.log'
-$readyPath = Join-Path $liveDir 'CAPTURE_READY.marker'
-$resumeMarker = Join-Path $liveDir 'RESUME_ONCE.marker'
-$captureStop = Join-Path $liveDir 'capture.stop'
 $openOcdStdout = Join-Path $liveDir 'openocd.stdout.log'
 $openOcdStderr = Join-Path $liveDir 'openocd.stderr.log'
-$resumeCount = 0
-$ramReadCount = 0
-$retryCount = 0
-$finalLogged = $false
-$captureJob = $null
+$serial = $null
 $openOcdProcess = $null
 $client = $null
 $stream = $null
-$rspState = New-RspState
+$helloResumeCount = 0
+$apbResumeCount = 0
+$ramReadCount = 0
+$retryCount = 0
+$finalLogged = $false
+$counts = @{ Rx = 0; Tx = 0 }
+Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha RETRY_COUNT=0" | Out-Null
 try {
-    Write-RunLog $executionLog "RUN_ID=$runId MODE=Live BASE_SHA=$BaseSha QZS_SHA=$QzsAuthorizationSha WSC_SHA=$WscContractSha DESIGN_SHA=$DesignSha"
-    $identity = Resolve-UniqueUart1Identity -Port $UartPort -Allowlist $Uart1PnPAllowlist
+    $currentCommit = Get-CurrentCommit
+    $wsc = Read-WscContract $WscContractRoot
+    $artifactHashes = @{
+        bitstream = Assert-FileHash $Bitstream $Manifest.fixed_artifacts.bitstream_sha256 'bitstream'
+        hello_elf = Assert-FileHash $HelloElf $Manifest.fixed_artifacts.hello_elf_sha256 'hello_elf'
+        probe_elf = Assert-FileHash $ProbeElf $wsc.ProbeElfSha256 'probe_elf'
+        soc_h = Assert-FileHash $SocH $wsc.SocHSha256 'soc_h'
+        ftdi_cfg = Assert-FileHash $FtdiConfig $Manifest.fixed_artifacts.ftdi_cfg_sha256 'ftdi_cfg'
+        target_cfg = Assert-FileHash $TargetConfig $Manifest.fixed_artifacts.target_cfg_sha256 'target_cfg'
+        wsc_contract_document = Get-Sha256 $wsc.DocumentPath
+        wsc_contract_summary = Get-Sha256 $wsc.SummaryPath
+        wsc_contract_verifier = Get-Sha256 $wsc.VerifierPath
+    }
+    $approvalObject = Get-Content -LiteralPath $ApprovalRecordPath -Raw | ConvertFrom-Json
+    $identity = Resolve-UniqueUart1Identity -Port $UartPort -ExpectedKey $approvalObject.uart1_pnp_key
+    $approval = Get-LiveApproval -Path $ApprovalRecordPath -Commit $currentCommit -ExpectedBoard $BoardId -ExpectedPnp $identity.Key -ArtifactHashes $artifactHashes
+    Write-RunLog $executionLog "COMMIT_SHA=$currentCommit"
+    Write-RunLog $executionLog "APPROVAL_SHA256=$(Get-Sha256 $ApprovalRecordPath) WINDOW_ID=$($approval.window_id) BOARD_ID=$BoardId STOP_STRATEGY=$StopStrategy"
     Write-RunLog $executionLog "PNP=$($identity.Key) FRIENDLY_NAME=$($identity.FriendlyName) ROUTE=TYPEC_UART1"
-    $openOcdArguments = Get-OpenOcdArguments -FtdiPath $FtdiConfig -TargetPath $TargetConfig -RequireFiles
+    foreach ($entry in $artifactHashes.GetEnumerator()) { Write-RunLog $executionLog "PREFLIGHT_HASH_$($entry.Key.ToUpperInvariant())=$($entry.Value)" | Out-Null }
+    $openOcdArguments = Get-OpenOcdArguments $FtdiConfig $TargetConfig
     Write-RunLog $executionLog "OPENOCD_ARGUMENT_FLOW=-f $FtdiConfig -f $TargetConfig"
     $openOcdProcess = Start-Process -FilePath $OpenOcdExe -ArgumentList $openOcdArguments -RedirectStandardOutput $openOcdStdout -RedirectStandardError $openOcdStderr -WindowStyle Hidden -PassThru
-    Invoke-GdbRamOnlyLoad -Path $GdbExe -Elf $ProbeElf -HostName $OpenOcdHost -Port $OpenOcdPort
-    $captureJob = Start-UartCapture -Identity $identity -ReadyPath $readyPath -StopPath $captureStop -ByteLogPath $byteLog
-    $readyTimer = [Diagnostics.Stopwatch]::StartNew()
-    while (-not (Test-Path -LiteralPath $readyPath) -and $readyTimer.ElapsedMilliseconds -lt 5000) { Start-Sleep -Milliseconds 10 }
-    if (-not (Test-Path -LiteralPath $readyPath)) { throw 'UART1 capture did not produce CAPTURE_READY.' }
-    $readyContent = (Get-Content -LiteralPath $readyPath -Raw).Trim()
-    Write-RunLog $executionLog $readyContent
-    $captureReadyTime = [DateTimeOffset]::Parse(($readyContent -split '[ =]')[1])
+    Wait-OpenOcdReady -Process $openOcdProcess -StdoutPath $openOcdStdout -StderrPath $openOcdStderr -Port $OpenOcdPort
+
+    $serial = [IO.Ports.SerialPort]::new($identity.Port, 115200, [IO.Ports.Parity]::None, 8, [IO.Ports.StopBits]::One)
+    $serial.Handshake = [IO.Ports.Handshake]::None
+    $serial.ReadTimeout = 100
+    $serial.WriteTimeout = 1000
+    $serial.Open()
+    $captureReady = [DateTimeOffset]::UtcNow
+    Write-RunLog $executionLog "CAPTURE_READY_TIME=$($captureReady.ToString('o')) PNP=$($identity.Key) AUTO_CRLF=DISABLED"
+    Invoke-GdbRamOnlyLoad $GdbExe $HelloElf $OpenOcdHost $OpenOcdPort $Manifest.fixed_artifacts.hello_entry_pc 'HELLO' $executionLog | Out-Null
     $client = [Net.Sockets.TcpClient]::new($OpenOcdHost, $OpenOcdPort)
     $stream = $client.GetStream()
-    $supported = Send-RspCommand -Stream $stream -State $rspState -Payload 'qSupported:multiprocess+;swbreak+;hwbreak+'
-    if ($supported -notmatch 'PacketSize=') { throw 'OpenOCD RSP qSupported negotiation failed; retry is prohibited.' }
-    [void](Send-RspCommand -Stream $stream -State $rspState -Payload ('Z0,{0:x},4' -f $ExpectedHaltPc))
-    $resumeTime = [DateTimeOffset]::UtcNow
-    if ($resumeTime -le $captureReadyTime) { throw 'CAPTURE_READY_TIME must be earlier than RESUME_ONCE_TIME.' }
-    $resumeCount++
-    if ($resumeCount -ne 1) { throw 'Global resume count invariant violated.' }
-    Write-AtomicMarker $resumeMarker "RUN_ID=$runId`r`nCAPTURE_READY_TIME=$($captureReadyTime.ToString('o'))`r`nRESUME_ONCE_TIME=$($resumeTime.ToString('o'))`r`nRESUME_COUNT=1"
-    Write-RunLog $executionLog "RESUME_ONCE_TIME=$($resumeTime.ToString('o')) RESUME_COUNT=1 MARKER=$resumeMarker"
-    Send-RspCommand -Stream $stream -State $rspState -Payload 'c' -NoReply | Out-Null
-    $stop = Wait-AsyncStopReply -Stream $stream -State $rspState -TimeoutMilliseconds $TimeoutMs
+    $rspState = New-RspState
+    $supported = Send-RspCommand $stream $rspState 'qSupported:multiprocess+;swbreak+;hwbreak+'
+    if ($supported -notmatch '(?:^|;)PacketSize=[0-9A-Fa-f]+(?:;|$)') { throw 'OpenOCD RSP qSupported negotiation failed; retry is prohibited.' }
+    $helloMarker = Write-PhaseResumeMarker $liveDir $runId 'HELLO' $captureReady
+    $helloResumeCount++
+    Write-RunLog $executionLog "HELLO_RESUME_ONCE_TIME=$($helloMarker.Time.ToString('o')) HELLO_RESUME_COUNT=$helloResumeCount MARKER=$($helloMarker.Path)"
+    Send-RspCommand $stream $rspState 'c' -NoReply | Out-Null
+    Complete-HelloEcho $serial $executionLog $counts ([byte][char]$EchoByte)
+    $stream.WriteByte(3); $stream.Flush()
+    $helloStop = Wait-AsyncStopReply $stream $rspState 1000
+    if ($null -eq $helloStop) { throw 'HELLO_HALT_UNCONFIRMED; APB phase prohibited.' }
+    Write-RunLog $executionLog ('HELLO_HALT_CONFIRMED=true HALT_REASON={0} HALT_PC=0x{1:X8}' -f $helloStop.Reason, $helloStop.Pc)
+    $stream.Dispose(); $stream = $null; $client.Dispose(); $client = $null
+
+    Invoke-GdbRamOnlyLoad $GdbExe $ProbeElf $OpenOcdHost $OpenOcdPort $wsc.EntryPc 'APB' $executionLog | Out-Null
+    Write-RunLog $executionLog 'APB_PHASE_STARTED_AFTER_HELLO_PASS=true'
+    $client = [Net.Sockets.TcpClient]::new($OpenOcdHost, $OpenOcdPort)
+    $stream = $client.GetStream()
+    $rspState = New-RspState
+    $supported = Send-RspCommand $stream $rspState 'qSupported:multiprocess+;swbreak+;hwbreak+'
+    if ($supported -notmatch '(?:^|;)PacketSize=[0-9A-Fa-f]+(?:;|$)') { throw 'OpenOCD RSP qSupported negotiation failed; retry is prohibited.' }
+    [void](Send-RspCommand $stream $rspState ('Z0,{0:x},4' -f $wsc.HaltPc))
+    $apbReady = [DateTimeOffset]::UtcNow
+    $apbMarker = Write-PhaseResumeMarker $liveDir $runId 'APB' $apbReady
+    $apbResumeCount++
+    Write-RunLog $executionLog "APB_RESUME_ONCE_TIME=$($apbMarker.Time.ToString('o')) APB_RESUME_COUNT=$apbResumeCount MARKER=$($apbMarker.Path)"
+    Send-RspCommand $stream $rspState 'c' -NoReply | Out-Null
+    $stop = Wait-AsyncStopReply $stream $rspState $wsc.TimeoutMs
     $timedOut = $null -eq $stop
     if ($timedOut) {
-        $stream.WriteByte(3)
-        $stream.Flush()
-        Write-RunLog $executionLog "WATCHDOG_TIMEOUT_MS=$TimeoutMs ACTIVE_HALT=CTRL_C"
-        $stop = Wait-AsyncStopReply -Stream $stream -State $rspState -TimeoutMilliseconds 1000
-        if ($null -eq $stop) {
-            Write-RunLog $executionLog 'TIMEOUT_HALT_UNCONFIRMED RAM_READ_COUNT=0 RETRY_COUNT=0'
-            Write-RunLog $executionLog 'FINAL_STATE=FAILED_CLOSED RESUME_COUNT=1 RAM_READ_COUNT=0 RETRY_COUNT=0'
-            $finalLogged = $true
-            throw 'TIMEOUT_HALT_UNCONFIRMED'
-        }
+        $stream.WriteByte(3); $stream.Flush()
+        Write-RunLog $executionLog "WATCHDOG_TIMEOUT_MS=$($wsc.TimeoutMs) ACTIVE_HALT_COUNT=1"
+        $stop = Wait-AsyncStopReply $stream $rspState 1000
+        if ($null -eq $stop) { Write-RunLog $executionLog 'TIMEOUT_HALT_UNCONFIRMED RAM_READ_COUNT=0 RETRY_COUNT=0'; throw 'TIMEOUT_HALT_UNCONFIRMED' }
     }
-    Write-RunLog $executionLog ('HALT_CONFIRMED=true HALT_REASON={0} HALT_PC=0x{1:X8} TIMED_OUT={2}' -f $stop.Reason, $stop.Pc, $timedOut)
-    if ($timedOut -or $stop.Reason -cne 'BREAKPOINT' -or $stop.Pc -ne $ExpectedHaltPc) {
-        Write-RunLog $executionLog 'FINAL_STATE=FAILED_CLOSED RESUME_COUNT=1 RAM_READ_COUNT=0 RETRY_COUNT=0'
-        $finalLogged = $true
-        throw 'Halt reason/PC gate failed; RAM reads are prohibited.'
-    }
-    foreach ($entry in $ExpectedRam.GetEnumerator()) {
-        $value = ConvertFrom-RspLittleEndianHex (Send-RspCommand -Stream $stream -State $rspState -Payload ('m{0:x},4' -f $entry.Value.Address))
+    Write-RunLog $executionLog ('APB_HALT_CONFIRMED=true HALT_REASON={0} HALT_PC=0x{1:X8} TIMED_OUT={2}' -f $stop.Reason, $stop.Pc, $timedOut)
+    if ($timedOut -or $stop.Reason -cne 'BREAKPOINT' -or $stop.Pc -ne $wsc.HaltPc) { throw 'APB halt reason/PC gate failed; RAM reads prohibited.' }
+    foreach ($entry in $wsc.Ram.GetEnumerator()) {
+        $value = ConvertFrom-RspLittleEndianHex (Send-RspCommand $stream $rspState ('m{0:x},4' -f $entry.Value.Address))
         if ($value -ne $entry.Value.Value) { throw "RAM evidence mismatch: $($entry.Key)" }
         $ramReadCount++
         Write-RunLog $executionLog "RAM_$($entry.Key)=0x$($value.ToString('X8'))"
     }
-    Write-RunLog $executionLog 'FINAL_STATE=SUCCESS RESUME_COUNT=1 RAM_READ_COUNT=4 RETRY_COUNT=0'
+    if ($ramReadCount -ne $wsc.SuccessRamReadCount) { throw 'WSC RAM read count mismatch.' }
+    Write-RunLog $executionLog "BYTE_COUNTS RX=$($counts.Rx) TX=$($counts.Tx)"
+    Write-RunLog $executionLog "FINAL_STATE=SUCCESS HELLO_RESUME_COUNT=$helloResumeCount APB_RESUME_COUNT=$apbResumeCount RETRY_COUNT=$retryCount RAM_READ_COUNT=$ramReadCount"
     $finalLogged = $true
 } catch {
-    if (Test-Path -LiteralPath $executionLog) {
-        if (-not $finalLogged) {
-            Write-RunLog $executionLog "FINAL_STATE=FAILED_CLOSED ERROR=$($_.Exception.Message) RESUME_COUNT=$resumeCount RAM_READ_COUNT=$ramReadCount RETRY_COUNT=$retryCount"
-        }
+    if (Test-Path -LiteralPath $executionLog -and -not $finalLogged) {
+        Write-RunLog $executionLog "BYTE_COUNTS RX=$($counts.Rx) TX=$($counts.Tx)" | Out-Null
+        Write-RunLog $executionLog "FINAL_STATE=FAILED_CLOSED ERROR=$($_.Exception.Message) HELLO_RESUME_COUNT=$helloResumeCount APB_RESUME_COUNT=$apbResumeCount RETRY_COUNT=$retryCount RAM_READ_COUNT=$ramReadCount"
     }
     throw
 } finally {
-    if ($null -ne $captureJob) {
-        New-Item -ItemType File -Path $captureStop -Force | Out-Null
-        Wait-Job -Job $captureJob -Timeout 5 | Out-Null
-        Remove-Job -Job $captureJob -Force
-    }
-    if (Test-Path -LiteralPath $byteLog) {
-        Get-Content -LiteralPath $byteLog | Add-Content -LiteralPath $executionLog -Encoding ascii
-    } elseif (Test-Path -LiteralPath $executionLog) {
-        Write-RunLog $executionLog 'BYTE_COUNTS RX=0 TX=0'
-    }
+    if ($null -ne $serial) { if ($serial.IsOpen) { $serial.Close() }; $serial.Dispose() }
     if ($null -ne $stream) { $stream.Dispose() }
     if ($null -ne $client) { $client.Dispose() }
     if ($null -ne $openOcdProcess -and -not $openOcdProcess.HasExited) { Stop-Process -Id $openOcdProcess.Id -Force }

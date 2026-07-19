@@ -1,117 +1,124 @@
-# I0 UART1 Goal 4 Execution Chain Review Packet
+# I0 UART1 Goal 4 Two-Phase Execution Review Packet
 
-Status: `READY FOR QZS STATIC REVIEW / HARDWARE NOT AUTHORIZED / BOARD NOT VERIFIED`.
+Status: `READY FOR QZS STATIC REVIEW / DO NOT MERGE 69a1030e / HARDWARE NOT AUTHORIZED`.
 
-## Provenance And Ownership
+## Provenance And Scope
 
-- Patch base: `2d713b80a41185e472837abaec3a10c01383c70f`.
-- QZS temporary-ownership authorization:
-  `a222ea64653a2232945342faacfb53a06ce50e42`, file
-  `docs/agent_context/GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md`.
-- WSC contract source: `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`.
+- Patch base: `69a1030e1e72854a857fab147aa2c9cc8f0e6800`.
+- QZS temporary ownership registration:
+  `a222ea64653a2232945342faacfb53a06ce50e42`, covering
+  `competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1`.
+- WSC contract source, consumed read-only from a clean checkout:
+  `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`.
 - Fixed design source: `6effdc3685d696cb4d33f3fbb1c449729ed72e33`.
 
-This is one minimal follow-up on the existing libaoxun personal branch. It does
-not merge, rebase, cherry-pick, or copy the histories of `a840f08`, `5a61c4c`,
-`48548f4`, or `a222ea6`. The qzs and WSC commits are read-only provenance.
+This is one minimal follow-up on the same libaoxun branch. It does not merge,
+rebase, cherry-pick, or migrate the histories of `a840f08`, `5a61c4c`,
+`48548f4`, or `a222ea6`. QZS should perform static review only and should not
+merge the current `69a1030e` baseline.
 
-## Changed Files
+Changed files remain within the six-file temporary scope: runner, static
+verifier, authoritative manifest, target cfg, operation card, and this Packet.
+The cfg is unchanged in this follow-up. User `.gitignore` is untouched.
 
-- `tools/i0_uart1_cleanlf_user2.cfg`
-- `tools/run_i0_uart1_execution_chain.ps1`
-- `tools/verify_i0_uart1_execution_config.ps1`
-- `tools/i0_uart1_execution_manifest.json`
-- `docs/debug_sessions/I0_UART1_CLEANLF_USER2_OPERATION_CARD_20260719.md`
-- this Review Packet
+`tools/i0_uart1_execution_manifest.json` is the single authoritative hash
+inventory. It binds every changed file except itself. This Packet neither
+stores the manifest hash nor is hashed by a second Packet, so there is no
+Packet/manifest circular dependency. A future external approval record may
+bind the final manifest hash without becoming a repository authorization token.
 
-`tools/i0_uart1_execution_manifest.json` is the only authoritative file-hash
-inventory. The Packet does not repeat file hashes or hash the manifest, so
-there is no Packet/manifest circular dependency. The manifest binds every
-modified runtime, verifier, operation-card, and Packet file except itself.
+## Implemented Control Chain
 
-## OpenOCD Argument Flow
+Live mode represents one run ID and one OpenOCD process. It accepts only
+`Scenario=run`; `Scenario=all`, automatic retry, TAP/cable changes, UART0
+fallback, and generic token authorization fail before external action.
 
-The target configuration now supplies the RISC-V target commands literally:
+Before OpenOCD starts, the runner checks the bitstream, Hello ELF, probe ELF,
+same-batch `soc.h`, FTDI cfg, target cfg, and all three WSC contract file hashes.
+It verifies the WSC checkout is clean at the fixed SHA, then parses entry PC,
+halt PC, timeout, RAM addresses/values, probe ELF hash, and `soc.h` hash from
+that source. It does not keep a second driftable copy of those constants. After
+launch it waits for the fixed GDB-listener readiness line; exit or bounded
+readiness timeout fails without retry.
+
+The target argument path remains exactly:
 
 ```text
+-f <approved FTDI cfg> -f <i0_uart1_cleanlf_user2.cfg>
 riscv use_bscan_tunnel 6 1
 riscv set_bscan_tunnel_ir 0x09
 ```
 
-The orchestrator constructs the future process arguments in fixed order:
+The same target cfg fixes the outer FPGA TAP expected ID to the TJ375N529
+identity `0x006A0EF3`; the Efinity FTDI template's `0x006A0A79` default is for
+Ti375 and is rejected by the verifier.
+
+`OPENOCD_ARGUMENT_FLOW=PASS` means the future process consumes those exact
+files and arguments. It does not claim USER2 board PASS.
+
+The full sequence is uniquely bound Type-C UART1 capture, Hello load and exact
+post-load PC gate, `HELLO_RESUME_COUNT=1`, exact three-line Hello, one
+printable non-CR/LF TX byte and same-byte echo, confirmed halt, APB probe load
+and exact post-load PC gate, then `APB_RESUME_COUNT=1`. The APB phase is logged
+only after `HELLO_ECHO=PASS`. Whole-chain `RETRY_COUNT=0`.
+
+The APB watchdog is the parsed WSC `1000 ms` value. Timeout issues one active
+Ctrl-C halt. `TIMEOUT_HALT_UNCONFIRMED`, timeout, trap, wrong PC, or wrong
+reason reads zero RAM words. Only confirmed `BREAKPOINT` at `0xF90000C4` reads
+the four WSC RAM evidence words.
+
+RSP fixtures cover ACK, NACK without retry, checksum ACK/NACK generation,
+half/sticky/fragmented packets, and asynchronous stop replies. Additional
+negative fixtures cover the fixed Hello transcript, wrong echo byte, wrong
+post-load PC false positive, wrong artifact hash, and wrong approval tuple.
+
+UART1 identity requires one exact `VID/PID/serial/instance` match. COM17,
+CH340, J44/UART0, and programmer identities are explicitly rejected. The same
+orchestrator atomically creates both persistent phase markers and the complete
+execution log.
 
 ```text
--f <approved FTDI config> -f <i0_uart1_cleanlf_user2.cfg>
+HELLO_RESUME_COUNT=1
+APB_RESUME_COUNT=1
+RETRY_COUNT=0
 ```
 
-Offline fixtures verify that order and the literal target arguments. This is
-`OPENOCD_ARGUMENT_FLOW=PASS`, not USER2 hardware proof. No OpenOCD process was
-started during this patch; `USER2=NOT_VERIFIED`.
+## Original 82/21 Evidence Rerun
 
-## Host State Machine
+The six restored original evidence files under
+`C:\cicc_i0_uart1_stage_20260719_v4` remain byte-for-byte bound as follows:
 
-`run_i0_uart1_execution_chain.ps1` is the only authorized host orchestrator.
-Before any external action, Live mode requires `Scenario=run` and rejects
-`Scenario=all`, fixture outcome labels, a missing approval token, and missing
-explicit tool/config/ELF paths. One Live invocation represents one run and owns
-one global resume count.
+| File | SHA-256 |
+|---|---|
+| `efinity_console.log` | `4DD0C40BAF660B440B08B6668617D37ED01476B192663155385CF24F421655B4` |
+| `uart1_hello_build.log` | `83CAAC75485C8C0098DFE2379C9CA329CE75429C1257F88A29E38CF4EF08B939` |
+| `uart1_hello_readelf.txt` | `43C7825F6FEAC3086E17B57772D2469BD53EA9831528001DBC8771CF2C3277F3` |
+| `uart1_hello_undefined.txt` | `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855` |
+| `preflight.txt` | `9DC15B0661CF43C3C2877946A989D89D53751F58E5F5B70A53BF7A2964F53CEF` |
+| `postflight.txt` | `A502C8C5CD0437E379C957838FAD61FC0F48FEFE1D236C3DBBC97E9DCCE03D9F` |
 
-The same runner implements and fixture-tests:
-
-- RSP ACK and NACK handling with no retry after NACK.
-- RSP checksum validation and `+`/`-` response generation.
-- persistent parser state for half packets, sticky packets, TCP fragments, and
-  asynchronous stop replies.
-- a `1000 ms` host watchdog followed by one active Ctrl-C halt request.
-- `TIMEOUT_HALT_UNCONFIRMED` when no halt reply follows; this path reads zero
-  RAM words and performs zero retries.
-- four RAM evidence reads only for confirmed `BREAKPOINT` at `0xF90000C4`
-  before timeout. Timeout, trap, wrong reason, wrong PC, and unconfirmed halt
-  all require `RAM_READ_COUNT=0`.
-
-## UART1 Identity And Evidence
-
-Live UART1 requires one exact allowlist match containing VID, PID, serial, and
-full PnP instance. Zero or multiple matches fail closed. COM17, CH340, and a
-friendly name identifying J44/UART0/programmer/downloader/burner are rejected.
-The currently connected J44/UART0 programmer is not a UART1 capture candidate.
-
-The orchestrator creates the capture-ready marker, persistent
-`RESUME_ONCE.marker`, UART byte log, and execution log under one run ID. The
-offline fixtures verify:
+Exact verifier command:
 
 ```text
-CAPTURE_READY_TIME < RESUME_ONCE_TIME
-RESUME_COUNT=1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\cicc_i0_uart1_evidence_lf_20260719_v2\competition_project_single_camera\embedded_sw\uart1_hello_onchip\verify_i0_uart1_build_evidence.ps1 -DesignRoot C:\cicc_i0_uart1_design_lf_20260719_v4 -EvidenceRoot C:\cicc_i0_uart1_stage_20260719_v4 -OutflowRoot C:\cicc_i0_uart1_design_lf_20260719_v4\competition_project_single_camera\outflow_i0_uart1_20260719_cleanlf_v4 -WorkRoot C:\cicc_i0_uart1_design_lf_20260719_v4\competition_project_single_camera\work_i0_uart1_20260719_cleanlf_v4 -EfinityRoot D:\Efinity\2025.2 -RiscvToolchainBin D:\Efinity\efinity-riscv-ide-2025.2\toolchain\bin -MakePath D:\Efinity\efinity-riscv-ide-2025.2\build_tools\bin\make.exe
 ```
 
-Logs contain the run ID, fixed SHAs, exact PnP identity, byte-level RX/TX
-timestamps, final RX/TX counts, halt state, RAM-read count, retry count, and
-final result.
+Recorded result:
 
-## Offline Validation
+```text
+I0_UART1_BUILD_EVIDENCE=PASS batch=I0_UART1_20260719_CLEAN_LF_FINAL design_sha=6effdc3685d696cb4d33f3fbb1c449729ed72e33 inputs=82 artifacts=21
+exit_code=0
+```
 
-- Runner fixtures: success, timeout, trap, wrong PC, wrong reason, and halt
-  unconfirmed all pass their expected gates.
-- Success reads four RAM words; every failure reads zero.
-- WSC contract verifier is executed from a clean checkout at `48548f4`.
-- WSC G2 host evidence is executed with an explicit external `-RunDir`.
-- The original UART1 build verifier is executed from the `72cc281` evidence
-  checkout with the original roots and reports `inputs=82 artifacts=21`, exit
-  zero.
-- `git diff --check`, temporary scope, dangerous-route scan, manifest hashes,
-  and EOL policy pass. PowerShell is CRLF; GDB and CFG are LF.
+This proves offline build evidence only. It does not prove USER2, UART1, APB,
+or any board gate.
 
-Recorded WSC Host detail: the first automatic-compiler run selected GCC and
-failed closed because the fixed WSC test uses MSVC `fopen_s`. The retry used the
-script's public `-CompilerPreference Msvc` parameter with a new external
-`-RunDir`, then passed `single_camera_runtime: 648/648` with exit zero. No WSC
-file was changed.
+## Validation And Safety
 
-## Safety And Remaining Boundary
-
-No Efinity Programmer, OpenOCD, GDB, JTAG, USER2, UART, APB, wiring, Flash,
-DDR, UART2/J52, or mechanical-arm session was started.
+The submission validation is limited to mock/offline fixtures, the clean WSC
+contract verifier, WSC G2 Host evidence with an explicit external `-RunDir`,
+the original 82/21 evidence verifier, PowerShell parsing, manifest hashes,
+EOL, `git diff --check`, temporary scope, and dangerous-route scans.
 
 ```text
 HARDWARE_ACTIONS=NONE
@@ -119,3 +126,6 @@ USER2=NOT_VERIFIED
 UART1=NOT_VERIFIED
 APB=NOT_VERIFIED
 ```
+
+No Efinity Programmer, OpenOCD, GDB, JTAG, UART, APB, wiring, Flash, DDR,
+UART2/J52, or mechanical-arm session was started.
