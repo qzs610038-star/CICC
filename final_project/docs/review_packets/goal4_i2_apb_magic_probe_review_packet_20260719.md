@@ -90,6 +90,11 @@ apb_base_materialized=0xE8100000
 apb_offset=0x000
 apb_write_count=0
 compiler_warnings=0
+contract_verifier_exit=0
+contract_verifier_sha256=004872EF2565929B1BBDA53195FC93C677A643DDED6B0111307EAE2110523F0A
+deterministic_halt_pc=0xF90000C4
+run_timeout_ms=1000
+debugger_direct_apb_read=PROHIBITED
 ```
 
 反汇编关键序列：
@@ -102,9 +107,21 @@ f90000a8: 4398      lw  a4,0(a5)
 `g_apb_probe_address`、`g_apb_probe_expected`、`g_apb_probe_status` 和
 `g_apb_probe_observed` 均由符号审计确认位于 `0xF9000000..0xF9003FFF`。
 
+`verify_apb_probe_contract.ps1` 已实际执行并输出 `APB_PROBE_CONTRACT=PASS`；
+它直接计算 `soc.h`/ELF SHA-256，解析 readelf、objdump 与 symbols，并断言：
+`APB lw=1`、`APB store=0`、唯一地址/偏移为 `0xE8100000+0`、确定性
+halt PC 为 `0xF90000C4`、四个结果符号地址固定，以及合同禁止 debugger
+直接读取 APB window。
+
 ## 未来板级观察点与失败分类
 
 只有本 Packet 获批、Goal4-I0/I1 在同一批准窗口 PASS 后，才允许下载匹配 probe ELF。未来 debugger 观察点：
+
+精确操作顺序和超时合同见
+`competition_project_single_camera/embedded_sw/apb_magic_onchip/APB_PROBE_DEBUGGER_CONTRACT.md`：
+load 后先验证 entry PC，预置 `0xF90000C4` 断点，只 resume 一次，并在
+`1000 ms` 内以该断点 halt。debugger 禁止直接读取 `0xE8100000` 或 APB window；
+确定性 halt 通过后只能读取下表四个片上 RAM 符号。
 
 | 变量 | 期望 |
 |---|---|
@@ -118,6 +135,9 @@ f90000a8: 4398      lw  a4,0(a5)
 ## 未验证项、风险假设与回退条件
 
 - `NOT VERIFIED`：USER2、CPU 实际执行 probe、APB read、MAGIC 值、UART1、视频和 OSD。
+- 超过 `1000 ms` 未在 `0xF90000C4` 断点 halt 时，必须主动 halt 并记录
+  PC/reason/elapsed，分类 `APB_PROBE_RUN_TIMEOUT`；禁止读取四个 RAM 符号、
+  禁止 resume/step/retry，禁止 debugger 直接查看 APB window。
 - 静态反汇编只能证明编译结果，不证明总线时钟、复位、连线或板级返回值。
 - 若 `soc.h`、linker、startup、RTL/XML/SDC/IP、bitstream 或 BSP 任一输入变化，ELF 和本 Packet 立即失效，须重新构建和审查。
 - 若实际板级访问 trap/hang，halt CPU 并保存寄存器/PC；不得通过增加重试、猜地址或写寄存器规避。

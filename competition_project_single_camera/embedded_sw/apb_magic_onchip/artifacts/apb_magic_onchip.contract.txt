@@ -1,0 +1,15 @@
+APB_PROBE_CONTRACT=PASS
+soc_h_sha256=25BABB96D96E8FFE9F699A060A62ACEE7F0AC67DFAA31456EB6BCA88E62C982B
+elf_sha256=6CB7E5E1CA5AF1B82FB99015925F13C2517B9332FD0FB0015DC1B4FDC3DFEAEC
+entry=0xF9000000
+load_segments=1
+load_end=0xF90008F0
+apb_address=0xE8100000
+apb_offset=0x000
+apb_lw_count=1
+apb_store_count=0
+ram_result_store_count=2
+deterministic_halt_pc=0xF90000C4
+run_timeout_ms=1000
+debugger_direct_apb_read=PROHIBITED
+ram_symbols=0xF90000D0,0xF90000D4,0xF90000E4,0xF90000E8
