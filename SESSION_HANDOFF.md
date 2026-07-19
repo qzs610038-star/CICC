@@ -64,8 +64,8 @@ Goal 4 已形成可直接转发的双人提示词与任务矩阵：`docs/agent_c
 - 旧“7 项例外”已更正为 11 个跨所有者 ACMR 输入（libaoxun 5、WSC 2、qzs Gate/治理 4），
   并按来源 SHA 分段 `team_scope_check -BaseRef/-TargetRef` 全部 PASS。
 - EOL 策略固定为 `*.ps1=CRLF`、`*.gdb=LF`、`*.cfg=LF`；docs/JSON/source 延续
-  `.gitattributes` 既有规则。clean `6e15b92` checkout 已生成最终 manifest，记录 checkout
-  SHA-256 和 Git blob SHA-1。
+  `.gitattributes` 既有规则。clean `72ab29b` checkout 已生成并独立验证最终 manifest，记录
+  checkout SHA-256 和 Git blob SHA-1。
 - `git diff --check`、接口冻结、WSC G2 `648/648`、classifier `54/54` 均 PASS；危险路由
   扫描未发现 Flash 或 direct-APB 写入，APB `PWDATA` 未连接。
 - libaoxun 总 verifier 本机为 `NOT_RERUN_LOCAL`：集合 checkout 缺 `evidence/work/Efinity`

@@ -32,11 +32,11 @@ WSC 源码复制到 libaoxun 路径，也没有改写其作者/提交归属。li
 
 - `.gitattributes` 已冻结 `*.ps1=CRLF`、`*.gdb=LF`、`*.cfg=LF`；docs、JSON 与 source
   延续仓库既有规则。
-- 从干净 `6e15b92e5ff5171f1942d1f80ee1c846fd68ff71` checkout 生成
+- 从干净 `72ab29b5b4e1fe68f88818da03713d096c7ee849` checkout 生成
   [`FINAL_STATIC_INTEGRATION_MANIFEST_20260719.json`](../../competition_project_single_camera/integration/FINAL_STATIC_INTEGRATION_MANIFEST_20260719.json)。
 - manifest 逐项记录实际 checkout bytes 的 SHA-256 与 Git blob SHA-1；前者是执行身份，后者
   仅作 Git 可追溯性。manifest 自身 SHA-256 为
-  `BF0BD4E4E81055CF6233E223DD8F2D28B5C31671D5BE7F6B8DFDEA34B53C1AD4`。
+  `8013E54ADDF26743D7D418854A419B5464C81E45A62862E22812D61EE36CF1AC`。
 
 ## 最终静态检查
 
@@ -46,7 +46,7 @@ WSC 源码复制到 libaoxun 路径，也没有改写其作者/提交归属。li
 | `team_scope_check` 三角色 | PASS | 使用 `-BaseRef/-TargetRef` 分来源审查；不再把集合树误归单角色 |
 | interface freeze | PASS | `files=8`、`surfaces=1`、`route=UART1_TYPEC` |
 | WSC probe verifier | PASS | G2 runtime `648/648`，classifier `54/54` |
-| 最终 manifest | PASS | 11 个执行/门控输入、clean checkout、EOL 与双 hash 已绑定 |
+| 最终 manifest | PASS | 12 个执行/门控输入、clean checkout、EOL 与双 hash 已绑定；独立 verifier 已在 `72ab29b` PASS |
 | libaoxun 总 verifier | `NOT_RERUN_LOCAL` | 原始 evidence/work/Efinity roots 缺失；历史固定 SHA 记录为 `PASS inputs=82 artifacts=21`，不可提升为本机复跑 PASS |
 | 危险路由扫描 | PASS_WITH_BOUNDARY | USER1 仅为既有 JTAG 定义；DDR 仍由视频状态机驱动；APB `PWDATA` 未接、`pwrite` 只进入只读 MAGIC 外设；未发现 Flash 路由 |
 | qzs worktree / 远端 SHA | PENDING_COMMIT_AND_PUSH | 本 Packet 提交后需 worktree clean；远端当前回读为 `e72fb6a`，尚未等于本次最终 HEAD |

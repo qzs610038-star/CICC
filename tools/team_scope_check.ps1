@@ -77,6 +77,10 @@ $paths = New-Object 'System.Collections.Generic.List[string]'
 @(& git -C $repoRoot diff --name-only --diff-filter=ACMR $BaseRef $TargetRef --) |
     ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $paths.Add(($_ -replace '\\', '/')) } }
 if ($TargetRef -eq 'HEAD') {
+    @(& git -C $repoRoot diff --name-only --diff-filter=ACMR $TargetRef --) |
+        ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $paths.Add(($_ -replace '\\', '/')) } }
+    @(& git -C $repoRoot diff --cached --name-only --diff-filter=ACMR $TargetRef --) |
+        ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $paths.Add(($_ -replace '\\', '/')) } }
     @(& git -C $repoRoot ls-files --others --exclude-standard) |
         ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $paths.Add(($_ -replace '\\', '/')) } }
 }

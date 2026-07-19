@@ -1,7 +1,7 @@
 {
     "schema_version":  1,
     "purpose":  "final static integration identity; checkout bytes are authoritative for execution",
-    "source_commit":  "6e15b92e5ff5171f1942d1f80ee1c846fd68ff71",
+    "source_commit":  "72ab29b5b4e1fe68f88818da03713d096c7ee849",
     "clean_checkout_verified":  true,
     "eol_policy":  {
                        "ps1":  "CRLF",
@@ -78,6 +78,13 @@
                                 "path":  "tools/team_scope_check.ps1",
                                 "checkout_sha256":  "261FAD391CC093573570D2E86931965F23610DF62016C03FE049860AA2B333CF",
                                 "git_blob_sha1":  "9e8aaaff0dc6d67d63e64c8f8b7183c061170c85",
+                                "eol_attribute":  "crlf",
+                                "required_eol":  "crlf"
+                            },
+                            {
+                                "path":  "tools/verify_final_static_integration_manifest.ps1",
+                                "checkout_sha256":  "C62E00DA42B288C7B3A5BF58BCC16A37873E14292BDB45F1857BEE3629DC9557",
+                                "git_blob_sha1":  "36b408eaa0a4f8c1ec606a7a6fd9f6388ceff067",
                                 "eol_attribute":  "crlf",
                                 "required_eol":  "crlf"
                             },

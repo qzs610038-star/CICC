@@ -104,7 +104,7 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ## POST_MERGE_REFRESH_REQUIRED
 
-2026-07-19 已按 `libaoxun 72cc281 → WSC 13419d9 → QZS 018ced2` 的固定输入顺序形成集合树并刷新本文件。最终静态 manifest 已从 clean `6e15b92` checkout 生成；“7 项例外”已纠正为 11 个跨所有者输入并按来源复核。WSC verifier、接口冻结、分段 team-scope 与 `git diff --check` 已 PASS；libaoxun 总 verifier 当前仅有来源主机 PASS 记录，本机因原始 roots 缺失为 `NOT_RERUN_LOCAL`。因此不得申请新窗口；本状态仍不是正式 `main` 或板级 PASS。
+2026-07-19 已按 `libaoxun 72cc281 → WSC 13419d9 → QZS 018ced2` 的固定输入顺序形成集合树并刷新本文件。最终静态 manifest 已从 clean `72ab29b` checkout 生成并由独立 verifier 复查；“7 项例外”已纠正为 11 个跨所有者输入并按来源复核。WSC verifier、接口冻结、分段 team-scope 与 `git diff --check` 已 PASS；libaoxun 总 verifier 当前仅有来源主机 PASS 记录，本机因原始 roots 缺失为 `NOT_RERUN_LOCAL`。因此不得申请新窗口；本状态仍不是正式 `main` 或板级 PASS。
 
 ## FINAL_GATE_STATUS
 
