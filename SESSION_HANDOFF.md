@@ -94,7 +94,7 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 
 ## Goal 4 follow-up — 2026-07-19 18:14 +08:00
 
-- qzs 远端交接记录：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；两位个人补丁基线仍为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。
+- qzs 临时登记起点：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；同名远端当前 HEAD 每次以 `ls-remote` 回读，两位个人补丁基线始终为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。
 - WSC `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` 已固定并通过独立复跑：四个临时文件、APB contract、success/timeout/trap/wrong-PC/wrong-reason、G2 `648/648`、classifier `54/54`。原 WSC dirty 未被覆盖。
 - libaoxun `2d713b80a41185e472837abaec3a10c01383c70f` 是直接基于 `182fd6f` 的十文件独立补丁；只接受为 `BLOCKER_SNAPSHOT`，未合入集合分支。
 - USER2 根因已定位为 OpenOCD 参数语义错误：`use_bscan_tunnel 6 1` 是 width/type，`set_bscan_tunnel_ir` 必须消费 USER2 `0x09`；当前候选传入 `8`。Efinity `select_user()` API 不是必须的直接调用桥。

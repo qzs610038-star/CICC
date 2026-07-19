@@ -4,13 +4,14 @@
 >
 > 集合分支：`codex/qzs-wsc-libaoxun-integration-20260718`
 >
-> 固定集合 SHA：`182fd6f5c4d628379760d6f4fc74e3b342e30083`
+> 两人独立个人补丁基线：`182fd6f5c4d628379760d6f4fc74e3b342e30083`
 >
 > 状态：`TEMPORARY_SCOPE_REGISTERED / NO_DIRECT_WORK_OR_MERGE / HARDWARE_WINDOW_NOT_APPROVED`
 
 > **2026-07-19 交接覆盖说明**：本文件先前包含的 `e72fb6a` 同步/执行提示仅作历史记录，
-> 不得再执行。当前远端已回读 `182fd6f`，且本轮只登记临时所有权，不授权两人立即修改、
-> cherry-pick、合并、构建或硬件操作。唯一有效的范围与回收点见
+> 不得再执行。qzs 同名远端当前 HEAD 必须在派工时以 `git ls-remote` 回读；它只承载治理记录，
+> 不改变两人的 `182fd6f` 个人补丁基线，也不授权 cherry-pick、合并、构建或硬件操作。
+> 唯一有效的范围与回收点见
 > [`GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md`](GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md)。
 
 本文件把 Goal 4 拆成“共同同步 → 双人独立预检 → qzs 汇总 → 用户批准 → libaoxun 单人上板执行 → wsc 判读 → qzs 收口”。它不授权 JTAG、USER2、串口打开、APB 访问或任何机械臂操作。

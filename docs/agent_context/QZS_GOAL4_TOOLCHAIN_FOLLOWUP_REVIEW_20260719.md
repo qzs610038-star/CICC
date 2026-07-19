@@ -7,7 +7,7 @@ GDB、JTAG、USER2、串口、APB、接线或机械臂动作。
 
 ## 固定输入
 
-- qzs handoff：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`
+- qzs temporary-register origin：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；当前远端 HEAD 以 `ls-remote` 为准
 - 两人 patch base：`182fd6f5c4d628379760d6f4fc74e3b342e30083`
 - WSC contract：`48548f47dfa5964b13aed7edf3b3e9da6f6583a2`
 - libaoxun blocker snapshot：`2d713b80a41185e472837abaec3a10c01383c70f`

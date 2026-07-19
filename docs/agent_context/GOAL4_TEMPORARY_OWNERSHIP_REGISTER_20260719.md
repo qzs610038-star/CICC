@@ -2,9 +2,10 @@
 
 ## 生效事实与总边界
 
-- 远端交接记录为 `codex/qzs-wsc-libaoxun-integration-20260718@fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；
-  两人的独立个人补丁基线仍固定为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。读取登记与建立补丁
-  使用不同 SHA，不得把 qzs 治理提交并入个人补丁。
+- 本登记的初始 qzs 记录提交为 `fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；qzs 同名远端分支会继续追加
+  治理/EOL 修复，当前交接 HEAD 必须在每次派工时用 `git ls-remote --heads origin` 回读，不在本文件
+  自引用硬编码。两人的独立个人补丁基线始终固定为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`，
+  不得把任何 qzs 治理提交并入个人补丁。
 - `a840f0869c11bab0915757d64c56a167f6d4f917`（WSC）与
   `5a61c4cb2932ba1bd1eb86687563eb89d8823845`（libaoxun）均**不是** `182fd6f` 的祖先。
   它们只能作为待拆解的设计输入，禁止直接 merge、rebase、cherry-pick 整条链或将其称为
