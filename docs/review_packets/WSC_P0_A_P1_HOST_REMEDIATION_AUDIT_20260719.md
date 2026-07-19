@@ -8,6 +8,8 @@
 >
 > qzs 裁定：`CHANGES_REQUESTED / DO NOT MERGE / P0-A IMPLEMENTATION ACCEPTED / P0-A READY NO / P1-HOST READY NO`
 
+> 后续状态：wsc 已提交 R1/R2 整改 SHA `a74b21d19e9a81d315456e106e9d23cc5402243a`。R1 与 runtime replay 功能已通过，P0-A 已签发 READY；P1 仍有 clean-checkout manifest hash 封装问题。最新复审见 `WSC_P0_A_P1_HOST_R1_R2_FINAL_AUDIT_20260719.md`。
+
 ## 1. 固定来源、范围与安全边界
 
 - `git ls-remote` 实读远端分支为 `328f115c1716023d2c10c4276c80cd2833291551`；首次候选 `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d` 是其祖先，其后共有 5 个整改提交。

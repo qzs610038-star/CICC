@@ -44,3 +44,7 @@
 ## 2026-07-19 WSC 整改候选状态
 
 `328f115c1716023d2c10c4276c80cd2833291551` 已 fresh 通过 P1 model `37/37`、adapter `39/39`、classifier `54/54`、F1 `213/213`、runtime `648/648` 与 schema `11/11`；ACK、frame-boundary、result latch 和 reserved bit 阻断关闭。但 20 轮 runner 把 decision/reason、snapshot hash 与 commit count 写在预置表中，只执行输入事务模型，没有从 fake snapshot 驱动 runtime/参考模型得到 actual 结果。因此本表仍为 `PARTIAL / CHANGES_REQUESTED`，不是 `P1-HOST-READY`。详见 `docs/review_packets/WSC_P0_A_P1_HOST_REMEDIATION_AUDIT_20260719.md`。
+
+## 2026-07-19 WSC R1/R2 快速复审状态
+
+`a74b21d19e9a81d315456e106e9d23cc5402243a` 已关闭 runtime replay 的预置输出问题：20 轮从序列化 snapshot 经 runtime/fake transport/packer 产生 actual 结果，任务 `5+5+5+5`、submit/commit/ACK 均为 1、second result=0、`ARM=0`，篡改负例 PASS。剩余问题仅为 committed bundle 的 EOL/hash 封装：clean checkout 中三份文本 hash 与 manifest 不符，且当前 validator 未回验 manifest 文件 hash。因此本表仍为 `PARTIAL / CHANGES_REQUESTED`，修复并在 clean checkout fail-closed PASS 后即可评定 `P1-HOST-READY`。

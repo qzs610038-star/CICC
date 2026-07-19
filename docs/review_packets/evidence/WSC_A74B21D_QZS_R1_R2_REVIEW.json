@@ -1,0 +1,41 @@
+{
+  "schema": "qzs-wsc-r1-r2-review-v1",
+  "wsc_fixed_sha": "a74b21d19e9a81d315456e106e9d23cc5402243a",
+  "implementation_sha": "2564f146fede84383be0ff607aa63408b2889f37",
+  "governance_sha": "e282a95fcef306c87e4015385c9fcd0041f5a722",
+  "r1": {
+    "fresh_builds": 2,
+    "build_exit": [0, 0],
+    "ram_used_bytes": 2976,
+    "ram_size_bytes": 16384,
+    "p0_a_verifier": ["PASS", "PASS"],
+    "compared_fields": 12,
+    "reproducibility": "PASS",
+    "tamper_exit": 1,
+    "tamper_marker": "P0A_REPRO_ARTIFACT_HASH"
+  },
+  "r2": {
+    "rounds": 20,
+    "task_counts": {"1": 5, "2": 5, "3": 5, "4": 5},
+    "arm_enabled": 0,
+    "runtime_submit_bad": 0,
+    "result_commit_bad": 0,
+    "feature_ack_bad": 0,
+    "second_result_bad": 0,
+    "external_tamper_exit": 1,
+    "external_tamper_marker": "P1_SNAPSHOT_HASH_MISMATCH round=1",
+    "functional_status": "PASS"
+  },
+  "committed_bundle_hash_mismatches": {
+    "rounds.jsonl": {"expected": "2D32393E9F20B7B01137DCFCADC3BD93AF152A77674F4242B9ABC3CDA56A6BC1", "actual": "18E764A99D0EBE205F19189550DA3264C8CC6FE09D68B84351C6A67820519878"},
+    "compile.txt": {"expected": "04FA4D3EF660722D59379F4BFD32B19D3489574DB66D122973F63BD0A2E3801B", "actual": "DFABC3264C3062CB6A3019BE66BECBE030E35EA67E3CA1F4CCF5B6232F520065"},
+    "tamper.jsonl": {"expected": "0C830B89CBBDBCB21A7FFA75D7BFEC404C9A01A69BA0A15FF07D6E825F8F5CA9", "actual": "2A08150461A482187A2266AC604A05B119C23DB78DA5BEB14787CBB06137F1D9"}
+  },
+  "verdict": {
+    "p0_a_ready": true,
+    "p1_runtime_replay": "PASS",
+    "p1_host_ready": false,
+    "board_verified": false,
+    "arm_enabled": 0
+  }
+}

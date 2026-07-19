@@ -74,3 +74,5 @@
 2026-07-19 更新：wsc `dbdbc9b84ce43e4c58a112678eadbb18ea4ef70d` 经 qzs 复审为 `CHANGES_REQUESTED / P0-A NOT READY`，因此 P0-B 触发前提尚未满足；本 Packet 继续 HOLD，且不联系或占用正在推进 UART1/USER2 的 libaoxun。
 
 2026-07-19 整改复审：wsc `328f115c1716023d2c10c4276c80cd2833291551` 的 P0-A 实现、严格构建和两个独立工作树身份 hash 已通过，但提交的 `reproducibility.json` 仍含与 manifest/fresh 不一致的旧 objdump hash，因此正式 `P0-A-READY` 尚未签发。P0-B 继续 HOLD；不联系、不拉取、不占用正在推进 UART1/USER2 的 libaoxun。
+
+2026-07-19 R1 快速复审：qzs 已对 wsc `a74b21d19e9a81d315456e106e9d23cc5402243a` 签发 `P0-A-READY`，但 USER2/板级 canary 仍 `NOT RUN`，更未发生两次有新证据的失败修正，因此 P0-B 的完整触发条件仍未满足。本 Packet 继续 HOLD；不联系、不拉取、不占用 libaoxun。
