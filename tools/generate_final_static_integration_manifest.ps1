@@ -26,6 +26,53 @@ function Get-RequiredEol {
     return $null
 }
 
+function Get-EolProfile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $crlfCount = 0
+    $bareLfCount = 0
+    $bareCrCount = 0
+    for ($index = 0; $index -lt $bytes.Length; $index++) {
+        if ($bytes[$index] -eq 13) {
+            if ($index + 1 -ge $bytes.Length -or $bytes[$index + 1] -ne 10) { $bareCrCount++ }
+        } elseif ($bytes[$index] -eq 10) {
+            if ($index -gt 0 -and $bytes[$index - 1] -eq 13) { $crlfCount++ } else { $bareLfCount++ }
+        }
+    }
+    $actual = if ($bareCrCount -gt 0 -or ($crlfCount -gt 0 -and $bareLfCount -gt 0)) {
+        'mixed_or_invalid'
+    } elseif ($crlfCount -gt 0) {
+        'crlf'
+    } elseif ($bareLfCount -gt 0) {
+        'lf'
+    } else {
+        'none'
+    }
+    return [ordered]@{
+        actual_eol = $actual
+        crlf_count = $crlfCount
+        bare_lf_count = $bareLfCount
+        bare_cr_count = $bareCrCount
+    }
+}
+
+function Assert-RequiredEolBytes {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$RequiredEol,
+        [Parameter(Mandatory = $true)]$Profile
+    )
+
+    if ($Profile.bare_cr_count -ne 0) { throw "MANIFEST_FAIL: bare CR detected for $Path" }
+    if ($RequiredEol -ceq 'crlf' -and ($Profile.actual_eol -cne 'crlf' -or $Profile.bare_lf_count -ne 0)) {
+        throw "MANIFEST_FAIL: checkout bytes are not CRLF-only for $Path"
+    }
+    if ($RequiredEol -ceq 'lf' -and ($Profile.actual_eol -cne 'lf' -or $Profile.crlf_count -ne 0)) {
+        throw "MANIFEST_FAIL: checkout bytes are not LF-only for $Path"
+    }
+}
+
 $repoRoot = (& git rev-parse --show-toplevel).Trim()
 if ([string]::IsNullOrWhiteSpace($repoRoot)) { throw 'MANIFEST_FAIL: not inside a Git repository' }
 Set-Location -LiteralPath $repoRoot
@@ -60,17 +107,23 @@ $entries = foreach ($relativePath in $files) {
     if ($null -ne $requiredEol -and $attributeEol -cne $requiredEol) {
         throw "MANIFEST_FAIL: EOL policy mismatch for $relativePath expected=$requiredEol actual=$attributeEol"
     }
+    $eolProfile = Get-EolProfile -Path $absolutePath
+    if ($null -ne $requiredEol) { Assert-RequiredEolBytes -Path $relativePath -RequiredEol $requiredEol -Profile $eolProfile }
     [ordered]@{
         path = $relativePath
         checkout_sha256 = (Get-FileHash -LiteralPath $absolutePath -Algorithm SHA256).Hash
         git_blob_sha1 = $blob
         eol_attribute = $attributeEol
         required_eol = if ($null -eq $requiredEol) { 'repository_existing_rule' } else { $requiredEol }
+        actual_eol = $eolProfile.actual_eol
+        crlf_count = $eolProfile.crlf_count
+        bare_lf_count = $eolProfile.bare_lf_count
+        bare_cr_count = $eolProfile.bare_cr_count
     }
 }
 
 $manifest = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     purpose = 'final static integration identity; checkout bytes are authoritative for execution'
     source_commit = $commit
     clean_checkout_verified = $true

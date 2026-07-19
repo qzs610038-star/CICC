@@ -2,10 +2,9 @@
 
 ## 生效事实与总边界
 
-- qzs 本地及远端集合真源均为
-  `codex/qzs-wsc-libaoxun-integration-20260718@182fd6f5c4d628379760d6f4fc74e3b342e30083`；
-  `git status --short --branch` clean，`git diff --check` exit 0，远端以
-  `git ls-remote --heads origin` 回读同一 SHA。
+- 远端交接记录为 `codex/qzs-wsc-libaoxun-integration-20260718@fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；
+  两人的独立个人补丁基线仍固定为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。读取登记与建立补丁
+  使用不同 SHA，不得把 qzs 治理提交并入个人补丁。
 - `a840f0869c11bab0915757d64c56a167f6d4f917`（WSC）与
   `5a61c4cb2932ba1bd1eb86687563eb89d8823845`（libaoxun）均**不是** `182fd6f` 的祖先。
   它们只能作为待拆解的设计输入，禁止直接 merge、rebase、cherry-pick 整条链或将其称为
@@ -44,6 +43,7 @@ libaoxun 原有 `embedded_sw/apb_magic_onchip/{build_apb_probe_evidence.ps1,make
 | libaoxun | `competition_project_single_camera/tools/i0_uart1_wsc_probe_gate.ps1` | APB probe Gate 静态校验器 | 同上 |
 | libaoxun | `competition_project_single_camera/tools/verify_i0_uart1_execution_config.ps1` | 静态执行配置校验器 | 同上 |
 | libaoxun | `competition_project_single_camera/tools/wsc_i0_apb_probe_contract.json` | WSC 契约消费摘要；须链接 WSC SHA | 同上 |
+| libaoxun | `competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1` | 唯一 host orchestrator；只允许离线实现和 mock fixture，负责 `CAPTURE_READY → resume marker` 与 APB timeout/halt/reason/PC Gate | qzs 收口后归还 qzs；硬件模式仍需独立用户授权 |
 | libaoxun | `final_project/docs/review_packets/goal4_i2_apb_magic_probe_review_packet_20260719.md` | 只能追加 libaoxun 证据引用；不得覆盖 WSC 来源段落 | qzs 收口后归还 qzs；WSC 段落保留 WSC 提交归属 |
 
 以下旧提交内容**不在临时授权内**：
@@ -66,5 +66,7 @@ libaoxun 原有 `embedded_sw/apb_magic_onchip/{build_apb_probe_evidence.ps1,make
 
 ## 当前派工状态
 
-`HOLD_FOR_QZS_HANDOFF_TEXT`：登记完成，但尚未向 WSC/libaoxun 发出开始修改的执行指令。
-在 qzs 明确发送新的、基于 `182fd6f` 的个人分支任务书之前，两人只可阅读本登记和回传问题。
+WSC 已固定 `48548f47dfa5964b13aed7edf3b3e9da6f6583a2`，四个临时文件与 fail-closed Host 合同通过
+qzs/Codex 静态复核。libaoxun 的 `2d713b80a41185e472837abaec3a10c01383c70f` 仅接受为
+`BLOCKER_SNAPSHOT`：USER2 OpenOCD 参数语义、host timeout/resume-marker orchestrator 与原始 82/21 evidence
+尚未关闭。允许 libaoxun 在同一分支追加静态修复提交；禁止硬件、JTAG、OpenOCD、GDB、串口或 APB 会话。

@@ -15,6 +15,8 @@
 - WSC：`dev/wsc6090-uart1-cpu-20260719@13419d9922f3f8e7585bd43b77491b81b4bc0681`；集合分支包含其相对 `f47af29` 的 6 个 Host 修复提交。
 - libaoxun：`dev/libaoxun688-uart1-i0-20260719-cleanlf-final@72cc281bd104726d9db1e88cb2894facb1d5fd1a`；以 merge commit `f10cbd3` 原子合入 UART1 Hard SoC、Hello 与构建证据。
 - QZS：`codex/qzs-final-integration-goals-20260718@018ced2a6e7b96c8e1fef85ea6c15d4c1fa77a23`；以 merge commit `03f9750` 合入 Goal 控制面、审查记录和报告草稿。
+- Goal 4 WSC 合同：`dev/wsc6090-goal4-contract-after-qzs-20260719@48548f47dfa5964b13aed7edf3b3e9da6f6583a2`；直接基于 `182fd6f`，四个临时授权文件，fail-closed Host 合同与 G2/classifier 静态复核 PASS。
+- Goal 4 libaoxun 快照：`dev/libaoxun688-goal4-static-20260719@2d713b80a41185e472837abaec3a10c01383c70f`；直接基于 `182fd6f`，仅接受为 `BLOCKER_SNAPSHOT`，未合入集合分支。
 - WSC 根目录四份重复指南已排除；唯一规范版本位于 `learning_guides/接口对齐与数据链路学习/`。
 - 当前结果只属于独立集合分支；该分支可推送到同名远端供协作，但尚未合入正式 `main`。
 - 2026-07-18 用户与三位协作者确认：正式视频/识别路线固定为单摄 J48/ch0，原双摄方案取消；三人文件范围已冻结。
@@ -71,24 +73,26 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 2. idle-drain 仅 Host 验证；真实 I1 单槽、ACK、overrun、CDC 和 APB ABI 未冻结。
 3. I0 UART1 只有同批离线构建与制品身份；USER2、板上 CPU 取指、Type-C UART1 Hello/回显和 APB MAGIC 尚未执行。
 4. CPU→OSD、正式目标输入、板级逐轮事务和 myCobot UART2/J52 均未形成当前批次证据。
-5. libaoxun 已确认其证据主机实际 clone 为 `C:\Users\20306\Desktop\赛题资料\CICC`，Git 顶层、origin 与 clean status 均通过，结论为 `READY_PATH`；这只关闭路径阻塞，集合分支同步、原始制品预检和全部板级项仍未执行。
-6. WSC 已确认 clone `D:\CICC w` 与 origin 身份，但原 `dev/claude-cpu-plan-status-0717` 含 tracked 修改 `final_project/cpu/CPU_MODULE_PLAN.txt`，已在 fetch/switch 前安全停止。该修改必须保留；WSC 后续改用 detached 固定 SHA 独立 worktree，不在原 dirty 工作树切分支。
-7. 最终静态集成仍不能给出新窗口请求：libaoxun 总 verifier 的 `evidence/work/Efinity` 原始 roots 不在本集合 checkout，无法在最终 HEAD 本机复跑；同名远端尚未回读本次最终 SHA。
+5. libaoxun `2d713b80` 的 OpenOCD 参数语义错误：`use_bscan_tunnel 6 1` 中 `6` 是 DM TAP IR width、`1` 是 tunnel type；`set_bscan_tunnel_ir` 应消费 Titanium USER2 外层 IR `0x09`，当前却传入 `8`。因此 `USER2_SELECTION_CHAIN=BLOCKED`。
+6. UART capture 只消费 `RESUME_ONCE` marker，没有受控生产者；APB GDB 只打印 `1000 ms` marker，没有 host timer、timeout 主动 halt 或 halt-reason Gate。唯一 host orchestrator 尚未实现。
+7. libaoxun 原始 build verifier 缺 `efinity_console.log`、四份 Hello/ELF 文本证据及 pre/postflight 共六个 evidence-root 文件，实际 exit 1；`82/21` 仅为 manifest 计数，不能写成 PASS。
+8. qzs 旧 final manifest 将三个 PS1 的 LF 工作树字节写入 checkout SHA，但 `.gitattributes` 要求 CRLF；fresh worktree 会正确签出 CRLF并导致 hash mismatch。生成器/verifier 正在升级为实际字节 EOL 检查。
 
 ## NEXT_GATE
 
-1. 在 libaoxun 证据主机的 clean fixed-SHA worktree 复跑总 verifier，回传实际 roots、命令、exit 与 `inputs=82 artifacts=21`；缺失时保持 `NOT_RERUN_LOCAL`。
-2. 提交最终 manifest/Packet/状态，确认 qzs worktree clean，并推送后以 `git ls-remote --heads origin` 回读最终 SHA。
-3. 仅当 libaoxun、WSC、qzs 三角色的静态目标全 PASS，qzs 才可给出 `VERDICT=READY_FOR_NEW_WINDOW_REQUEST`；该结论不等于硬件授权。
-4. 之后仍须用户明确批准，才可由 libaoxun 作为唯一上板执行者连续完成 USER2 → UART1 Hello/回显 → APB MAGIC；中间不重复确认，不回退 UART0。
-5. I0-SMOKE PASS 后进入受审 I1-I4；UART2/J52、机械臂接线、myCobot 帧和动作继续独立 `NO-GO`。
+1. qzs 完成 actual-byte EOL verifier、fresh-worktree manifest 重生成，并补充授权唯一 `run_i0_uart1_execution_chain.ps1`；该授权仍只覆盖离线实现/mock。
+2. libaoxun 在 `2d713b80` 后追加最小补丁：修正 `width=6/type=1/outer_ir=0x09`，实现 `CAPTURE_READY → resume marker` 与 APB timeout/halt/reason/PC host runner，将 runner/verifier 纳入 manifest。
+3. 在原始证据主机恢复六个固定 hash evidence 文件并复跑总 verifier；若无法恢复，关闭当前 batch 并建立新批次，不得伪造旧日志。
+4. WSC 只读复核 host runner 对 `48548f47` 合同的消费；qzs 再按两个独立 SHA 做最终集成、范围/EOL/manifest 审查。
+5. 仅当三角色静态目标全 PASS，qzs 才可给出 `VERDICT=READY_FOR_NEW_WINDOW_REQUEST`；该结论不等于硬件授权。
+6. 用户之后仍须明确批准，才可由 libaoxun 连续执行 USER2 → UART1 Hello/回显 → APB MAGIC；UART2/J52、机械臂继续独立 `NO-GO`。
 
 ## PENDING_DECISIONS
 
 - 任务二圆柱/锥体真实标定方案与混淆矩阵验收阈值。
 - idle-drain 在真实单槽 I1 中的 wire ACK/flush 编码和跨轮调度规则。
 - I0-SMOKE 的实际 Type-C UART1 枚举端口、板卡/制品批准窗口和失败停止责任人。
-- libaoxun 的板卡/原始制品 READY 报告与 WSC 的 CPU/Hello READY 报告尚未返回；WSC 需先完成 dirty 隔离 worktree。
+- WSC `48548f47` 已返回并通过静态合同复核；libaoxun `2d713b80` 仅为 blocker snapshot，等待 USER2/host runner/82-21 evidence 三项关闭。
 
 ## DEPRECATED_ROUTES
 
@@ -104,11 +108,12 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ## POST_MERGE_REFRESH_REQUIRED
 
-2026-07-19 已按 `libaoxun 72cc281 → WSC 13419d9 → QZS 018ced2` 的固定输入顺序形成集合树并刷新本文件。最终静态 manifest 已从 clean `8f0f618` checkout 生成并由独立 verifier 复查；“7 项例外”已纠正为 11 个跨所有者输入并按来源复核。WSC verifier、接口冻结、分段 team-scope 与 `git diff --check` 已 PASS；libaoxun 总 verifier 当前仅有来源主机 PASS 记录，本机因原始 roots 缺失为 `NOT_RERUN_LOCAL`。因此不得申请新窗口；本状态仍不是正式 `main` 或板级 PASS。
+2026-07-19 Goal 4 follow-up 已固定 WSC `48548f47` 与 libaoxun `2d713b80`。WSC 合同通过；libaoxun 快照主动保持 execution verifier exit 2。Codex 反向审查进一步确认 USER2 OpenOCD 参数误解、缺 host orchestrator、六个原始 evidence 文件缺失，以及 qzs 旧 final manifest 的 LF/CRLF 可复现性问题。qzs 只推进治理/EOL 修复，不合入该 blocker snapshot，不申请硬件窗口。
 
 ## FINAL_GATE_STATUS
 
 ```text
+GOAL4=BLOCKED_EXECUTION_TOOLCHAIN
 USER2=NOT_VERIFIED
 PC=NOT_VERIFIED
 UART1_HELLO_ECHO=NOT_VERIFIED

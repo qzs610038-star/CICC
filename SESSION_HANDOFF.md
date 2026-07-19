@@ -91,3 +91,15 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 - `BLOCKED`：任务二非正方体完整能力；I0 UART1 离线批次已生成，但板级链路仍未验证。
 - `NOT VERIFIED`：USER2、Type-C UART1 Hello/回显、APB MAGIC、真实 I1/APB/CDC、CPU→OSD、正式 RISC-V 板上执行、板级逐轮事务、机械臂闭环。
 - `NOT RUN`：完整 myCobot 非动作矩阵与 PowerShell fail-closed 负例；不影响本次接口/分工冻结 PASS。
+
+## Goal 4 follow-up — 2026-07-19 18:14 +08:00
+
+- qzs 远端交接记录：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；两位个人补丁基线仍为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。
+- WSC `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` 已固定并通过独立复跑：四个临时文件、APB contract、success/timeout/trap/wrong-PC/wrong-reason、G2 `648/648`、classifier `54/54`。原 WSC dirty 未被覆盖。
+- libaoxun `2d713b80a41185e472837abaec3a10c01383c70f` 是直接基于 `182fd6f` 的十文件独立补丁；只接受为 `BLOCKER_SNAPSHOT`，未合入集合分支。
+- USER2 根因已定位为 OpenOCD 参数语义错误：`use_bscan_tunnel 6 1` 是 width/type，`set_bscan_tunnel_ir` 必须消费 USER2 `0x09`；当前候选传入 `8`。Efinity `select_user()` API 不是必须的直接调用桥。
+- libaoxun 还缺统一 host orchestrator：UART capture 没有 resume-marker 生产者，APB GDB 没有真实 1000 ms timeout 主动 halt/halt-reason Gate；原始 82/21 verifier 缺六个 evidence-root 文件并 exit 1。
+- qzs 旧 final manifest 在本机 LF checkout 可 PASS，但 fresh worktree 依据 `.gitattributes` 签出 CRLF 后三个 PS1 hash 失败。生成器/verifier 必须同时检查 attribute 与实际字节，并从 fresh worktree 重生成。
+- 临时所有权新增唯一 `competition_project_single_camera/tools/run_i0_uart1_execution_chain.ps1`，只授权 libaoxun 离线实现和 mock fixture；不授权启动 OpenOCD/GDB/串口/JTAG/APB。
+
+保持：`GOAL4=BLOCKED_EXECUTION_TOOLCHAIN`、`HARDWARE_ACTIONS=NONE`、USER2/PC/UART1/APB 全部 `NOT_VERIFIED`。
