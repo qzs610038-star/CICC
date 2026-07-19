@@ -36,16 +36,23 @@ $hashes = [ordered]@{}
 foreach ($name in $files) {
     $hashes[$name] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $RunDir $name)).Hash
 }
-$hashes['test_source'] = (Get-FileHash -Algorithm SHA256 -LiteralPath $test).Hash
-$hashes['model_source'] = (Get-FileHash -Algorithm SHA256 -LiteralPath $source).Hash
-$hashes['vector_file'] = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $PSScriptRoot 'vectors\p1\p1_contract_vectors.jsonl')).Hash
-$hashes['schema_file'] = (Get-FileHash -Algorithm SHA256 -LiteralPath $SchemaPath).Hash
+function Get-NormalizedTextSha256([string]$Path) {
+    $text = (Get-Content -Raw -LiteralPath $Path) -replace "`r`n", "`n"
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)))).Replace('-','') }
+    finally { $sha.Dispose() }
+}
+$hashes['test_source_lf'] = Get-NormalizedTextSha256 $test
+$hashes['model_source_lf'] = Get-NormalizedTextSha256 $source
+$hashes['vector_file_lf'] = Get-NormalizedTextSha256 (Join-Path $PSScriptRoot 'vectors\p1\p1_contract_vectors.jsonl')
+$hashes['schema_file_lf'] = Get-NormalizedTextSha256 $SchemaPath
 $manifest = [ordered]@{
     schema = 'p1-host-replay-bundle-v1'
     status = 'AWAITING_QZS_REVIEW'
     implementation_git_sha = $ImplementationGitSha
     governance_git_sha = $GovernanceGitSha
     compiler_policy = 'MSVC C11 /W4 /WX'
+    text_hash_policy = 'UTF-8 with CRLF normalized to LF'
     round_count = 20
     task_counts = [ordered]@{'1'=5;'2'=5;'3'=5;'4'=5}
     required_negative_cases = @('ABANDON','TIMEOUT','RESET','NO_SECOND_RESULT')

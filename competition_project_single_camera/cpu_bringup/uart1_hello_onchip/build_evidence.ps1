@@ -68,7 +68,10 @@ try {
     $mapText = $mapText -replace [regex]::Escape($root), '<WORKTREE>'
     $toolchainPattern = [regex]::Escape($ToolchainRoot) -replace '\\\\','[\\/]'
     $mapText = $mapText -replace $toolchainPattern, '<TOOLCHAIN>'
-    (($mapText -split "`r?`n") | ForEach-Object { $_.TrimEnd() }) -join "`n" |
+    $mapLines = @($mapText -split "`r?`n")
+    $debugStart = [Array]::FindIndex($mapLines, [Predicate[string]]{ param($line) $line -match '^\.debug_' })
+    if ($debugStart -gt 0) { $mapLines = @($mapLines[0..($debugStart - 1)]) }
+    (($mapLines | ForEach-Object { $_.TrimEnd() }) -join "`n") |
         Set-Content -NoNewline -Encoding ascii (Join-Path $evidence 'diagnostic.map')
 
     $witness = Join-Path $evidence 'tx-never-ready.json'
@@ -136,6 +139,7 @@ try {
             git_sha=$FirmwareGitSha; input_sha256=$inputHash; build_id_rule='uint32_be(SHA256(normalized input hash lines)[0:4])'
             build_id_hex=('0x' + $buildIdHex.ToUpper()); debug_elf_identity='NON_IDENTITY_LOCAL_BUILD_ONLY'
             identity_artifact='diagnostic.elf (strip-debug, prefix-mapped)'
+            map_policy='loadable layout only; debug sections removed from text evidence'
         }
         artifacts=$artifacts
         memory=[ordered]@{base='0xF9000000';size_bytes=16384;regions=@(
