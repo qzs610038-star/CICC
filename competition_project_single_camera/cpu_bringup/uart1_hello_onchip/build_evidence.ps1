@@ -48,10 +48,12 @@ try {
     & $make clean 2>&1 | ForEach-Object { $_.ToString().TrimEnd() } |
         Set-Content -Encoding ascii (Join-Path $evidence 'clean.txt')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & $make "CFLAGS_ARGS=$prefixFlags" all 2>&1 |
-        ForEach-Object { $_.ToString().TrimEnd() } |
-        Tee-Object (Join-Path $evidence 'strict-build.txt')
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $buildOutput = @(& $make "CFLAGS_ARGS=$prefixFlags" all 2>&1 |
+        ForEach-Object { $_.ToString().TrimEnd() })
+    $buildExit = $LASTEXITCODE
+    $buildOutput | Set-Content -Encoding ascii (Join-Path $evidence 'strict-build.txt')
+    $buildOutput | ForEach-Object { Write-Host $_ }
+    if ($buildExit -ne 0) { exit $buildExit }
     & $objcopy --strip-debug $debugElf $diagnosticElf
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $readelf -h -l -S -s $diagnosticElf | ForEach-Object { $_.TrimEnd() } |

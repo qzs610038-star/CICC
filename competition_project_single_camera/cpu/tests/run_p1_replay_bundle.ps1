@@ -23,8 +23,11 @@ $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
 $compileLog = Join-Path $RunDir 'compile.txt'
 $command = 'pushd "' + $build + '" && call "' + $vcvars + '" x64 >nul && cl.exe /nologo /utf-8 /std:c11 /W4 /WX /I"' +
     $include + '" /Fe"' + $exe + '" "' + $test + '" "' + $source + '" && popd'
-cmd.exe /d /s /c $command 2>&1 | Tee-Object $compileLog
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$compileOutput = @(cmd.exe /d /s /c $command 2>&1 | ForEach-Object { $_.ToString().TrimEnd() })
+$compileExit = $LASTEXITCODE
+$compileOutput | Set-Content -Encoding ascii $compileLog
+$compileOutput | ForEach-Object { Write-Host $_ }
+if ($compileExit -ne 0) { exit $compileExit }
 & $exe $records $rawLog
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
