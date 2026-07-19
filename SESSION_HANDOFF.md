@@ -1,13 +1,13 @@
-# SESSION HANDOFF — 2026-07-18 单摄接口冻结与三人分工确认
+# SESSION HANDOFF — 2026-07-19 Goal 1/2 固定 SHA 集合与 Goal 3 准备
 
 ## 恢复入口
 
 - 分支：`codex/qzs-wsc-libaoxun-integration-20260718`
 - 基线：`main@9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`
-- WSC 来源：`cbe6eafa395a2aa95bee0e86ff9fd3d54490a54f`，本地合并提交 `30d3274`
-- QZS 来源：PR #12 `b3682a4dc824e460b7018cee9d09ef4b52b09a90`，本地合并提交 `60afcbd`
-- libaoxun 来源：PR #13 `5bada18a4079053b0531772b2ab645492043e912`，本地合并提交 `8495859`
-- `main` 未改，远端未推送。恢复后先实读 `git status --short --branch` 和 `CURRENT_STATE.md`。
+- WSC 来源：`dev/wsc6090-uart1-cpu-20260719@13419d9922f3f8e7585bd43b77491b81b4bc0681`
+- libaoxun 来源：`dev/libaoxun688-uart1-i0-20260719-cleanlf-final@72cc281bd104726d9db1e88cb2894facb1d5fd1a`，合并提交 `f10cbd3`
+- QZS 来源：`codex/qzs-final-integration-goals-20260718@018ced2a6e7b96c8e1fef85ea6c15d4c1fa77a23`，合并提交 `03f9750`
+- 固定输入顺序：libaoxun UART1 原子批次 → WSC Host 修复 → QZS 状态刷新。正式 `main` 未改；恢复后先实读 `git status --short --branch`、`git rev-parse HEAD` 和 `CURRENT_STATE.md`。
 
 ## 已完成的集成裁决
 
@@ -20,6 +20,9 @@
 7. 用户与三人确认单摄为唯一正式视频/识别路线，原双摄方案取消。
 8. I0 固定为 SoC UART1 → 板载 Type-C UART1，RX=`GPIOR_96/B12`、TX=`GPIOR_100/D12`、`115200 8N1`；UART0/R0 只保留为历史证据。
 9. 三人文件所有权与精简 Gate 已冻结，见 `docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md`。
+10. Goal 1 已对 libaoxun `72cc281` / batch `I0_UART1_20260719_CLEAN_LF_FINAL` 给出 `APPROVE`；Goal 2 已在 WSC `13419d9` 与该硬件批次的固定组合上复审为 `APPROVE`。
+11. 两个固定分支均已合入集合分支；合并树探测无文本冲突，未拆分 Hard SoC 原子输入。
+12. 用户在 2026-07-19 明确授权本轮集合提交同时纳入 `ppt_doc_outlines/**` 的 Markdown 行尾空格清理；该目录不在旧 `team_scope_check -Role qzs` 白名单，因此静态范围检查会保留 3 项预期 violation，作为治理 WARN 而不是接口/安全越界。
 
 ## 已观察测试结果
 
@@ -27,15 +30,17 @@
 - `single_camera_feature_adapter`：`33/33 PASS`
 - `single_camera_runtime`：`648/648 PASS`
 - G2 bundle validation：`PASS`
-- classifier 直接 Host 入口：`FAIL`，MSVC `/W4 /WX` 下 `test_single_camera_classifier.c` 常量宏断言触发 `C4127`，可执行文件未运行。
-- PowerShell R0 capture 脚本：仅语法解析 `PASS`。
-- 本次接口治理后已补跑离线门禁：`offline_presubmit=PASS_WITH_WARNINGS`（exit 0），接口冻结、context budget、handoff health、G2 bundle/runtime、QEMU skeleton 和 `git diff --check` 均 PASS；freshness 为 7 WARN/0 FAIL。完整 myCobot 非动作矩阵与 PowerShell fail-closed 负例未单独重跑。
+- classifier 直接 Host 入口：`54/54 PASS`；VS2022 `/W4 /WX` 编译并实际运行，旧 `C4127` 阻断已关闭。
+- 以上四项均为 2026-07-19 在合并后的真实工作树 fresh 运行并 exit 0；Host PASS 不证明板级 UART1、APB、OSD 或 RISC-V 执行。
+- Goal 3 `offline_presubmit=PASS_WITH_WARNINGS`（exit 0）：G2 bundle unittest、G2 Host `648/648`、myCobot 非动作 QEMU、接口冻结、context、handoff 与 `git diff --check` 均 PASS；freshness 为 `WARN=8 / FAIL=0`。
+- 沙箱内首次 offline presubmit 因系统 TEMP `PermissionError` 失败；获准在真实环境用同一命令重跑后 PASS，故该失败归类为环境权限证据而非代码回归。
+- `team_scope_check -Role qzs` 报 3 个 `ppt_doc_outlines/**` violation；用户已明确授权一起提交，未改旧白名单，保留为治理 WARN。
 
 ## 硬件与安全状态
 
-- 本次三方集成未改变 FPGA/Hard SoC 八项关键输入 blob，不因合并自动重跑 Efinity，不因合并自动使现有 Hello ELF 失效。
+- 当前集合树已改变并固定 FPGA/Hard SoC UART1 原子输入；旧 UART0/R0 制品因此保持历史状态，不得继承。
 - R0/UART0 已降级为历史批次，不再作为下一 Gate；其 bitstream/ELF、COM12/COM17 和 0-byte 记录不得继承到 UART1。
-- 当前 Hard SoC 仍只有 UART0：`PERI_UART_1=0`，wrapper/`.peri.xml`/`soc.h` 均未生成 UART1。I0 UART1 为 `ROUTE FROZEN / IMPLEMENTATION PENDING`。
+- 当前 Hard SoC 源码与离线制品身份为 UART1：`PERI_UART_0=0`、`PERI_UART_1=1`、`PERI_UART_2=0`，RX/TX=`GPIOR_96/GPIOR_100`；同批 bitstream `D05E...C544`、Hello ELF `919B...F7FA`。其结论仅为 `I0-BUILD APPROVE`，USER2/UART1/APB 仍 `NOT VERIFIED`。
 - UART2/J52、myCobot 接线、帧和动作全部 `NO-GO`；本次没有执行任何硬件或机械臂动作。
 
 ## 三位队友拉取后的第一步
@@ -48,11 +53,10 @@
 4. `competition_project_single_camera/integration/single_camera_feature_contract.md`
 5. `final_project/cpu/CPU_MODULE_PLAN.txt`
 
-三人确认已经完成。下一步按所有权表直接执行：libaoxun 生成 UART1 原子硬件批次，wsc 修复离线 FAIL并在新 `soc.h` 后构建 UART1 Hello，qzs 维护冻结/范围检查和最终证据。固定同一输入 hash 后，USER2、UART1 Hello 与 APB MAGIC 使用一次连续批准，不重复确认。
+三人确认已经完成。下一步先读取 Goal 1/2 审查记录和本次 Goal 3 总门结果；只有集合 SHA、bitstream/ELF hash 与用户批准窗口完全匹配，才连续执行 USER2、UART1 Hello/回显与 APB MAGIC。相同输入 hash 不重复确认，任何 hash、接线或失败现象变化都重开对应 Gate。
 
 ## 下一执行者必须保留的标注
 
-- `FAIL`：classifier MSVC 严格测试入口。
-- `BLOCKED`：任务二非正方体完整能力、I0 UART1 生成与板级链路。
-- `NOT VERIFIED`：真实 I1/APB/CDC、CPU→OSD、正式 RISC-V 集成、板级逐轮事务、机械臂闭环。
+- `BLOCKED`：任务二非正方体完整能力；I0 UART1 离线批次已生成，但板级链路仍未验证。
+- `NOT VERIFIED`：USER2、Type-C UART1 Hello/回显、APB MAGIC、真实 I1/APB/CDC、CPU→OSD、正式 RISC-V 板上执行、板级逐轮事务、机械臂闭环。
 - `NOT RUN`：完整 myCobot 非动作矩阵与 PowerShell fail-closed 负例；不影响本次接口/分工冻结 PASS。

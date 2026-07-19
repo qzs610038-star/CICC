@@ -1,8 +1,8 @@
 # 具身智能机器人芯机协同多场景目标感知与自主操控系统设计 — 技术文档初稿
 
-> **赛事名称**：第十届全国大学生集成电路创新创业大赛  
-> **杯赛名称**：雄芯院杯  
-> **文档属性**：决赛技术设计文档（草稿版 / 盲审版 / 严禁泄露任何高校、导师及个人信息）  
+> **赛事名称**：第十届全国大学生集成电路创新创业大赛
+> **杯赛名称**：雄芯院杯
+> **文档属性**：决赛技术设计文档（草稿版 / 盲审版 / 严禁泄露任何高校、导师及个人信息）
 > **项目状态说明**：V1.2（根据Codex真实性审计更新，降级未验证陈述，纠正 APB 契约与源码，补齐证据属性）
 
 ---
@@ -144,14 +144,14 @@ ch0 framebuffer -> Debayer -> RGB 转换 -> HDMI 物理输出
 ### 5.1 软件仿真与 Host 单元测试 `[Host已验证]`
 *   **验证范围**：在无物理硬核 SoC 依赖下，使用 Host 环境对固件逻辑进行测试回归。
 *   **测试证据及属性**：
-    *   **F1 Host** (213/213 校验)：测试逐轮分拣状态机、20轮回归与 Abandon 策略。  
-        *证据文件*：[run_single_camera_f1_host.ps1](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/cpu/tests/run_single_camera_f1_host.ps1)；  
+    *   **F1 Host** (213/213 校验)：测试逐轮分拣状态机、20轮回归与 Abandon 策略。
+        *证据文件*：[run_single_camera_f1_host.ps1](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/cpu/tests/run_single_camera_f1_host.ps1)；
         *日期/批次*：2026-07-15 / 工作日志 `L814-842`；运行状态：**PASS**。
-    *   **Adapter Host** (33/33 校验)：验证物理契约字段校验及 overrun 溢出安全。  
-        *证据文件*：[run_single_camera_feature_adapter_host.ps1](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/cpu/tests/run_single_camera_feature_adapter_host.ps1)；  
+    *   **Adapter Host** (33/33 校验)：验证物理契约字段校验及 overrun 溢出安全。
+        *证据文件*：[run_single_camera_feature_adapter_host.ps1](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/cpu/tests/run_single_camera_feature_adapter_host.ps1)；
         *日期/批次*：2026-07-15 / 工作日志 `L858-868`；运行状态：**PASS**。
-    *   **Runtime Host** (648/648 校验)：验证 C runtime 整体逻辑在 Host 下的运行。  
-        *证据文件*：由 C runtime 离线环境运行；  
+    *   **Runtime Host** (648/648 校验)：验证 C runtime 整体逻辑在 Host 下的运行。
+        *证据文件*：由 C runtime 离线环境运行；
         *日期/批次*：2026-07-15 / 工作日志 `L836`；运行状态：**PASS**。
     *   **Classifier Host**：颜色与形状分类器的 Host 单测验证。由于 MSVC 严格编译警告 `/W4 /WX` 限制，目前触发 `C4127` 处于 **`FAIL`** 状态（参考 [CURRENT_STATE.md:L37](file:///D:/第十届集创赛-雄芯院材料/CURRENT_STATE.md#L37)）。
 
@@ -161,7 +161,7 @@ ch0 framebuffer -> Debayer -> RGB 转换 -> HDMI 物理输出
 *   **时序与资源数据证据**：
     *   *时序收敛*：Setup 最小 Slack 为 `+1.766ns`，Hold 最小 Slack 为 `+0.026ns`（无 CDC 亚稳态警告）。
     *   *资源消耗*：`EFX_LUT4` = 10887，`EFX_FF` = 9434，`EFX_RAM10` = 163，`EFX_DPRAM10` = 4。
-    *   *证据文件/日期*：[m2_feature_tap_manual_build_board_check_20260715.md](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md)；  
+    *   *证据文件/日期*：[m2_feature_tap_manual_build_board_check_20260715.md](file:///D:/第十届集创赛-雄芯院材料/competition_project_single_camera/docs/debug_sessions/m2_feature_tap_manual_build_board_check_20260715.md)；
     *   *批次 Hash/构建时间*：2026-07-15 15:32:07 / bitstream SHA-256 为 `45427C12AFE874C6032614B3D241EFD3BCBABFF395970D4D80FFFE8165F78535`。
     *   *运行状态*：**PASS (显示链路非回归通过)**。上板烧录后 HDMI 画面正常显示，无任何画面撕裂退化。
 

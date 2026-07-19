@@ -7,6 +7,10 @@
 * [daily_guide_template.md](daily_guide_template.md)：标准卡片式学习指南模板。
 * [no_board_mycobot_maintenance_learning_brief_20260717.md](no_board_mycobot_maintenance_learning_brief_20260717.md)：供 Gemini 扩写的无板机械臂/项目维护学习简报；当前 Gate 以 `CURRENT_STATE.md` 为准。
 * `daily_sync/`：按日期和合并分支归档的子目录。例如：
+  * [daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/)：合并 WSC `13419d9`、libaoxun `72cc281` 与 qzs-final `018ced2` 后的 Goal 1/2 固定 SHA 集合指南；严格区分 I0-BUILD 与板级 I0-SMOKE。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_fpga_vision_front.md)：UART1 Hard SoC 原子批次、管脚与证据分层（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_cpu_arm_control.md)：严格 Host 门、同批 UART1 Hello 与 ARM 禁用（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_system_integration.md)：旧 BLOCKED 时间线、固定 SHA 合并与下一 Gate（面向角色 C）。
   * [daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/)：WSC、QZS PR #12 与 libaoxun PR #13 的固定 SHA 本地集成指南；保留任务二、classifier 和板级证据阻塞标注。
     * [guide_fpga_vision_front.md](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_fpga_vision_front.md)：双批次 manifest、硬件证据和 I1 边界（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_cpu_arm_control.md)：idle-drain ACK、任务二 WAIT 与 Host 结果（面向角色 B）。

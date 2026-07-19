@@ -43,7 +43,7 @@ qzs 的核心产出不是代替 wsc 写 CPU，也不是代替 libaoxun 改 RTL/H
 |---|---|---|---:|---|---|
 | 0 | 建立最终日控制面与证据骨架 | 当前分支 | 30–60 分钟 | PowerShell 7、Git；新增文档通常 < 5 MB | 控制板、证据清单、操作卡草案齐全 |
 | 1 | 审查 libaoxun UART1 原子硬件批次 | libaoxun 固定 SHA 与证据包 | 45–90 分钟 | Git、Efinity 原始日志只读；仓库不收二进制制品 | `APPROVE / CHANGES_REQUESTED / BLOCKED` |
-| 2 | 审查 wsc classifier/Host/UART1 Hello 批次 | wsc 固定 SHA；Goal 1 提供同批 `soc.h` | 已完成 | Git、MSVC/测试日志只读 | `BLOCKED`；见下方执行状态 |
+| 2 | 审查 wsc classifier/Host/UART1 Hello 批次 | wsc 固定 SHA；Goal 1 提供同批 `soc.h` | 已完成 | Git、MSVC/测试日志只读 | `APPROVE`；固定组合见下方执行状态 |
 | 3 | 按固定 SHA 集成并跑离线总门 | Goal 1、2 均 APPROVE | 1–3 小时 | PowerShell、Git、VS2022/QEMU；临时目录使用系统 TEMP | 离线门结果和候选集成 SHA |
 | 4 | 执行一次 I0-SMOKE 证据链 | Goal 3；匹配 hash；用户批准硬件窗口 | 30–90 分钟 | 板卡、Type-C UART1、JTAG；禁止 UART2/J52 | USER2→UART1→APB MAGIC 的 PASS 或单点 FAIL |
 | 5 | 最终状态、handoff、报告/PPT索引 | Goal 3；通常再依赖 Goal 4 | 45–90 分钟 | PowerShell、Git、Markdown | 状态与证据一致、队友可直接接手 |
@@ -60,12 +60,13 @@ Goal 0
 
 Goal 1 与 Goal 2 的队友产出可以并行准备；qzs 的最终接收与合并必须遵循 libaoxun → wsc → qzs 刷新顺序。
 
-### Goal 2 执行状态（2026-07-18）
+### Goal 1 / Goal 2 执行状态（2026-07-19 刷新）
 
-- 状态：**已完成，结论 `BLOCKED`**；审查对象固定为 `dev/wsc6090-uart1-cpu-20260719@35b074c385fa34a588f7168307f360c1f38d7152`。
-- 已关闭/复验：MSVC `/W4 /WX` 下 classifier `54/54`、F1 `213/213`、feature adapter `33/33`、runtime/G2 `648/648` 均真实运行并 exit 0；`ARM_ENABLED=0`，无 UART2/J52 transport 初始化或 myCobot 帧发送。
-- 阻断：没有 Goal 1 APPROVE 的 UART1 原子硬件批次、生成 `SYSTEM_UART_1_*` `soc.h`、UART1 Hello 构建记录或 ELF 身份；当前 UART0 `soc.h` 不得外推为 UART1 证据。
-- 审查记录：[QZS Goal 2 WSC CPU/UART1 审查](QZS_GOAL2_WSC_CPU_UART1_AUDIT_20260718.md)。因此 Goal 3 仍无可消费的 Goal 2 `APPROVE` 输入，不得合并。
+- Goal 1：**已完成，结论 `APPROVE`**；固定为 `dev/libaoxun688-uart1-i0-20260719-cleanlf-final@72cc281bd104726d9db1e88cb2894facb1d5fd1a`、batch `I0_UART1_20260719_CLEAN_LF_FINAL`。
+- Goal 2：**已完成复审，结论 `APPROVE`**；固定为 `dev/wsc6090-uart1-cpu-20260719@13419d9922f3f8e7585bd43b77491b81b4bc0681` 与上述 libaoxun 批次的组合输入。
+- fresh 复验：MSVC `/W4 /WX` 下 classifier `54/54`、F1 `213/213`、feature adapter `33/33`、runtime/G2 `648/648` 均真实运行并 exit 0；`ARM_ENABLED=0`，无 UART2/J52 transport 初始化或 myCobot 帧发送。
+- 离线批准不等于板级批准：USER2、Type-C UART1 Hello/回显、APB MAGIC 仍为 `NOT VERIFIED`。
+- 审查记录：[Goal 1 最终审计](QZS_GOAL1_LIBAOXUN_UART1_I0_BUILD_FINAL_AUDIT_20260719.md)；[Goal 2 WSC CPU/UART1 审查及 2026-07-19 复审](QZS_GOAL2_WSC_CPU_UART1_AUDIT_20260718.md)。Goal 3 仅可消费这两个固定 SHA。
 
 ## 三、统一验收语言
 
@@ -343,12 +344,10 @@ CURRENT_STATE.md 必须记录当前候选 SHA、batch ID、bitstream/ELF hash，
 
 ## 六、推荐执行节奏
 
-1. 现在执行 Goal 0。
-2. 等 libaoxun 提交固定 SHA 后执行 Goal 1。
-3. Goal 2 已完成并 `BLOCKED`；等待 Goal 1 批次与 UART1 Hello 制品后，按同一审查门补齐或重审。
-4. Goal 1、2 均有固定 `APPROVE` 后执行 Goal 3。
-5. 用户明确批准匹配制品的硬件窗口后执行 Goal 4。
-6. 无论 Goal 4 PASS 或 FAIL，都执行 Goal 5，保持真实状态。
-7. 只有 Goal 4 当前批次 PASS 才执行 Goal 6。
+1. Goal 0、Goal 1、Goal 2 已完成；Goal 1/2 当前均为固定 `APPROVE`。
+2. Goal 3 已完成固定 SHA 集成与离线总门：`offline_presubmit=PASS_WITH_WARNINGS`，freshness `WARN=8 / FAIL=0`；用户授权的 3 个 `ppt_doc_outlines/**` 文件作为旧 qzs 白名单外的显式治理例外随最终刷新提交。
+3. Goal 3 提交并核对远端集合 SHA 后，用户明确批准匹配制品的硬件窗口，再执行 Goal 4。
+4. 无论 Goal 4 PASS 或 FAIL，都执行 Goal 5，保持真实状态。
+5. 只有 Goal 4 当前批次 PASS 才执行 Goal 6。
 
 如果任一 Goal 连续失败，不要通过扩大修改范围“救火”；保留单一故障、原始证据和停止点，回到对应负责人处理。
