@@ -94,6 +94,8 @@ WSC 随后回传 clone `D:\CICC w` 与 origin 身份正常，但 `dev/claude-cpu
 
 ## Goal 4 follow-up — 2026-07-19 18:14 +08:00
 
+> **2026-07-20 执行权转移（当前优先）**：本节中 qzs 汇总 READY、请求/签发窗口、WSC 实时判读以及多次交接的执行要求均已失效。用户已将 Goal 4 硬件段交给 libaoxun 证据主机独立闭环；qzs 不再签发硬件执行、也不作为运行前置。唯一当前入口为 `docs/agent_context/GOAL4_LIBAOXUN_SINGLE_OWNER_EXECUTION_20260720.md`；qzs 只在收到完整原始 evidence bundle 后做事后归档。历史结论与 SHA 仍保留，不能被解释为当前板级 PASS。
+
 - qzs 临时登记起点：`fd3fc0881d4e71338f1aa34f361cd498b7cd2d4c`；同名远端当前 HEAD 每次以 `ls-remote` 回读，两位个人补丁基线始终为 `182fd6f5c4d628379760d6f4fc74e3b342e30083`。
 - WSC `48548f47dfa5964b13aed7edf3b3e9da6f6583a2` 已固定并通过独立复跑：四个临时文件、APB contract、success/timeout/trap/wrong-PC/wrong-reason、G2 `648/648`、classifier `54/54`。原 WSC dirty 未被覆盖。
 - libaoxun `2d713b80a41185e472837abaec3a10c01383c70f` 是直接基于 `182fd6f` 的十文件独立补丁；只接受为 `BLOCKER_SNAPSHOT`，未合入集合分支。

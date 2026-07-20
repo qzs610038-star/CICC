@@ -61,6 +61,10 @@ qzs 接管的是最终集成层的 manifest、静态 Gate 转录和治理文档�
 - qzs 保有 I0 operation card、接口冻结检查、team-scope Gate、最终 manifest/Packet 与
   `CURRENT_STATE.md`/`SESSION_HANDOFF.md`。这些是治理产物，不是 CPU 或 Hard SoC 实现。
 
+### 3.2 Goal 4 硬件执行单主机例外（2026-07-20）
+
+用户已将 Goal 4 的 live preflight、volatile JTAG、USER2/PC、UART1 与 APB 只读链，以及原始 evidence bundle 的唯一结论，完整交给 libaoxun 证据主机。qzs 的 operation card/状态文档所有权不等于硬件签发权：qzs 不再要求 READY、签发窗口、实时判读或作为执行前置；若收到完整原始证据，只能事后归档。该例外不修改冻结接口、CPU/RTL/Hard SoC 文件归属，也不放开 UART2/J52、myCobot 或持久化烧录。
+
 最终集成审查不得把全量三方差分交给单一角色判定。`team_scope_check.ps1` 必须用
 `-BaseRef` 和 `-TargetRef` 按固定来源分别运行：libaoxun
 `f47af29..72cc281`、wsc `f47af29..13419d9`，以及 qzs 的独立治理片段

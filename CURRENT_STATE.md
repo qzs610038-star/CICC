@@ -80,18 +80,18 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ## NEXT_GATE
 
-1. qzs 完成 actual-byte EOL verifier、fresh-worktree manifest 重生成，并补充授权唯一 `run_i0_uart1_execution_chain.ps1`；该授权仍只覆盖离线实现/mock。
-2. libaoxun 在 `2d713b80` 后追加最小补丁：修正 `width=6/type=1/outer_ir=0x09`，实现 `CAPTURE_READY → resume marker` 与 APB timeout/halt/reason/PC host runner，将 runner/verifier 纳入 manifest。
-3. 在原始证据主机恢复六个固定 hash evidence 文件并复跑总 verifier；若无法恢复，关闭当前 batch 并建立新批次，不得伪造旧日志。
-4. WSC 只读复核 host runner 对 `48548f47` 合同的消费；qzs 再按两个独立 SHA 做最终集成、范围/EOL/manifest 审查。
-5. 仅当三角色静态目标全 PASS，qzs 才可给出 `VERDICT=READY_FOR_NEW_WINDOW_REQUEST`；该结论不等于硬件授权。
-6. 用户之后仍须明确批准，才可由 libaoxun 连续执行 USER2 → UART1 Hello/回显 → APB MAGIC；UART2/J52、机械臂继续独立 `NO-GO`。
+> **临时探索判据（2026-07-20，当前优先）**：用户暂时放弃窗口与严格 hash 校验。libaoxun 只需在板卡 Type-C UART1、`115200 8N1`、一次新的复位后，于同一原始串口捕获中按顺序看到固定三行 CPU Hello，即记录 `GOAL4=PASS (CPU_HELLO_ONLY)`。操作细节见 `docs/agent_context/GOAL4_LIBAOXUN_HELLO_MINIMUM_OPERATION_CARD_20260720.md`。
+
+1. libaoxun 打开 UART1 串口终端，先开始接收，再复位/启动当前探索镜像。
+2. 三行 Hello 完整且顺序正确即通过；可选单字符 `U` 回显只作 UART 收发强确认，不是本阶段 PASS 必要条件。
+3. 不得用 COM17/CH340/UART0 冒充 UART1；不执行 APB、UART2/J52 或机械臂操作。
+4. qzs 不再签发或汇总硬件执行；收到截图/原始日志后仅事后归档。
 
 ## PENDING_DECISIONS
 
 - 任务二圆柱/锥体真实标定方案与混淆矩阵验收阈值。
 - idle-drain 在真实单槽 I1 中的 wire ACK/flush 编码和跨轮调度规则。
-- I0-SMOKE 的实际 Type-C UART1 枚举端口、板卡/制品批准窗口和失败停止责任人。
+- I0-SMOKE 的实际 Type-C UART1 枚举端口、板卡/制品操作人自证明记录与第一失败停止责任人（均由 libaoxun 证据主机闭环）。
 - WSC `48548f47` 已返回并通过静态合同复核；libaoxun `2d713b80` 仅为 blocker snapshot，等待 USER2/host runner/82-21 evidence 三项关闭。
 
 ## DEPRECATED_ROUTES
@@ -108,7 +108,7 @@ Host PASS 不等于 RISC-V ELF、真实 MMIO/APB、UART、OSD 或板级闭环。
 
 ## POST_MERGE_REFRESH_REQUIRED
 
-2026-07-19 Goal 4 follow-up 已固定 WSC `48548f47` 与 libaoxun `2d713b80`。WSC 合同通过；libaoxun 快照主动保持 execution verifier exit 2。Codex 反向审查进一步确认 USER2 OpenOCD 参数误解、缺 host orchestrator、六个原始 evidence 文件缺失，以及 qzs 旧 final manifest 的 LF/CRLF 可复现性问题。qzs 只推进治理/EOL 修复，不合入该 blocker snapshot，不申请硬件窗口。
+2026-07-20 用户将 Goal 4 硬件段完整转交 libaoxun。旧 `2d713b80` blocker snapshot、qzs 批准窗口和多角色 READY 链不再是执行路径；不可变输入改为 portable runner `2434f013...` 与 WSC 只读合同 `48548f47...`。qzs 不再申请、签发或汇总硬件窗口，只能在收到 libaoxun 原始 evidence bundle 后归档事实。详见 `docs/agent_context/GOAL4_LIBAOXUN_SINGLE_OWNER_EXECUTION_20260720.md`。
 
 ## FINAL_GATE_STATUS
 

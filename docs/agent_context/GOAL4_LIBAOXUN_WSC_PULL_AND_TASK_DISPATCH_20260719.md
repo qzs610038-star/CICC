@@ -6,15 +6,18 @@
 >
 > 两人独立个人补丁基线：`182fd6f5c4d628379760d6f4fc74e3b342e30083`
 >
-> 状态：`TEMPORARY_SCOPE_REGISTERED / NO_DIRECT_WORK_OR_MERGE / HARDWARE_WINDOW_NOT_APPROVED`
+> 状态：`HISTORICAL_DISPATCH_SUPERSEDED_FOR_EXECUTION`
 
-> **2026-07-19 交接覆盖说明**：本文件先前包含的 `e72fb6a` 同步/执行提示仅作历史记录，
+> **2026-07-20 单主机覆盖说明**：本文件的共同同步、双人预检、qzs 汇总/批准、WSC 实时判读与 qzs 收口全部不再是 Goal 4 的执行要求。
+> 当前执行只认 [`GOAL4_LIBAOXUN_SINGLE_OWNER_EXECUTION_20260720.md`](GOAL4_LIBAOXUN_SINGLE_OWNER_EXECUTION_20260720.md)：libaoxun 在硬件证据主机独立运行，qzs 不签发硬件执行。
+>
+> **2026-07-19 历史说明**：本文件先前包含的 `e72fb6a` 同步/执行提示仅作历史记录，
 > 不得再执行。qzs 同名远端当前 HEAD 必须在派工时以 `git ls-remote` 回读；它只承载治理记录，
 > 不改变两人的 `182fd6f` 个人补丁基线，也不授权 cherry-pick、合并、构建或硬件操作。
 > 唯一有效的范围与回收点见
 > [`GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md`](GOAL4_TEMPORARY_OWNERSHIP_REGISTER_20260719.md)。
 
-本文件把 Goal 4 拆成“共同同步 → 双人独立预检 → qzs 汇总 → 用户批准 → libaoxun 单人上板执行 → wsc 判读 → qzs 收口”。它不授权 JTAG、USER2、串口打开、APB 访问或任何机械臂操作。
+本文件保留“共同同步 → 双人预检 → qzs 汇总 → 用户批准 → libaoxun 上板 → WSC 判读 → qzs 收口”的历史派工；它不再授权或阻塞当前执行。当前硬件链仅由 libaoxun 的单主机证据闭环授权；UART2/J52 和机械臂仍不授权。
 
 `D:\第十届集创赛-雄芯院材料` 只是 qzs 主机上的来源路径，不是队友主机必须存在的路径。跨机器执行只认队友实际 Git clone 根目录和仓库相对路径。
 
