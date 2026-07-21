@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 preflight
+
+> This record preserves historical observations only. It is not a current port-identification or hardware-operation card. The active receipt route is UART1 Type-C on `COM17`; `COM10` and `COM13` are prohibited as UART1 candidates.
+
 # M2 UART0 CPU Hello — 新 bitstream 预飞行记录
 
 > 日期：2026-07-16

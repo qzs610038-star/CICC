@@ -5,7 +5,16 @@
 ## 📁 目录结构
 
 * [daily_guide_template.md](daily_guide_template.md)：标准卡片式学习指南模板。
+* [no_board_mycobot_maintenance_learning_brief_20260717.md](no_board_mycobot_maintenance_learning_brief_20260717.md)：供 Gemini 扩写的无板机械臂/项目维护学习简报；当前 Gate 以 `CURRENT_STATE.md` 为准。
 * `daily_sync/`：按日期和合并分支归档的子目录。例如：
+  * [daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/)：合并 WSC `13419d9`、libaoxun `72cc281` 与 qzs-final `018ced2` 后的 Goal 1/2 固定 SHA 集合指南；严格区分 I0-BUILD 与板级 I0-SMOKE。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_fpga_vision_front.md)：UART1 Hard SoC 原子批次、管脚与证据分层（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_cpu_arm_control.md)：严格 Host 门、同批 UART1 Hello 与 ARM 禁用（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-19_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_system_integration.md)：旧 BLOCKED 时间线、固定 SHA 合并与下一 Gate（面向角色 C）。
+  * [daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/)：WSC、QZS PR #12 与 libaoxun PR #13 的固定 SHA 本地集成指南；保留任务二、classifier 和板级证据阻塞标注。
+    * [guide_fpga_vision_front.md](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_fpga_vision_front.md)：双批次 manifest、硬件证据和 I1 边界（面向角色 A）。
+    * [guide_cpu_arm_control.md](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_cpu_arm_control.md)：idle-drain ACK、任务二 WAIT 与 Host 结果（面向角色 B）。
+    * [guide_system_integration.md](daily_sync/2026-07-18_merge_codex_qzs-wsc-libaoxun-integration-20260718/guide_system_integration.md)：固定 SHA、失败标注和队友拉取边界（面向角色 C）。
   * [daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/](daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/)：7 月 8 日合并分支时生成的讲解指南。
     * [guide_fpga_vision_front.md](daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_fpga_vision_front.md)：FPGA与视频前端（面向角色 A）。
     * [guide_cpu_arm_control.md](daily_sync/2026-07-08_merge_dev_pc_arm_v2.12/guide_cpu_arm_control.md)：嵌入式 CPU 控制与通信（面向角色 B）。
@@ -54,6 +63,14 @@
 * [competition_score_maximization_explanation_guide.md](competition_score_maximization_explanation_guide.md)：决赛最大化得分总控方案的大白话通俗解读与决策面板。
 * [mycobot_cpu_board_bringup_explanation_guide.md](mycobot_cpu_board_bringup_explanation_guide.md)：myCobot 机械臂上板主实施方案的大白话通俗解读与分级门禁指南。
 * [m2_preflight_and_risk_guide.md](m2_preflight_and_risk_guide.md)：单摄 M2 预飞行安全门与物理推进风险白话指南。
+
+## 🤝 AI 协作与三岗位学习包（2026-07-17）
+
+* [ai_collaboration_roles_20260717/](ai_collaboration_roles_20260717/)：面向 qzs、wsc、libaoxun 的 Agent 使用与岗位补课指南；以 `competition_project_single_camera/` 的 bring-up 任务为场景，强调接口优先、证据分层、原子批次和安全 Gate。
+  * [guide_agent_common.md](ai_collaboration_roles_20260717/guide_agent_common.md)：全员通用的方案讨论—执行—验收工作流。
+  * [guide_qzs_integration_owner.md](ai_collaboration_roles_20260717/guide_qzs_integration_owner.md)：qzs 的集成负责人、机械臂安全与仓库治理学习重点。
+  * [guide_wsc_cpu_control.md](ai_collaboration_roles_20260717/guide_wsc_cpu_control.md)：wsc 的 CPU、分类、状态机与 ABI/MMIO 学习重点。
+  * [guide_libaoxun_fpga_vision.md](ai_collaboration_roles_20260717/guide_libaoxun_fpga_vision.md)：libaoxun 的视频前端、Hard SoC、CDC 与构建证据学习重点。
 
 ---
 

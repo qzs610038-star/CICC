@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 operator card
+
+> This document is retained only as a FAIL_STOP history index. It is not executable. The current route is UART1 Type-C on `COM17`; `COM10` and `COM13` are prohibited as UART1 candidates. See `CURRENT_STATE.md` and `../review_packets/CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md`.
+
 # M2 UART0 CPU Hello — 板级操作卡
 
 > 适用范围：只关闭 `competition_project_single_camera/` 的隔离 CPU UART0 Hello。

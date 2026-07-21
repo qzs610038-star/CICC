@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 capture preparation
+
+> This preparation record is not a UART1 tool or approval. The legacy UART0 capture script is hard-blocked; wait for the libaoxun fixed-SHA UART1 H0-H6 package.
+
 # M2 UART0 横幅监听守卫 — 离线准备记录
 
 > 日期：2026-07-16

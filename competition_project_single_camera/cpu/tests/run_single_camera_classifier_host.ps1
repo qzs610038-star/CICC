@@ -6,12 +6,6 @@ $include = Join-Path $cpuRoot 'include'
 $classifier = Join-Path $cpuRoot 'src\single_camera_classifier.c'
 $f1 = Join-Path $cpuRoot 'src\single_camera_f1.c'
 $test = Join-Path $PSScriptRoot 'test_single_camera_classifier.c'
-$build = Join-Path $PSScriptRoot 'build'
-$exe = Join-Path $build 'test_single_camera_classifier.exe'
-
-$gcc = (Get-Command gcc -ErrorAction Stop).Source
-New-Item -ItemType Directory -Force -Path $build | Out-Null
-& $gcc -std=c11 -Wall -Wextra -Werror "-I$include" $test $classifier $f1 -o $exe
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& $exe
-exit $LASTEXITCODE
+. (Join-Path $PSScriptRoot 'host_test_compiler.ps1')
+Invoke-StrictCHostTest -Name 'test_single_camera_classifier' -IncludeDir $include -TestFile $test -Sources @($classifier, $f1)
+exit $script:HostTestExitCode

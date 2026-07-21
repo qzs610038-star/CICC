@@ -243,6 +243,33 @@ git status --short --branch
 5. Efinity每次构建记录Map/PNR/Setup/Hold/CDC/warning/bitstream，不把Map PASS写成板级PASS。
 6. 机械臂相关动作必须另附安全Gate和Review Packet；本日志只引用，不替代安全记录。
 
+### [R0-01] 当前批次 USER2/APB 前置制品身份核验
+
+- 时间：2026-07-17（Asia/Shanghai）。
+- 触发：用户批准执行“真实摄像头 -> FPGA 同帧统计 -> APB0 -> 板上 CPU 分类 -> UART0 输出”的最小闭环，并要求从 R0 开始。
+- 目标：在不编辑 RTL、不启动调试器或串口的前提下，确认当前 `main` 有可用于 R0 的匹配 bitstream/Hello ELF。
+- 输入基线：实读 `main@9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`；G1 冷构建有效基线 `489ab5b0c1773bfcb776cedd9f39b3f088fb4a0f`。
+- 实际动作：运行交接健康检查、读取 G1 Packet、比较 `489ab5b..HEAD` 的单摄输入差异、重算当前工程和历史外部证据位置的 bitstream/ELF SHA-256；未启动 Programmer/OpenOCD/GDB/串口，未选择 USER1/USER2。
+- 修改文件：新增 `docs/debug_sessions/evidence/r0_current_batch_artifact_identity_blocker_20260717.md`；本条仅追加工作日志。未修改 RTL、XML、SDC、IP、BSP、用户未提交 README 或最小闭环计划。
+- D盘写入：无。
+- 结果：`BLOCKED`。G1 输入相对当前 HEAD 未变化，G1 冻结批次应为 bitstream `A897...1ACD` 与 ELF `E5BC...1928`；但本机 `outflow/mem_test.bit=3B118...4D93`、Hello ELF=`2A71...C448`，且外部 G1 制品已缺失，均不可作为当前 R0 制品。
+- 证据：`docs/debug_sessions/evidence/r0_current_batch_artifact_identity_blocker_20260717.md`、`docs/review_packets/G1_EFINITY_COLD_BUILD_REVIEW_PACKET_20260717_0307.md`。
+- NOT VERIFIED：USER2、CPU 取指、UART0、APB MAGIC、视频、真实识别及所有 R1-R5 项均未执行。
+- 下一步门禁：由受控 Efinity 环境重新生成当前 HEAD 匹配的 bitstream/ELF，并冻结 hash、Map/Interface/PNR/STA/CDC 和 warning 分类；匹配制品可得前不得开始任何 USER2/SRAM 或串口动作。
+
+### [R0-02] 当前 HEAD 隔离冷构建与 Hello ELF 重建
+
+- 时间：2026-07-17（Asia/Shanghai）。
+- 触发：R0-01 发现当前工作区旧 `outflow/mem_test.bit` 和 Hello ELF 不匹配当前冻结批次。
+- 目标：在不触及主工作区、旧生成物或板卡的条件下，重新建立当前 `main@9acf4d8` 的可审计 FPGA/Hello 制品。
+- 实际动作：新建隔离 worktree `codex/r0-current-batch-build-20260717` 与外部输出/工作目录，使用 Efinity 2025.2.288.4.15 执行完整 compile flow，并在同一隔离 worktree 重建片上 RAM Hello ELF。
+- 修改文件：主工作区未改 RTL/XML/SDC/IP/BSP；新增 `docs/review_packets/R0_CURRENT_HEAD_COLD_BUILD_REVIEW_PACKET_20260717.md`。Efinity 仅在隔离 worktree 的 `mem_test.xml` 回写 `last_change` 时间戳，已保留作审计，未混入源码。
+- 外部写入：仅 `<external-r0-evidence>` 的临时输出、work 与原始日志；未修改仓库 `outflow/`。
+- 结果：`PASS`（离线构建层）。Map/Interface/PNR/STA/CDC/bitstream 完成，setup/hold 为 `+1.321/+0.026 ns`，CDC 无 synchronizer warning；当前批次 bitstream=`9F6F...8F320`，Hello ELF=`CD4C...9411B`。
+- 证据：`docs/review_packets/R0_CURRENT_HEAD_COLD_BUILD_REVIEW_PACKET_20260717.md`。
+- NOT VERIFIED：FPGA 配置、USER2、CPU 取指、UART0、APB MAGIC、视频与识别闭环均未执行。
+- 下一步门禁：仅使用上述同批 bitstream/ELF 进入 USER2/SRAM R0 操作卡审查；不得用历史 `outflow` 或旧 hash 替代。
+
 ### [M0-07] 用户现场反馈：真实画面偏绿、模糊与拍屏伪影初判
 
 - 触发：用户提供已烧录后的 HDMI 画面截图，并反馈“有真实画面，但是画面有点偏绿，有点模糊，不知道是不是摄像机像素低的问题”。
@@ -1309,3 +1336,25 @@ git diff --check
 - 文档收敛：更新 `CURRENT_STATE.md`、`AGENTS.md`、`CLAUDE.md`、`fpga_vision`/`cpu_mycobot` Skills、Review Packet，并生成 2026-07-16 A/B/C 三轨学习指南；不再要求队友重复补交已存在的 Hard SoC 真源。
 - 安全边界：未烧录、未连接机械臂、未运行任何动作。USER2 实际连接、片上 RAM 取指、UART0 115200 横幅与回显仍为 `NOT VERIFIED`。
 - 下一门：仅使用匹配的新 bitstream、FPGA `USER2` 与片上 RAM Hello 完成 UART0 横幅/回显；禁止 `USER1`、Flash、外部 DDR、UART2/J52 和机械臂。
+### [R0-20260717] Current-batch USER2/APB pass, UART0 banner blocker
+
+- Batch: `main@9acf4d8b2ec788ccd5777f3833a7bfb756c51cad`; bitstream `9F6F254E33C803C0F1B6D2F3CAB1929496477D9CBEE4655EC680A91B4028F320`; Hello ELF `CD4CAB96D3C30ECDC085B5C5A36B175DCED0016FBD53929BB0E2D3741E29411B`.
+- PASS: matching volatile JTAG configuration, USER2 tunnel IR 9, four QCRV32 harts, SRAM load plus `PC=0xF9000000`, and APB `0xE8100000=0x375A0001`.
+- UART attempt: concurrent read-only COM10 and COM13 listeners (115200 8N1, flow none, DTR/RTS false) began before the approved bounded `continue`. Both ports opened, both received zero bytes, and both recorded `uart_bytes_sent=0`.
+- Decision: `R0 BLOCKED_AT_UART0_BANNER`; no R1/R2/R3/R4/R5 work. No USER1, Flash/SPI, external DDR, UART2/J52, myCobot, OSD, PC classification, or UART transmit.
+- Evidence: `docs/debug_sessions/evidence/r0_uart0_synchronized_banner_blocker_20260717.md`.
+
+### [R0-20260718] UART0 CH340 passive receive retry
+
+- User correction: UART0 is connected to the PC through a USB-to-TTL CH340 adapter; FTDI COM10/COM13 are not the UART0 receive route and their zero-byte passive check is excluded from the UART0 decision.
+- Correct candidates: CH340 `COM12` at Windows location `1-9` and CH340 `COM17` at `1-4.1`, both VID:PID `1A86:7523`.
+- Capture: both ports were opened concurrently at 115200 8N1, no flow control, DTR/RTS disabled, with zero transmitted bytes. The 30-second window at `17:37:54..17:38:24` and the 60-second window at `17:39:10..17:40:10` each received zero bytes on both ports.
+- Decision: `UART0 HELLO NOT OBSERVED / R0 REMAINS BLOCKED`. The run does not independently prove that CPU/SoC reset occurred inside either capture window and does not yet distinguish port selection, TX/RX/GND wiring, E10 routing, or UART TX generation.
+- Safety: no Programmer, OpenOCD, GDB, USER1/USER2, Flash, external DDR, UART2/J52, myCobot, UART transmit, RTL, XML, SDC, IP, or firmware action occurred.
+- Evidence: `docs/debug_sessions/evidence/r0_uart0_ch340_passive_listen_20260718.md`.
+# [CPU_HELLO_UART1_20260721] Current candidate supersession record
+
+- Current route is SoC UART1 → Type-C UART1, `115200 8N1`, RX=`GPIOR_96/B12`, TX=`GPIOR_100/D12`, on-chip RAM=`0xF9000000..0xF9003FFF`.
+- Team-confirmed port identity is `COM17` for Type-C UART1 CH340. `COM10` and `COM13` are J44/USER FTDI and are prohibited as UART1 candidates.
+- Team-confirmed H3 route is TAP ID `0x006A0EF3`, BSCAN `6,1`, inner IR `9`. Old UART0/R0, old COM mappings, inner IR `8`, CPU TAP `0x006A0A79`, and prior batch narratives are `HISTORICAL / SUPERSEDED`.
+- This record does not claim H4/H5, CPU Hello, APB, I1/APB/CDC, CPU→OSD, UART2/J52, or myCobot PASS. See `CURRENT_STATE.md` and `docs/review_packets/CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md`.

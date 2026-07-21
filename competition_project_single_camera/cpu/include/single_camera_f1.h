@@ -16,9 +16,20 @@ typedef enum {
 typedef enum {
     SC_SHAPE_UNKNOWN = 0,
     SC_SHAPE_CUBE = 1,
-    SC_SHAPE_CYLINDER = 2,
-    SC_SHAPE_CONE = 3
+    SC_SHAPE_CYLINDER = 2, /* Uncalibrated diagnostic — keeps F1 in WAIT. */
+    SC_SHAPE_CONE = 3      /* Uncalibrated diagnostic — keeps F1 in WAIT. */
 } sc_shape_t;
+
+/* Production-reliable shape gate: only CUBE is trusted for task decisions in phase A.
+   CYLINDER and CONE are Host-synthetic heuristics without real-camera calibration;
+   they are DIAGNOSTIC labels only and must not produce terminal business SKIP/EXECUTE.
+   UNKNOWN also keeps the controller in WAIT/ACQUIRING. Consequently, task 2
+   remains BLOCKED for non-cube inputs until real-camera calibration; timeout or
+   explicit operator abandon are the only terminal paths for those inputs. */
+#define SC_SHAPE_IS_RELIABLE_CUBE(s) ((s) == SC_SHAPE_CUBE)
+/* DIAGNOSTIC only — not a production-trusted non-cube verdict. */
+#define SC_SHAPE_IS_DIAGNOSTIC_NON_CUBE(s) \
+    ((s) == SC_SHAPE_CYLINDER || (s) == SC_SHAPE_CONE)
 
 typedef struct {
     sc_color_t color;

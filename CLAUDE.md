@@ -43,6 +43,7 @@ Claude 开始任务时依次读取：
 ## REQUIRED_BOUNDARY_POINTERS
 
 - FPGA/CPU/PC 职责：`AGENTS.md`「分赛区决赛系统架构硬边界」。
-- 当前单摄 Gate、UART0/myCobot 波特率和禁止项：`CURRENT_STATE.md`。
+- 当前单摄 Gate、I0 UART1/myCobot UART2 波特率和禁止项：`CURRENT_STATE.md`。
+- 冻结接口与 wsc/libaoxun/qzs 文件范围：`docs/agent_context/TEAM_INTERFACE_FREEZE_AND_FINAL_DAY_OWNERSHIP_20260719.md`。
 - 合并治理：`docs/merge_governance/`。
 - 模块细则：`.agents/skills/fpga_vision/SKILL.md`、`.agents/skills/cpu_mycobot/SKILL.md`。

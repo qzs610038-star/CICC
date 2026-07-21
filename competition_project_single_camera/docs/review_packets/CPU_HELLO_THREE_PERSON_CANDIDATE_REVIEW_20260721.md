@@ -1,5 +1,7 @@
 # CPU Hello 三人集成候选审查包（2026-07-21）
 
+> SUPERSEDED: this pre-UART1 candidate packet is retained as history. The active receipt and integration packet is `CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md`; its `CURRENT_STATE.md` status governs all H0-H6 claims.
+
 ## 结论
 
 本提交是供三人继续集成的 **本地候选**，尚未推送、尚未合入 `main`。

@@ -4,11 +4,11 @@
 >
 > 日期：2026-07-15
 >
-> 状态：`HOST CONTRACT VERIFIED / FPGA-SoC-APB NOT IMPLEMENTED`
+> 状态：`HOST CONTRACT VERIFIED / FEATURE RTL PRESENT BUT DISCONNECTED / BOARD NOT VERIFIED`
 
 ## 1. 目的与边界
 
-此文档是单摄候选工程唯一的 FPGA 到板上 CPU 基础特征契约。它定义 CPU
+此文档是正式单摄视频/识别工程唯一的 FPGA 到板上 CPU 基础特征契约。它定义 CPU
 分类器所需的统计语义，不定义 APB 地址、`soc.h` 宏、IRQ、UART 命令、OSD
 寄存器格式或机械臂接口。
 
@@ -112,6 +112,10 @@ ch0 framebuffer -> debayer_top_2to1 -> rgb0_data_rgb -> HDMI
    帧视为不稳定。
 6. 像素域到 CPU/总线域必须使用经审查的 multi-bit snapshot CDC 或异步 FIFO。
    不得逐字段直接打两拍后自行拼接。
+7. Host runtime 的集成裁决允许在本轮结果已经锁存后，对成功读取的同一
+   `frame_id` 做 release-only ACK：只释放单槽并更新帧序，不再分类或提交结果。
+   这只是待审语义，不是已冻结 wire ABI；真实 APB/CDC 必须另行定义如何区分
+   业务消费 ACK 与终态释放，并覆盖撕裂、错 ACK、overrun 和跨轮行为。
 
 ## 6. F1 Host 映射
 
@@ -142,19 +146,22 @@ sc_features_t -> sc_classify_features() -> sc_observation_t
 | ch0 Debayer 后 RGB tap 位置 | 已由真实 `src/top.v` 审计 |
 | 画面旁路不回压原则 | 已冻结 |
 | `sc_features_t` 和 Host 分类器 | 已实现并 Host 测试 |
-| FPGA 统计 RTL | 未实现 |
-| SoC/APB/CDC/ACK 硬件 | 未实现，且 Hard SoC PLL 冲突未关闭 |
-| 正式地址/`soc.h`/IRQ | 未定义，禁止手填 |
+| FPGA 统计 RTL | 源码与 testbench 已存在；顶层 `i_capture_enable=1'b0`，ACK 固定关闭，输出 unused |
+| Hard SoC / `soc.h` / APB0 MAGIC | 源码与同批生成物已存在；仅离线冷构建有证据，板级仍未验证 |
+| 业务 APB/CDC/ACK/result/OSD | 未实现；当前 feature 不可由 CPU 读取 |
+| 正式业务地址/IRQ | 未定义，禁止手填；`IO_APB_SLAVE_0_INPUT` 只作为同批 APB0 MAGIC 候选基址，尚未板级实读 |
 | 板级特征、五色准确率、OSD | 未验证 |
 
 ## 8. 后续实施门禁
 
-开始 RTL 前必须同时满足：
+开始 feature/APB/CDC/OSD 业务接入前必须同时满足：
 
-1. 用户批准新增的 feature tap 小 Gate；
-2. 先补独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出和 ACK
-   不匹配；
-3. RTL 仅新增旁路统计模块及受控顶层连接，不修改 framebuffer、Debayer、HDMI、
-   `constrain.sdc`、`mem_test.xml`、`.peri.xml` 或 IP；
-4. 初次综合/PNR 必须回传资源、Setup、Hold、CDC 和 HDMI 回归证据；
-5. SoC 未合法生成前，feature RTL 不得伪装为 CPU 可读 APB 外设。
+1. 新 UART1 原子批次完成后，在一次批准窗口内连续通过 USER2、Type-C UART1 Hello/回显与既有 APB MAGIC 实读；
+2. 用户批准包含 feature、目标/事件、result/OSD 的最小 F1 原子批次 Review Packet；
+3. 保留并扩展独立 RTL testbench，覆盖双像素展开、ROI 边界、帧锁存、溢出、
+   ACK 不匹配、CDC 和 APB 访问方向；
+4. RTL 只做受审旁路统计及业务通道连接，不修改 framebuffer、Debayer、HDMI
+   数据路径；若 `constrain.sdc`、`mem_test.xml`、`.peri.xml`、IP 或顶层发生变化，
+   必须作为同一原子批次重开全部构建和板级证据；
+5. 初次综合/PNR 必须回传资源、Setup、Hold、CDC 和 HDMI 回归证据；
+6. 业务地址与 `soc.h` 未同批冻结前，feature RTL 不得伪装为 CPU 可读 APB 外设。

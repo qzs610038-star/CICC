@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 Hello guide
+
+> This guide is not executable. Current CPU Hello governance is UART1 Type-C, with H0-H6 evidence receipt controlled by `../review_packets/CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md`.
+
 # M2 UART0 片上 RAM Hello 上板操作说明
 
 ## 当前前提

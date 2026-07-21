@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 USER2/RAM card
+
+> Retained for historical FAIL_STOP traceability only. It must not define the I0 UART1 H3/H4 route; current route facts are recorded in `CURRENT_STATE.md`.
+
 # M2 UART0 CPU Hello — USER2 片上 RAM 下载操作卡
 
 > 目标：仅证明 QCRV32 可经 `JTAG_USER2` 下载并停在固定 Hello ELF 的片上 RAM 入口。

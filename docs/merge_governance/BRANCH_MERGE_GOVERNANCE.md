@@ -20,7 +20,7 @@
 
 | 内容领域 | 优先来源 | 裁决规则 |
 |---|---|---|
-| FPGA、Hard SoC、IP、工程 XML、约束、顶层硬件连接、时钟/复位、JTAG、UART0、APB、Efinity 构建与板级硬件结论 | `@libaoxun688` 的批准固定提交 | 采用其匹配的硬件配置与硬件结论；任何变更都重开对应制品和板级 Gate。 |
+| FPGA、Hard SoC、IP、工程 XML、约束、顶层硬件连接、时钟/复位、JTAG、I0 UART1、APB、Efinity 构建与板级硬件结论 | `@libaoxun688` 的批准固定提交 | 采用其匹配的硬件配置与硬件结论；原子输入变化才重开对应制品 Gate，同一输入 hash 不重复确认。 |
 | CPU 代码基础架构、CPU 分类/任务状态机、结果语义、固件构建策略、CPU→APB/OSD 软件契约 | `@wsc6090-CPU` 的批准固定提交 | 采用其 CPU 设计/代码意图，但必须适配已批准的 Hard SoC 硬件 ABI。 |
 | myCobot 协议、动作序列、点位、夹爪、速度、互锁、超时/重试、异常停机、机械臂安全策略，以及仓库最终集成与核心约束 | `@qzs610038-star` 当前本地 `main` | 保留本地实现和安全策略；其他来源只能提出可审计补丁，不得隐式覆盖。 |
 
@@ -88,13 +88,13 @@ M0 的固定审查步骤：
 6. 不手改 `mem_test.xml`、`.peri.xml`、`constrain.sdc` 或 IP settings；不把 Map PASS 写成 M0、PNR、STA、CDC、bitstream 或板级 PASS；
 7. 对最终补丁执行 `git diff --check`，并在 libaoxun 的实际 Efinity 工程语义下重测路径修复。
 
-`dev/wsc6090-cpu-g4a-20260716` 不在上述 M0 范围内。它若改变 UART0 Hello 源码/构建，将导致当前 ELF hash、操作卡和预检器失效；只有 `@qzs610038-star` 明确将其列入某次审查范围后，才可作为独立 CPU 候选处理。
+`dev/wsc6090-cpu-g4a-20260716` 不在上述 M0 范围内。它改变的是已退役 UART0 Hello 源码/构建，只能作为历史候选，不得进入新的 I0 UART1 批次。
 
 ## 6. `@qzs610038-star` 的机械臂与仓库治理责任
 
 `@qzs610038-star` 的本地 `main` 是 myCobot 控制实现、机械臂安全策略、最终仓库集成和核心约束的优先来源。其范围包括协议帧、波特率、点位、动作序列、夹爪、速度限制、互锁、超时、重试、异常停机和防重复触发。
 
-任何来源都不得借 CPU Hello、FPGA 构建或 Host/Mock 测试推断 UART2/J52/myCobot 可用。UART0 的 115200 验证与 myCobot 的 1000000 baud 控制是独立 Gate；未确认电平、接线、安全姿态、急停/断电方式和用户明确授权前，禁止输出机械臂动作命令。
+任何来源都不得借 CPU Hello、FPGA 构建或 Host/Mock 测试推断 UART2/J52/myCobot 可用。I0 UART1 的 115200 验证与 myCobot UART2 的 1000000 baud 控制是独立 Gate；未确认电平、接线、安全姿态、急停/断电方式和用户明确授权前，禁止输出机械臂动作命令。
 
 涉及实际动作、夹爪、FPGA-to-机械臂接线/电平、CP210x 驱动或 `pymycobot` 控制脚本的补丁，必须先形成 Codex Review Packet。PC 工具仅用于调试、标定、健康检查、日志和录像，不能进入正式识别/控制闭环。
 

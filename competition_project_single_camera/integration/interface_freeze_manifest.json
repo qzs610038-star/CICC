@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "frozen_at": "2026-07-18",
+  "baseline_commit": "0c7530fd9090b1e198679410832f7e6af120df09",
+  "approval_phrase": "确认接口文件修改，已经和wsc、libaoxun、qzs沟通。",
+  "i0": {
+    "soc_uart": "UART1",
+    "board_route": "Type-C UART1",
+    "rx": "GPIOR_96/B12",
+    "tx": "GPIOR_100/D12",
+    "baud": 115200,
+    "format": "8N1",
+    "implementation_state": "ROUTE_FROZEN_IMPLEMENTATION_PENDING"
+  },
+  "files": [
+    {
+      "path": "competition_project_single_camera/integration/I0_UART1_INTERFACE_FREEZE.md",
+      "sha256": "A1F83E66CC9C5DC1EC57728568CD758C46C970232235BD067ABE72ADA3E79042"
+    },
+    {
+      "path": "competition_project_single_camera/integration/F1_INTERFACE_ALIGNMENT_DRAFT.md",
+      "sha256": "CB36D5273DD79A185DED6E54E7F1882ACD5779AF712F428A1CE7026F6018E1C7"
+    },
+    {
+      "path": "competition_project_single_camera/integration/F1_INTERFACE_CONFIRMATION_REGISTER.md",
+      "sha256": "E8313C846722C467F061558587ED883B8FB10F6AAB46474FC75BA950DA5E2759"
+    },
+    {
+      "path": "competition_project_single_camera/integration/single_camera_feature_contract.md",
+      "sha256": "7866964EDB7DACBD2622100734C48B19AE395CC299AB13F2CD44AC1AF9160987"
+    },
+    {
+      "path": "competition_project_single_camera/cpu/include/single_camera_classifier.h",
+      "sha256": "736278265C701A9B745935894C52B3F3B2B25F5CF48BDA1C245516628AC07FC5"
+    },
+    {
+      "path": "competition_project_single_camera/cpu/include/single_camera_feature_adapter.h",
+      "sha256": "23847E7204D9D3F7945975915B37DA961EDEF82C56322096F927A92E37F994D5"
+    },
+    {
+      "path": "competition_project_single_camera/cpu/include/single_camera_f1.h",
+      "sha256": "E4754B8B51BB90133148498859F7C5C16CF56D7960BBBAF595C8764E4A563675"
+    },
+    {
+      "path": "competition_project_single_camera/cpu/include/single_camera_runtime.h",
+      "sha256": "C476EBEA1C55DED157FD750F4F29AD255A9B59A2B6234D565A7407916E0548B5"
+    }
+  ],
+  "surfaces": [
+    {
+      "path": "competition_project_single_camera/src/feature_stats/feature_stats_tap.v",
+      "kind": "verilog_module_header_and_flag_constants",
+      "sha256": "8A48D27643891F2E3F9F42C8E028099A97992071E0EA79CE48E940A400F9FB22"
+    }
+  ]
+}

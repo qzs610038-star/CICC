@@ -1,6 +1,6 @@
 # final_project Current Code Architecture
 
-> 历史快照（2026-07-07）。本文中的“当前”仅表示当日工作树；CPU 代码、ch1 预处理旁路和当前视频故障边界已在 2026-07-09 至 2026-07-11 发生变化。请优先阅读 [current_code_architecture_2026-07-11.md](current_code_architecture_2026-07-11.md) 与根目录 `CURRENT_STATE.md`。
+> 历史快照（2026-07-07）。本文中的“当前”仅表示当日工作树；2026-07-18 团队已取消双摄方案并固定 `competition_project_single_camera/` 单摄 J48/ch0 为唯一正式视频/识别路线。请优先阅读根目录 `CURRENT_STATE.md`。
 
 Date: 2026-07-07
 

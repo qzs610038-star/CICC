@@ -33,8 +33,9 @@
 - 这是 `HOST VERIFIED` 的纯软件核心，尚不是板上 CPU、UART、APB 或 OSD。
 - 尺寸固定为 `SIZE_UNAVAILABLE`，任务三/四只能显示不可用或人工放弃，不得
   产生执行授权。
-- 圆柱/锥体细分门限仅为未标定启发式；F1 只将可靠的 `CUBE/NON_CUBE` 用于
-  任务判定，现场标定前不得将圆柱/锥体细分作为得分能力宣称。
+- 圆柱/锥体细分门限仅为未标定诊断标签；F1 只信任 `CUBE`，圆柱/锥体保持
+  `WAIT`，只能由超时或人工放弃结束。任务二完整能力保持 `BLOCKED`，现场
+  标定和混淆矩阵完成前不得将圆柱/锥体细分作为得分能力宣称。
 - `ARM_ENABLED=0`；任何 `EXECUTE` 都只表示 F1 应显示 `ARM_DISABLED`，绝不
   发送机械臂请求。
 - runtime seam 的 `source=fake_transport` 仅证明 Host/fake 事务；它不证明 RISC-V ELF、

@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — UART0 troubleshooting summary
+
+> Historical failure records remain intact, but none of their COM mappings, UART0 route conclusions, or old batch identities define the current UART1 H0-H6 route.
+
 # 2026-07-17 M2 USER2/UART0 CPU Hello 排障日志汇总
 
 > 范围：`competition_project_single_camera/` 的隔离 CPU Hello 候选工程。
