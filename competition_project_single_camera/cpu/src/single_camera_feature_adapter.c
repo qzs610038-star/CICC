@@ -11,10 +11,12 @@ int sc_feature_snapshot_is_usable(const sc_feature_snapshot_t *snapshot)
     uint8_t rejected = SC_FEATURE_FLAG_DIAG_ACTIVE |
                        SC_FEATURE_FLAG_COUNTER_OVERFLOW |
                        SC_FEATURE_FLAG_SNAPSHOT_OVERRUN;
+    const uint8_t reserved = 0x80u;
 
     if (snapshot == 0) return -1;
     if ((snapshot->source_flags & required) != required) return -1;
     if (snapshot->source_flags & rejected) return -1;
+    if (snapshot->source_flags & reserved) return -1;
     if (snapshot->features.roi_pixel_count == 0u) return -1;
     return 0;
 }
