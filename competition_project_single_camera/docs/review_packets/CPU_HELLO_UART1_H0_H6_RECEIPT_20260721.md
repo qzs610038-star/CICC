@@ -23,15 +23,28 @@ This packet is the only receipt gate for the next libaoxun fixed commit. It uses
 | H3 USER2/DTM | raw DTM/Target-examined markers for TAP/BSCAN/inner-IR route | `WAITING_LIBAOXUN_FIXED_SHA` |
 | H4 RAM/Hello TX | ELF SHA-256; PC gate; one resume; raw three-line UART1 bytes; exit/status | `WAITING_LIBAOXUN_FIXED_SHA` |
 | H5 RX echo | one approved printable byte sent once and exactly one identical byte echoed | `WAITING_LIBAOXUN_FIXED_SHA` |
-| H6 APB handoff | not run, or an explicit reason and separate APB review reference | `NOT_VERIFIED` |
+| H6 minimum non-destructive failure triage | only after an H0–H5 failure: earliest failed stage, already-captured raw failure-window index, exact tool exit/marker and classification; no new board action | `NOT_INVOKED` when H0–H5 close; otherwise `WAITING_TRIAGE_RECEIPT` |
+| APB MAGIC (independent Gate) | not part of H0–H6; requires its own CPU-owned review and evidence | `NOT_VERIFIED` |
 
 ## Fixed-commit intake checklist
 
 - Remote ref, complete commit SHA, parent SHA, baseline SHA, actual changed-file list.
 - Bitstream, Hello ELF and `soc.h` SHA-256; Efinity/OpenOCD/GDB/execution-tool identity; commands, timestamps, exit codes and warnings.
-- H0–H6 evidence above; preserved indices for all failed windows; remaining `NOT VERIFIED` items.
+- H0–H5 evidence above; H6 receipt only when invoked; preserved indices for all failed windows; remaining `NOT VERIFIED` items.
 - Declaration of no Flash, DDR, USER1, UART0, `COM10`, `COM13`, APB, UART2/J52 or myCobot scope breach.
 - Git payload limited to source, reproducible scripts, manifest/verifier, sanitized evidence summary, raw-evidence index and SHA-256. No binary payloads, outflow/work trees, temporary databases, private board configuration or unsanitized raw logs.
+
+## Interface mutation matrix
+
+| Surface | H0–H5 normal verification | Allowed current changes |
+|---|---|---|
+| UART1 route, baud, pins and on-chip RAM range | Frozen; no redesign | None |
+| `I0_UART1_INTERFACE_FREEZE.md`, F1 headers/register, feature contract and freeze manifest | Frozen; no ABI change | None |
+| `src/feature_stats/feature_stats_tap.v` ports, parameters, field widths and flag encoding | Frozen; no wire-ABI change | None |
+| XML/IP/SDC/top/BSP/`soc.h`/APB atomic inputs | H0–H5 only verifies the submitted batch | Only a complete fixed-SHA atomic batch with all invalidation consequences recorded |
+| Host runners, manifest/verifier and sanitized evidence/governance documents | Not an interface redesign | Scope-bounded compatibility, receipt and audit changes only |
+
+Any change to a frozen row requires the complete user authorization phrase: `确认接口文件修改，已经和wsc、libaoxun、qzs沟通。` The authorization does not turn Host results into board evidence and does not authorize APB, UART2/J52 or myCobot actions.
 
 ## Supersession matrix
 

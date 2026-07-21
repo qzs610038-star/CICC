@@ -4,7 +4,7 @@
 
 - 候选分支：`codex/qzs-wsc-libaoxun-cpuhello-candidate-20260721`。
 - 当前纳入来源：`origin/codex/qzs-wsc-libaoxun-integration-20260718@0e5ab490559c58642734b0095753c6cf8787c709`。
-- P1 来源已保留在本候选历史中；Host 回放与 tamper 资产不得被 UART1 接入覆盖。
+- P1 来源为“预存候选 P1，用户授权保留”；Host 回放与 tamper 资产不得被 UART1 接入覆盖，也不得归属为任一成员的本轮新增实现。
 - 合并登记仅在实际进入 `main` 后写入 `docs/merge_governance/MERGE_REGISTER.md`。
 
 ## 当前路线与替代关系
@@ -16,12 +16,13 @@
 
 ## 状态边界
 
-- I0-BUILD、H0、H1、H2、H3、H4、H5、APB MAGIC、I1/APB/CDC、CPU→OSD、UART2/J52/myCobot 必须逐层记录，任何前层不得替代后层。
+- I0-BUILD、H0、H1、H2、H3、H4、H5、H6、APB MAGIC、I1/APB/CDC、CPU→OSD、UART2/J52/myCobot 必须逐层记录，任何前层不得替代后层。
 - 仅 H4/H5 完整闭合后可写 CPU Hello PASS；H5 不授权 APB，APB 不授权 I1、OSD 或机械臂。
+- H6 仅在 H0–H5 出现失败时记录最小非破坏性故障判别；H0–H5 全闭合时必须为 `NOT_INVOKED`。
 - 当前固定状态见 `CURRENT_STATE.md`：`CPU_HELLO=WAITING_LIBAOXUN_FIXED_SHA`、`BOARD_PASS=NOT_CLAIMED`、`APB_MAGIC=NOT_VERIFIED`、`I1_APB_CDC=NOT_VERIFIED`、`CPU_TO_OSD=NOT_VERIFIED`、`UART2_J52_MYCOBOT=NO_GO`。
 
 ## 下一执行者
 
 1. 先读取 `CURRENT_STATE.md`、`competition_project_single_camera/docs/review_packets/CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md` 和 `docs/agent_context/LIBAOXUN_UART1_NEXT_STAGE_HANDOFF_20260721.md`。
 2. 等待 libaoxun 提供完整 SHA、父提交、改动文件、同批 SHA-256、H0–H5 原始证据索引和禁止项声明。
-3. 只按固定 SHA 审查；合并后执行 fresh 门禁，更新本文件和 `CURRENT_STATE.md`，由用户决定提交与推送。
+3. qzs 只按固定 SHA 审查并合入；完成 fresh 门禁、更新本文件和 `CURRENT_STATE.md`、推送结果 HEAD 后，libaoxun 才能拉取结果进入随后获授权的独立板级阶段。

@@ -8,7 +8,9 @@ param(
 
     [string]$TargetRef = 'HEAD',
 
-    [switch]$ListPolicy
+    [switch]$ListPolicy,
+
+    [string]$ProvenanceFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,6 +66,14 @@ if ($ListPolicy) {
     exit 0
 }
 
+function Test-RolePathAllowed {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    foreach ($pattern in $allowed) {
+        if ($Path -match $pattern) { return $true }
+    }
+    return $false
+}
+
 & git -C $repoRoot rev-parse --verify --quiet $BaseRef *> $null
 if ($LASTEXITCODE -ne 0) {
     throw "TEAM_SCOPE_FAIL: invalid base ref: $BaseRef"
@@ -71,6 +81,83 @@ if ($LASTEXITCODE -ne 0) {
 & git -C $repoRoot rev-parse --verify --quiet $TargetRef *> $null
 if ($LASTEXITCODE -ne 0) {
     throw "TEAM_SCOPE_FAIL: invalid target ref: $TargetRef"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ProvenanceFile)) {
+    if ($Role -ne 'qzs') {
+        throw 'TEAM_SCOPE_FAIL: merge provenance mode is defined only for qzs candidate integration review'
+    }
+    if (-not (Test-Path -LiteralPath $ProvenanceFile -PathType Leaf)) {
+        throw "TEAM_SCOPE_FAIL: provenance file not found: $ProvenanceFile"
+    }
+
+    try {
+        $provenance = Get-Content -LiteralPath $ProvenanceFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        throw "TEAM_SCOPE_FAIL: invalid provenance JSON: $($_.Exception.Message)"
+    }
+    if ($provenance.schema -ne 'cpu-hello-merge-provenance-v1') {
+        throw 'TEAM_SCOPE_FAIL: unsupported provenance schema'
+    }
+
+    $anchor = [string]$provenance.merge_anchor
+    $uart1Parent = [string]$provenance.uart1_parent
+    $candidateParent = [string]$provenance.candidate_parent
+    foreach ($ref in @($anchor, $uart1Parent, $candidateParent)) {
+        & git -C $repoRoot rev-parse --verify --quiet $ref *> $null
+        if ($LASTEXITCODE -ne 0) { throw "TEAM_SCOPE_FAIL: invalid provenance ref: $ref" }
+    }
+    $anchorParents = @((& git -C $repoRoot show -s --format=%P $anchor).Trim().Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries))
+    if ($anchorParents -notcontains $uart1Parent -or $anchorParents -notcontains $candidateParent) {
+        throw 'TEAM_SCOPE_FAIL: merge anchor parents do not match provenance parents'
+    }
+    & git -C $repoRoot merge-base --is-ancestor $anchor $TargetRef
+    if ($LASTEXITCODE -ne 0) { throw 'TEAM_SCOPE_FAIL: target is not descended from merge anchor' }
+
+    $preserved = @($provenance.preserved_candidate_p1_paths | ForEach-Object { [string]$_ })
+    $resolutionPaths = @($provenance.qzs_merge_resolution_paths | ForEach-Object { [string]$_ })
+    $postAnchorExceptions = @($provenance.post_anchor_qzs_exception_paths | ForEach-Object { [string]$_ })
+    $anchorPaths = @(& git -C $repoRoot diff --name-only --diff-filter=ACMR $uart1Parent $anchor -- |
+        ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $_ -replace '\\', '/' } } |
+        Sort-Object -Unique)
+    $violations = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($path in $anchorPaths) {
+        if (Test-RolePathAllowed -Path $path) { continue }
+        if ($resolutionPaths -contains $path) { continue }
+        if ($preserved -contains $path) {
+            $anchorBlob = (& git -C $repoRoot rev-parse "$anchor`:$path" 2>$null).Trim()
+            $candidateBlob = (& git -C $repoRoot rev-parse "$candidateParent`:$path" 2>$null).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($anchorBlob) -and $anchorBlob -eq $candidateBlob) { continue }
+            $violations.Add("anchor preserved-path blob mismatch: $path")
+            continue
+        }
+        $violations.Add("anchor unassigned path: $path")
+    }
+
+    $postPaths = New-Object 'System.Collections.Generic.List[string]'
+    @(& git -C $repoRoot diff --name-only --diff-filter=ACMR $anchor $TargetRef --) |
+        ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $postPaths.Add(($_ -replace '\\', '/')) } }
+    if ($TargetRef -eq 'HEAD') {
+        @(& git -C $repoRoot diff --name-only --diff-filter=ACMR $TargetRef --) |
+            ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $postPaths.Add(($_ -replace '\\', '/')) } }
+        @(& git -C $repoRoot diff --cached --name-only --diff-filter=ACMR $TargetRef --) |
+            ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $postPaths.Add(($_ -replace '\\', '/')) } }
+        @(& git -C $repoRoot ls-files --others --exclude-standard) |
+            ForEach-Object { if (-not [string]::IsNullOrWhiteSpace($_)) { $postPaths.Add(($_ -replace '\\', '/')) } }
+    }
+    $postPaths = @($postPaths | Sort-Object -Unique)
+    foreach ($path in $postPaths) {
+        if ((Test-RolePathAllowed -Path $path) -or $postAnchorExceptions -contains $path) { continue }
+        $violations.Add("post-anchor out-of-scope path: $path")
+    }
+    if ($violations.Count -gt 0) {
+        foreach ($violation in $violations) { Write-Host "FAIL: $violation" }
+        Write-Host "TEAM_SCOPE=FAIL role=$Role mode=merge-provenance anchor_paths=$($anchorPaths.Count) post_anchor_paths=$($postPaths.Count) violations=$($violations.Count)"
+        exit 1
+    }
+    Write-Host "TEAM_SCOPE=PASS role=$Role mode=merge-provenance anchor=$anchor anchor_paths=$($anchorPaths.Count) post_anchor_paths=$($postPaths.Count)"
+    exit 0
 }
 
 $paths = New-Object 'System.Collections.Generic.List[string]'
@@ -88,14 +175,7 @@ if ($TargetRef -eq 'HEAD') {
 $changedPaths = @($paths | Sort-Object -Unique)
 $violations = New-Object 'System.Collections.Generic.List[string]'
 foreach ($path in $changedPaths) {
-    $isAllowed = $false
-    foreach ($pattern in $allowed) {
-        if ($path -match $pattern) {
-            $isAllowed = $true
-            break
-        }
-    }
-    if (-not $isAllowed) { $violations.Add($path) }
+    if (-not (Test-RolePathAllowed -Path $path)) { $violations.Add($path) }
 }
 
 if ($violations.Count -gt 0) {

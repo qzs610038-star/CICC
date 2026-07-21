@@ -8,6 +8,16 @@ static int checks;
 static int failures;
 static FILE *raw_log;
 
+static int open_binary_write(FILE **out, const char *path)
+{
+#if defined(_MSC_VER)
+    return fopen_s(out, path, "wb");
+#else
+    *out = fopen(path, "wb");
+    return *out == NULL ? 1 : 0;
+#endif
+}
+
 #define CHECK(expr) do { checks++; if (!(expr)) { failures++; \
     printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #expr); } } while (0)
 
@@ -818,7 +828,7 @@ int main(int argc, char **argv)
 {
     FILE *requested_raw_log = 0;
     if (argc == 3 && strcmp(argv[1], "--raw-log") == 0) {
-        if (fopen_s(&requested_raw_log, argv[2], "wb") != 0 || requested_raw_log == 0) return 2;
+        if (open_binary_write(&requested_raw_log, argv[2]) != 0 || requested_raw_log == 0) return 2;
     }
     test_normal_target_and_non_target();
     test_bad_flags_and_overrun_fail_closed();

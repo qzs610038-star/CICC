@@ -16,6 +16,16 @@ typedef enum {
     TERMINAL_TIMEOUT = 2
 } terminal_kind_t;
 
+static int open_binary_write(FILE **out, const char *path)
+{
+#if defined(_MSC_VER)
+    return fopen_s(out, path, "wb");
+#else
+    *out = fopen(path, "wb");
+    return *out == NULL ? 1 : 0;
+#endif
+}
+
 typedef struct {
     sc_task_t task;
     sc_color_t target_color;
@@ -308,9 +318,9 @@ int main(int argc, char **argv)
     unsigned i;
 
     if (argc != 4) return 2;
-    if (fopen_s(&records, argv[1], "wb") != 0 || records == NULL) return 2;
-    if (fopen_s(&log, argv[2], "wb") != 0 || log == NULL) { fclose(records); return 2; }
-    if (fopen_s(&negative, argv[3], "wb") != 0 || negative == NULL) { fclose(records); fclose(log); return 2; }
+    if (open_binary_write(&records, argv[1]) != 0 || records == NULL) return 2;
+    if (open_binary_write(&log, argv[2]) != 0 || log == NULL) { fclose(records); return 2; }
+    if (open_binary_write(&negative, argv[3]) != 0 || negative == NULL) { fclose(records); fclose(log); return 2; }
     p1_input_init(&input);
     if (init_runtime(&fake, &runtime) != 0 || run_ack_negative_cases(log) != 0 ||
         run_tamper_case(negative) != 0) return 1;

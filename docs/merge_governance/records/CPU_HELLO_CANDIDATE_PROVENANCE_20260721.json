@@ -1,0 +1,37 @@
+{
+  "schema": "cpu-hello-merge-provenance-v1",
+  "merge_anchor": "46e9b0d3a257c71f3c415094e1128e0e89fbd0c8",
+  "uart1_parent": "0e5ab490559c58642734b0095753c6cf8787c709",
+  "candidate_parent": "58640581669305e2df0d57d3964edc8f6a6d640f",
+  "preserved_candidate_p1_owner": "preexisting_candidate_p1_user_authorized",
+  "preserved_candidate_p1_source_commit": "eb76110a2aa336d4da7daf9feea6368b7b4c9521",
+  "preserved_candidate_p1_paths": [
+    "competition_project_single_camera/cpu/src/p1_host_model.c",
+    "competition_project_single_camera/cpu/src/p1_host_model.h",
+    "competition_project_single_camera/cpu/src/single_camera_feature_adapter.c",
+    "competition_project_single_camera/cpu/tests/p1_replay_runner.c",
+    "competition_project_single_camera/cpu/tests/run_p1_host_model.ps1",
+    "competition_project_single_camera/cpu/tests/run_p1_replay_bundle.ps1",
+    "competition_project_single_camera/cpu/tests/test_p1_host_model.c",
+    "competition_project_single_camera/cpu/tests/test_single_camera_feature_adapter.c",
+    "competition_project_single_camera/cpu/tests/validate_p1_vectors.ps1",
+    "competition_project_single_camera/cpu/tests/vectors/p1/calibration_analysis.csv",
+    "competition_project_single_camera/cpu/tests/vectors/p1/p1_contract_vectors.jsonl",
+    "competition_project_single_camera/cpu/tests/verify_p1_replay_manifest.ps1"
+  ],
+  "qzs_merge_resolution_paths": [
+    "competition_project_single_camera/cpu/tests/run_single_camera_feature_adapter_host.ps1",
+    "competition_project_single_camera/cpu/tests/test_p1_replay_manifest_verifier.ps1",
+    "competition_project_single_camera/WORK_LOG.md"
+  ],
+  "post_anchor_qzs_exception_paths": [
+    "competition_project_single_camera/cpu/tests/p1_replay_runner.c",
+    "competition_project_single_camera/cpu/tests/test_single_camera_runtime.c"
+  ],
+  "constraints": [
+    "Every anchor path must be allowed by qzs policy, an unchanged preserved candidate P1 blob, or an explicit qzs merge-resolution path.",
+    "Every post-anchor path must be allowed by qzs policy or an explicit scope-bounded compatibility exception.",
+    "This record does not transfer P1 implementation ownership to qzs, wsc, or libaoxun.",
+    "This record does not authorize a frozen-interface change, board action, APB probe, UART2/J52 action, or myCobot action."
+  ]
+}

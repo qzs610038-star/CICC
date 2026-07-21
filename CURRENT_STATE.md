@@ -27,6 +27,7 @@
 | H3 USER2/DTM | `TEAM_CONFIRMED_ROUTE_PENDING_FIXED_EVIDENCE` | 不等于 RAM load 或 CPU resume |
 | H4 RAM load、PC gate、resume、UART1 TX Hello | `WAITING_LIBAOXUN_FIXED_SHA_AND_BOARD_EVIDENCE` | 不等于 RX echo 或 APB |
 | H5 UART1 RX echo | `WAITING_LIBAOXUN_FIXED_SHA_AND_BOARD_EVIDENCE` | 不等于 APB |
+| H6 最小非破坏性故障判别 | `NOT_INVOKED_UNLESS_H0_TO_H5_FAIL` | 只记录最早失败层、既有原始失败窗口和工具标记；不是 APB Gate，也不授权新动作 |
 | APB MAGIC | `NOT_VERIFIED` | 不等于 I1/APB/CDC |
 | I1/APB/CDC | `NOT_VERIFIED` | 不等于 CPU→OSD |
 | CPU→OSD | `NOT_VERIFIED` | 不等于机械臂许可 |
@@ -37,7 +38,7 @@
 1. 唯一等待输入是 libaoxun 的固定提交 SHA、同批源码/制品 identity、H0–H5 原始证据索引和脱敏摘要；接收要求见 `competition_project_single_camera/docs/review_packets/CPU_HELLO_UART1_H0_H6_RECEIPT_20260721.md`。
 2. 在固定 SHA 到达前，不得把 H4/H5、`CPU_HELLO`、`BOARD_PASS`、`APB_MAGIC`、`I1_APB_CDC` 或 `CPU_TO_OSD` 写为 PASS。
 3. P1 Host 与所有 Host/mock 回归只证明离线软件行为；不得作为 RISC-V、UART1、APB、OSD 或板级闭环证明。
-4. H4/H5 与所有后续板级 Gate 保持 `NOT VERIFIED`，直到固定 SHA 的证据接收表闭合。
+4. H4/H5 与所有后续板级 Gate 保持 `NOT VERIFIED`，直到固定 SHA 的证据接收表闭合；H0–H5 全部闭合时 H6 必须记为 `NOT_INVOKED`。
 5. myCobot 链路速率 `1000000` 与 UART1 CPU Hello 路线独立；当前仍为 NO-GO，禁止外推或执行动作。
 
 ## NEXT_GATE
@@ -45,12 +46,13 @@
 1. qzs 按完整 SHA 审查 libaoxun 提交的父提交、实际文件、原子输入、manifest/verifier 和 H0–H5 证据。
 2. 若 XML、IP、SDC、top、BSP、`soc.h` 或 APB 输入变更，作为完整原子批次审查；旧 bitstream、ELF、Map/PNR/STA/CDC、warning 和板级记录全部失效。
 3. 合并后 fresh 重跑 P1、adapter、classifier、F1、runtime/G2、manifest/tamper、offline presubmit、freeze、freshness、handoff 与 `git diff --check`；结果只以新合并 HEAD 实跑值记录。
-4. 仅当 H0–H5 证据闭合后，才可写 `CPU_HELLO=PASS`。H5 PASS 仍不等于 APB PASS。
+4. 仅当 H0–H5 证据闭合后，才可写 `CPU_HELLO=PASS`；H6 仅在前序失败时记录最小非破坏性诊断。H5 PASS 仍不等于 APB PASS。
 
 ## PENDING_DECISIONS
 
 - 是否在收到 libaoxun 固定 SHA 后接受其完整原子批次，取决于 H0–H5 证据、构建输入和 scope 声明的审查结果。
 - 在 H5 关闭前，CPU Hello、APB MAGIC、I1/APB/CDC 和 CPU→OSD 均不得标记 PASS。
+- H0–H5 正常验证不修改冻结接口；允许范围与完整口令要求见 H0–H6 接收表中的接口修改矩阵。
 
 ## DEPRECATED_ROUTES
 
